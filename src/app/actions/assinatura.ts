@@ -1,0 +1,290 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/prisma";
+import { exigirUsuario } from "@/lib/auth";
+import { registrarAuditoria } from "@/lib/auditoria";
+import { getGateway, type FormaPagamento, type Plano, PRECO_PLANO } from "@/lib/gateway";
+import { normalizarCnpj } from "@/lib/validators";
+
+type Result = { erro?: string; ok?: boolean; cobrancaId?: string };
+
+// Garante customerId no gateway pra esta conta
+async function garantirCustomer(contaId: string) {
+  const conta = await prisma.conta.findUnique({
+    where: { id: contaId },
+    include: {
+      empresas: { take: 1 },
+      usuarios: { take: 1 },
+    },
+  });
+  if (!conta) throw new Error("Conta não encontrada.");
+
+  if (conta.gatewayCustomerId) return { conta, customerId: conta.gatewayCustomerId };
+
+  const empresa = conta.empresas[0];
+  const usuario = conta.usuarios[0];
+  if (!empresa || !usuario) throw new Error("Cadastre uma empresa antes de assinar.");
+
+  const gateway = await getGateway();
+  const { customerId } = await gateway.criarCliente({
+    contaId,
+    nome: empresa.razaoSocial,
+    email: usuario.email,
+    cpfCnpj: normalizarCnpj(empresa.cnpj),
+    telefone: empresa.telefones,
+    endereco: empresa.endereco,
+  });
+
+  const atualizada = await prisma.conta.update({
+    where: { id: contaId },
+    data: { gatewayCustomerId: customerId, gatewayProvider: gateway.nome },
+  });
+
+  return { conta: atualizada, customerId };
+}
+
+export async function iniciarCheckoutAction(_p: Result | null, formData: FormData): Promise<Result> {
+  const usuario = await exigirUsuario();
+  if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins podem alterar a assinatura." };
+
+  const plano = String(formData.get("plano") || "BASICO") as Plano;
+  const forma = String(formData.get("forma") || "PIX") as FormaPagamento;
+  if (!["BASICO", "PREMIUM"].includes(plano)) return { erro: "Plano inválido." };
+  if (!["PIX", "BOLETO", "CARTAO_CREDITO"].includes(forma)) return { erro: "Forma de pagamento inválida." };
+
+  const valor = PRECO_PLANO[plano];
+  const competencia = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+  const vencimento = new Date(Date.now() + 3 * 86400000); // 3 dias
+
+  try {
+    const { customerId } = await garantirCustomer(usuario.contaId);
+
+    const cobrancaInterna = await prisma.cobranca.create({
+      data: {
+        contaId: usuario.contaId,
+        competencia,
+        plano,
+        forma,
+        valor,
+        vencimento,
+        status: "PENDENTE",
+      },
+    });
+
+    const gateway = await getGateway();
+    const cartao =
+      forma === "CARTAO_CREDITO"
+        ? {
+            numero: String(formData.get("cartaoNumero") || "").replace(/\s/g, ""),
+            nome: String(formData.get("cartaoNome") || ""),
+            validadeMes: Number(formData.get("cartaoValidadeMes") || 0),
+            validadeAno: Number(formData.get("cartaoValidadeAno") || 0),
+            cvv: String(formData.get("cartaoCvv") || ""),
+          }
+        : undefined;
+
+    const result = await gateway.criarCobranca({
+      customerId,
+      cobrancaIdInterno: cobrancaInterna.id,
+      valor,
+      vencimento,
+      forma,
+      descricao: `CP System — Plano ${plano} (${competencia})`,
+      cartao,
+    });
+
+    const cobrancaAtualizada = await prisma.cobranca.update({
+      where: { id: cobrancaInterna.id },
+      data: {
+        gatewayChargeId: result.chargeId,
+        gatewayInvoiceUrl: result.invoiceUrl || null,
+        pixQrCode: result.pixQrCode || null,
+        pixCopiaCola: result.pixCopiaCola || null,
+        boletoUrl: result.boletoUrl || null,
+        status: result.status,
+      },
+    });
+
+    // Salva últimos dígitos do cartão (PCI-DSS: nunca o PAN inteiro)
+    if (cartao) {
+      const ultimos = cartao.numero.slice(-4);
+      const bandeira = detectarBandeira(cartao.numero);
+      await prisma.metodoPagamento.create({
+        data: {
+          contaId: usuario.contaId,
+          forma: "CARTAO_CREDITO",
+          apelido: `${bandeira} final ${ultimos}`,
+          bandeira,
+          ultimosDigitos: ultimos,
+          validadeMes: cartao.validadeMes,
+          validadeAno: cartao.validadeAno,
+          padrao: true,
+        },
+      });
+    }
+
+    // Se já foi paga (cartão aprovado), atualiza status da conta
+    if (cobrancaAtualizada.status === "PAGA") {
+      await ativarPlano(usuario.contaId, plano);
+    }
+
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "CRIAR",
+      recurso: "Cobranca",
+      recursoId: cobrancaAtualizada.id,
+      resumo: `${forma} R$ ${valor} ${plano} → ${cobrancaAtualizada.status}`,
+    });
+
+    revalidatePath("/conta/assinatura");
+    return { ok: true, cobrancaId: cobrancaAtualizada.id };
+  } catch (err) {
+    return { erro: err instanceof Error ? err.message : "Erro no checkout." };
+  }
+}
+
+export async function cancelarAssinaturaAction(_p: Result | null, _formData: FormData): Promise<Result> {
+  const usuario = await exigirUsuario();
+  if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
+
+  await prisma.conta.update({
+    where: { id: usuario.contaId },
+    data: {
+      statusAssinatura: "CANCELADA",
+      proximoVencimento: null,
+      bloqueadoEm: new Date(),
+    },
+  });
+
+  // Cancela cobranças pendentes no gateway
+  const pendentes = await prisma.cobranca.findMany({
+    where: { contaId: usuario.contaId, status: "PENDENTE" },
+  });
+  const gateway = await getGateway();
+  for (const c of pendentes) {
+    if (c.gatewayChargeId) {
+      try {
+        await gateway.cancelarCobranca(c.gatewayChargeId);
+      } catch {
+        // segue
+      }
+      await prisma.cobranca.update({ where: { id: c.id }, data: { status: "CANCELADA" } });
+    }
+  }
+
+  await registrarAuditoria({
+    contaId: usuario.contaId,
+    usuarioId: usuario.id,
+    acao: "ATUALIZAR",
+    recurso: "Assinatura",
+    resumo: "Cancelada pelo cliente",
+  });
+
+  revalidatePath("/conta/assinatura");
+  redirect("/conta/assinatura");
+}
+
+// Marcar plano como ativo após confirmação de pagamento
+export async function ativarPlano(contaId: string, plano: Plano) {
+  const proximo = new Date();
+  proximo.setMonth(proximo.getMonth() + 1);
+  await prisma.conta.update({
+    where: { id: contaId },
+    data: {
+      plano,
+      statusAssinatura: "ATIVA",
+      proximoVencimento: proximo,
+      bloqueadoEm: null,
+    },
+  });
+  revalidatePath("/dashboard");
+  revalidatePath("/conta/assinatura");
+}
+
+// Régua de cobrança — manualmente acionada pelo admin no MVP
+// Em produção: cron job (Vercel Cron, GitHub Actions, etc.)
+export async function executarReguaCobrancaAction(_p: Result | null, _formData: FormData): Promise<Result> {
+  const usuario = await exigirUsuario();
+  if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
+
+  const hoje = new Date();
+  const em3dias = new Date(hoje.getTime() + 3 * 86400000);
+
+  // 1. Cobranças vencendo em 3 dias → enviar aviso (registra log; integração WhatsApp/email vem depois)
+  const aVencer = await prisma.cobranca.findMany({
+    where: { status: "PENDENTE", vencimento: { gte: hoje, lte: em3dias } },
+    include: { conta: { include: { usuarios: { take: 1 } } } },
+  });
+  for (const c of aVencer) {
+    await registrarAuditoria({
+      contaId: c.contaId,
+      acao: "ATUALIZAR",
+      recurso: "Cobranca",
+      recursoId: c.id,
+      resumo: `Aviso de vencimento enviado (TODO: e-mail/WhatsApp) — ${c.conta.usuarios[0]?.email || "?"}`,
+    });
+  }
+
+  // 2. Cobranças vencidas há mais de 3 dias → marcar ATRASADA
+  const ha3dias = new Date(hoje.getTime() - 3 * 86400000);
+  const vencidas = await prisma.cobranca.findMany({
+    where: { status: "PENDENTE", vencimento: { lt: ha3dias } },
+  });
+  for (const c of vencidas) {
+    await prisma.cobranca.update({ where: { id: c.id }, data: { status: "ATRASADA" } });
+  }
+
+  // 3. Contas com cobrança ATRASADA há mais de 7 dias → bloquear
+  const ha7dias = new Date(hoje.getTime() - 7 * 86400000);
+  const aBloquear = await prisma.cobranca.findMany({
+    where: { status: "ATRASADA", vencimento: { lt: ha7dias } },
+    distinct: ["contaId"],
+  });
+  for (const c of aBloquear) {
+    await prisma.conta.update({
+      where: { id: c.contaId },
+      data: { statusAssinatura: "INADIMPLENTE", bloqueadoEm: new Date() },
+    });
+  }
+
+  return { ok: true };
+}
+
+// Webhook → confirmar pagamento
+export async function processarEventoGateway(opts: {
+  chargeId: string;
+  status: "PAGA" | "ATRASADA" | "CANCELADA" | "ESTORNADA";
+  pagaEm?: Date;
+}) {
+  const cobranca = await prisma.cobranca.findFirst({ where: { gatewayChargeId: opts.chargeId } });
+  if (!cobranca) return;
+
+  await prisma.cobranca.update({
+    where: { id: cobranca.id },
+    data: {
+      status: opts.status === "ESTORNADA" ? "ESTORNADA" : opts.status,
+      pagaEm: opts.pagaEm ?? (opts.status === "PAGA" ? new Date() : null),
+    },
+  });
+
+  if (opts.status === "PAGA") {
+    await ativarPlano(cobranca.contaId, cobranca.plano);
+  } else if (opts.status === "ATRASADA") {
+    await prisma.conta.update({
+      where: { id: cobranca.contaId },
+      data: { statusAssinatura: "INADIMPLENTE" },
+    });
+  }
+}
+
+function detectarBandeira(numero: string): string {
+  const n = numero.replace(/\D/g, "");
+  if (/^4/.test(n)) return "Visa";
+  if (/^5[1-5]/.test(n)) return "Mastercard";
+  if (/^3[47]/.test(n)) return "Amex";
+  if (/^6/.test(n)) return "Elo/Discover";
+  return "Outros";
+}

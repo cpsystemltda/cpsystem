@@ -1,0 +1,1103 @@
+// CP System — schema Prisma
+// PostgreSQL em produção (Neon/Supabase) e dev. Multi-tenant: cada Conta tem 1+ Empresas e 1+ Usuários.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// AUTH / TENANCY
+// ============================================================
+
+enum TipoConta {
+  EMPRESA
+  ANALISTA
+}
+
+enum Plano {
+  BASICO
+  PREMIUM
+}
+
+enum StatusAssinatura {
+  TRIAL
+  ATIVA
+  INADIMPLENTE
+  CANCELADA
+}
+
+model Conta {
+  id                String           @id @default(cuid())
+  tipo              TipoConta        @default(EMPRESA)
+  plano             Plano            @default(BASICO)
+  statusAssinatura  StatusAssinatura @default(TRIAL)
+  trialAteEm        DateTime?
+  proximoVencimento DateTime?
+  termosAceitosEm   DateTime?
+  embaixadorId      String? // analista que indicou esta conta (programa de embaixadores SaaS — não confundir com VinculoAnalista B2G)
+  // Gateway de pagamento (ASAAS por padrão)
+  gatewayProvider   GatewayProvider?
+  gatewayCustomerId String?          // customer_id no gateway
+  gatewaySubscriptionId String?      // subscription_id no gateway
+  ultimaTentativaCobranca DateTime?
+  bloqueadoEm       DateTime?
+  criadoEm          DateTime         @default(now())
+  atualizadoEm      DateTime         @updatedAt
+
+  usuarios       Usuario[]
+  empresas       Empresa[]
+  analista       Analista?
+  embaixador     Analista?       @relation("ContasIndicadas", fields: [embaixadorId], references: [id])
+  comissoes      Comissao[]
+  logsAuditoria  LogAuditoria[]
+  cobrancas      Cobranca[]
+  metodosPagamento MetodoPagamento[]
+  vinculosAnalista VinculoAnalista[]
+}
+
+enum GatewayProvider {
+  ASAAS
+  STRIPE
+  DEMO   // sem gateway real, simulação local
+}
+
+enum PerfilUsuario {
+  ADMIN
+  OPERACIONAL
+  VISUALIZADOR
+}
+
+model Usuario {
+  id                String        @id @default(cuid())
+  nome              String
+  email             String        @unique
+  senhaHash         String
+  perfil            PerfilUsuario @default(ADMIN)
+  superAdmin        Boolean       @default(false) // gestor da plataforma (Igor) — vê tudo
+  emailVerificadoEm DateTime?
+  criadoEm          DateTime      @default(now())
+  atualizadoEm      DateTime      @updatedAt
+
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  sessoes              Sessao[]
+  logsAuditoria        LogAuditoria[]
+  notificacoesSistema  NotificacaoSistema[]
+
+  @@index([contaId])
+}
+
+model Sessao {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  usuarioId String
+  expiraEm  DateTime
+  criadoEm  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+}
+
+// ============================================================
+// EMPRESA (multi-CNPJ)
+// ============================================================
+
+enum PorteEmpresa {
+  MEI
+  ME
+  EPP
+  MEDIA
+  GRANDE
+}
+
+model Empresa {
+  id               String       @id @default(cuid())
+  razaoSocial      String
+  nomeFantasia     String?
+  cnpj             String       @unique
+  porte            PorteEmpresa
+  cnaePrincipal    String
+  cnaesSecundarios String?
+  naturezaJuridica String
+  endereco         String
+  cep              String
+  email            String
+  telefones        String
+  responsavel      String
+  criadoEm         DateTime     @default(now())
+  atualizadoEm     DateTime     @updatedAt
+
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  atas      Ata[]
+  contratos Contrato[]
+  empenhos  Empenho[]
+
+  @@index([contaId])
+}
+
+// ============================================================
+// ANALISTA + EMBAIXADORES + COMISSÕES
+// ============================================================
+
+enum TierEmbaixador {
+  BRONZE   // 1-5 ativos = 3%
+  PRATA    // 6-10 ativos = 4%
+  OURO     // 11-15 ativos = 5%
+  DIAMOND  // 15+ ativos = 6%
+}
+
+model Analista {
+  id            String   @id @default(cuid())
+  nomeCompleto  String
+  cpf           String   @unique
+  telefone      String
+  endereco      String
+  email         String
+  banco         String?
+  agencia       String?
+  contaCorrente String?
+  pix           String?
+  razaoSocial   String?
+  nomeFantasia  String?
+  cnpj          String?
+  divulgacaoUrl String? // link da bio com o programa
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  contaId String? @unique
+  conta   Conta?  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  contasIndicadas Conta[]           @relation("ContasIndicadas")
+  comissoes       Comissao[]
+  vinculos        VinculoAnalista[]
+}
+
+// ============================================================
+// VÍNCULO GRUPO ↔ ANALISTA (modelo B2G)
+// ============================================================
+// Tabela associativa que carrega os atributos do vínculo: data de início
+// (regra crítica de comissionamento), percentual, fixo mensal e status.
+// O analista comissiona apenas execuções com criadoEm >= dataInicio.
+//
+// Hoje ainda existe Conta.embaixadorId pra modelo de embaixador SaaS;
+// ambos coexistem (são comissões de naturezas diferentes).
+
+enum StatusVinculoAnalista {
+  ATIVO
+  ENCERRADO
+}
+
+model VinculoAnalista {
+  id                  String                @id @default(cuid())
+  contaId             String
+  conta               Conta                 @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  analistaId          String
+  analista            Analista              @relation(fields: [analistaId], references: [id], onDelete: Cascade)
+
+  dataInicio          DateTime              @default(now())
+  percentualComissao  Float                 @default(0)
+  fixoMensal          Float                 @default(0)
+  diaVencimentoFixo   Int                   @default(5)
+  status              StatusVinculoAnalista @default(ATIVO)
+  encerradoEm         DateTime?
+  observacoes         String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  fixosPagos PagamentoFixoMensal[]
+
+  @@unique([contaId, analistaId, dataInicio])
+  @@index([contaId])
+  @@index([analistaId])
+  @@index([status])
+}
+
+// Histórico de pagamentos do fixo mensal (por competência)
+model PagamentoFixoMensal {
+  id          String          @id @default(cuid())
+  vinculoId   String
+  vinculo     VinculoAnalista @relation(fields: [vinculoId], references: [id], onDelete: Cascade)
+  competencia String          // YYYY-MM
+  valor       Float
+  paga        Boolean         @default(false)
+  pagaEm      DateTime?
+  observacoes String?
+  criadoEm    DateTime        @default(now())
+
+  @@unique([vinculoId, competencia])
+  @@index([vinculoId])
+}
+
+model Comissao {
+  id           String         @id @default(cuid())
+  analistaId   String
+  contaId      String
+  competencia  String         // YYYY-MM
+  valorBase    Float          // MRR da conta
+  tier         TierEmbaixador
+  percentual   Float          // 3, 4, 5 ou 6
+  valor        Float
+  paga         Boolean        @default(false)
+  pagaEm       DateTime?
+  criadoEm     DateTime       @default(now())
+
+  analista Analista @relation(fields: [analistaId], references: [id], onDelete: Cascade)
+  conta    Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  @@unique([analistaId, contaId, competencia])
+  @@index([analistaId])
+  @@index([contaId])
+}
+
+// ============================================================
+// CONTRATAÇÕES
+// ============================================================
+
+enum TipoObjeto {
+  FORNECIMENTO
+  FORNECIMENTO_CONTINUO
+  SERVICOS
+  SERVICOS_CONTINUOS
+}
+
+enum ProcedimentoSelecao {
+  PREGAO_ELETRONICO
+  PREGAO_ELETRONICO_INTERNACIONAL
+  PREGAO_PRESENCIAL
+  CONCORRENCIA
+  CONCURSO
+  LEILAO
+  DIALOGO_COMPETITIVO
+  DISPENSA
+  INEXIGIBILIDADE
+}
+
+enum Moeda {
+  BRL
+  USD
+  EUR
+}
+
+enum TipoOrgaoNaAta {
+  GERENCIADOR
+  PARTICIPANTE
+  CARONA
+}
+
+enum FuncaoPontoFocal {
+  GESTOR
+  FISCAL_TECNICO
+  FISCAL_ADMINISTRATIVO
+  RESPONSAVEL_SETOR
+  CONTATO_GERAL
+}
+
+model Ata {
+  id                     String              @id @default(cuid())
+  tipo                   TipoObjeto
+  numero                 String
+  processoAdministrativo String
+  procedimentoSelecao    ProcedimentoSelecao
+  numeroLicitacao        String?
+
+  // Órgão GERENCIADOR (sempre 1, snapshot legado pra compatibilidade)
+  orgaoNome      String
+  orgaoCnpj      String
+  orgaoEndereco  String
+  orgaoEmail     String?
+  orgaoTelefone  String?
+
+  objeto                 String
+  dataAssinatura         DateTime
+  dataPublicacao         DateTime?
+  vigenciaInicio         DateTime
+  vigenciaFim            DateTime
+  prazoEntregaDias       Int?
+  prazoPagamentoDias     Int?
+  marcoOrcamentoEstimado DateTime?
+
+  aceitaCarona  Boolean @default(false)
+  idAtaPncp     String?
+  arquivoPdfUrl String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  itens                AtaItem[]
+  contratos             Contrato[]
+  empenhos              Empenho[]
+  orgaos                OrgaoNaAta[]
+  enderecosEntrega      EnderecoEntrega[]
+  pontosFocais          PontoFocal[]
+  notificacoes          Notificacao[]
+  procedimentos         ProcedimentoApuratorio[]
+  anexos                Anexo[]
+  anotacoes             Anotacao[]
+
+  @@index([empresaId])
+}
+
+model AtaItem {
+  id            String  @id @default(cuid())
+  descricao     String
+  unidade       String
+  quantidade    Float
+  marca         String?
+  valorUnitario Float
+  valorTotal    Float
+  moeda         Moeda   @default(BRL)
+
+  ataId String
+  ata   Ata    @relation(fields: [ataId], references: [id], onDelete: Cascade)
+
+  contratoItens ContratoItem[]
+  empenhoItens  EmpenhoItem[]
+
+  @@index([ataId])
+}
+
+model OrgaoNaAta {
+  id            String         @id @default(cuid())
+  ataId         String
+  ata           Ata            @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  tipo          TipoOrgaoNaAta
+  nome          String
+  cnpj          String
+  endereco      String
+  email         String?
+  telefone      String?
+  // Carona: limites de adesão
+  limiteValor   Float?         // valor monetário máximo permitido a esse carona
+  limitePct     Float?         // % do total da Ata (default sistema: 50% por órgão)
+
+  enderecosEntrega EnderecoEntrega[]
+  pontosFocais     PontoFocal[]
+
+  @@index([ataId])
+}
+
+model EnderecoEntrega {
+  id        String  @id @default(cuid())
+  rotulo    String?
+  endereco  String
+  ataId     String?
+  ata       Ata?    @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  orgaoNaAtaId String?
+  orgaoNaAta   OrgaoNaAta? @relation(fields: [orgaoNaAtaId], references: [id], onDelete: Cascade)
+
+  @@index([ataId])
+  @@index([contratoId])
+  @@index([empenhoId])
+  @@index([orgaoNaAtaId])
+}
+
+model PontoFocal {
+  id        String           @id @default(cuid())
+  funcao    FuncaoPontoFocal
+  nome      String
+  email     String?
+  telefone  String?
+  ataId     String?
+  ata       Ata?             @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato?       @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?        @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  orgaoNaAtaId String?
+  orgaoNaAta   OrgaoNaAta?   @relation(fields: [orgaoNaAtaId], references: [id], onDelete: Cascade)
+
+  @@index([ataId])
+  @@index([contratoId])
+  @@index([empenhoId])
+  @@index([orgaoNaAtaId])
+}
+
+model Contrato {
+  id                     String              @id @default(cuid())
+  tipo                   TipoObjeto
+  numero                 String
+  numeroNotaEmpenho      String?
+  processoAdministrativo String
+  procedimentoSelecao    ProcedimentoSelecao
+  numeroLicitacao        String?
+
+  orgaoNome      String
+  orgaoCnpj      String
+  orgaoEndereco  String
+  orgaoEmail     String?
+  orgaoTelefone  String?
+
+  objeto                 String
+  dataAssinatura         DateTime
+  dataPublicacao         DateTime?
+  vigenciaInicio         DateTime
+  vigenciaFim            DateTime
+  prazoEntregaDias       Int?
+  prazoPagamentoDias     Int?
+  marcoOrcamentoEstimado DateTime?
+
+  arquivoPdfUrl String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  ataId String?
+  ata   Ata?    @relation(fields: [ataId], references: [id])
+
+  itens             ContratoItem[]
+  empenhos          Empenho[]
+  enderecosEntrega  EnderecoEntrega[]
+  pontosFocais      PontoFocal[]
+  termosAditivos    TermoAditivo[]
+  apostilamentos    Apostilamento[]
+  reajustes         Reajuste[]
+  notificacoes      Notificacao[]
+  procedimentos     ProcedimentoApuratorio[]
+  garantias         Garantia[]
+  anexos            Anexo[]
+  anotacoes         Anotacao[]
+
+  @@index([empresaId])
+  @@index([ataId])
+}
+
+model ContratoItem {
+  id            String  @id @default(cuid())
+  descricao     String
+  unidade       String
+  quantidade    Float
+  marca         String?
+  valorUnitario Float
+  valorTotal    Float
+  moeda         Moeda   @default(BRL)
+
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  ataItemId String?
+  ataItem   AtaItem? @relation(fields: [ataItemId], references: [id])
+
+  @@index([contratoId])
+  @@index([ataItemId])
+}
+
+enum StatusExecucao {
+  EMPENHADO
+  PEDIDO_RECEBIDO
+  EM_TRANSITO
+  ENTREGUE
+  NF_EMITIDA
+  NF_ENCAMINHADA
+  PAGO
+}
+
+model Empenho {
+  id                     String              @id @default(cuid())
+  tipo                   TipoObjeto
+  numero                 String
+  identificador          String?             // ex: "1ª parcela", "Solicitação 042/2026"
+  processoAdministrativo String
+  procedimentoSelecao    ProcedimentoSelecao
+  numeroLicitacao        String?
+
+  orgaoNome      String
+  orgaoCnpj      String
+  orgaoEndereco  String
+  orgaoEmail     String?
+  orgaoTelefone  String?
+
+  objeto                  String
+  dataEmissao             DateTime
+  dataPrevistaExecucao    DateTime?           // pra alerta de prazo no painel do analista
+  dataPrevistaPagamento   DateTime?
+  vigenciaInicio          DateTime
+  vigenciaFim             DateTime
+  prazoEntregaDias        Int?
+  prazoPagamentoDias      Int?
+
+  status StatusExecucao @default(EMPENHADO)
+
+  dataPedidoRecebido DateTime?
+  dataDespacho       DateTime?
+  dataEntrega        DateTime?
+  dataNfEmitida      DateTime?
+  dataNfEncaminhada  DateTime?
+  dataPagamento      DateTime?
+
+  arquivoPdfUrl String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  ataId String?
+  ata   Ata?    @relation(fields: [ataId], references: [id])
+
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id])
+
+  itens             EmpenhoItem[]
+  enderecosEntrega  EnderecoEntrega[]
+  pontosFocais      PontoFocal[]
+  termosAditivos    TermoAditivo[]
+  apostilamentos    Apostilamento[]
+  reajustes         Reajuste[]
+  notificacoes      Notificacao[]
+  procedimentos     ProcedimentoApuratorio[]
+  garantias         Garantia[]
+  anexos            Anexo[]
+  anotacoes         Anotacao[]
+
+  @@index([empresaId])
+  @@index([ataId])
+  @@index([contratoId])
+}
+
+model EmpenhoItem {
+  id            String  @id @default(cuid())
+  descricao     String
+  unidade       String
+  quantidade    Float
+  marca         String?
+  valorUnitario Float
+  valorTotal    Float
+  moeda         Moeda   @default(BRL)
+
+  empenhoId String
+  empenho   Empenho @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  ataItemId String?
+  ataItem   AtaItem? @relation(fields: [ataItemId], references: [id])
+
+  @@index([empenhoId])
+  @@index([ataItemId])
+}
+
+// ============================================================
+// ALTERAÇÕES CONTRATUAIS (aditivos, apostilamentos, reajustes)
+// ============================================================
+
+enum NaturezaAlteracao {
+  VALOR
+  PRAZO_VIGENCIA
+  PRAZO_ENTREGA
+  ESCOPO
+  REAJUSTE
+  REEQUILIBRIO
+  OUTRO
+}
+
+model TermoAditivo {
+  id              String              @id @default(cuid())
+  numero          String
+  objeto          String
+  dataAssinatura  DateTime
+  natureza        String              // CSV de NaturezaAlteracao
+  alteraValor     Boolean             @default(false)
+  novoValor       Float?
+  alteraPrazoVigencia Boolean         @default(false)
+  novaVigenciaFim DateTime?
+  alteraPrazoEntrega Boolean          @default(false)
+  novoPrazoEntregaDias Int?
+  observacoes     String?
+  arquivoPdfUrl   String?
+  criadoEm        DateTime            @default(now())
+
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@index([empenhoId])
+}
+
+model Apostilamento {
+  id                  String   @id @default(cuid())
+  numero              String
+  objeto              String
+  dataAssinatura      DateTime
+  natureza            String
+  alteraValor         Boolean  @default(false)
+  novoValor           Float?
+  alteraPrazoVigencia Boolean  @default(false)
+  novaVigenciaFim     DateTime?
+  alteraPrazoEntrega  Boolean  @default(false)
+  novoPrazoEntregaDias Int?
+  observacoes         String?
+  arquivoPdfUrl       String?
+  criadoEm            DateTime @default(now())
+
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@index([empenhoId])
+}
+
+enum InstrumentoReajuste {
+  TERMO_ADITIVO
+  APOSTILAMENTO
+}
+
+enum IndiceReajuste {
+  IPCA
+  IGPM
+  INCC
+  INPC
+  CONTRATUAL
+  OUTRO
+}
+
+model Reajuste {
+  id                String              @id @default(cuid())
+  dataPedido        DateTime
+  dataAprovacao     DateTime?
+  indice            IndiceReajuste
+  percentual        Float
+  valorAnterior     Float
+  valorNovo         Float
+  instrumento       InstrumentoReajuste
+  instrumentoNumero String?
+  observacoes       String?
+  criadoEm          DateTime            @default(now())
+
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  @@index([contratoId])
+  @@index([empenhoId])
+}
+
+// ============================================================
+// NOTIFICAÇÕES ADMINISTRATIVAS
+// ============================================================
+
+enum StatusNotificacao {
+  RECEBIDA
+  EM_TRATATIVA
+  RESPONDIDA
+  FINALIZADA
+}
+
+model Notificacao {
+  id             String            @id @default(cuid())
+  numero         String?
+  assunto        String
+  descricao      String
+  dataRecebimento DateTime
+  prazoResposta  Int?              // dias
+  status         StatusNotificacao @default(RECEBIDA)
+  arquivoPdfUrl  String?
+  criadoEm       DateTime          @default(now())
+  atualizadoEm   DateTime          @updatedAt
+
+  ataId      String?
+  ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  andamentos AndamentoNotificacao[]
+
+  @@index([ataId])
+  @@index([contratoId])
+  @@index([empenhoId])
+}
+
+model AndamentoNotificacao {
+  id            String            @id @default(cuid())
+  notificacaoId String
+  notificacao   Notificacao       @relation(fields: [notificacaoId], references: [id], onDelete: Cascade)
+  status        StatusNotificacao
+  descricao     String
+  dataEvento    DateTime
+  criadoEm      DateTime          @default(now())
+
+  @@index([notificacaoId])
+}
+
+// ============================================================
+// PROCEDIMENTOS APURATÓRIOS (Lei 14.133/2021 art. 157+)
+// ============================================================
+
+enum FaseProcedimento {
+  ABERTURA
+  NOTIFICACAO_DEFESA
+  DEFESA_APRESENTADA
+  PEDIDO_PROVAS
+  DEFERIMENTO_PROVAS
+  NOTIFICACAO_ALEGACOES
+  ALEGACOES_FINAIS
+  DECISAO_1A_INSTANCIA
+  RECURSO
+  DECISAO_FINAL
+  ARQUIVAMENTO
+  PENALIDADE_APLICADA
+}
+
+enum TipoPenalidade {
+  ADVERTENCIA
+  MULTA
+  IMPEDIMENTO_LICITAR
+  DECLARACAO_INIDONEIDADE
+}
+
+model ProcedimentoApuratorio {
+  id                String   @id @default(cuid())
+  numero            String?
+  notificacaoNumero String?
+  assunto           String
+  descricao         String
+  comissao          String?  // nome dos servidores da comissão
+  autoridade        String?  // autoridade competente
+  dataAbertura      DateTime
+  prazoDefesaDias   Int      @default(15) // padrão Lei 14.133
+  prazoRecursoDias  Int      @default(15)
+  arquivado         Boolean  @default(false)
+  arquivoPdfUrl     String?
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  ataId      String?
+  ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  andamentos  AndamentoProcedimento[]
+  penalidades Penalidade[]
+
+  @@index([ataId])
+  @@index([contratoId])
+  @@index([empenhoId])
+}
+
+model AndamentoProcedimento {
+  id              String           @id @default(cuid())
+  procedimentoId  String
+  procedimento    ProcedimentoApuratorio @relation(fields: [procedimentoId], references: [id], onDelete: Cascade)
+  fase            FaseProcedimento
+  descricao       String
+  dataEvento      DateTime
+  arquivoPdfUrl   String?
+  criadoEm        DateTime         @default(now())
+
+  @@index([procedimentoId])
+}
+
+model Penalidade {
+  id              String         @id @default(cuid())
+  procedimentoId  String
+  procedimento    ProcedimentoApuratorio @relation(fields: [procedimentoId], references: [id], onDelete: Cascade)
+  tipo            TipoPenalidade
+  valor           Float?         // pra multa
+  duracaoMeses    Int?           // pra impedimento/inidoneidade
+  fundamentacao   String?
+  dataAplicacao   DateTime
+  criadoEm        DateTime       @default(now())
+
+  @@index([procedimentoId])
+}
+
+// ============================================================
+// GARANTIA CONTRATUAL
+// ============================================================
+
+enum ModalidadeGarantia {
+  SEGURO_GARANTIA
+  FIANCA_BANCARIA
+  CAUCAO_DINHEIRO
+  TITULOS_DIVIDA_PUBLICA
+}
+
+model Garantia {
+  id          String             @id @default(cuid())
+  modalidade  ModalidadeGarantia
+  // Seguro-garantia
+  seguradora  String?
+  // Fiança bancária
+  banco       String?
+  // Comum
+  valor       Float
+  dataInicio  DateTime
+  dataFim     DateTime?
+  descricao   String?            // pra títulos da dívida pública e outros
+  arquivoPdfUrl String?
+  criadoEm    DateTime           @default(now())
+  atualizadoEm DateTime          @updatedAt
+
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  endossos Endosso[]
+
+  @@index([contratoId])
+  @@index([empenhoId])
+}
+
+model Endosso {
+  id          String   @id @default(cuid())
+  garantiaId  String
+  garantia    Garantia @relation(fields: [garantiaId], references: [id], onDelete: Cascade)
+  valor       Float
+  dataInicio  DateTime
+  dataFim     DateTime?
+  observacoes String?
+  arquivoPdfUrl String?
+  criadoEm    DateTime @default(now())
+
+  @@index([garantiaId])
+}
+
+// ============================================================
+// ANEXOS + ANOTAÇÕES
+// ============================================================
+
+enum CategoriaAnexo {
+  CONTRATUAL
+  ADITIVO
+  APOSTILAMENTO
+  GARANTIA
+  NOTIFICACAO
+  PROCEDIMENTO
+  NF
+  COMPROVANTE
+  OUTRO
+}
+
+model Anexo {
+  id           String         @id @default(cuid())
+  nome         String
+  url          String         // path local /uploads/<id>.<ext>
+  mimeType     String?
+  tamanhoBytes Int?
+  categoria    CategoriaAnexo @default(OUTRO)
+  criadoEm     DateTime       @default(now())
+
+  ataId      String?
+  ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  @@index([ataId])
+  @@index([contratoId])
+  @@index([empenhoId])
+}
+
+model Anotacao {
+  id        String   @id @default(cuid())
+  texto     String
+  autorNome String?
+  criadoEm  DateTime @default(now())
+
+  ataId      String?
+  ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  @@index([ataId])
+  @@index([contratoId])
+  @@index([empenhoId])
+}
+
+// ============================================================
+// LOGS DE AUDITORIA
+// ============================================================
+
+enum AcaoAuditoria {
+  CRIAR
+  ATUALIZAR
+  EXCLUIR
+  LOGIN
+  LOGOUT
+  EXPORTAR
+  UPLOAD
+  DOWNLOAD
+}
+
+model LogAuditoria {
+  id          String        @id @default(cuid())
+  contaId     String
+  conta       Conta         @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  usuarioId   String?
+  usuario     Usuario?      @relation(fields: [usuarioId], references: [id])
+  acao        AcaoAuditoria
+  recurso     String        // ex: "Ata", "Contrato"
+  recursoId   String?
+  resumo      String?
+  ip          String?
+  criadoEm    DateTime      @default(now())
+
+  @@index([contaId])
+  @@index([usuarioId])
+  @@index([criadoEm])
+}
+
+// ============================================================
+// PAGAMENTO / ASSINATURA
+// ============================================================
+
+enum FormaPagamento {
+  CARTAO_CREDITO
+  PIX
+  BOLETO
+  TRANSFERENCIA_BANCARIA
+}
+
+enum StatusCobranca {
+  PENDENTE          // criada, aguardando pagamento
+  PROCESSANDO       // em retentativa de cartão
+  PAGA              // confirmada
+  ATRASADA          // venceu sem pagamento
+  CANCELADA
+  ESTORNADA
+}
+
+model Cobranca {
+  id                String         @id @default(cuid())
+  contaId           String
+  conta             Conta          @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  competencia       String         // YYYY-MM
+  plano             Plano
+  forma             FormaPagamento
+  valor             Float
+  status            StatusCobranca @default(PENDENTE)
+
+  vencimento        DateTime
+  pagaEm            DateTime?
+  tentativas        Int            @default(0)
+
+  // IDs no gateway
+  gatewayChargeId   String?        // ID da cobrança no ASAAS/Stripe
+  gatewayInvoiceUrl String?        // link pra fatura/boleto/QR PIX
+  pixQrCode         String?        // base64 do QR
+  pixCopiaCola      String?        // string PIX copia e cola
+  boletoUrl         String?        // URL do boleto
+
+  observacoes       String?
+  criadaEm          DateTime       @default(now())
+  atualizadoEm      DateTime       @updatedAt
+
+  eventos           EventoGateway[]
+
+  @@index([contaId])
+  @@index([status])
+  @@index([vencimento])
+}
+
+model MetodoPagamento {
+  id                String         @id @default(cuid())
+  contaId           String
+  conta             Conta          @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  forma             FormaPagamento
+  apelido           String?        // ex: "Cartão Itaú final 1234"
+
+  // Cartão (NUNCA armazenar PAN — só os 4 últimos dígitos e bandeira)
+  bandeira          String?
+  ultimosDigitos    String?
+  validadeMes       Int?
+  validadeAno       Int?
+
+  // Token do gateway (referência segura, sem dados sensíveis)
+  gatewayTokenId    String?
+
+  padrao            Boolean        @default(false)
+  ativo             Boolean        @default(true)
+  criadoEm          DateTime       @default(now())
+
+  @@index([contaId])
+}
+
+model EventoGateway {
+  id          String    @id @default(cuid())
+  cobrancaId  String?
+  cobranca    Cobranca? @relation(fields: [cobrancaId], references: [id], onDelete: Cascade)
+  provider    GatewayProvider
+  evento      String    // ex: "PAYMENT_CONFIRMED", "PAYMENT_OVERDUE"
+  payload     String    // JSON serializado
+  recebidoEm  DateTime  @default(now())
+
+  @@index([cobrancaId])
+  @@index([evento])
+}
+
+// ============================================================
+// NOTIFICAÇÕES INTERNAS DO SISTEMA (sininho + central)
+// ============================================================
+
+enum TipoNotificacaoSistema {
+  PRAZO_PROXIMO            // execução com data de execução/pagamento próxima
+  STATUS_PAGO              // execução mudou pra PAGO (analista é avisado)
+  NOVA_EXECUCAO            // empresa cadastrou nova execução em contrato vinculado ao analista
+  VINCULO_CRIADO           // empresa vinculou um analista
+  VINCULO_ENCERRADO
+  COMISSAO_DISPONIVEL      // valor a receber consolidado mensal
+  AVISO_VENCIMENTO_FATURA  // assinatura SaaS vencendo
+}
+
+model NotificacaoSistema {
+  id              String                @id @default(cuid())
+  usuarioId       String                // destinatário
+  usuario         Usuario               @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo            TipoNotificacaoSistema
+  titulo          String
+  descricao       String?
+  link            String?               // rota interna (ex: "/execucao/abc123")
+  recursoTipo     String?               // ex: "Empenho", "VinculoAnalista"
+  recursoId       String?
+  lida            Boolean               @default(false)
+  lidaEm          DateTime?
+  criadoEm        DateTime              @default(now())
+
+  @@index([usuarioId, lida])
+  @@index([criadoEm])
+}
+
+// Configuração singleton (1 linha por instalação) das credenciais do gateway
+model ConfiguracaoGateway {
+  id              String          @id @default("singleton")
+  provider        GatewayProvider @default(DEMO)
+  ambiente        String          @default("sandbox") // sandbox | production
+  apiKey          String?         // criptografada em produção
+  webhookToken    String?         // valida POSTs do gateway
+  atualizadoEm    DateTime        @updatedAt
+  atualizadoPor   String?
+}
