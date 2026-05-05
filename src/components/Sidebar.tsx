@@ -26,6 +26,7 @@ import {
 import { logoutAction } from "@/app/actions/auth";
 import { Logo } from "@/components/Logo";
 import { SeletorVisao } from "@/components/SeletorVisao";
+import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
 import { HelpButtons } from "@/components/HelpButtons";
 import type { Visao } from "@/lib/visao";
 import { Crown, Users2, Activity, Workflow } from "lucide-react";
@@ -33,7 +34,9 @@ import { Crown, Users2, Activity, Workflow } from "lucide-react";
 type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 type Grupo = { titulo: string; itens: Item[] };
 
-const GRUPOS_EMPRESA: Grupo[] = [
+// Itens operacionais — só fazem sentido com uma empresa em foco. No modo "Todas as
+// empresas" (consolidado) só aparecem o Dashboard e os menus de configuração da conta.
+const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
   {
     titulo: "Operação",
     itens: [
@@ -53,6 +56,21 @@ const GRUPOS_EMPRESA: Grupo[] = [
       { href: "/juridico", label: "Jurídico", icon: Scale },
     ],
   },
+];
+
+// Versão "consolidada" — sem operação por empresa. Cliente só vê Dashboard agregado
+// e o menu pra adicionar empresas (CNPJs).
+const GRUPOS_EMPRESA_CONSOLIDADO: Grupo[] = [
+  {
+    titulo: "Visão geral",
+    itens: [
+      { href: "/dashboard", label: "Dashboard consolidado", icon: LayoutDashboard },
+      { href: "/empresas", label: "Empresas (CNPJs)", icon: Building2 },
+    ],
+  },
+];
+
+const GRUPOS_EMPRESA_CONTA: Grupo[] = [
   {
     titulo: "Conta",
     itens: [
@@ -122,6 +140,8 @@ export function Sidebar({
   visao,
   superAdmin = false,
   qtdNotificacoesNaoLidas = 0,
+  empresas = [],
+  empresaIdSelecionada = null,
 }: {
   nomeUsuario: string;
   nomeConta: string;
@@ -129,14 +149,20 @@ export function Sidebar({
   visao: Visao;
   superAdmin?: boolean;
   qtdNotificacoesNaoLidas?: number;
+  empresas?: EmpresaOpcao[];
+  empresaIdSelecionada?: string | null;
 }) {
   const pathname = usePathname();
   const grupos =
     visao === "ADMIN_PLATAFORMA"
       ? GRUPOS_ADMIN_PLATAFORMA
       : visao === "ANALISTA"
-      ? GRUPOS_ANALISTA
-      : GRUPOS_EMPRESA;
+        ? GRUPOS_ANALISTA
+        : !empresaIdSelecionada
+          ? // Nenhuma empresa selecionada (visão consolidada) → só Dashboard agregado + Conta
+            [...GRUPOS_EMPRESA_CONSOLIDADO, ...GRUPOS_EMPRESA_CONTA]
+          : // Empresa específica em foco → menu operacional completo
+            [...GRUPOS_EMPRESA_OPERACAO, ...GRUPOS_EMPRESA_CONTA];
   const inicial = nomeUsuario.trim().charAt(0).toUpperCase();
 
   return (
@@ -161,6 +187,13 @@ export function Sidebar({
       {superAdmin && (
         <div className="border-b border-slate-100 px-3 py-3">
           <SeletorVisao visaoAtual={visao} />
+        </div>
+      )}
+
+      {/* Seletor de empresa (só visão EMPRESA, e quando há ao menos uma empresa) */}
+      {visao === "EMPRESA" && empresas.length > 0 && (
+        <div className="border-b border-slate-100 px-3 py-3">
+          <SeletorEmpresa empresas={empresas} empresaIdAtual={empresaIdSelecionada} />
         </div>
       )}
 
@@ -223,7 +256,13 @@ export function Sidebar({
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-900">{nomeUsuario}</p>
             <p className="truncate text-[11px] text-slate-500">
-              {nomeConta} · {tipoConta === "ANALISTA" ? "Analista" : "Empresa"}
+              {tipoConta === "ANALISTA"
+                ? "Analista de licitações"
+                : empresaIdSelecionada
+                  ? `Em foco: ${empresas.find((x) => x.id === empresaIdSelecionada)?.nome ?? "?"}`
+                  : empresas.length > 0
+                    ? `Visão consolidada · ${empresas.length} empresa${empresas.length > 1 ? "s" : ""}`
+                    : "Sem empresa cadastrada"}
             </p>
           </div>
         </div>
