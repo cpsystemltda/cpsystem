@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   PlusCircle,
@@ -153,6 +154,22 @@ export function Sidebar({
   empresaIdSelecionada?: string | null;
 }) {
   const pathname = usePathname();
+  const [navigating, setNavigating] = useState(false);
+
+  useEffect(() => { setNavigating(false); }, [pathname]);
+
+  useEffect(() => {
+    function onClickLink(e: MouseEvent) {
+      const a = (e.target as Element).closest("a");
+      if (!a) return;
+      const href = a.getAttribute("href") ?? "";
+      if (!href || href.startsWith("http") || href.startsWith("#") || href === pathname) return;
+      setNavigating(true);
+    }
+    document.addEventListener("click", onClickLink, true);
+    return () => document.removeEventListener("click", onClickLink, true);
+  }, [pathname]);
+
   const grupos =
     visao === "ADMIN_PLATAFORMA"
       ? GRUPOS_ADMIN_PLATAFORMA
@@ -179,7 +196,9 @@ export function Sidebar({
           }
           className="block transition hover:opacity-80"
         >
-          <Logo variant="sm" priority />
+          <div className={navigating ? "animate-spin" : ""} style={{ animationDuration: "0.8s" }}>
+            <Logo variant="sm" priority />
+          </div>
         </Link>
       </div>
 

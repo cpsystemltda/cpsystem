@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
+import { NavigationProgress } from "@/components/NavigationProgress";
 import { contarNaoLidas } from "@/lib/notificacoes";
 import { lerVisao, type Visao } from "@/lib/visao";
 import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
@@ -109,6 +110,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen">
+      <NavigationProgress />
       <Sidebar
         nomeUsuario={usuario.nome}
         nomeConta={principal}
