@@ -7,6 +7,7 @@ import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor, type AtaItemRef } from "@/components/ItensEditor";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
+import { EnderecosEntregaEditor, PontosFocaisEditor } from "@/components/EditoresOrgao";
 import { criarEmpenhoAction } from "@/app/actions/contratacoes";
 import { extrairEmpenhoPdfAction } from "@/app/actions/iaExtracao";
 import { OPCOES_PROCEDIMENTO, OPCOES_TIPO } from "@/lib/validators";
@@ -74,7 +75,7 @@ export default function NovoEmpenhoForm({
                     : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                {op === "livre" ? "Empenho livre" : op === "ata" ? "Derivado de Ata" : "Derivado de Contrato"}
+                {op === "livre" ? "Empenho livre" : op === "ata" ? "Derivado de uma ARP (Ata de Registro de Preços)" : "Derivado de um Contrato"}
               </button>
             ))}
           </div>
@@ -243,7 +244,27 @@ export default function NovoEmpenhoForm({
               span={1}
               defaultValue={dados?.prazoPagamentoDias?.toString() ?? ""}
             />
+            <Field
+              label="Nº da Ordem de Fornecimento (se houver)"
+              name="numeroOrdemFornecimento"
+              placeholder="OF nº/ano"
+              span={2}
+            />
           </div>
+        </Secao>
+
+        <Secao titulo="Endereços de entrega/execução">
+          <p className="mb-3 text-xs text-slate-600">
+            Locais onde este empenho será cumprido.
+          </p>
+          <EnderecosEntregaEditor />
+        </Secao>
+
+        <Secao titulo="Pontos focais do órgão (Lei 14.133 art. 117)">
+          <p className="mb-3 text-xs text-slate-600">
+            Gestor + Fiscais Técnico/Administrativo do contrato.
+          </p>
+          <PontosFocaisEditor />
         </Secao>
 
         <Secao titulo="Itens empenhados">

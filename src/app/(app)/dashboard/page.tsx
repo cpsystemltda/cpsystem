@@ -15,6 +15,8 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { dadosPorUf } from "@/lib/agregacaoUf";
 import { MapaBrasil } from "@/components/MapaBrasil";
+import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
+import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import {
   VencimentosPorMesChart,
   TiposObjetoChart,
@@ -56,6 +58,8 @@ function brlCompacto(n: number): string {
 export default async function DashboardPage() {
   const usuario = await exigirUsuario();
   const contaId = usuario.contaId;
+  const filtroEmpresa = await filtroEmpresaWhere(contaId);
+  const empresaIdSelecionada = await lerEmpresaSelecionada();
   const hoje = new Date();
   const fimAno = new Date(hoje.getFullYear(), 11, 31);
 
@@ -71,27 +75,27 @@ export default async function DashboardPage() {
     dadosUf,
   ] = await Promise.all([
     prisma.empresa.count({ where: { contaId } }),
-    prisma.ata.count({ where: { empresa: { contaId }, vigenciaFim: { gte: hoje } } }),
-    prisma.contrato.count({ where: { empresa: { contaId }, vigenciaFim: { gte: hoje } } }),
+    prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
+    prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
     prisma.empenho.findMany({
-      where: { empresa: { contaId } },
+      where: { empresa: filtroEmpresa },
       select: { id: true, status: true, vigenciaFim: true, dataPagamento: true, tipo: true },
     }),
     prisma.empenho.findMany({
-      where: { empresa: { contaId } },
+      where: { empresa: filtroEmpresa },
       select: { itens: { select: { valorTotal: true } }, status: true, tipo: true },
     }),
     prisma.contrato.findMany({
-      where: { empresa: { contaId }, vigenciaFim: { gte: hoje } },
+      where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } },
       select: { tipo: true, vigenciaFim: true, itens: { select: { valorTotal: true } } },
     }),
     prisma.ata.findMany({
-      where: { empresa: { contaId }, vigenciaFim: { gte: hoje } },
+      where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } },
       select: { tipo: true, vigenciaFim: true, itens: { select: { valorTotal: true } } },
     }),
     prisma.empenho.findMany({
       where: {
-        empresa: { contaId },
+        empresa: filtroEmpresa,
         status: { not: "PAGO" },
         OR: [
           { dataPrevistaExecucao: { gte: hoje, lte: new Date(hoje.getTime() + 30 * 86400000) } },
@@ -113,7 +117,7 @@ export default async function DashboardPage() {
       orderBy: { vigenciaFim: "asc" },
       take: 6,
     }),
-    dadosPorUf(contaId),
+    dadosPorUf(contaId, empresaIdSelecionada ?? undefined),
   ]);
 
   const valorEmCarteira =
@@ -168,6 +172,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
+      <BannerEmpresaEmFoco contaId={contaId} />
       {/* Header */}
       <div className="flex items-end justify-between gap-6">
         <div>

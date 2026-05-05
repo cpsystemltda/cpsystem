@@ -185,6 +185,16 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
   const contaCorrente = String(dados.contaCorrente || "").trim();
   const pix = String(dados.pix || "").trim();
 
+  // Pessoa jurídica (opcional)
+  const razaoSocial = String(dados.razaoSocial || "").trim();
+  const nomeFantasia = String(dados.nomeFantasia || "").trim();
+  const cnpjPj = String(dados.cnpj || "").replace(/\D/g, "");
+  const portePj = String(dados.porte || "").trim();
+  const cnaePrincipal = String(dados.cnaePrincipal || "").trim();
+  const cnaesSecundarios = String(dados.cnaesSecundarios || "").trim();
+  const naturezaJuridica = String(dados.naturezaJuridica || "").trim();
+  const enderecoPj = String(dados.enderecoPj || "").trim();
+
   if (!nome || nome.length < 2) return { erro: "Nome inválido." };
   if (!email.includes("@")) return { erro: "E-mail inválido." };
   if (senha.length < 8) return { erro: "Senha deve ter ao menos 8 caracteres." };
@@ -219,6 +229,16 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
           agencia: agencia || null,
           contaCorrente: contaCorrente || null,
           pix: pix || null,
+          razaoSocial: razaoSocial || null,
+          nomeFantasia: nomeFantasia || null,
+          cnpj: cnpjPj.length === 14 ? cnpjPj : null,
+          porte: ["MEI", "ME", "EPP", "MEDIA", "GRANDE"].includes(portePj)
+            ? (portePj as "MEI" | "ME" | "EPP" | "MEDIA" | "GRANDE")
+            : null,
+          cnaePrincipal: cnaePrincipal || null,
+          cnaesSecundarios: cnaesSecundarios || null,
+          naturezaJuridica: naturezaJuridica || null,
+          enderecoPj: enderecoPj || null,
           ativo: true,
         },
       },

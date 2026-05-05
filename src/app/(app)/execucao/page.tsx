@@ -4,6 +4,8 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { FiltroLista } from "@/components/FiltroLista";
+import { filtroEmpresaWhere } from "@/lib/empresaContexto";
+import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -27,6 +29,7 @@ const COR_STATUS: Record<string, string> = {
 
 export default async function ExecucaoPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; orgao?: string }> }) {
   const usuario = await exigirUsuario();
+  const filtroEmpresa = await filtroEmpresaWhere(usuario.contaId);
   const sp = await searchParams;
   const q = (sp.q || "").trim();
   const statusFiltro = sp.status || "";
@@ -34,7 +37,7 @@ export default async function ExecucaoPage({ searchParams }: { searchParams: Pro
 
   const empenhos = await prisma.empenho.findMany({
     where: {
-      empresa: { contaId: usuario.contaId },
+      empresa: filtroEmpresa,
       ...(q && {
         OR: [
           { numero: { contains: q } },
@@ -55,12 +58,13 @@ export default async function ExecucaoPage({ searchParams }: { searchParams: Pro
 
   const orgaosDistintos = await prisma.empenho.groupBy({
     by: ["orgaoNome"],
-    where: { empresa: { contaId: usuario.contaId } },
+    where: { empresa: filtroEmpresa },
     orderBy: { orgaoNome: "asc" },
   });
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
+      <BannerEmpresaEmFoco contaId={usuario.contaId} />
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Execução / Logística</h1>

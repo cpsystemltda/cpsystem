@@ -7,6 +7,7 @@ import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { signupAction, signupAnalistaAction, buscarAnalistasPublicos } from "@/app/actions/auth";
 import { Logo } from "@/components/Logo";
+import { OPCOES_NATUREZA_JURIDICA } from "@/lib/validators";
 
 const PORTES = [
   { value: "MEI", label: "MEI" },
@@ -263,6 +264,23 @@ function FormAnalista() {
       <Field label="Agência" name="agencia" span={1} />
       <Field label="Conta corrente" name="contaCorrente" span={1} />
       <Field label="PIX (chave preferencial)" name="pix" span={4} />
+
+      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Pessoa jurídica <span className="ml-2 font-normal normal-case text-slate-400">(opcional, se você emite nota como PJ)</span>
+      </h2>
+      <Field label="Razão social" name="razaoSocial" span={3} />
+      <Select label="Porte" name="porte" options={PORTES} span={1} />
+      <Field label="Nome fantasia" name="nomeFantasia" span={2} />
+      <Field label="CNPJ" name="cnpj" placeholder="00.000.000/0000-00" span={2} />
+      <Field label="CNAE principal" name="cnaePrincipal" span={2} />
+      <Field label="CNAEs secundários (separar por vírgula)" name="cnaesSecundarios" span={2} />
+      <Select
+        label="Natureza jurídica"
+        name="naturezaJuridica"
+        options={[{ value: "", label: "—" }, ...OPCOES_NATUREZA_JURIDICA]}
+        span={2}
+      />
+      <Field label="Endereço da PJ" name="enderecoPj" span={2} />
 
       <div className="col-span-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
         Como analista, você não paga assinatura. Seu painel mostra todas as empresas que vincularem você como responsável,

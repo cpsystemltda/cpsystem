@@ -4,8 +4,20 @@ import { ChevronLeft, ClipboardList, Receipt } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularSaldoContrato } from "@/lib/saldo";
-import { brl, formatarCnpj, ROTULO_PROCEDIMENTO, ROTULO_TIPO } from "@/lib/validators";
+import {
+  brl,
+  formatarCnpj,
+  ROTULO_PROCEDIMENTO,
+  ROTULO_TIPO,
+  ROTULO_MODALIDADE_ENTREGA,
+  ROTULO_MARCO_INICIAL,
+  isContratoNaoContinuado,
+} from "@/lib/validators";
 import { Tabs } from "@/components/Tabs";
+import { TimelineExecucao } from "@/components/TimelineExecucao";
+import { AnaliseJuridicaIA } from "@/components/AnaliseJuridicaIA";
+import { RelatorioContratacao } from "@/components/RelatorioContratacao";
+import { AlertaReajuste } from "@/components/AlertaReajuste";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
 import { ReajustesTab } from "@/components/abas/ReajustesTab";
@@ -23,8 +35,10 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
     where: { id, empresa: { contaId: usuario.contaId } },
     include: {
       empresa: true,
+      itens: { select: { quantidade: true, valorTotal: true } },
       ata: true,
       empenhos: { orderBy: { criadoEm: "desc" } },
+      parcelas: { orderBy: { numero: "asc" } },
       enderecosEntrega: true,
       pontosFocais: true,
       termosAditivos: { orderBy: { dataAssinatura: "desc" } },
@@ -68,13 +82,18 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
             )}
           </p>
         </div>
-        <Link
-          href="/contratacoes/nova/empenho"
-          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-        >
-          + Empenho
-        </Link>
+        <div className="flex items-start gap-2">
+          <AnaliseJuridicaIA contratoId={contrato.id} />
+          <Link
+            href="/contratacoes/nova/empenho"
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            + Empenho
+          </Link>
+        </div>
       </div>
+
+      <AlertaReajuste marcoOrcamentoEstimado={contrato.marcoOrcamentoEstimado} hrefReajustes="/reajustes" />
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <Stat titulo="Valor total contratado" valor={brl(saldo.valorTotal)} />
@@ -94,7 +113,13 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               key: "aditivos",
               label: "Aditivos",
               badge: contrato.termosAditivos.length,
-              content: <AditivosTab aditivos={contrato.termosAditivos} contratoId={contrato.id} />,
+              content: (
+                <AditivosTab
+                  aditivos={contrato.termosAditivos}
+                  contratoId={contrato.id}
+                  contratoTipo={contrato.tipo}
+                />
+              ),
             },
             {
               key: "apostilamentos",
@@ -161,6 +186,39 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               label: "Dados",
               content: <DadosContrato c={contrato} />,
             },
+            {
+              key: "relatorio",
+              label: "Relatório",
+              content: (
+                <RelatorioContratacao
+                  rotuloRecurso="Contrato"
+                  contrato={{
+                    numero: contrato.numero,
+                    vigenciaInicio: contrato.vigenciaInicio,
+                    vigenciaFim: contrato.vigenciaFim,
+                    dataAssinatura: contrato.dataAssinatura,
+                    prazoEntregaDias: contrato.prazoEntregaDias,
+                    prazoPagamentoDias: contrato.prazoPagamentoDias,
+                    marcoOrcamentoEstimado: contrato.marcoOrcamentoEstimado,
+                    itens: contrato.itens.map((i) => ({ quantidade: i.quantidade, valorTotal: i.valorTotal })),
+                  }}
+                  saldo={saldo}
+                  qtdEmpenhos={contrato.empenhos.length}
+                  empenhosPagos={contrato.empenhos.filter((e) => e.status === "PAGO").length}
+                  qtdAditivos={contrato.termosAditivos.length}
+                  aditivos={contrato.termosAditivos.map((a) => ({
+                    alteraValor: a.alteraValor,
+                    novoValor: a.novoValor,
+                    alteraPrazoVigencia: a.alteraPrazoVigencia,
+                    novaVigenciaFim: a.novaVigenciaFim,
+                  }))}
+                  qtdApostilamentos={contrato.apostilamentos.length}
+                  qtdReajustes={contrato.reajustes.length}
+                  qtdNotificacoes={contrato.notificacoes.length}
+                  qtdProcedimentos={contrato.procedimentos.length}
+                />
+              ),
+            },
           ]}
         />
       </div>
@@ -207,17 +265,80 @@ function TabelaSaldoContrato({
   );
 }
 
-function EmpenhosVinculados({ empenhos }: { empenhos: { id: string; numero: string; status: string }[] }) {
+function empenhoEmExecucao(e: EmpenhoVinculado): boolean {
+  // Empenho está "em execução" quando saiu do estado inicial — ou status avançou,
+  // ou já há ao menos um marco posterior preenchido (caso editado retroativamente).
+  return (
+    e.status !== "EMPENHADO" ||
+    !!e.dataPedidoRecebido ||
+    !!e.dataDespacho ||
+    !!e.dataEntrega ||
+    !!e.dataNfEmitida ||
+    !!e.dataNfEncaminhada ||
+    !!e.dataPagamento
+  );
+}
+
+type EmpenhoVinculado = {
+  id: string;
+  numero: string;
+  status: string;
+  objeto: string;
+  dataEmissao: Date;
+  dataPedidoRecebido: Date | null;
+  dataDespacho: Date | null;
+  dataEntrega: Date | null;
+  dataNfEmitida: Date | null;
+  dataNfEncaminhada: Date | null;
+  dataPagamento: Date | null;
+};
+
+function EmpenhosVinculados({ empenhos }: { empenhos: EmpenhoVinculado[] }) {
   if (empenhos.length === 0)
     return <p className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">Nenhum empenho vinculado.</p>;
   return (
-    <div className="grid gap-2 md:grid-cols-2">
+    <div className="space-y-3">
       {empenhos.map((e) => (
-        <Link key={e.id} href={`/execucao/${e.id}`} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 hover:border-blue-300">
-          <Receipt className="h-4 w-4 text-amber-600" />
-          <div>
-            <div className="text-sm font-medium">Empenho {e.numero}</div>
-            <div className="text-xs text-slate-500">Status: {e.status}</div>
+        <Link
+          key={e.id}
+          href={`/execucao/${e.id}`}
+          className="block rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm"
+        >
+          <div className="flex items-start gap-3">
+            <Receipt className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-900">Empenho {e.numero}</p>
+                <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-800">
+                  {e.status.replace(/_/g, " ")}
+                </span>
+              </div>
+              {e.objeto && (
+                <p className="mt-0.5 truncate text-xs text-slate-500">{e.objeto}</p>
+              )}
+              {empenhoEmExecucao(e) ? (
+                <div className="mt-3">
+                  <TimelineExecucao
+                    status={e.status}
+                    comDatas
+                    compacta
+                    marcos={{
+                      EMPENHADO: e.dataEmissao,
+                      PEDIDO_RECEBIDO: e.dataPedidoRecebido,
+                      EM_TRANSITO: e.dataDespacho,
+                      ENTREGUE: e.dataEntrega,
+                      NF_EMITIDA: e.dataNfEmitida,
+                      NF_ENCAMINHADA: e.dataNfEncaminhada,
+                      PAGO: e.dataPagamento,
+                    }}
+                  />
+                </div>
+              ) : (
+                <p className="mt-3 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  Aguardando início da execução. Empenhado em {e.dataEmissao.toLocaleDateString("pt-BR")} — quando o órgão emitir a ordem de fornecimento, a barra de status aparecerá aqui.
+                </p>
+              )}
+            </div>
           </div>
         </Link>
       ))}
@@ -234,21 +355,76 @@ function DadosContrato({
     orgaoNome: string; orgaoCnpj: string; dataAssinatura: Date;
     dataPublicacao: Date | null; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null; prazoPagamentoDias: number | null;
+    modalidadeEntrega: string;
+    marcoInicialPrazo: string | null;
+    marcoInicialDescricao: string | null;
+    parcelas: { id: string; numero: number; prazoDias: number; descricao: string | null; valorEstimado: number | null }[];
   };
 }) {
+  const naoContinuado = isContratoNaoContinuado(c.tipo as Parameters<typeof isContratoNaoContinuado>[0]);
   return (
-    <div className="grid gap-x-8 gap-y-3 text-sm md:grid-cols-2">
-      <Info label="Tipo" valor={ROTULO_TIPO[c.tipo as keyof typeof ROTULO_TIPO]} />
-      <Info label="Procedimento" valor={ROTULO_PROCEDIMENTO[c.procedimentoSelecao as keyof typeof ROTULO_PROCEDIMENTO]} />
-      <Info label="Processo administrativo" valor={c.processoAdministrativo} />
-      <Info label="Nº Licitação" valor={c.numeroLicitacao || "—"} />
-      <Info label="Nota de Empenho de suporte" valor={c.numeroNotaEmpenho || "—"} />
-      <Info label="Órgão" valor={`${c.orgaoNome} (${formatarCnpj(c.orgaoCnpj)})`} />
-      <Info label="Data de assinatura" valor={c.dataAssinatura.toLocaleDateString("pt-BR")} />
-      <Info label="Data de publicação" valor={c.dataPublicacao?.toLocaleDateString("pt-BR") || "—"} />
-      <Info label="Vigência" valor={`${c.vigenciaInicio.toLocaleDateString("pt-BR")} → ${c.vigenciaFim.toLocaleDateString("pt-BR")}`} />
-      <Info label="Prazo de entrega" valor={c.prazoEntregaDias ? `${c.prazoEntregaDias} dias` : "—"} />
-      <Info label="Prazo de pagamento" valor={c.prazoPagamentoDias ? `${c.prazoPagamentoDias} dias` : "—"} />
+    <div className="space-y-6">
+      <div className="grid gap-x-8 gap-y-3 text-sm md:grid-cols-2">
+        <Info label="Tipo" valor={ROTULO_TIPO[c.tipo as keyof typeof ROTULO_TIPO]} />
+        <Info label="Procedimento" valor={ROTULO_PROCEDIMENTO[c.procedimentoSelecao as keyof typeof ROTULO_PROCEDIMENTO]} />
+        <Info label="Processo administrativo" valor={c.processoAdministrativo} />
+        <Info label="Nº Licitação" valor={c.numeroLicitacao || "—"} />
+        <Info label="Nota de Empenho de suporte" valor={c.numeroNotaEmpenho || "—"} />
+        <Info label="Órgão" valor={`${c.orgaoNome} (${formatarCnpj(c.orgaoCnpj)})`} />
+        <Info label="Data de assinatura" valor={c.dataAssinatura.toLocaleDateString("pt-BR")} />
+        <Info label="Data de publicação" valor={c.dataPublicacao?.toLocaleDateString("pt-BR") || "—"} />
+        <Info label="Vigência" valor={`${c.vigenciaInicio.toLocaleDateString("pt-BR")} → ${c.vigenciaFim.toLocaleDateString("pt-BR")}`} />
+        <Info label="Prazo de entrega" valor={c.prazoEntregaDias ? `${c.prazoEntregaDias} dias` : "—"} />
+        <Info label="Prazo de pagamento" valor={c.prazoPagamentoDias ? `${c.prazoPagamentoDias} dias` : "—"} />
+        <Info
+          label="Modalidade de entrega"
+          valor={ROTULO_MODALIDADE_ENTREGA[c.modalidadeEntrega as keyof typeof ROTULO_MODALIDADE_ENTREGA] || c.modalidadeEntrega}
+        />
+        <Info
+          label="Marco inicial do prazo"
+          valor={
+            c.modalidadeEntrega === "SOB_DEMANDA"
+              ? "—  (sob demanda)"
+              : c.marcoInicialPrazo === "OUTRO"
+                ? c.marcoInicialDescricao || "Outro documento hábil"
+                : ROTULO_MARCO_INICIAL[c.marcoInicialPrazo as keyof typeof ROTULO_MARCO_INICIAL] || "—"
+          }
+        />
+      </div>
+
+      {naoContinuado && (
+        <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          Contrato não-continuado (Lei 14.133): encerra após cumprimento da obrigação. <strong>Não admite prorrogação de vigência</strong> via termo aditivo. Reajustes, apostilamentos e alteração de prazo de entrega seguem permitidos.
+        </p>
+      )}
+
+      {c.modalidadeEntrega === "PARCELADA" && c.parcelas.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-slate-700">Cronograma de parcelas</h3>
+          <table className="w-full text-sm">
+            <thead className="text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-slate-200">
+                <th className="py-2 text-left font-medium">#</th>
+                <th className="py-2 text-left font-medium">Prazo</th>
+                <th className="py-2 text-left font-medium">Descrição</th>
+                <th className="py-2 text-right font-medium">Valor estimado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {c.parcelas.map((p) => (
+                <tr key={p.id} className="border-b border-slate-100">
+                  <td className="py-2 font-medium text-slate-700">{p.numero}</td>
+                  <td className="py-2 text-slate-600">{p.prazoDias} dias</td>
+                  <td className="py-2 text-slate-600">{p.descricao || "—"}</td>
+                  <td className="py-2 text-right tabular-nums text-slate-700">
+                    {p.valorEstimado ? brl(p.valorEstimado) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -266,6 +266,67 @@ function ManifestoBlock() {
           corporativo de R$ 17 mil.
         </p>
       </div>
+
+      {/* Vantagem competitiva — Inteligência Jurídica Nativa */}
+      <div className="mt-24 bg-[#0C1019] py-24">
+        <div className="mx-auto max-w-5xl px-6 text-white">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#F4D374]">
+            Vantagem competitiva
+          </p>
+          <h2 className="mt-4 text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl">
+            <span className="bg-gradient-to-r from-[#F4D374] via-[#D4AF37] to-[#B8860B] bg-clip-text text-transparent">
+              Inteligência Jurídica Nativa.
+            </span>
+            <br />
+            <span className="text-white">O fosso defensivo do CP System.</span>
+          </h2>
+          <p className="mt-8 max-w-3xl text-lg leading-relaxed text-slate-300 sm:text-xl">
+            O nosso fosso defensivo não é apenas o código.{" "}
+            <strong className="text-white">Não somos uma empresa de tecnologia tentando entender de licitação;
+            somos especialistas em licitação aplicando tecnologia.</strong>
+          </p>
+          <p className="mt-6 max-w-3xl text-lg leading-relaxed text-slate-300 sm:text-xl">
+            A plataforma é desenhada sob uma ótica{" "}
+            <span className="text-[#F4D374] font-semibold">Legal-Business-driven</span> — orientada para o mundo
+            jurídico e empresarial, garantindo que cada funcionalidade entregue
+            <span className="text-white"> conformidade legal (compliance)</span> e
+            <span className="text-white"> defesa estratégica</span>.
+          </p>
+          <p className="mt-6 max-w-3xl text-base leading-relaxed text-slate-400 sm:text-lg">
+            Um ativo impossível de ser replicado por empresas de software tradicionais.
+          </p>
+
+          <div className="mt-12 grid gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-[#D4AF37]/30 bg-white/5 p-6 backdrop-blur">
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#F4D374]">
+                Lei 14.133/2021
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                Cada regra do sistema (vigências, modalidades, prazos, prerrogativas, sanções,
+                reajuste, prorrogação, formalização) reflete o texto legal vigente.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#D4AF37]/30 bg-white/5 p-6 backdrop-blur">
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#F4D374]">
+                Compliance embutido
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                Bloqueios automáticos para movimentos não admitidos pela lei (ex.: contrato
+                não-continuado não aceita prorrogação de vigência).
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[#D4AF37]/30 bg-white/5 p-6 backdrop-blur">
+              <p className="text-xs font-semibold uppercase tracking-widest text-[#F4D374]">
+                Defesa estratégica
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">
+                Notificações, procedimentos apuratórios, garantias e equilíbrio econômico-financeiro
+                geridos com cabeça de jurista, não de planilhista.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

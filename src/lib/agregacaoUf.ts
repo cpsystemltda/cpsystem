@@ -80,9 +80,9 @@ export function extrairUf(endereco: string | null | undefined, cep?: string | nu
   return null;
 }
 
-export async function dadosPorUf(contaId: string): Promise<DadosUf[]> {
+export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Promise<DadosUf[]> {
   const empresas = await prisma.empresa.findMany({
-    where: { contaId },
+    where: empresaIdFiltro ? { contaId, id: empresaIdFiltro } : { contaId },
     select: { id: true, endereco: true, cep: true },
   });
 

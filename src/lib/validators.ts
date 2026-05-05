@@ -5,6 +5,24 @@ const cepRegex = /^\d{5}-?\d{3}$/;
 
 export const portes = ["MEI", "ME", "EPP", "MEDIA", "GRANDE"] as const;
 
+// Naturezas jurídicas mais comuns no contexto de licitação pública (Lei 14.133/2021).
+// Lista derivada da tabela oficial da Receita Federal — agrupada para uso prático.
+export const naturezasJuridicas = [
+  "EI",         // Empresário Individual
+  "EIRELI",     // Empresa Individual de Responsabilidade Limitada (extinta — mantido p/ legado)
+  "LTDA",       // Sociedade Empresária Limitada
+  "SLU",        // Sociedade Limitada Unipessoal
+  "SA_FECHADA", // Sociedade Anônima Fechada
+  "SA_ABERTA",  // Sociedade Anônima Aberta
+  "SS",         // Sociedade Simples
+  "COOPERATIVA",
+  "COOP_SOCIAL",
+  "SOC_PROFISSIONAL", // Sociedade entre Profissionais
+  "EMPRESA_PUBLICA",
+  "SEM_FINS_LUCRATIVOS",
+  "OUTRA",
+] as const;
+
 export const signupSchema = z.object({
   // Usuário
   nome: z.string().min(2, "Nome muito curto"),
@@ -17,7 +35,7 @@ export const signupSchema = z.object({
   cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
   porte: z.enum(portes),
   cnaePrincipal: z.string().min(4, "Informe o CNAE principal"),
-  naturezaJuridica: z.string().min(2, "Informe a natureza jurídica"),
+  naturezaJuridica: z.enum(naturezasJuridicas, { message: "Selecione a natureza jurídica" }),
   endereco: z.string().min(5, "Endereço muito curto"),
   cep: z.string().regex(cepRegex, "CEP inválido"),
   emailEmpresa: z.string().email("E-mail da empresa inválido"),
@@ -30,22 +48,50 @@ export const loginSchema = z.object({
   senha: z.string().min(1, "Senha obrigatória"),
 });
 
-export const novaEmpresaSchema = z.object({
-  razaoSocial: z.string().min(2),
-  nomeFantasia: z.string().optional(),
-  cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
-  porte: z.enum(portes),
-  cnaePrincipal: z.string().min(4),
-  cnaesSecundarios: z.string().optional(),
-  naturezaJuridica: z.string().min(2),
-  endereco: z.string().min(5),
-  cep: z.string().regex(cepRegex, "CEP inválido"),
-  email: z.string().email(),
-  telefones: z.string().min(8),
-  responsavel: z.string().min(2),
-});
+export const novaEmpresaSchema = z
+  .object({
+    razaoSocial: z.string().min(2),
+    nomeFantasia: z.string().optional(),
+    cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
+    porte: z.enum(portes),
+    cnaePrincipal: z.string().min(4),
+    cnaesSecundarios: z.string().optional(),
+    naturezaJuridica: z.enum(naturezasJuridicas),
+    endereco: z.string().min(5),
+    cep: z.string().regex(cepRegex, "CEP inválido"),
+    email: z.string().email(),
+    telefones: z.string().min(8),
+    responsavel: z.string().min(2),
+    // Senha do "usuário-responsável" desta empresa (opcional). Quando preenchida, o sistema
+    // cria um Usuario perfil OPERACIONAL atrelado à conta para este responsável.
+    senha: z.string().optional(),
+    confirmacaoSenha: z.string().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.senha || v.confirmacaoSenha) {
+      if (!v.senha || v.senha.length < 8) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["senha"], message: "Senha mínima de 8 caracteres." });
+      }
+      if (v.senha !== v.confirmacaoSenha) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["confirmacaoSenha"],
+          message: "Confirmação não confere com a senha informada.",
+        });
+      }
+    }
+  });
 
 export const tiposObjeto = ["FORNECIMENTO", "FORNECIMENTO_CONTINUO", "SERVICOS", "SERVICOS_CONTINUOS"] as const;
+
+// Tipos não-continuados (fluxograma do contrato independente: não permitem prorrogação).
+export const tiposNaoContinuados = ["FORNECIMENTO", "SERVICOS"] as const;
+export function isContratoNaoContinuado(tipo: (typeof tiposObjeto)[number]): boolean {
+  return (tiposNaoContinuados as readonly string[]).includes(tipo);
+}
+
+export const modalidadesEntrega = ["INTEGRAL", "PARCELADA", "SOB_DEMANDA"] as const;
+export const marcosIniciaisPrazo = ["ASSINATURA_CONTRATO", "ORDEM_FORNECIMENTO", "OUTRO"] as const;
 export const procedimentosSelecao = [
   "PREGAO_ELETRONICO",
   "PREGAO_ELETRONICO_INTERNACIONAL",
@@ -87,27 +133,82 @@ const contratacaoBase = z.object({
   marcoOrcamentoEstimado: z.coerce.date().optional(),
 });
 
+const enderecoEntregaSchema = z.object({
+  rotulo: z.string().optional(),
+  endereco: z.string().min(5, "Endereço muito curto"),
+});
+
+const pontoFocalSchema = z.object({
+  funcao: z.enum(["GESTOR", "FISCAL_TECNICO", "FISCAL_ADMINISTRATIVO", "RESPONSAVEL_SETOR", "CONTATO_GERAL"]),
+  nome: z.string().min(2, "Informe o nome"),
+  email: z.string().email().optional().or(z.literal("")),
+  telefone: z.string().optional(),
+});
+
 export const novaAtaSchema = contratacaoBase.extend({
   numeroAta: z.string().optional(),
   dataAssinatura: z.coerce.date(),
   dataPublicacao: z.coerce.date().optional(),
   aceitaCarona: z.coerce.boolean().optional(),
   idAtaPncp: z.string().optional(),
+  enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
+  pontosFocais: z.array(pontoFocalSchema).optional(),
   itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
 });
 
-export const novoContratoSchema = contratacaoBase.extend({
-  ataId: z.string().optional(),
-  numeroNotaEmpenho: z.string().optional(),
-  dataAssinatura: z.coerce.date(),
-  dataPublicacao: z.coerce.date().optional(),
-  itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
+const parcelaSchema = z.object({
+  numero: z.coerce.number().int().positive(),
+  prazoDias: z.coerce.number().int().nonnegative(),
+  descricao: z.string().optional(),
+  valorEstimado: z.coerce.number().nonnegative().optional(),
 });
+
+export const novoContratoSchema = contratacaoBase
+  .extend({
+    ataId: z.string().optional(),
+    numeroNotaEmpenho: z.string().optional(),
+    numeroOrdemFornecimento: z.string().optional(),
+    dataAssinatura: z.coerce.date(),
+    dataPublicacao: z.coerce.date().optional(),
+    modalidadeEntrega: z.enum(modalidadesEntrega).default("INTEGRAL"),
+    marcoInicialPrazo: z.enum(marcosIniciaisPrazo).optional(),
+    marcoInicialDescricao: z.string().optional(),
+    parcelas: z.array(parcelaSchema).optional(),
+    enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
+    pontosFocais: z.array(pontoFocalSchema).optional(),
+    itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
+  })
+  .superRefine((v, ctx) => {
+    if (v.modalidadeEntrega !== "SOB_DEMANDA" && !v.marcoInicialPrazo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["marcoInicialPrazo"],
+        message: "Selecione o marco inicial do prazo de entrega",
+      });
+    }
+    if (v.marcoInicialPrazo === "OUTRO" && !v.marcoInicialDescricao?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["marcoInicialDescricao"],
+        message: "Descreva qual o marco inicial",
+      });
+    }
+    if (v.modalidadeEntrega === "PARCELADA" && (!v.parcelas || v.parcelas.length < 2)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["parcelas"],
+        message: "Em entrega parcelada, informe ao menos 2 parcelas",
+      });
+    }
+  });
 
 export const novoEmpenhoSchema = contratacaoBase.extend({
   ataId: z.string().optional(),
   contratoId: z.string().optional(),
+  numeroOrdemFornecimento: z.string().optional(),
   dataEmissao: z.coerce.date(),
+  enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
+  pontosFocais: z.array(pontoFocalSchema).optional(),
   itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
 });
 
@@ -164,12 +265,47 @@ export function formatarCnpj(cnpj: string): string {
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
+export const ROTULO_NATUREZA_JURIDICA: Record<(typeof naturezasJuridicas)[number], string> = {
+  EI: "Empresário Individual (EI)",
+  EIRELI: "EIRELI (legado — extinta em 2021)",
+  LTDA: "Sociedade Empresária Limitada (LTDA)",
+  SLU: "Sociedade Limitada Unipessoal (SLU)",
+  SA_FECHADA: "Sociedade Anônima — Capital Fechado",
+  SA_ABERTA: "Sociedade Anônima — Capital Aberto",
+  SS: "Sociedade Simples (SS)",
+  COOPERATIVA: "Cooperativa",
+  COOP_SOCIAL: "Cooperativa Social",
+  SOC_PROFISSIONAL: "Sociedade entre Profissionais",
+  EMPRESA_PUBLICA: "Empresa Pública / Sociedade de Economia Mista",
+  SEM_FINS_LUCRATIVOS: "Associação ou Fundação (sem fins lucrativos)",
+  OUTRA: "Outra natureza jurídica",
+};
+
+export const OPCOES_NATUREZA_JURIDICA = (
+  Object.entries(ROTULO_NATUREZA_JURIDICA) as [string, string][]
+).map(([value, label]) => ({ value, label }));
+
 export const ROTULO_TIPO: Record<(typeof tiposObjeto)[number], string> = {
   FORNECIMENTO: "Fornecimento",
   FORNECIMENTO_CONTINUO: "Fornecimento contínuo",
   SERVICOS: "Serviços",
   SERVICOS_CONTINUOS: "Serviços contínuos",
 };
+
+export const ROTULO_MODALIDADE_ENTREGA: Record<(typeof modalidadesEntrega)[number], string> = {
+  INTEGRAL: "Integral (todo quantitativo de uma vez)",
+  PARCELADA: "Parcelada (lotes com prazos distintos)",
+  SOB_DEMANDA: "Sob demanda (quantidade estimativa)",
+};
+
+export const ROTULO_MARCO_INICIAL: Record<(typeof marcosIniciaisPrazo)[number], string> = {
+  ASSINATURA_CONTRATO: "Assinatura do contrato",
+  ORDEM_FORNECIMENTO: "Recebimento da ordem de fornecimento",
+  OUTRO: "Outro documento hábil (descrever)",
+};
+
+export const OPCOES_MODALIDADE_ENTREGA = (Object.entries(ROTULO_MODALIDADE_ENTREGA) as [string, string][]).map(([value, label]) => ({ value, label }));
+export const OPCOES_MARCO_INICIAL = (Object.entries(ROTULO_MARCO_INICIAL) as [string, string][]).map(([value, label]) => ({ value, label }));
 
 export const ROTULO_PROCEDIMENTO: Record<(typeof procedimentosSelecao)[number], string> = {
   PREGAO_ELETRONICO: "Pregão Eletrônico",

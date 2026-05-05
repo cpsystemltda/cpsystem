@@ -12,6 +12,8 @@ import {
   Building2,
 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
+import { filtroEmpresaWhere } from "@/lib/empresaContexto";
+import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { prisma } from "@/lib/prisma";
 import { TimelineExecucao } from "@/components/TimelineExecucao";
 
@@ -40,13 +42,14 @@ export default async function OperacaoPage({
   const hoje = new Date();
   const em30dias = new Date(hoje.getTime() + 30 * 86400000);
   const contaId = usuario.contaId;
+  const filtroEmpresa = await filtroEmpresaWhere(contaId);
 
   // Carrega tudo de uma vez
   const [empenhosEmExecucao, contratosPertoVencer, notificacoesAbertas, procedimentosAbertos, contadores] =
     await Promise.all([
       // Em execução: empenhos não pagos
       prisma.empenho.findMany({
-        where: { empresa: { contaId }, status: { not: "PAGO" } },
+        where: { empresa: filtroEmpresa, status: { not: "PAGO" } },
         include: {
           empresa: { select: { nomeFantasia: true, razaoSocial: true } },
           itens: { select: { valorTotal: true } },
@@ -56,7 +59,7 @@ export default async function OperacaoPage({
       // Perto de vencer: contratos + atas com vigenciaFim em ≤ 30 dias
       prisma.contrato.findMany({
         where: {
-          empresa: { contaId },
+          empresa: filtroEmpresa,
           vigenciaFim: { gte: hoje, lte: em30dias },
         },
         include: {
@@ -70,9 +73,9 @@ export default async function OperacaoPage({
         where: {
           status: { in: ["RECEBIDA", "EM_TRATATIVA"] },
           OR: [
-            { ata: { empresa: { contaId } } },
-            { contrato: { empresa: { contaId } } },
-            { empenho: { empresa: { contaId } } },
+            { ata: { empresa: filtroEmpresa } },
+            { contrato: { empresa: filtroEmpresa } },
+            { empenho: { empresa: filtroEmpresa } },
           ],
         },
         include: {
@@ -87,9 +90,9 @@ export default async function OperacaoPage({
         where: {
           arquivado: false,
           OR: [
-            { ata: { empresa: { contaId } } },
-            { contrato: { empresa: { contaId } } },
-            { empenho: { empresa: { contaId } } },
+            { ata: { empresa: filtroEmpresa } },
+            { contrato: { empresa: filtroEmpresa } },
+            { empenho: { empresa: filtroEmpresa } },
           ],
         },
         include: {
@@ -112,6 +115,7 @@ export default async function OperacaoPage({
 
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
+      <BannerEmpresaEmFoco contaId={contaId} />
       {/* Header */}
       <div className="flex items-end justify-between gap-6">
         <div>

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { salvarArquivo } from "@/lib/uploads";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { isContratoNaoContinuado, ROTULO_TIPO } from "@/lib/validators";
 
 type Result = { erro?: string; ok?: boolean };
 type Vinculo = { contratoId?: string; empenhoId?: string };
@@ -15,7 +16,7 @@ async function validarVinculo(usuario: { contaId: string }, v: Vinculo) {
       where: { id: v.contratoId, empresa: { contaId: usuario.contaId } },
     });
     if (!c) throw new Error("Contrato inválido.");
-    return { contratoId: c.id, paiPath: `/contratos/${c.id}` };
+    return { contratoId: c.id, contratoTipo: c.tipo, paiPath: `/contratos/${c.id}` };
   }
   if (v.empenhoId) {
     const e = await prisma.empenho.findFirst({
@@ -39,6 +40,20 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
 
   try {
     const link = await validarVinculo(usuario, v);
+    const alteraPrazoVigencia = formData.get("alteraPrazoVigencia") === "on";
+
+    // Lei 14.133 — fluxograma do contrato não-continuado: prorrogação de vigência
+    // não é admissível. O contrato encerra após cumprimento (entrega + pagamento).
+    if (
+      alteraPrazoVigencia &&
+      link.contratoTipo &&
+      isContratoNaoContinuado(link.contratoTipo)
+    ) {
+      return {
+        erro: `Contratos do tipo "${ROTULO_TIPO[link.contratoTipo]}" não admitem prorrogação de vigência (Lei 14.133 — fluxograma do contrato independente). Para alterar valor, prazo de entrega ou outra natureza, mantenha "Altera prazo de vigência" desmarcado.`,
+      };
+    }
+
     const file = formData.get("arquivo") as File | null;
     let arquivoPdfUrl: string | undefined;
     if (file && file.size > 0) {
@@ -54,7 +69,7 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
         natureza: String(formData.get("natureza") || ""),
         alteraValor: formData.get("alteraValor") === "on",
         novoValor: formData.get("novoValor") ? Number(formData.get("novoValor")) : null,
-        alteraPrazoVigencia: formData.get("alteraPrazoVigencia") === "on",
+        alteraPrazoVigencia,
         novaVigenciaFim: formData.get("novaVigenciaFim") ? new Date(String(formData.get("novaVigenciaFim"))) : null,
         alteraPrazoEntrega: formData.get("alteraPrazoEntrega") === "on",
         novoPrazoEntregaDias: formData.get("novoPrazoEntregaDias")

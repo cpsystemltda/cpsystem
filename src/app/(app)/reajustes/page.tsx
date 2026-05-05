@@ -3,15 +3,18 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { TrendingUp, AlertTriangle } from "lucide-react";
+import { filtroEmpresaWhere } from "@/lib/empresaContexto";
+import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 
 export default async function ReajustesPage() {
   const usuario = await exigirUsuario();
+  const filtroEmpresa = await filtroEmpresaWhere(usuario.contaId);
 
   const reajustes = await prisma.reajuste.findMany({
     where: {
       OR: [
-        { contrato: { empresa: { contaId: usuario.contaId } } },
-        { empenho: { empresa: { contaId: usuario.contaId } } },
+        { contrato: { empresa: filtroEmpresa } },
+        { empenho: { empresa: filtroEmpresa } },
       ],
     },
     include: {
@@ -24,11 +27,11 @@ export default async function ReajustesPage() {
   // Janelas de reajuste: contratos/atas/empenhos com marcoOrcamentoEstimado entre -60d e +60d da virada do ano
   const hoje = Date.now();
   const atasComMarco = await prisma.ata.findMany({
-    where: { empresa: { contaId: usuario.contaId }, marcoOrcamentoEstimado: { not: null } },
+    where: { empresa: filtroEmpresa, marcoOrcamentoEstimado: { not: null } },
     select: { id: true, numero: true, objeto: true, marcoOrcamentoEstimado: true },
   });
   const contratosComMarco = await prisma.contrato.findMany({
-    where: { empresa: { contaId: usuario.contaId }, marcoOrcamentoEstimado: { not: null } },
+    where: { empresa: filtroEmpresa, marcoOrcamentoEstimado: { not: null } },
     select: { id: true, numero: true, objeto: true, marcoOrcamentoEstimado: true },
   });
 
@@ -66,6 +69,7 @@ export default async function ReajustesPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
+      <BannerEmpresaEmFoco contaId={usuario.contaId} />
       <div className="flex items-start gap-3">
         <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50">
           <TrendingUp className="h-5 w-5 text-blue-700" />

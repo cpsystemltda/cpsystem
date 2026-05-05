@@ -2,14 +2,21 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, MapPin, Users, FileSignature } from "lucide-react";
 import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor, type AtaItemRef } from "@/components/ItensEditor";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
+import { EnderecosEntregaEditor, PontosFocaisEditor } from "@/components/EditoresOrgao";
 import { criarContratoAction } from "@/app/actions/contratacoes";
 import { extrairContratoPdfAction } from "@/app/actions/iaExtracao";
-import { OPCOES_PROCEDIMENTO, OPCOES_TIPO } from "@/lib/validators";
+import {
+  OPCOES_PROCEDIMENTO,
+  OPCOES_TIPO,
+  OPCOES_MODALIDADE_ENTREGA,
+  OPCOES_MARCO_INICIAL,
+} from "@/lib/validators";
+import { Plus, Trash2 } from "lucide-react";
 import type { ContratoExtraido } from "@/lib/extrairAta";
 
 type EmpresaOpt = { value: string; label: string };
@@ -19,7 +26,10 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
   const [state, formAction] = useActionState(criarContratoAction, null);
   const e = state?.campos ?? {};
   const [ataId, setAtaId] = useState("");
+  const [vinculadoArp, setVinculadoArp] = useState<"SIM" | "NAO">(atas.length > 0 ? "NAO" : "NAO");
   const [dados, setDados] = useState<ContratoExtraido | null>(null);
+  const [modalidadeEntrega, setModalidadeEntrega] = useState<"INTEGRAL" | "PARCELADA" | "SOB_DEMANDA">("INTEGRAL");
+  const [marcoInicialPrazo, setMarcoInicialPrazo] = useState<string>("");
 
   const ataSelecionada = atas.find((a) => a.value === ataId);
   const formKey = dados ? `auto-${dados.numero}` : "manual";
@@ -55,14 +65,54 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
           <div className="grid grid-cols-4 gap-4">
             <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} />
             <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} />
-            <Select
-              label="Vincular a uma Ata? (opcional)"
-              name="ataId"
-              options={atas.map((a) => ({ value: a.value, label: a.label }))}
-              span={2}
-              value={ataId}
-              onChange={(ev) => setAtaId(ev.currentTarget.value)}
-            />
+
+            {/* Toggle Vinculado a ARP */}
+            <div className="col-span-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex flex-wrap items-center gap-4">
+                <span className="text-sm font-semibold text-slate-700">
+                  Este contrato é derivado de uma ARP (Ata de Registro de Preços)?
+                </span>
+                <label className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="radio"
+                    name="vinculadoArp"
+                    value="SIM"
+                    checked={vinculadoArp === "SIM"}
+                    onChange={() => setVinculadoArp("SIM")}
+                  />
+                  Sim
+                </label>
+                <label className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="radio"
+                    name="vinculadoArp"
+                    value="NAO"
+                    checked={vinculadoArp === "NAO"}
+                    onChange={() => {
+                      setVinculadoArp("NAO");
+                      setAtaId("");
+                    }}
+                  />
+                  Não, é contrato direto
+                </label>
+              </div>
+              {vinculadoArp === "SIM" && (
+                <div className="mt-3">
+                  <Select
+                    label="Qual a ARP?"
+                    name="ataId"
+                    options={atas.map((a) => ({ value: a.value, label: a.label }))}
+                    required={vinculadoArp === "SIM"}
+                    value={ataId}
+                    onChange={(ev) => setAtaId(ev.currentTarget.value)}
+                  />
+                  <p className="mt-1.5 text-xs text-emerald-700">
+                    O sistema vai abater automaticamente o saldo dos itens da ARP escolhida.
+                  </p>
+                </div>
+              )}
+            </div>
+
             <Field
               label="Número do Contrato (nº/ano)"
               name="numero"
@@ -77,6 +127,13 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               erro={e.numeroNotaEmpenho}
               span={1}
               defaultValue={dados?.numeroNotaEmpenho ?? ""}
+            />
+            <Field
+              label="Nº da Ordem de Fornecimento (se houver)"
+              name="numeroOrdemFornecimento"
+              placeholder="OF nº/ano"
+              erro={e.numeroOrdemFornecimento}
+              span={2}
             />
             <Field
               label="Processo administrativo"
@@ -223,6 +280,85 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
           </div>
         </Secao>
 
+        <Secao titulo="Modalidade de entrega">
+          <p className="mb-4 text-xs text-slate-600">
+            Conforme Lei 14.133 (fluxograma do contrato independente). Em entrega
+            parcelada, cada parcela gera nota fiscal e pagamento próprios.
+          </p>
+          <div className="grid grid-cols-4 gap-4">
+            <Select
+              label="Como será entregue?"
+              name="modalidadeEntrega"
+              options={OPCOES_MODALIDADE_ENTREGA}
+              required
+              erro={e.modalidadeEntrega}
+              span={2}
+              value={modalidadeEntrega}
+              onChange={(ev) =>
+                setModalidadeEntrega(ev.currentTarget.value as "INTEGRAL" | "PARCELADA" | "SOB_DEMANDA")
+              }
+            />
+
+            {modalidadeEntrega !== "SOB_DEMANDA" && (
+              <Select
+                label="O prazo de entrega começa a contar de"
+                name="marcoInicialPrazo"
+                options={OPCOES_MARCO_INICIAL}
+                required
+                erro={e.marcoInicialPrazo}
+                span={2}
+                value={marcoInicialPrazo}
+                onChange={(ev) => setMarcoInicialPrazo(ev.currentTarget.value)}
+              />
+            )}
+
+            {marcoInicialPrazo === "OUTRO" && modalidadeEntrega !== "SOB_DEMANDA" && (
+              <Field
+                label="Descreva o documento hábil"
+                name="marcoInicialDescricao"
+                placeholder='Ex: "ordem de serviço", "termo de recebimento", etc.'
+                required
+                erro={e.marcoInicialDescricao}
+                span={4}
+              />
+            )}
+          </div>
+
+          {modalidadeEntrega === "PARCELADA" && (
+            <div className="mt-6">
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">Cronograma de parcelas</h3>
+              <p className="mb-3 text-xs text-slate-600">
+                Cada parcela é entregue em prazo distinto (contado a partir do marco inicial). A
+                cada parcela cumprida, emite-se nota fiscal e o órgão paga.
+              </p>
+              <ParcelasEditor erro={e.parcelas} />
+            </div>
+          )}
+
+          {modalidadeEntrega === "SOB_DEMANDA" && (
+            <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Quantidade estimativa, sem cronograma fixo. Cada empenho/AF puxa do saldo do
+              contrato — equivalente operacional a uma Ata, mas formalizado por Termo de Contrato.
+            </p>
+          )}
+        </Secao>
+
+        <Secao titulo="Endereços de entrega/execução">
+          <p className="mb-3 text-xs text-slate-600">
+            Locais onde o contrato será cumprido. Os empenhos derivados podem referenciar
+            qualquer um deles.
+          </p>
+          <EnderecosEntregaEditor />
+        </Secao>
+
+        <Secao titulo="Pontos focais do órgão (Lei 14.133 art. 117)">
+          <p className="mb-3 text-xs text-slate-600">
+            Pessoas-chave para gestão e fiscalização. Adicione pelo menos o Gestor — Fiscais
+            Técnico e Administrativo são recomendados.
+          </p>
+          <PontosFocaisEditor />
+        </Secao>
+
         <Secao titulo="Itens contratados">
           {ataSelecionada && (
             <p className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
@@ -258,5 +394,117 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
       <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">{titulo}</h2>
       {children}
     </section>
+  );
+}
+
+type ParcelaState = { numero: number; prazoDias: string; descricao: string; valorEstimado: string };
+
+function ParcelasEditor({ erro }: { erro?: string }) {
+  const [parcelas, setParcelas] = useState<ParcelaState[]>([
+    { numero: 1, prazoDias: "30", descricao: "", valorEstimado: "" },
+    { numero: 2, prazoDias: "60", descricao: "", valorEstimado: "" },
+  ]);
+
+  const atualizar = (idx: number, campo: keyof ParcelaState, valor: string) => {
+    setParcelas((prev) =>
+      prev.map((p, i) => (i === idx ? { ...p, [campo]: campo === "numero" ? Number(valor) : valor } : p)),
+    );
+  };
+
+  const adicionar = () => {
+    setParcelas((prev) => [
+      ...prev,
+      { numero: prev.length + 1, prazoDias: "", descricao: "", valorEstimado: "" },
+    ]);
+  };
+
+  const remover = (idx: number) => {
+    if (parcelas.length <= 2) return;
+    setParcelas((prev) => prev.filter((_, i) => i !== idx).map((p, i) => ({ ...p, numero: i + 1 })));
+  };
+
+  return (
+    <div>
+      {erro && (
+        <p className="mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {erro}
+        </p>
+      )}
+      <table className="w-full text-sm">
+        <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <tr className="border-b border-slate-200">
+            <th className="py-2 text-left font-medium">#</th>
+            <th className="py-2 text-left font-medium">Prazo (dias)</th>
+            <th className="py-2 text-left font-medium">Descrição (opcional)</th>
+            <th className="py-2 text-left font-medium">Valor estimado</th>
+            <th className="py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {parcelas.map((p, idx) => (
+            <tr key={idx} className="border-b border-slate-100">
+              <td className="py-2 pr-2">
+                <input
+                  type="hidden"
+                  name={`parcelas[${idx}][numero]`}
+                  value={p.numero}
+                />
+                <span className="text-sm font-medium text-slate-700">{p.numero}</span>
+              </td>
+              <td className="py-2 pr-2">
+                <input
+                  type="number"
+                  min="0"
+                  name={`parcelas[${idx}][prazoDias]`}
+                  value={p.prazoDias}
+                  onChange={(ev) => atualizar(idx, "prazoDias", ev.currentTarget.value)}
+                  className="w-24 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  required
+                />
+              </td>
+              <td className="py-2 pr-2">
+                <input
+                  type="text"
+                  name={`parcelas[${idx}][descricao]`}
+                  value={p.descricao}
+                  onChange={(ev) => atualizar(idx, "descricao", ev.currentTarget.value)}
+                  placeholder="ex: 50 computadores DELL Inspiron"
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                />
+              </td>
+              <td className="py-2 pr-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name={`parcelas[${idx}][valorEstimado]`}
+                  value={p.valorEstimado}
+                  onChange={(ev) => atualizar(idx, "valorEstimado", ev.currentTarget.value)}
+                  className="w-32 rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                />
+              </td>
+              <td className="py-2">
+                <button
+                  type="button"
+                  onClick={() => remover(idx)}
+                  disabled={parcelas.length <= 2}
+                  className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-40"
+                  title="Remover parcela"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button
+        type="button"
+        onClick={adicionar}
+        className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+      >
+        <Plus className="h-3.5 w-3.5" /> Adicionar parcela
+      </button>
+    </div>
   );
 }

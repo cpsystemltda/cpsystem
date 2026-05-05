@@ -6,12 +6,12 @@ import { trocarVisaoAction, type Visao } from "@/lib/visao";
 
 const ROTULOS: Record<Visao, { titulo: string; sub: string; icon: React.ComponentType<{ className?: string }> }> = {
   ADMIN_PLATAFORMA: {
-    titulo: "Gestor da plataforma",
-    sub: "Visão de todos os clientes",
+    titulo: "Adm CP System",
+    sub: "Clientes, recorrência e vencimentos",
     icon: Crown,
   },
-  EMPRESA: { titulo: "Empresa fornecedora", sub: "Operação dia a dia", icon: Building2 },
-  ANALISTA: { titulo: "Analista de licitação", sub: "Empresas e comissões", icon: UserCheck },
+  EMPRESA: { titulo: "Empresa (multiempresas)", sub: "Até 4 CNPJs no mesmo grupo", icon: Building2 },
+  ANALISTA: { titulo: "Analista de licitações", sub: "Empresas e comissões", icon: UserCheck },
 };
 
 export function SeletorVisao({ visaoAtual }: { visaoAtual: Visao }) {

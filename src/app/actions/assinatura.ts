@@ -204,52 +204,13 @@ export async function ativarPlano(contaId: string, plano: Plano) {
   revalidatePath("/conta/assinatura");
 }
 
-// Régua de cobrança — manualmente acionada pelo admin no MVP
-// Em produção: cron job (Vercel Cron, GitHub Actions, etc.)
+// Régua de cobrança — disparo manual pelo admin (também roda automaticamente via Vercel Cron).
+// A lógica fica em `@/lib/regua` para ser reutilizada pelo endpoint /api/cron/regua-cobranca.
 export async function executarReguaCobrancaAction(_p: Result | null, _formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
-
-  const hoje = new Date();
-  const em3dias = new Date(hoje.getTime() + 3 * 86400000);
-
-  // 1. Cobranças vencendo em 3 dias → enviar aviso (registra log; integração WhatsApp/email vem depois)
-  const aVencer = await prisma.cobranca.findMany({
-    where: { status: "PENDENTE", vencimento: { gte: hoje, lte: em3dias } },
-    include: { conta: { include: { usuarios: { take: 1 } } } },
-  });
-  for (const c of aVencer) {
-    await registrarAuditoria({
-      contaId: c.contaId,
-      acao: "ATUALIZAR",
-      recurso: "Cobranca",
-      recursoId: c.id,
-      resumo: `Aviso de vencimento enviado (TODO: e-mail/WhatsApp) — ${c.conta.usuarios[0]?.email || "?"}`,
-    });
-  }
-
-  // 2. Cobranças vencidas há mais de 3 dias → marcar ATRASADA
-  const ha3dias = new Date(hoje.getTime() - 3 * 86400000);
-  const vencidas = await prisma.cobranca.findMany({
-    where: { status: "PENDENTE", vencimento: { lt: ha3dias } },
-  });
-  for (const c of vencidas) {
-    await prisma.cobranca.update({ where: { id: c.id }, data: { status: "ATRASADA" } });
-  }
-
-  // 3. Contas com cobrança ATRASADA há mais de 7 dias → bloquear
-  const ha7dias = new Date(hoje.getTime() - 7 * 86400000);
-  const aBloquear = await prisma.cobranca.findMany({
-    where: { status: "ATRASADA", vencimento: { lt: ha7dias } },
-    distinct: ["contaId"],
-  });
-  for (const c of aBloquear) {
-    await prisma.conta.update({
-      where: { id: c.contaId },
-      data: { statusAssinatura: "INADIMPLENTE", bloqueadoEm: new Date() },
-    });
-  }
-
+  const { executarRegua } = await import("@/lib/regua");
+  await executarRegua();
   return { ok: true };
 }
 

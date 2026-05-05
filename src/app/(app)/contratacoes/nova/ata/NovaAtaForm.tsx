@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
-import { ChevronLeft, Sparkles, Upload, Check, AlertCircle, Loader2 } from "lucide-react";
+import { ChevronLeft, Sparkles, Upload, Check, AlertCircle, Loader2, Plus, Trash2, MapPin, Users } from "lucide-react";
 import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor } from "@/components/ItensEditor";
@@ -292,16 +292,40 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               erro={e.marcoOrcamentoEstimado}
               span={2}
             />
-            <label className="col-span-4 flex items-center gap-2 text-sm">
+            <label className="col-span-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
               <input
                 type="checkbox"
                 name="aceitaCarona"
-                className="rounded border-slate-300"
+                className="mt-0.5 rounded border-slate-300"
                 defaultChecked={dados?.aceitaCarona}
               />
-              <span>Esta Ata aceita adesão (carona) por outros órgãos</span>
+              <span className="text-amber-900">
+                Esta Ata aceita adesão (carona) por outros órgãos.
+                <br />
+                <span className="text-xs">
+                  Lei 14.133/2021 art. 86: limite de <strong>50% por órgão</strong> e
+                  <strong> 100% no total</strong>. O sistema monitora os limites automaticamente
+                  conforme caronas vão sendo registradas.
+                </span>
+              </span>
             </label>
           </div>
+        </Secao>
+
+        <Secao titulo="Endereços de entrega" icone={MapPin}>
+          <p className="mb-3 text-xs text-slate-600">
+            Cadastre todos os endereços onde o órgão pode pedir entrega. O contrato e os
+            empenhos derivados poderão referenciar qualquer um deles.
+          </p>
+          <EnderecosEntregaEditor />
+        </Secao>
+
+        <Secao titulo="Pontos focais do órgão" icone={Users}>
+          <p className="mb-3 text-xs text-slate-600">
+            Pessoas-chave para gestão e fiscalização do contrato (Lei 14.133, art. 117).
+            Adicione pelo menos o Gestor — Fiscais Técnico e Administrativo são recomendados.
+          </p>
+          <PontosFocaisEditor />
         </Secao>
 
         <Secao titulo="Itens registrados">
@@ -328,11 +352,120 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
   );
 }
 
-function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Secao({
+  titulo,
+  icone: Icone,
+  children,
+}: {
+  titulo: string;
+  icone?: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">{titulo}</h2>
+      <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        {Icone && <Icone className="h-4 w-4 text-slate-400" />}
+        {titulo}
+      </h2>
       {children}
     </section>
+  );
+}
+
+function EnderecosEntregaEditor() {
+  const [enderecos, setEnderecos] = useState<{ rotulo: string; endereco: string }[]>([
+    { rotulo: "", endereco: "" },
+  ]);
+
+  const atualizar = (idx: number, campo: "rotulo" | "endereco", valor: string) => {
+    setEnderecos((prev) => prev.map((e, i) => (i === idx ? { ...e, [campo]: valor } : e)));
+  };
+  const adicionar = () => setEnderecos((prev) => [...prev, { rotulo: "", endereco: "" }]);
+  const remover = (idx: number) =>
+    setEnderecos((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+
+  return (
+    <div className="space-y-2">
+      {enderecos.map((e, idx) => (
+        <div key={idx} className="grid grid-cols-12 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <input
+            type="text"
+            placeholder="Rótulo (ex: Almoxarifado central)"
+            name={`enderecosEntrega[${idx}][rotulo]`}
+            value={e.rotulo}
+            onChange={(ev) => atualizar(idx, "rotulo", ev.currentTarget.value)}
+            className="col-span-3 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Endereço completo (rua, nº, bairro, cidade/UF, CEP)"
+            name={`enderecosEntrega[${idx}][endereco]`}
+            value={e.endereco}
+            onChange={(ev) => atualizar(idx, "endereco", ev.currentTarget.value)}
+            className="col-span-8 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => remover(idx)}
+            disabled={enderecos.length <= 1}
+            className="col-span-1 grid place-items-center rounded-md text-slate-400 hover:bg-white hover:text-red-600 disabled:opacity-40"
+            title="Remover endereço"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={adicionar}
+        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+      >
+        <Plus className="h-3.5 w-3.5" /> Adicionar endereço de entrega
+      </button>
+    </div>
+  );
+}
+
+const FUNCOES_PADRAO: { funcao: "GESTOR" | "FISCAL_TECNICO" | "FISCAL_ADMINISTRATIVO"; rotulo: string }[] = [
+  { funcao: "GESTOR", rotulo: "Gestor do contrato" },
+  { funcao: "FISCAL_TECNICO", rotulo: "Fiscal técnico" },
+  { funcao: "FISCAL_ADMINISTRATIVO", rotulo: "Fiscal administrativo" },
+];
+
+function PontosFocaisEditor() {
+  return (
+    <div className="space-y-3">
+      {FUNCOES_PADRAO.map((f, idx) => (
+        <div key={f.funcao} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              {f.rotulo}
+            </span>
+            <span className="text-[10px] text-slate-400">opcional</span>
+          </div>
+          <input type="hidden" name={`pontosFocais[${idx}][funcao]`} value={f.funcao} />
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              type="text"
+              placeholder="Nome"
+              name={`pontosFocais[${idx}][nome]`}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              type="email"
+              placeholder="E-mail"
+              name={`pontosFocais[${idx}][email]`}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              type="text"
+              placeholder="Telefone"
+              name={`pontosFocais[${idx}][telefone]`}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

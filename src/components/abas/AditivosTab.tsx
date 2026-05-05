@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { brl } from "@/lib/validators";
+import { brl, isContratoNaoContinuado, ROTULO_TIPO } from "@/lib/validators";
 import { criarTermoAditivoAction } from "@/app/actions/contratuais";
 
 type Aditivo = {
@@ -24,15 +24,23 @@ export function AditivosTab({
   aditivos,
   contratoId,
   empenhoId,
+  contratoTipo,
 }: {
   aditivos: Aditivo[];
   contratoId?: string;
   empenhoId?: string;
+  contratoTipo?: keyof typeof ROTULO_TIPO;
 }) {
   const [state, formAction] = useActionState(criarTermoAditivoAction, null);
+  const naoContinuado = !!contratoTipo && isContratoNaoContinuado(contratoTipo);
 
   return (
     <div className="space-y-6">
+      {naoContinuado && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <strong>Atenção:</strong> contrato do tipo &ldquo;{ROTULO_TIPO[contratoTipo!]}&rdquo; não admite prorrogação de vigência (Lei 14.133 — fluxograma do contrato independente). O sistema bloqueia aditivos com &ldquo;altera prazo de vigência&rdquo; marcado. Outros aditivos (valor, prazo de entrega, etc.) seguem permitidos.
+        </p>
+      )}
       {aditivos.length > 0 && (
         <ul className="space-y-2">
           {aditivos.map((a) => (
@@ -82,8 +90,12 @@ export function AditivosTab({
           <Campo label="Natureza (CSV)" name="natureza" placeholder="ex: VALOR,PRAZO_VIGENCIA" colSpan={2} />
           <Toggle label="Altera valor?" name="alteraValor" />
           <Campo label="Novo valor" name="novoValor" type="number" step="0.01" />
-          <Toggle label="Altera prazo de vigência?" name="alteraPrazoVigencia" />
-          <Campo label="Nova vigência (fim)" name="novaVigenciaFim" type="date" />
+          <Toggle
+            label={naoContinuado ? "Altera prazo de vigência? (não permitido)" : "Altera prazo de vigência?"}
+            name="alteraPrazoVigencia"
+            disabled={naoContinuado}
+          />
+          <Campo label="Nova vigência (fim)" name="novaVigenciaFim" type="date" disabled={naoContinuado} />
           <Toggle label="Altera prazo de entrega?" name="alteraPrazoEntrega" />
           <Campo label="Novo prazo entrega (dias)" name="novoPrazoEntregaDias" type="number" />
           <Campo label="Observações" name="observacoes" colSpan={2} />
@@ -117,10 +129,10 @@ function Campo({
   );
 }
 
-function Toggle({ label, name }: { label: string; name: string }) {
+function Toggle({ label, name, disabled }: { label: string; name: string; disabled?: boolean }) {
   return (
-    <label className="flex items-center gap-2 text-xs">
-      <input type="checkbox" name={name} className="rounded border-slate-300" />
+    <label className={`flex items-center gap-2 text-xs ${disabled ? "text-slate-400" : ""}`}>
+      <input type="checkbox" name={name} disabled={disabled} className="rounded border-slate-300 disabled:opacity-50" />
       {label}
     </label>
   );
