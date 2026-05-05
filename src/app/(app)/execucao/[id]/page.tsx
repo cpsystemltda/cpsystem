@@ -7,6 +7,8 @@ import { brl, formatarCnpj, ROTULO_PROCEDIMENTO, ROTULO_TIPO } from "@/lib/valid
 import { AvancarStatus } from "@/components/AvancarStatus";
 import { Tabs } from "@/components/Tabs";
 import { TimelineExecucao } from "@/components/TimelineExecucao";
+import { RelatorioContratacao } from "@/components/RelatorioContratacao";
+import { AlertaReajuste } from "@/components/AlertaReajuste";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
 import { ReajustesTab } from "@/components/abas/ReajustesTab";
@@ -57,6 +59,9 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
 
   if (!e) notFound();
 
+  // Empenho não tem marcoOrcamentoEstimado próprio — herda do Contrato (ou Ata) pai
+  const marcoReajusteHerdado = e.contrato?.marcoOrcamentoEstimado ?? e.ata?.marcoOrcamentoEstimado ?? null;
+
   const valorTotal = e.itens.reduce((s, i) => s + i.valorTotal, 0);
   const prazoEntrega =
     e.dataPedidoRecebido && e.prazoEntregaDias
@@ -103,6 +108,8 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
         )}
       </div>
 
+      <AlertaReajuste marcoOrcamentoEstimado={marcoReajusteHerdado} hrefReajustes="/reajustes" />
+
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <Stat titulo="Valor empenhado" valor={brl(valorTotal)} />
         <Stat titulo="Status" valor={e.status.replace(/_/g, " ")} />
@@ -131,16 +138,19 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
           </span>
         </div>
         <div className="mt-5">
-          <TimelineExecucao status={e.status} />
-        </div>
-        <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[9px] font-medium text-slate-500">
-          <span>Empenhado</span>
-          <span>Pedido</span>
-          <span>Trânsito</span>
-          <span>Entregue</span>
-          <span>NF emitida</span>
-          <span>NF enviada</span>
-          <span>Pago</span>
+          <TimelineExecucao
+            status={e.status}
+            comDatas
+            marcos={{
+              EMPENHADO: e.dataEmissao,
+              PEDIDO_RECEBIDO: e.dataPedidoRecebido,
+              EM_TRANSITO: e.dataDespacho,
+              ENTREGUE: e.dataEntrega,
+              NF_EMITIDA: e.dataNfEmitida,
+              NF_ENCAMINHADA: e.dataNfEncaminhada,
+              PAGO: e.dataPagamento,
+            }}
+          />
         </div>
       </div>
 
@@ -150,7 +160,27 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
             {
               key: "execucao",
               label: "Execução / Linha do tempo",
-              content: <Timeline empenho={e} />,
+              content: (
+                <Timeline
+                  empenho={{
+                    id: e.id,
+                    prazoEntregaDias: e.prazoEntregaDias,
+                    prazoPagamentoDias: e.prazoPagamentoDias,
+                    dataPedidoRecebido: e.dataPedidoRecebido,
+                    arquivoPedidoRecebido: e.arquivoPedidoRecebido,
+                    dataDespacho: e.dataDespacho,
+                    arquivoDespacho: e.arquivoDespacho,
+                    dataEntrega: e.dataEntrega,
+                    arquivoEntrega: e.arquivoEntrega,
+                    dataNfEmitida: e.dataNfEmitida,
+                    arquivoNfEmitida: e.arquivoNfEmitida,
+                    dataNfEncaminhada: e.dataNfEncaminhada,
+                    arquivoNfEncaminhada: e.arquivoNfEncaminhada,
+                    dataPagamento: e.dataPagamento,
+                    arquivoPagamento: e.arquivoPagamento,
+                  }}
+                />
+              ),
             },
             {
               key: "itens",
@@ -222,6 +252,38 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
               label: "Dados",
               content: <DadosEmpenho e={e} />,
             },
+            {
+              key: "relatorio",
+              label: "Relatório",
+              content: (
+                <RelatorioContratacao
+                  rotuloRecurso="Empenho"
+                  contrato={{
+                    numero: e.numero,
+                    vigenciaInicio: e.vigenciaInicio,
+                    vigenciaFim: e.vigenciaFim,
+                    dataEmissao: e.dataEmissao,
+                    prazoEntregaDias: e.prazoEntregaDias,
+                    prazoPagamentoDias: e.prazoPagamentoDias,
+                    marcoOrcamentoEstimado: marcoReajusteHerdado,
+                    itens: e.itens.map((i) => ({ quantidade: i.quantidade, valorTotal: i.valorTotal })),
+                  }}
+                  qtdEmpenhos={1}
+                  empenhosPagos={e.status === "PAGO" ? 1 : 0}
+                  qtdAditivos={e.termosAditivos.length}
+                  aditivos={e.termosAditivos.map((a) => ({
+                    alteraValor: a.alteraValor,
+                    novoValor: a.novoValor,
+                    alteraPrazoVigencia: a.alteraPrazoVigencia,
+                    novaVigenciaFim: a.novaVigenciaFim,
+                  }))}
+                  qtdApostilamentos={e.apostilamentos.length}
+                  qtdReajustes={e.reajustes.length}
+                  qtdNotificacoes={e.notificacoes.length}
+                  qtdProcedimentos={e.procedimentos.length}
+                />
+              ),
+            },
           ]}
         />
       </div>
@@ -229,55 +291,197 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
   );
 }
 
+const CAMPO_ARQUIVO_ETAPA: Record<string, string> = {
+  PEDIDO_RECEBIDO: "arquivoPedidoRecebido",
+  EM_TRANSITO:     "arquivoDespacho",
+  ENTREGUE:        "arquivoEntrega",
+  NF_EMITIDA:      "arquivoNfEmitida",
+  NF_ENCAMINHADA:  "arquivoNfEncaminhada",
+  PAGO:            "arquivoPagamento",
+};
+
 function Timeline({
   empenho,
 }: {
   empenho: {
     id: string;
+    prazoEntregaDias: number | null;
+    prazoPagamentoDias: number | null;
     dataPedidoRecebido: Date | null;
+    arquivoPedidoRecebido: string | null;
     dataDespacho: Date | null;
+    arquivoDespacho: string | null;
     dataEntrega: Date | null;
+    arquivoEntrega: string | null;
     dataNfEmitida: Date | null;
+    arquivoNfEmitida: string | null;
     dataNfEncaminhada: Date | null;
+    arquivoNfEncaminhada: string | null;
     dataPagamento: Date | null;
+    arquivoPagamento: string | null;
   };
 }) {
-  return (
-    <ol className="space-y-3">
-      {PASSOS.map((p, idx) => {
-        const data = empenho[p.campo as keyof typeof empenho] as Date | null;
-        const concluido = !!data;
-        const anterior = idx === 0 ? true : !!empenho[PASSOS[idx - 1].campo as keyof typeof empenho];
-        const podeFazer = !concluido && anterior;
+  // Prazo-limite calculado a partir de quando o pedido foi recebido
+  const prazoLimiteEntrega =
+    empenho.dataPedidoRecebido && empenho.prazoEntregaDias
+      ? new Date(empenho.dataPedidoRecebido.getTime() + empenho.prazoEntregaDias * 86400000)
+      : null;
 
-        return (
-          <li
-            key={p.marco}
-            className={`flex items-center gap-4 rounded-lg border p-4 ${
-              concluido ? "border-emerald-200 bg-emerald-50/40" : podeFazer ? "border-blue-200 bg-blue-50/30" : "border-slate-200 bg-slate-50"
-            }`}
-          >
-            <div
-              className={`grid h-8 w-8 place-items-center rounded-full text-xs font-bold ${
-                concluido ? "bg-emerald-600 text-white" : podeFazer ? "bg-blue-600 text-white" : "bg-slate-300 text-slate-600"
-              }`}
-            >
-              {idx + 1}
-            </div>
-            <div className="flex-1 text-sm">{p.label}</div>
-            <div>
-              {concluido ? (
-                <AvancarStatus empenhoId={empenho.id} marco={p.marco} ja={data} />
-              ) : podeFazer ? (
-                <AvancarStatus empenhoId={empenho.id} marco={p.marco} />
-              ) : (
-                <span className="text-xs text-slate-400">Aguardando etapa anterior</span>
+  // Prazo-limite de pagamento (30 dias após NF encaminhada, ou prazoPagamentoDias se definido)
+  const diasPgto = empenho.prazoPagamentoDias ?? 30;
+  const prazoLimitePagamento =
+    empenho.dataNfEncaminhada
+      ? new Date(empenho.dataNfEncaminhada.getTime() + diasPgto * 86400000)
+      : null;
+
+  const entregaAtrasada =
+    prazoLimiteEntrega &&
+    !empenho.dataEntrega &&
+    Date.now() > prazoLimiteEntrega.getTime();
+
+  const pagamentoAtrasado =
+    prazoLimitePagamento &&
+    !empenho.dataPagamento &&
+    Date.now() > prazoLimitePagamento.getTime();
+
+  const entregaComAtraso =
+    empenho.dataEntrega &&
+    prazoLimiteEntrega &&
+    empenho.dataEntrega > prazoLimiteEntrega;
+
+  return (
+    <div className="space-y-3">
+      {/* Alertas ativos */}
+      {entregaAtrasada && (
+        <Alerta cor="red">
+          Entrega em atraso — o prazo de {empenho.prazoEntregaDias} dias venceu em{" "}
+          {prazoLimiteEntrega!.toLocaleDateString("pt-BR")}.
+        </Alerta>
+      )}
+      {pagamentoAtrasado && (
+        <Alerta cor="red">
+          Pagamento em atraso pelo órgão — prazo de {diasPgto} dias encerrou em{" "}
+          {prazoLimitePagamento!.toLocaleDateString("pt-BR")}.
+        </Alerta>
+      )}
+
+      <ol className="space-y-2">
+        {PASSOS.map((p, idx) => {
+          const data = empenho[p.campo as keyof typeof empenho] as Date | null;
+          const arquivo = empenho[CAMPO_ARQUIVO_ETAPA[p.marco] as keyof typeof empenho] as string | null;
+          const concluido = !!data;
+          const anterior = idx === 0 ? true : !!empenho[PASSOS[idx - 1].campo as keyof typeof empenho];
+          const podeFazer = !concluido && anterior;
+
+          // Alerta de entrega com atraso
+          const isEntrega = p.marco === "ENTREGUE";
+          const isPago = p.marco === "PAGO";
+
+          return (
+            <>
+              <li
+                key={p.marco}
+                className={`rounded-xl border p-4 transition ${
+                  concluido
+                    ? "border-emerald-200 bg-emerald-50/40"
+                    : podeFazer
+                      ? "border-blue-200 bg-blue-50/20"
+                      : "border-slate-200 bg-slate-50/60"
+                }`}
+              >
+                <div className="flex items-start gap-4">
+                  {/* Indicador */}
+                  <div
+                    className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold ${
+                      concluido
+                        ? "bg-emerald-600 text-white"
+                        : podeFazer
+                          ? "bg-blue-600 text-white"
+                          : "border border-slate-300 bg-white text-slate-400"
+                    }`}
+                  >
+                    {concluido ? (
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+                        <path d="M16 5.5a7 7 0 1 0 0 13" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                        <path d="M14 5.5v13" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                        <path d="M14 9.2h2.5a2.4 2.4 0 0 1 0 4.8H14" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      idx + 1
+                    )}
+                  </div>
+
+                  {/* Conteúdo */}
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`text-sm font-semibold ${concluido ? "text-slate-800" : podeFazer ? "text-slate-900" : "text-slate-400"}`}>
+                        {p.label}
+                      </span>
+                      {isEntrega && entregaComAtraso && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                          ⚠ Entregue com atraso
+                        </span>
+                      )}
+                      {isPago && prazoLimitePagamento && concluido && empenho.dataPagamento! > prazoLimitePagamento && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                          ⚠ Pago com atraso pelo órgão
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-2">
+                      <AvancarStatus
+                        empenhoId={empenho.id}
+                        marco={p.marco}
+                        ja={data}
+                        jaArquivo={arquivo}
+                        bloqueado={!concluido && !anterior}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </li>
+
+              {/* Marcador do prazo-limite de entrega — aparece após "Pedido recebido" */}
+              {p.marco === "PEDIDO_RECEBIDO" && prazoLimiteEntrega && (
+                <li
+                  key="prazo-limite"
+                  className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 ${
+                    entregaAtrasada
+                      ? "border-red-200 bg-red-50"
+                      : empenho.dataEntrega && entregaComAtraso
+                        ? "border-red-200 bg-red-50"
+                        : "border-amber-200 bg-amber-50"
+                  }`}
+                >
+                  <div className="h-5 w-5 shrink-0 rounded-full border-2 border-amber-400 bg-amber-400" />
+                  <div>
+                    <p className={`text-xs font-semibold ${entregaAtrasada || entregaComAtraso ? "text-red-800" : "text-amber-800"}`}>
+                      Prazo-limite de entrega
+                    </p>
+                    <p className={`text-xs ${entregaAtrasada || entregaComAtraso ? "text-red-700" : "text-amber-700"}`}>
+                      {prazoLimiteEntrega.toLocaleDateString("pt-BR")} ({empenho.prazoEntregaDias} dias após recebimento do pedido)
+                      {entregaAtrasada && " — vencido"}
+                      {entregaComAtraso && " — entregue com atraso"}
+                    </p>
+                  </div>
+                </li>
               )}
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+            </>
+          );
+        })}
+      </ol>
+
+      {/* Info prazo de pagamento */}
+      {prazoLimitePagamento && !empenho.dataPagamento && (
+        <div className={`rounded-lg border px-4 py-2.5 ${pagamentoAtrasado ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`}>
+          <p className={`text-xs font-medium ${pagamentoAtrasado ? "text-red-800" : "text-slate-600"}`}>
+            Prazo de pagamento pelo órgão: {prazoLimitePagamento.toLocaleDateString("pt-BR")} ({diasPgto} dias após NF encaminhada)
+            {pagamentoAtrasado && " — vencido"}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 

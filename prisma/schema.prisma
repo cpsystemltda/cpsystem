@@ -169,6 +169,14 @@ model Analista {
   razaoSocial   String?
   nomeFantasia  String?
   cnpj          String?
+  // Pessoa jurídica adicional (opcional — preenchido se o analista emite nota como PJ)
+  porte             PorteEmpresa?
+  cnaePrincipal     String?
+  cnaesSecundarios  String?
+  naturezaJuridica  String?
+  enderecoPj        String?
+  emailPj           String?
+  telefonePj        String?
   divulgacaoUrl String? // link da bio com o programa
   ativo         Boolean  @default(true)
   criadoEm      DateTime @default(now())
@@ -269,6 +277,24 @@ enum TipoObjeto {
   FORNECIMENTO_CONTINUO
   SERVICOS
   SERVICOS_CONTINUOS
+}
+
+// Modalidade de entrega do contrato (Lei 14.133 — fluxograma do contrato não-continuado).
+// INTEGRAL = todo o quantitativo de uma vez.
+// PARCELADA = lotes com prazos distintos (ver ParcelaContrato).
+// SOB_DEMANDA = quantidade estimativa, sem cronograma fixo (cada empenho/AF puxa do saldo).
+enum ModalidadeEntrega {
+  INTEGRAL
+  PARCELADA
+  SOB_DEMANDA
+}
+
+// Marco a partir do qual conta o prazo de entrega.
+// O contrato define qual é (Lei 14.133 — fluxograma do contrato não-continuado).
+enum MarcoInicialPrazoEntrega {
+  ASSINATURA_CONTRATO
+  ORDEM_FORNECIMENTO
+  OUTRO
 }
 
 enum ProcedimentoSelecao {
@@ -454,6 +480,16 @@ model Contrato {
   prazoPagamentoDias     Int?
   marcoOrcamentoEstimado DateTime?
 
+  // Fluxograma da contratação — Lei 14.133 (contratos não-continuados):
+  // como o quantitativo é entregue e qual o marco inicial do prazo.
+  modalidadeEntrega     ModalidadeEntrega         @default(INTEGRAL)
+  marcoInicialPrazo     MarcoInicialPrazoEntrega? // null quando SOB_DEMANDA (não há prazo único)
+  marcoInicialDescricao String?                   // só preenchido quando marcoInicialPrazo = OUTRO
+
+  // Documentos de suporte do contrato (Lei 14.133)
+  numeroOrdemFornecimento String? // ex: "OF 042/2024" — quando o órgão emite OF/AF
+  arquivoOfUrl            String?
+
   arquivoPdfUrl String?
 
   criadoEm     DateTime @default(now())
@@ -466,6 +502,7 @@ model Contrato {
   ata   Ata?    @relation(fields: [ataId], references: [id])
 
   itens             ContratoItem[]
+  parcelas          ParcelaContrato[]
   empenhos          Empenho[]
   enderecosEntrega  EnderecoEntrega[]
   pontosFocais      PontoFocal[]
@@ -480,6 +517,23 @@ model Contrato {
 
   @@index([empresaId])
   @@index([ataId])
+}
+
+// Cronograma de entrega quando modalidadeEntrega = PARCELADA.
+// Cada parcela tem seu próprio prazo (em dias após o marco inicial) e descrição.
+model ParcelaContrato {
+  id            String   @id @default(cuid())
+  numero        Int
+  prazoDias     Int      // dias após o marco inicial do contrato
+  descricao     String?  // ex: "primeiros 50 computadores DELL Inspiron"
+  valorEstimado Float?
+  criadoEm      DateTime @default(now())
+
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  @@unique([contratoId, numero])
+  @@index([contratoId])
 }
 
 model ContratoItem {
@@ -538,12 +592,22 @@ model Empenho {
 
   status StatusExecucao @default(EMPENHADO)
 
-  dataPedidoRecebido DateTime?
-  dataDespacho       DateTime?
-  dataEntrega        DateTime?
-  dataNfEmitida      DateTime?
-  dataNfEncaminhada  DateTime?
-  dataPagamento      DateTime?
+  dataPedidoRecebido      DateTime?
+  arquivoPedidoRecebido   String?
+  dataDespacho            DateTime?
+  arquivoDespacho         String?
+  dataEntrega             DateTime?
+  arquivoEntrega          String?
+  dataNfEmitida           DateTime?
+  arquivoNfEmitida        String?
+  dataNfEncaminhada       DateTime?
+  arquivoNfEncaminhada    String?
+  dataPagamento           DateTime?
+  arquivoPagamento        String?
+
+  // Ordem de Fornecimento/Execução
+  numeroOrdemFornecimento String?
+  arquivoOfUrl            String?
 
   arquivoPdfUrl String?
 

@@ -12,6 +12,7 @@ import {
   novoEmpenhoSchema,
   normalizarCnpj,
 } from "@/lib/validators";
+import { salvarArquivo } from "@/lib/uploads";
 
 type ActionResult = { erro?: string; campos?: Record<string, string> };
 
@@ -41,13 +42,77 @@ function parseItens(formData: FormData) {
   return out;
 }
 
+function parseEnderecosEntrega(formData: FormData) {
+  const out: { rotulo?: string; endereco: string }[] = [];
+  let i = 0;
+  while (formData.has(`enderecosEntrega[${i}][endereco]`)) {
+    out.push({
+      rotulo: String(formData.get(`enderecosEntrega[${i}][rotulo]`) || "") || undefined,
+      endereco: String(formData.get(`enderecosEntrega[${i}][endereco]`) || ""),
+    });
+    i++;
+  }
+  return out;
+}
+
+function parsePontosFocais(formData: FormData) {
+  const out: { funcao: "GESTOR" | "FISCAL_TECNICO" | "FISCAL_ADMINISTRATIVO" | "RESPONSAVEL_SETOR" | "CONTATO_GERAL"; nome: string; email?: string; telefone?: string }[] = [];
+  let i = 0;
+  while (formData.has(`pontosFocais[${i}][nome]`)) {
+    const nome = String(formData.get(`pontosFocais[${i}][nome]`) || "").trim();
+    if (nome) {
+      out.push({
+        funcao: String(formData.get(`pontosFocais[${i}][funcao]`) || "CONTATO_GERAL") as
+          | "GESTOR"
+          | "FISCAL_TECNICO"
+          | "FISCAL_ADMINISTRATIVO"
+          | "RESPONSAVEL_SETOR"
+          | "CONTATO_GERAL",
+        nome,
+        email: String(formData.get(`pontosFocais[${i}][email]`) || "") || undefined,
+        telefone: String(formData.get(`pontosFocais[${i}][telefone]`) || "") || undefined,
+      });
+    }
+    i++;
+  }
+  return out;
+}
+
+function parseParcelas(formData: FormData) {
+  const out: { numero: number; prazoDias: number; descricao?: string; valorEstimado?: number }[] = [];
+  let i = 0;
+  while (formData.has(`parcelas[${i}][prazoDias]`)) {
+    const valor = formData.get(`parcelas[${i}][valorEstimado]`);
+    out.push({
+      numero: Number(formData.get(`parcelas[${i}][numero]`) || i + 1),
+      prazoDias: Number(formData.get(`parcelas[${i}][prazoDias]`) || 0),
+      descricao: String(formData.get(`parcelas[${i}][descricao]`) || "") || undefined,
+      valorEstimado: valor ? Number(valor) : undefined,
+    });
+    i++;
+  }
+  return out;
+}
+
 function extrairCampos(formData: FormData) {
   const obj: Record<string, unknown> = {};
   for (const [k, v] of formData.entries()) {
-    if (k.startsWith("itens[")) continue;
+    if (
+      k.startsWith("itens[") ||
+      k.startsWith("parcelas[") ||
+      k.startsWith("enderecosEntrega[") ||
+      k.startsWith("pontosFocais[")
+    )
+      continue;
     obj[k] = v;
   }
   obj.itens = parseItens(formData);
+  const parcelas = parseParcelas(formData);
+  if (parcelas.length > 0) obj.parcelas = parcelas;
+  const enderecosEntrega = parseEnderecosEntrega(formData);
+  if (enderecosEntrega.length > 0) obj.enderecosEntrega = enderecosEntrega;
+  const pontosFocais = parsePontosFocais(formData);
+  if (pontosFocais.length > 0) obj.pontosFocais = pontosFocais;
   if (obj.aceitaCarona === "on") obj.aceitaCarona = true;
   return obj;
 }
@@ -115,6 +180,24 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
           valorTotal: i.quantidade * i.valorUnitario,
         })),
       },
+      ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
+        enderecosEntrega: {
+          create: v.enderecosEntrega.map((e) => ({
+            rotulo: e.rotulo || null,
+            endereco: e.endereco,
+          })),
+        },
+      }),
+      ...(v.pontosFocais && v.pontosFocais.length > 0 && {
+        pontosFocais: {
+          create: v.pontosFocais.map((p) => ({
+            funcao: p.funcao,
+            nome: p.nome,
+            email: p.email || null,
+            telefone: p.telefone || null,
+          })),
+        },
+      }),
     },
   });
 
@@ -165,6 +248,16 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
     }
   }
 
+  const parcelasParaCriar =
+    v.modalidadeEntrega === "PARCELADA" && v.parcelas
+      ? v.parcelas.map((p) => ({
+          numero: p.numero,
+          prazoDias: p.prazoDias,
+          descricao: p.descricao || null,
+          valorEstimado: p.valorEstimado ?? null,
+        }))
+      : [];
+
   const contrato = await prisma.contrato.create({
     data: {
       empresaId: v.empresaId,
@@ -172,6 +265,7 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
       tipo: v.tipo,
       numero: v.numero,
       numeroNotaEmpenho: v.numeroNotaEmpenho || null,
+      numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
       processoAdministrativo: v.processoAdministrativo,
       procedimentoSelecao: v.procedimentoSelecao,
       numeroLicitacao: v.numeroLicitacao || null,
@@ -188,6 +282,10 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
       prazoEntregaDias: v.prazoEntregaDias || null,
       prazoPagamentoDias: v.prazoPagamentoDias || null,
       marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
+      modalidadeEntrega: v.modalidadeEntrega,
+      marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
+      marcoInicialDescricao:
+        v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
       itens: {
         create: v.itens.map((i) => ({
           descricao: i.descricao,
@@ -199,6 +297,25 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
           ataItemId: i.ataItemId || null,
         })),
       },
+      ...(parcelasParaCriar.length > 0 && { parcelas: { create: parcelasParaCriar } }),
+      ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
+        enderecosEntrega: {
+          create: v.enderecosEntrega.map((e) => ({
+            rotulo: e.rotulo || null,
+            endereco: e.endereco,
+          })),
+        },
+      }),
+      ...(v.pontosFocais && v.pontosFocais.length > 0 && {
+        pontosFocais: {
+          create: v.pontosFocais.map((p) => ({
+            funcao: p.funcao,
+            nome: p.nome,
+            email: p.email || null,
+            telefone: p.telefone || null,
+          })),
+        },
+      }),
     },
   });
 
@@ -329,6 +446,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
       vigenciaFim: v.vigenciaFim,
       prazoEntregaDias: v.prazoEntregaDias || null,
       prazoPagamentoDias: v.prazoPagamentoDias || null,
+      numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
       status: "EMPENHADO",
       itens: {
         create: v.itens.map((i) => ({
@@ -341,6 +459,24 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
           ataItemId: i.ataItemId || null,
         })),
       },
+      ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
+        enderecosEntrega: {
+          create: v.enderecosEntrega.map((e) => ({
+            rotulo: e.rotulo || null,
+            endereco: e.endereco,
+          })),
+        },
+      }),
+      ...(v.pontosFocais && v.pontosFocais.length > 0 && {
+        pontosFocais: {
+          create: v.pontosFocais.map((p) => ({
+            funcao: p.funcao,
+            nome: p.nome,
+            email: p.email || null,
+            telefone: p.telefone || null,
+          })),
+        },
+      }),
     },
   });
 
@@ -361,6 +497,84 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
   revalidatePath("/dashboard");
   revalidatePath("/painel-analista");
   redirect(`/execucao/${empenho.id}`);
+}
+
+// ============================================================
+// EXECUÇÃO — registrar marco com data + arquivo (useActionState)
+// ============================================================
+const CAMPO_DATA: Record<string, string> = {
+  PEDIDO_RECEBIDO: "dataPedidoRecebido",
+  EM_TRANSITO:     "dataDespacho",
+  ENTREGUE:        "dataEntrega",
+  NF_EMITIDA:      "dataNfEmitida",
+  NF_ENCAMINHADA:  "dataNfEncaminhada",
+  PAGO:            "dataPagamento",
+};
+const CAMPO_ARQUIVO: Record<string, string> = {
+  PEDIDO_RECEBIDO: "arquivoPedidoRecebido",
+  EM_TRANSITO:     "arquivoDespacho",
+  ENTREGUE:        "arquivoEntrega",
+  NF_EMITIDA:      "arquivoNfEmitida",
+  NF_ENCAMINHADA:  "arquivoNfEncaminhada",
+  PAGO:            "arquivoPagamento",
+};
+
+export async function registrarMarcoAction(
+  _p: { erro?: string; ok?: boolean } | null,
+  formData: FormData,
+): Promise<{ erro?: string; ok?: boolean }> {
+  const usuario = await exigirUsuario();
+  const empenhoId = String(formData.get("empenhoId") || "");
+  const marco     = String(formData.get("marco") || "");
+  const dataIso   = String(formData.get("data") || "");
+
+  if (!CAMPO_DATA[marco]) return { erro: "Marco inválido." };
+
+  const empenho = await prisma.empenho.findFirst({
+    where: { id: empenhoId, empresa: { contaId: usuario.contaId } },
+  });
+  if (!empenho) return { erro: "Empenho não encontrado." };
+
+  const data = new Date(dataIso);
+  if (isNaN(data.getTime())) return { erro: "Data inválida." };
+
+  const update: Record<string, Date | string> = {
+    [CAMPO_DATA[marco]]: data,
+    status: marco,
+  };
+
+  const file = formData.get("arquivo") as File | null;
+  if (file && file.size > 0) {
+    const salvo = await salvarArquivo(file);
+    update[CAMPO_ARQUIVO[marco]] = salvo.url;
+  }
+
+  await prisma.empenho.update({ where: { id: empenhoId }, data: update });
+
+  if (marco === "PAGO") {
+    const empenhoCompleto = await prisma.empenho.findUnique({
+      where: { id: empenhoId },
+      include: { itens: { select: { valorTotal: true } } },
+    });
+    if (empenhoCompleto) {
+      const valorTotal = empenhoCompleto.itens.reduce((s, i) => s + i.valorTotal, 0);
+      await notificarAnalistasDaEmpresa({
+        empresaId: empenho.empresaId,
+        tipo: "STATUS_PAGO",
+        titulo: `Empenho ${empenho.numero} pago`,
+        descricao: `${empenho.orgaoNome} · R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · sua comissão está liberada`,
+        link: `/painel-analista`,
+        recursoTipo: "Empenho",
+        recursoId: empenhoId,
+      });
+    }
+  }
+
+  revalidatePath(`/execucao/${empenhoId}`);
+  revalidatePath("/execucao");
+  revalidatePath("/dashboard");
+  revalidatePath("/painel-analista");
+  return { ok: true };
 }
 
 // ============================================================
