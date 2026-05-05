@@ -1,36 +1,46 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useActionState } from "react";
+import { useState, useOptimistic, useTransition } from "react";
 import { Check, FileText, Paperclip } from "lucide-react";
 import { registrarMarcoAction } from "@/app/actions/contratacoes";
 
 type Props = {
   empenhoId: string;
   marco: string;
-  /** Data já registrada (etapa concluída) */
   ja?: Date | null;
-  /** URL do arquivo já enviado */
   jaArquivo?: string | null;
-  /** Etapa anterior ainda não concluída → bloqueia */
   bloqueado?: boolean;
 };
 
 export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Props) {
   const [aberto, setAberto] = useState(false);
-  const [state, formAction] = useActionState(registrarMarcoAction, null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (state?.ok) setAberto(false);
-  }, [state?.ok]);
+  const [optimisticData, setOptimisticData] = useOptimistic<Date | null>(ja ?? null);
 
-  // ── Etapa concluída ──────────────────────────────────────
-  if (ja) {
+  async function handleSubmit(formData: FormData) {
+    const dataStr = formData.get("data") as string;
+    const dataOtimista = dataStr ? new Date(dataStr + "T12:00:00") : new Date();
+
+    setAberto(false);
+    setErro(null);
+
+    startTransition(async () => {
+      setOptimisticData(dataOtimista);
+      const result = await registrarMarcoAction(null, formData);
+      if (result?.erro) setErro(result.erro);
+    });
+  }
+
+  // ── Concluído (real ou otimista) ────────────────────────────────────────────
+  if (optimisticData) {
     return (
       <div className="flex items-center gap-3">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+        <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${isPending ? "text-emerald-400" : "text-emerald-700"}`}>
           <Check className="h-3.5 w-3.5" />
-          {ja.toLocaleDateString("pt-BR")}
+          {optimisticData.toLocaleDateString("pt-BR")}
+          {isPending && <span className="ml-1 text-[10px] text-slate-400">salvando…</span>}
         </span>
         {jaArquivo && (
           <a
@@ -42,16 +52,17 @@ export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Pr
             <FileText className="h-3.5 w-3.5" /> Arquivo
           </a>
         )}
+        {erro && <span className="text-xs text-red-600">{erro}</span>}
       </div>
     );
   }
 
-  // ── Etapa bloqueada (anterior não concluída) ─────────────
+  // ── Bloqueado ───────────────────────────────────────────────────────────────
   if (bloqueado) {
     return <span className="text-xs text-slate-400">Aguardando etapa anterior</span>;
   }
 
-  // ── Etapa disponível para registrar ─────────────────────
+  // ── Disponível ──────────────────────────────────────────────────────────────
   return (
     <div>
       {!aberto ? (
@@ -60,11 +71,11 @@ export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Pr
           onClick={() => setAberto(true)}
           className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition"
         >
-          <div className="h-4 w-4 rounded border-2 border-slate-400 group-hover:border-blue-500" />
+          <div className="h-4 w-4 rounded border-2 border-slate-400" />
           Registrar data
         </button>
       ) : (
-        <form action={formAction} className="space-y-2">
+        <form action={handleSubmit} className="space-y-2">
           <input type="hidden" name="empenhoId" value={empenhoId} />
           <input type="hidden" name="marco" value={marco} />
 
@@ -106,9 +117,7 @@ export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Pr
             />
           </label>
 
-          {state?.erro && (
-            <p className="text-xs text-red-600">{state.erro}</p>
-          )}
+          {erro && <p className="text-xs text-red-600">{erro}</p>}
         </form>
       )}
     </div>
