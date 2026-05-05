@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
@@ -43,7 +44,7 @@ export async function destruirSessao(): Promise<void> {
   }
 }
 
-export async function getUsuarioAtual() {
+export const getUsuarioAtual = cache(async function getUsuarioAtual() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -65,7 +66,7 @@ export async function getUsuarioAtual() {
   }
 
   return sessao.usuario;
-}
+});
 
 export async function exigirUsuario() {
   const u = await getUsuarioAtual();

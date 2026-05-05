@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 
 type Tipo =
@@ -67,5 +68,9 @@ export async function notificarAnalistasDaEmpresa(opts: {
 }
 
 export async function contarNaoLidas(usuarioId: string): Promise<number> {
-  return prisma.notificacaoSistema.count({ where: { usuarioId, lida: false } });
+  return unstable_cache(
+    () => prisma.notificacaoSistema.count({ where: { usuarioId, lida: false } }),
+    [`notif-count-${usuarioId}`],
+    { revalidate: 30, tags: [`notif-${usuarioId}`] },
+  )();
 }

@@ -5,6 +5,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { contarNaoLidas } from "@/lib/notificacoes";
 import { lerVisao, type Visao } from "@/lib/visao";
+import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
 
 // Rotas que SÓ a empresa acessa (analista é redirecionado pro painel dele)
 const ROTAS_SO_EMPRESA = [
@@ -37,12 +38,20 @@ const ROTAS_PERMITIDAS_INADIMPLENTE = [
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const usuario = await exigirUsuario();
+  // Todas as queries/cookies em paralelo — layout não pode bloquear a navegação
+  const [usuario, h, empresaSelecionadaCookie, visaoSalva] = await Promise.all([
+    exigirUsuario(),
+    headers(),
+    lerEmpresaSelecionada(),
+    lerVisao(),
+  ]);
+
+  const qtdNotificacoes = await contarNaoLidas(usuario.id);
+
   const empresas = usuario.conta.empresas;
   const principal = empresas[0]?.nomeFantasia || empresas[0]?.razaoSocial || (usuario.conta.tipo === "ANALISTA" ? "Analista" : "Sem empresa cadastrada");
   const tipoConta = usuario.conta.tipo as "EMPRESA" | "ANALISTA";
 
-  const h = await headers();
   const pathname = h.get("x-pathname") || "/";
 
   const conta = usuario.conta;
@@ -61,10 +70,37 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ? false
     : (tipoConta === "ANALISTA" && rotaSoEmpresa) || (tipoConta === "EMPRESA" && rotaSoAnalista);
 
-  const qtdNotificacoes = await contarNaoLidas(usuario.id);
+  // Rotas operacionais — só fazem sentido quando uma empresa específica está em foco.
+  // Em "Todas as empresas" (visão consolidada com 2+ CNPJs) só permitimos Dashboard,
+  // Empresas (CNPJs), Conta, Equipe, Notificações, Auditoria etc.
+  const ROTAS_OPERACIONAIS_POR_EMPRESA = [
+    "/operacao",
+    "/contratacoes",
+    "/atas",
+    "/contratos",
+    "/execucao",
+    "/reajustes",
+    "/relatorios",
+    "/juridico",
+  ];
 
-  // Visão: super admin pode trocar entre ADMIN_PLATAFORMA / EMPRESA / ANALISTA via cookie
-  const visaoSalva = await lerVisao();
+  // Empresa em foco (cookie). Validamos contra a lista da conta — se o cookie
+  // apontar para uma empresa que não existe mais, cai pra consolidado.
+  const empresaIdSelecionada =
+    empresaSelecionadaCookie && empresas.some((e) => e.id === empresaSelecionadaCookie)
+      ? empresaSelecionadaCookie
+      : null;
+  const empresasOpcoes = empresas.map((e) => ({
+    id: e.id,
+    nome: e.nomeFantasia || e.razaoSocial,
+  }));
+
+  // Bloqueio operacional consolidado (multi-empresas + nenhuma em foco)
+  const consolidadoBloqueado =
+    tipoConta === "EMPRESA" &&
+    empresas.length > 1 &&
+    !empresaIdSelecionada &&
+    ROTAS_OPERACIONAIS_POR_EMPRESA.some((r) => pathname.startsWith(r));
   const visao: Visao = usuario.superAdmin
     ? (visaoSalva ?? "ADMIN_PLATAFORMA")
     : tipoConta === "ANALISTA"
@@ -80,12 +116,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         visao={visao}
         superAdmin={usuario.superAdmin}
         qtdNotificacoesNaoLidas={qtdNotificacoes}
+        empresas={empresasOpcoes}
+        empresaIdSelecionada={empresaIdSelecionada}
       />
       <main className="flex-1 overflow-y-auto bg-slate-50/60">
         {acessoErrado ? (
           <AcessoNegado tipoConta={tipoConta} />
         ) : tipoConta === "EMPRESA" && bloqueada && !rotaPermitidaPaywall ? (
           <Paywall status={conta.statusAssinatura} trialExpirado={!!trialExpirado} />
+        ) : consolidadoBloqueado ? (
+          <SelecioneEmpresa />
         ) : (
           children
         )}
@@ -107,6 +147,36 @@ function AcessoNegado({ tipoConta }: { tipoConta: "EMPRESA" | "ANALISTA" }) {
       >
         Ir pra minha tela inicial
       </Link>
+    </div>
+  );
+}
+
+function SelecioneEmpresa() {
+  return (
+    <div className="mx-auto max-w-2xl px-8 py-20 text-center">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-blue-100">
+        <AlertTriangle className="h-8 w-8 text-blue-700" />
+      </div>
+      <h1 className="mt-6 text-3xl font-bold text-slate-900">Selecione uma empresa</h1>
+      <p className="mt-3 text-base text-slate-600">
+        Esta tela mostra dados operacionais de uma empresa específica.
+        <br />
+        Para acessá-la, escolha qual empresa do grupo está em foco usando o
+        seletor verde no topo da barra lateral.
+      </p>
+      <p className="mt-6 text-sm text-slate-500">
+        Em &ldquo;Todas as empresas&rdquo;, você só vê o painel consolidado e o cadastro de
+        novos CNPJs. Operação dia a dia (Atas, Contratos, Execução etc.) acontece
+        sempre dentro de uma empresa específica.
+      </p>
+      <div className="mt-8 flex justify-center gap-3">
+        <Link href="/dashboard" className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+          Voltar ao Dashboard
+        </Link>
+        <Link href="/empresas" className="rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          Ver empresas (CNPJs)
+        </Link>
+      </div>
     </div>
   );
 }
