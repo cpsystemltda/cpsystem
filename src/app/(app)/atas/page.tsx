@@ -3,51 +3,87 @@ import { Plus, FileText } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, ROTULO_TIPO } from "@/lib/validators";
-import { calcularSaldoAta } from "@/lib/saldo";
 import { FiltroLista } from "@/components/FiltroLista";
+import { filtroEmpresaWhere } from "@/lib/empresaContexto";
+import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
+import { KpiVencimentos } from "@/components/KpiVencimentos";
 
-export default async function AtasPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; orgao?: string }> }) {
-  const usuario = await exigirUsuario();
-  const sp = await searchParams;
+export default async function AtasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; status?: string; orgao?: string; alerta?: string }>;
+}) {
+  const [usuario, sp] = await Promise.all([exigirUsuario(), searchParams]);
+  const filtroEmpresa = await filtroEmpresaWhere(usuario.contaId);
+
   const q = (sp.q || "").trim();
   const status = sp.status || "";
   const orgao = sp.orgao || "";
+  const alertaDias = sp.alerta ? Number(sp.alerta) : 0;
 
   const hoje = new Date();
-  const atas = await prisma.ata.findMany({
-    where: {
-      empresa: { contaId: usuario.contaId },
-      ...(q && {
-        OR: [
-          { numero: { contains: q } },
-          { objeto: { contains: q } },
-          { processoAdministrativo: { contains: q } },
-          { orgaoNome: { contains: q } },
-          { idAtaPncp: { contains: q } },
-        ],
-      }),
-      ...(status === "vigentes" && { vigenciaFim: { gte: hoje } }),
-      ...(status === "vencidas" && { vigenciaFim: { lt: hoje } }),
-      ...(orgao && { orgaoNome: orgao }),
-    },
-    orderBy: { criadoEm: "desc" },
-    include: { empresa: { select: { nomeFantasia: true, razaoSocial: true } } },
-  });
-  const saldos = await Promise.all(atas.map((a) => calcularSaldoAta(a.id)));
+  const limiteAlerta = alertaDias > 0 ? new Date(hoje.getTime() + alertaDias * 86400000) : null;
+  const d30 = new Date(hoje.getTime() + 30 * 86400000);
+  const d60 = new Date(hoje.getTime() + 60 * 86400000);
+  const d90 = new Date(hoje.getTime() + 90 * 86400000);
+  const d120 = new Date(hoje.getTime() + 120 * 86400000);
 
-  // Lista de órgãos únicos pra filtro
-  const orgaosDistintos = await prisma.ata.groupBy({
-    by: ["orgaoNome"],
-    where: { empresa: { contaId: usuario.contaId } },
-    orderBy: { orgaoNome: "asc" },
+  const whereBase = { empresa: filtroEmpresa };
+  const whereQuery = {
+    empresa: filtroEmpresa,
+    ...(q && { OR: [{ numero: { contains: q } }, { objeto: { contains: q } }, { processoAdministrativo: { contains: q } }, { orgaoNome: { contains: q } }, { idAtaPncp: { contains: q } }] }),
+    ...(status === "vigentes" && { vigenciaFim: { gte: hoje } }),
+    ...(status === "vencidas" && { vigenciaFim: { lt: hoje } }),
+    ...(limiteAlerta && { vigenciaFim: { gte: hoje, lte: limiteAlerta } }),
+    ...(orgao && { orgaoNome: orgao }),
+  };
+
+  // Tudo em paralelo — sem N+1
+  const [atas, orgaosDistintos, qtdVigentes, qtdFinalizadas, venc30, venc60, venc90, venc120] =
+    await Promise.all([
+      prisma.ata.findMany({
+        where: whereQuery,
+        orderBy: { criadoEm: "desc" },
+        include: {
+          empresa: { select: { nomeFantasia: true, razaoSocial: true } },
+          itens: {
+            select: {
+              valorTotal: true,
+              valorUnitario: true,
+              quantidade: true,
+              contratoItens: { select: { quantidade: true } },
+              empenhoItens: { select: { quantidade: true, empenho: { select: { contratoId: true } } } },
+            },
+          },
+        },
+      }),
+      prisma.ata.groupBy({ by: ["orgaoNome"], where: whereBase, orderBy: { orgaoNome: "asc" } }),
+      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje } } }),
+      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { lt: hoje } } }),
+      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d30 } } }),
+      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d60 } } }),
+      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d90 } } }),
+      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d120 } } }),
+    ]);
+
+  // Saldo calculado em memória — zero queries extras
+  const atasComSaldo = atas.map((a) => {
+    const valorTotal = a.itens.reduce((s, it) => s + it.valorTotal, 0);
+    const valorUsado = a.itens.reduce((s, it) => {
+      const usadoContrato = it.contratoItens.reduce((ss, c) => ss + c.quantidade, 0);
+      const usadoEmpenhoSolto = it.empenhoItens.filter((e) => e.empenho.contratoId === null).reduce((ss, e) => ss + e.quantidade, 0);
+      return s + (usadoContrato + usadoEmpenhoSolto) * it.valorUnitario;
+    }, 0);
+    return { ...a, saldo: { valorTotal, valorUsado, valorDisponivel: valorTotal - valorUsado, percentualUsado: valorTotal === 0 ? 0 : (valorUsado / valorTotal) * 100 } };
   });
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
+      <BannerEmpresaEmFoco contaId={usuario.contaId} />
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Atas de Registro de Preços</h1>
-          <p className="mt-1 text-sm text-slate-600">{atas.length} ata(s) {q && `correspondendo a "${q}"`}.</p>
+          <p className="mt-1 text-sm text-slate-600">{atasComSaldo.length} ata(s) {q && `correspondendo a "${q}"`}.</p>
         </div>
         <Link
           href="/contratacoes/nova/ata"
@@ -56,6 +92,32 @@ export default async function AtasPage({ searchParams }: { searchParams: Promise
           <Plus className="h-4 w-4" /> Nova Ata
         </Link>
       </div>
+
+      <div className="mt-6">
+        <KpiVencimentos
+          rotuloPlural="Atas"
+          rotuloSingularDe="ata"
+          genero="f"
+          totalVigentes={qtdVigentes}
+          totalFinalizados={qtdFinalizadas}
+          vencendoEm30={venc30}
+          vencendoEm60={venc60}
+          vencendoEm90={venc90}
+          vencendoEm120={venc120}
+          hrefVigentes="/atas?status=vigentes"
+          hrefFinalizados="/atas?status=vencidas"
+          hrefBaseAlerta="/atas?alerta="
+        />
+      </div>
+
+      {alertaDias > 0 && (
+        <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+          Filtrando por vencimento em até {alertaDias} dias · {atasComSaldo.length} ata(s) ·{" "}
+          <Link href="/atas" className="underline">
+            limpar
+          </Link>
+        </p>
+      )}
 
       <div className="mt-6">
         <FiltroLista
@@ -78,12 +140,12 @@ export default async function AtasPage({ searchParams }: { searchParams: Promise
         />
       </div>
 
-      {atas.length === 0 ? (
+      {atasComSaldo.length === 0 ? (
         <EmptyState />
       ) : (
         <div className="mt-6 grid gap-4">
-          {atas.map((a, idx) => {
-            const s = saldos[idx];
+          {atasComSaldo.map((a) => {
+            const s = a.saldo;
             const venceEmDias = Math.ceil((a.vigenciaFim.getTime() - Date.now()) / 86400000);
             const venceClass = venceEmDias < 30 ? "text-red-600" : venceEmDias < 90 ? "text-amber-600" : "text-slate-500";
             return (

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { ClipboardList, Plus } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calcularSaldoContrato } from "@/lib/saldo";
 import { ContratosBrowser, type ContratoCard } from "@/components/ContratosBrowser";
+import { filtroEmpresaWhere } from "@/lib/empresaContexto";
+import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
+import { KpiVencimentos } from "@/components/KpiVencimentos";
 
 function classifica(vigenciaFim: Date): ContratoCard["status"] {
   const hoje = new Date();
@@ -16,43 +18,63 @@ function classifica(vigenciaFim: Date): ContratoCard["status"] {
 export default async function ContratosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; orgao?: string; aba?: string; v?: string }>;
+  searchParams: Promise<{ q?: string; orgao?: string; aba?: string; v?: string; alerta?: string; status?: string }>;
 }) {
-  const usuario = await exigirUsuario();
-  const sp = await searchParams;
+  const [usuario, sp] = await Promise.all([exigirUsuario(), searchParams]);
+  const filtroEmpresa = await filtroEmpresaWhere(usuario.contaId);
+
   const q = (sp.q || "").trim();
   const orgaoFiltro = sp.orgao || "";
-  const abaSelecionada = sp.aba || "vigentes";
+  const alertaDias = sp.alerta ? Number(sp.alerta) : 0;
+  const statusQs = sp.status || "";
+  const abaSelecionada =
+    statusQs === "vigentes" ? "vigentes" : statusQs === "vencidas" ? "vencidos" : sp.aba || "vigentes";
 
-  const todos = await prisma.contrato.findMany({
-    where: {
-      empresa: { contaId: usuario.contaId },
-      ...(q && {
-        OR: [
-          { numero: { contains: q } },
-          { objeto: { contains: q } },
-          { processoAdministrativo: { contains: q } },
-          { orgaoNome: { contains: q } },
-        ],
+  const hojeDate = new Date();
+  const limiteAlertaContrato =
+    alertaDias > 0 ? new Date(hojeDate.getTime() + alertaDias * 86400000) : null;
+
+  const whereBase = { empresa: filtroEmpresa };
+  const whereQuery = {
+    empresa: filtroEmpresa,
+    ...(q && { OR: [{ numero: { contains: q } }, { objeto: { contains: q } }, { processoAdministrativo: { contains: q } }, { orgaoNome: { contains: q } }] }),
+    ...(orgaoFiltro && { orgaoNome: orgaoFiltro }),
+    ...(statusQs === "vencidas" && { vigenciaFim: { lt: hojeDate } }),
+    ...(limiteAlertaContrato && { vigenciaFim: { gte: hojeDate, lte: limiteAlertaContrato } }),
+  };
+  const d30 = new Date(hojeDate.getTime() + 30 * 86400000);
+  const d60 = new Date(hojeDate.getTime() + 60 * 86400000);
+  const d90 = new Date(hojeDate.getTime() + 90 * 86400000);
+  const d120 = new Date(hojeDate.getTime() + 120 * 86400000);
+
+  // Tudo em paralelo — sem N+1
+  const [todos, orgaosDistintos, qtdContratosVigentes, qtdContratosFinalizados, venc30c, venc60c, venc90c, venc120c] =
+    await Promise.all([
+      prisma.contrato.findMany({
+        where: whereQuery,
+        orderBy: { vigenciaFim: "asc" },
+        include: {
+          empresa: { select: { nomeFantasia: true, razaoSocial: true } },
+          ata: { select: { numero: true } },
+          itens: { select: { valorTotal: true } },
+          empenhos: { select: { itens: { select: { valorTotal: true } } } },
+        },
       }),
-      ...(orgaoFiltro && { orgaoNome: orgaoFiltro }),
-    },
-    orderBy: { vigenciaFim: "asc" },
-    include: {
-      empresa: { select: { nomeFantasia: true, razaoSocial: true } },
-      ata: { select: { numero: true } },
-      itens: { select: { valorTotal: true } },
-    },
-  });
+      prisma.contrato.groupBy({ by: ["orgaoNome"], where: whereBase, orderBy: { orgaoNome: "asc" } }),
+      prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate } } }),
+      prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { lt: hojeDate } } }),
+      prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate, lte: d30 } } }),
+      prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate, lte: d60 } } }),
+      prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate, lte: d90 } } }),
+      prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate, lte: d120 } } }),
+    ]);
 
-  // Saldos
-  const saldos = await Promise.all(todos.map((c) => calcularSaldoContrato(c.id)));
-  const hoje = new Date();
-
-  const contratosCard: ContratoCard[] = todos.map((c, idx) => {
-    const s = saldos[idx];
-    const valorTotal = c.itens.reduce((sum, i) => sum + i.valorTotal, 0);
-    const dias = Math.ceil((c.vigenciaFim.getTime() - hoje.getTime()) / 86400000);
+  // Saldo calculado em memória — zero queries extras
+  const contratosCard: ContratoCard[] = todos.map((c) => {
+    const valorTotal = c.itens.reduce((s, i) => s + i.valorTotal, 0);
+    const valorExecutado = c.empenhos.reduce((s, e) => s + e.itens.reduce((ss, i) => ss + i.valorTotal, 0), 0);
+    const pctExecutado = valorTotal === 0 ? 0 : (valorExecutado / valorTotal) * 100;
+    const dias = Math.ceil((c.vigenciaFim.getTime() - hojeDate.getTime()) / 86400000);
     return {
       id: c.id,
       numero: c.numero,
@@ -64,14 +86,13 @@ export default async function ContratosPage({
       vigenciaInicio: c.vigenciaInicio.toISOString(),
       vigenciaFim: c.vigenciaFim.toISOString(),
       diasParaVencer: dias,
-      valorTotal: s.valorTotal || valorTotal,
-      valorExecutado: s.valorUsado,
-      pctExecutado: s.percentualUsado,
+      valorTotal,
+      valorExecutado,
+      pctExecutado,
       status: classifica(c.vigenciaFim),
     };
   });
 
-  // Contadores das abas
   const contadores = {
     vigentes: contratosCard.filter((c) => c.status === "vigentes").length,
     vencimento_proximo: contratosCard.filter((c) => c.status === "vencimento_proximo").length,
@@ -79,21 +100,14 @@ export default async function ContratosPage({
     finalizados: contratosCard.filter((c) => c.status === "finalizados").length,
   };
 
-  // Filtra pela aba selecionada
   const filtrados = contratosCard.filter((c) => {
     if (abaSelecionada === "finalizados") return c.pctExecutado >= 100;
     return c.status === abaSelecionada;
   });
 
-  // Lista de órgãos pra filtro
-  const orgaosDistintos = await prisma.contrato.groupBy({
-    by: ["orgaoNome"],
-    where: { empresa: { contaId: usuario.contaId } },
-    orderBy: { orgaoNome: "asc" },
-  });
-
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
+      <BannerEmpresaEmFoco contaId={usuario.contaId} />
       <div className="flex items-end justify-between gap-6">
         <div>
           <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
@@ -111,6 +125,32 @@ export default async function ContratosPage({
           <Plus className="h-4 w-4" /> Cadastrar contrato
         </Link>
       </div>
+
+      <div className="mt-6">
+        <KpiVencimentos
+          rotuloPlural="Contratos"
+          rotuloSingularDe="contrato"
+          genero="m"
+          totalVigentes={qtdContratosVigentes}
+          totalFinalizados={qtdContratosFinalizados}
+          vencendoEm30={venc30c}
+          vencendoEm60={venc60c}
+          vencendoEm90={venc90c}
+          vencendoEm120={venc120c}
+          hrefVigentes="/contratos?status=vigentes"
+          hrefFinalizados="/contratos?status=vencidas"
+          hrefBaseAlerta="/contratos?alerta="
+        />
+      </div>
+
+      {alertaDias > 0 && (
+        <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+          Filtrando por vencimento em até {alertaDias} dias · {todos.length} contrato(s) ·{" "}
+          <Link href="/contratos" className="underline">
+            limpar
+          </Link>
+        </p>
+      )}
 
       <div className="mt-6">
         <ContratosBrowser
