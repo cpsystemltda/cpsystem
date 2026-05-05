@@ -571,9 +571,11 @@ export async function registrarMarcoAction(
   }
 
   revalidatePath(`/execucao/${empenhoId}`);
-  revalidatePath("/execucao");
-  revalidatePath("/dashboard");
-  revalidatePath("/painel-analista");
+  if (marco === "PAGO") {
+    revalidatePath("/execucao");
+    revalidatePath("/dashboard");
+    revalidatePath("/painel-analista");
+  }
   return { ok: true };
 }
 
