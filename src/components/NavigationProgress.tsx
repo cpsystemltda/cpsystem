@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 export function NavigationProgress() {
   const pathname = usePathname();
   const barRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Inicia barra ao clicar em qualquer link interno
   useEffect(() => {
