@@ -8,6 +8,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { CampoCnpj } from "@/components/CampoCnpj";
 import { CampoCep } from "@/components/CampoCep";
 import { CampoCartao } from "@/components/CampoCartao";
+import { CampoBanco } from "@/components/CampoBanco";
+import { CampoMultiplo } from "@/components/CampoMultiplo";
 import { signupAction, signupAnalistaAction, buscarAnalistasPublicos } from "@/app/actions/auth";
 import { Logo } from "@/components/Logo";
 import { OPCOES_NATUREZA_JURIDICA } from "@/lib/validators";
@@ -338,8 +340,26 @@ function FormEmpresa() {
       <CampoCep defaultValue={v.cep ?? ""} erro={e.cep} span={1} />
       <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={3} />
       <Field label="Complemento" name="complemento" placeholder="Loja, sala, andar…" defaultValue={v.complemento ?? ""} erro={e.complemento} span={4} />
-      <Field label="E-mail da empresa" name="emailEmpresa" type="email" required defaultValue={v.emailEmpresa ?? ""} erro={e.emailEmpresa} span={2} />
-      <Field label="Telefone(s)" name="telefones" placeholder="(61) 9 9999-9999" required defaultValue={v.telefones ?? ""} erro={e.telefones} span={2} />
+      <CampoMultiplo
+        name="emailEmpresa"
+        label="E-mail da empresa"
+        tipo="email"
+        required
+        placeholder="contato@empresa.com.br"
+        defaultValues={v.emailEmpresa ? [v.emailEmpresa] : []}
+        erro={e.emailEmpresa}
+        span={2}
+      />
+      <CampoMultiplo
+        name="telefones"
+        label="Telefone(s)"
+        tipo="telefone"
+        required
+        placeholder="(61) 9 9999-9999"
+        defaultValues={v.telefones ? [v.telefones] : []}
+        erro={e.telefones}
+        span={2}
+      />
       <Field label="Nome do responsável" name="responsavel" required defaultValue={v.responsavel ?? ""} erro={e.responsavel} span={4} />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -545,7 +565,7 @@ function FormAnalista() {
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Dados bancários <span className="ml-2 font-normal normal-case text-slate-400">(pra receber comissões e fixo)</span>
       </h2>
-      <Field label="Banco" name="banco" placeholder="ex.: 341 — Itaú" defaultValue={v.banco ?? ""} erro={e.banco} span={2} />
+      <CampoBanco defaultValue={v.banco ?? ""} erro={e.banco} span={2} />
       <Field label="Agência (com dígito, se houver)" name="agencia" placeholder="0000-0" defaultValue={v.agencia ?? ""} erro={e.agencia} span={1} />
       <Field label="Conta corrente (com dígito)" name="contaCorrente" placeholder="00000-0" defaultValue={v.contaCorrente ?? ""} erro={e.contaCorrente} span={1} />
       <Select label="Tipo de chave PIX" name="pixTipo" options={PIX_TIPOS} defaultValue={pixTipo} erro={e.pixTipo} span={2} onChange={(ev) => setPixTipo((ev.target as HTMLSelectElement).value)} />

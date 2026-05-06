@@ -23,7 +23,17 @@ function valoresParaEcho(formData: FormData): Record<string, string> {
 }
 
 export async function signupAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
-  const dados = Object.fromEntries(formData);
+  // Múltiplos e-mails e telefones (CampoMultiplo) chegam como name="X[]"
+  // Pegamos todos, mas pro Zod usamos só o 1º (compat com schema antigo).
+  const emailsArray = formData.getAll("emailEmpresa[]").map(String).filter(Boolean);
+  const telefonesArray = formData.getAll("telefones[]").map(String).filter(Boolean);
+  const dados: Record<string, string> = {};
+  for (const [k, val] of formData.entries()) {
+    if (k.endsWith("[]")) continue;
+    dados[k] = String(val);
+  }
+  if (emailsArray.length > 0 && !dados.emailEmpresa) dados.emailEmpresa = emailsArray[0];
+  if (telefonesArray.length > 0 && !dados.telefones) dados.telefones = telefonesArray[0];
   const parsed = signupSchema.safeParse(dados);
   const valores = valoresParaEcho(formData);
 
@@ -123,7 +133,9 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
           complemento: v.complemento || null,
           cep: v.cep.replace(/\D/g, ""),
           email: v.emailEmpresa,
+          emails: emailsArray.length > 0 ? emailsArray : [v.emailEmpresa],
           telefones: v.telefones,
+          telefonesLista: telefonesArray.length > 0 ? telefonesArray : [v.telefones],
           responsavel: v.responsavel,
         },
       },
@@ -222,14 +234,26 @@ export async function loginAction(_prev: ActionResult | null, formData: FormData
     return { erro: "Preencha e-mail e senha." };
   }
 
-  const usuario = await prisma.usuario.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
+  const usuario = await prisma.usuario.findUnique({
+    where: { email: parsed.data.email.toLowerCase() },
+    include: { conta: true },
+  });
   if (!usuario) return { erro: "Credenciais inválidas." };
 
   const ok = await verificarSenha(parsed.data.senha, usuario.senhaHash);
   if (!ok) return { erro: "Credenciais inválidas." };
 
   await criarSessao(usuario.id);
-  redirect("/dashboard");
+  // Redireciona pra rota inicial conforme o tipo da conta:
+  // - SuperAdmin: visão de plataforma
+  // - Analista: painel próprio (não tem dashboard de empresa)
+  // - Empresa: dashboard operacional
+  const destino = usuario.superAdmin
+    ? "/admin-plataforma"
+    : usuario.conta.tipo === "ANALISTA"
+      ? "/painel-analista"
+      : "/dashboard";
+  redirect(destino);
 }
 
 export async function logoutAction() {

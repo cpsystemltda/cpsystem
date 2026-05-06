@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
@@ -64,12 +65,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ROTAS_PERMITIDAS_INADIMPLENTE = ["/conta/", "/empresas", "/equipe", "/termos", "/auditoria", "/admin"];
   const rotaPermitidaPaywall = ROTAS_PERMITIDAS_INADIMPLENTE.some((r) => pathname.startsWith(r));
 
-  // Bloqueio cruzado por tipo de conta (super admin nunca bloqueia)
+  // Bloqueio cruzado por tipo de conta (super admin nunca bloqueia).
+  // Em vez de exibir tela de erro, redirecionamos pra rota inicial do perfil —
+  // o usuário nunca cai em "tela não disponível" quando há um destino óbvio.
   const rotaSoEmpresa = ROTAS_SO_EMPRESA.some((r) => pathname.startsWith(r));
   const rotaSoAnalista = ROTAS_SO_ANALISTA.some((r) => pathname.startsWith(r));
-  const acessoErrado = usuario.superAdmin
-    ? false
-    : (tipoConta === "ANALISTA" && rotaSoEmpresa) || (tipoConta === "EMPRESA" && rotaSoAnalista);
+  if (!usuario.superAdmin) {
+    if (tipoConta === "ANALISTA" && rotaSoEmpresa) redirect("/painel-analista");
+    if (tipoConta === "EMPRESA" && rotaSoAnalista) redirect("/dashboard");
+  }
 
   // Rotas operacionais — só fazem sentido quando uma empresa específica está em foco.
   // Em "Todas as empresas" (visão consolidada com 2+ CNPJs) só permitimos Dashboard,
@@ -122,9 +126,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         empresaIdSelecionada={empresaIdSelecionada}
       />
       <main className="flex-1 overflow-y-auto bg-slate-50/60">
-        {acessoErrado ? (
-          <AcessoNegado tipoConta={tipoConta} />
-        ) : tipoConta === "EMPRESA" && bloqueada && !rotaPermitidaPaywall ? (
+        {tipoConta === "EMPRESA" && bloqueada && !rotaPermitidaPaywall ? (
           <Paywall status={conta.statusAssinatura} trialExpirado={!!trialExpirado} />
         ) : consolidadoBloqueado ? (
           <SelecioneEmpresa />
@@ -132,23 +134,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           children
         )}
       </main>
-    </div>
-  );
-}
-
-function AcessoNegado({ tipoConta }: { tipoConta: "EMPRESA" | "ANALISTA" }) {
-  return (
-    <div className="mx-auto max-w-2xl px-8 py-20 text-center">
-      <h1 className="text-2xl font-bold text-slate-900">Esta tela não está disponível pra sua conta</h1>
-      <p className="mt-3 text-sm text-slate-600">
-        Sua conta é do tipo <strong>{tipoConta}</strong>. Use o menu lateral pra acessar suas funcionalidades.
-      </p>
-      <Link
-        href={tipoConta === "ANALISTA" ? "/painel-analista" : "/dashboard"}
-        className="mt-6 inline-block rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white"
-      >
-        Ir pra minha tela inicial
-      </Link>
     </div>
   );
 }

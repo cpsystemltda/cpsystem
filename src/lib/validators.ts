@@ -49,6 +49,10 @@ export const signupSchema = z
     endereco: z.string().min(5, "Endereço muito curto"),
     complemento: z.string().optional(),
     cep: z.string().regex(cepRegex, "CEP inválido"),
+    // Múltiplos contatos: aceita string única (compat) OU array (do CampoMultiplo).
+    // O array vem como FormData.getAll("emailEmpresa[]") na action — convertemos
+    // pra string única (1ª entrada) pra cair aqui, mas guardamos array completo
+    // em emailsExtras pra persistir todos.
     emailEmpresa: z.string().email("E-mail da empresa inválido"),
     telefones: z.string().min(8, "Informe ao menos um telefone"),
     responsavel: z.string().min(2, "Informe o responsável"),

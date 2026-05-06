@@ -129,8 +129,10 @@ model Empresa {
   endereco         String
   complemento      String?
   cep              String
-  email            String
-  telefones        String
+  email            String   // primário (legado mantido pra not break queries existentes)
+  emails           String[] @default([])
+  telefones        String   // primário (legado)
+  telefonesLista   String[] @default([])
   responsavel      String
   criadoEm         DateTime     @default(now())
   atualizadoEm     DateTime     @updatedAt
