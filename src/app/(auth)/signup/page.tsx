@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
-import { Building2, UserCheck, Search, X } from "lucide-react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { Building2, UserCheck, Search, X, AlertCircle } from "lucide-react";
 import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { signupAction, signupAnalistaAction, buscarAnalistasPublicos } from "@/app/actions/auth";
@@ -16,6 +16,33 @@ const PORTES = [
   { value: "MEDIA", label: "Média" },
   { value: "GRANDE", label: "Grande" },
 ];
+
+const ROTULO_CAMPO: Record<string, string> = {
+  // Empresa
+  nome: "Seu nome",
+  email: "E-mail de acesso",
+  senha: "Senha",
+  razaoSocial: "Razão social",
+  porte: "Porte",
+  nomeFantasia: "Nome fantasia",
+  cnpj: "CNPJ",
+  cnaePrincipal: "CNAE principal",
+  naturezaJuridica: "Natureza jurídica",
+  endereco: "Endereço",
+  cep: "CEP",
+  emailEmpresa: "E-mail da empresa",
+  telefones: "Telefone(s)",
+  responsavel: "Responsável",
+  // Analista (só os que diferem)
+  cpf: "CPF",
+  telefone: "Telefone",
+  banco: "Banco",
+  agencia: "Agência",
+  contaCorrente: "Conta corrente",
+  pix: "PIX",
+  cnaesSecundarios: "CNAEs secundários",
+  enderecoPj: "Endereço da PJ",
+};
 
 type Tipo = "EMPRESA" | "ANALISTA";
 
@@ -89,31 +116,87 @@ function CardTipo({
 function FormEmpresa() {
   const [state, formAction] = useActionState(signupAction, null);
   const e = state?.campos ?? {};
+  const v = state?.valores ?? {};
+  const errosResumo = Object.entries(e);
+  const resumoRef = useRef<HTMLDivElement>(null);
+
+  // Rola até o resumo de erros e dá foco no primeiro campo problemático
+  useEffect(() => {
+    if (errosResumo.length === 0) return;
+    resumoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const primeiro = errosResumo[0]?.[0];
+    if (primeiro) {
+      const el = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${primeiro}"]`);
+      el?.focus({ preventScroll: true });
+    }
+  }, [errosResumo]);
 
   return (
     <form action={formAction} className="mt-8 grid grid-cols-4 gap-4">
+      {/* Resumo de erros no topo, com lista clicável */}
+      {(state?.erro || errosResumo.length > 0) && (
+        <div
+          ref={resumoRef}
+          className="col-span-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+        >
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+            <div className="flex-1">
+              <p className="font-semibold">{state?.erro ?? "Verifique os campos:"}</p>
+              {errosResumo.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {errosResumo.map(([campo, msg]) => (
+                    <li key={campo}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${campo}"]`);
+                          el?.focus();
+                          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="text-left underline hover:text-red-900"
+                      >
+                        <strong>{ROTULO_CAMPO[campo] ?? campo}</strong>: {msg}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <h2 className="col-span-4 mt-2 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Seu acesso
       </h2>
-      <Field label="Seu nome" name="nome" required erro={e.nome} span={2} />
-      <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required erro={e.email} span={2} />
+      <Field label="Seu nome" name="nome" required defaultValue={v.nome ?? ""} erro={e.nome} span={2} />
+      <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required defaultValue={v.email ?? ""} erro={e.email} span={2} />
       <Field label="Senha (mín. 8 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
       <div className="col-span-2" />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Empresa
       </h2>
-      <Field label="Razão social" name="razaoSocial" required erro={e.razaoSocial} span={3} />
-      <Select label="Porte" name="porte" options={PORTES} required erro={e.porte} span={1} />
-      <Field label="Nome fantasia" name="nomeFantasia" erro={e.nomeFantasia} span={2} />
-      <Field label="CNPJ" name="cnpj" placeholder="00.000.000/0000-00" required erro={e.cnpj} span={2} />
-      <Field label="CNAE principal" name="cnaePrincipal" required erro={e.cnaePrincipal} span={2} />
-      <Field label="Natureza jurídica" name="naturezaJuridica" required erro={e.naturezaJuridica} span={2} />
-      <Field label="Endereço" name="endereco" required erro={e.endereco} span={3} />
-      <Field label="CEP" name="cep" placeholder="00000-000" required erro={e.cep} span={1} />
-      <Field label="E-mail da empresa" name="emailEmpresa" type="email" required erro={e.emailEmpresa} span={2} />
-      <Field label="Telefone(s)" name="telefones" placeholder="(61) 9 9999-9999" required erro={e.telefones} span={2} />
-      <Field label="Responsável" name="responsavel" required erro={e.responsavel} span={4} />
+      <Field label="Razão social" name="razaoSocial" required defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={3} />
+      <Select label="Porte" name="porte" options={PORTES} required defaultValue={v.porte ?? ""} erro={e.porte} span={1} />
+      <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={2} />
+      <Field label="CNPJ" name="cnpj" placeholder="00.000.000/0000-00" required defaultValue={v.cnpj ?? ""} erro={e.cnpj} span={2} />
+      <Field label="CNAE principal" name="cnaePrincipal" placeholder="ex.: 6201-5/01" required defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={2} />
+      <Select
+        label="Natureza jurídica"
+        name="naturezaJuridica"
+        options={OPCOES_NATUREZA_JURIDICA}
+        required
+        defaultValue={v.naturezaJuridica ?? ""}
+        erro={e.naturezaJuridica}
+        span={2}
+      />
+      <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={3} />
+      <Field label="CEP" name="cep" placeholder="00000-000" required defaultValue={v.cep ?? ""} erro={e.cep} span={1} />
+      <Field label="E-mail da empresa" name="emailEmpresa" type="email" required defaultValue={v.emailEmpresa ?? ""} erro={e.emailEmpresa} span={2} />
+      <Field label="Telefone(s)" name="telefones" placeholder="(61) 9 9999-9999" required defaultValue={v.telefones ?? ""} erro={e.telefones} span={2} />
+      <Field label="Responsável" name="responsavel" required defaultValue={v.responsavel ?? ""} erro={e.responsavel} span={4} />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Analista de licitação <span className="ml-2 font-normal normal-case text-slate-400">(opcional)</span>
@@ -125,12 +208,6 @@ function FormEmpresa() {
         </p>
         <SeletorAnalista />
       </div>
-
-      {state?.erro && (
-        <div className="col-span-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {state.erro}
-        </div>
-      )}
 
       <div className="col-span-4 mt-2">
         <SubmitButton>Criar conta de empresa · Trial 14 dias</SubmitButton>
@@ -244,54 +321,97 @@ function SeletorAnalista() {
 
 function FormAnalista() {
   const [state, formAction] = useActionState(signupAnalistaAction, null);
+  const e = state?.campos ?? {};
+  const v = state?.valores ?? {};
+  const errosResumo = Object.entries(e);
+  const resumoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (errosResumo.length === 0) return;
+    resumoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const primeiro = errosResumo[0]?.[0];
+    if (primeiro) {
+      const el = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${primeiro}"]`);
+      el?.focus({ preventScroll: true });
+    }
+  }, [errosResumo]);
 
   return (
     <form action={formAction} className="mt-8 grid grid-cols-4 gap-4">
+      {(state?.erro || errosResumo.length > 0) && (
+        <div
+          ref={resumoRef}
+          className="col-span-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+        >
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+            <div className="flex-1">
+              <p className="font-semibold">{state?.erro ?? "Verifique os campos:"}</p>
+              {errosResumo.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {errosResumo.map(([campo, msg]) => (
+                    <li key={campo}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${campo}"]`);
+                          el?.focus();
+                          el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="text-left underline hover:text-red-900"
+                      >
+                        <strong>{ROTULO_CAMPO[campo] ?? campo}</strong>: {msg}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <h2 className="col-span-4 mt-2 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Dados pessoais
       </h2>
-      <Field label="Nome completo" name="nome" required span={3} />
-      <Field label="CPF" name="cpf" placeholder="000.000.000-00" required span={1} />
-      <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required span={2} />
-      <Field label="Senha (mín. 8)" name="senha" type="password" required span={2} />
-      <Field label="Telefone" name="telefone" placeholder="(61) 9 9999-9999" required span={2} />
-      <Field label="Endereço" name="endereco" required span={2} />
+      <Field label="Nome completo" name="nome" required defaultValue={v.nome ?? ""} erro={e.nome} span={3} />
+      <Field label="CPF" name="cpf" placeholder="000.000.000-00" required defaultValue={v.cpf ?? ""} erro={e.cpf} span={1} />
+      <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required defaultValue={v.email ?? ""} erro={e.email} span={2} />
+      <Field label="Senha (mín. 8)" name="senha" type="password" required erro={e.senha} span={2} />
+      <Field label="Telefone" name="telefone" placeholder="(61) 9 9999-9999" required defaultValue={v.telefone ?? ""} erro={e.telefone} span={2} />
+      <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={2} />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Dados bancários (pra receber comissões e fixo)
+        Dados bancários <span className="ml-2 font-normal normal-case text-slate-400">(pra receber comissões e fixo)</span>
       </h2>
-      <Field label="Banco" name="banco" span={2} />
-      <Field label="Agência" name="agencia" span={1} />
-      <Field label="Conta corrente" name="contaCorrente" span={1} />
-      <Field label="PIX (chave preferencial)" name="pix" span={4} />
+      <Field label="Banco" name="banco" defaultValue={v.banco ?? ""} erro={e.banco} span={2} />
+      <Field label="Agência" name="agencia" defaultValue={v.agencia ?? ""} erro={e.agencia} span={1} />
+      <Field label="Conta corrente" name="contaCorrente" defaultValue={v.contaCorrente ?? ""} erro={e.contaCorrente} span={1} />
+      <Field label="PIX (chave preferencial)" name="pix" defaultValue={v.pix ?? ""} erro={e.pix} span={4} />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Pessoa jurídica <span className="ml-2 font-normal normal-case text-slate-400">(opcional, se você emite nota como PJ)</span>
+        Pessoa jurídica <span className="ml-2 font-normal normal-case text-slate-400">(opcional — preencha só se emite nota como PJ)</span>
       </h2>
-      <Field label="Razão social" name="razaoSocial" span={3} />
-      <Select label="Porte" name="porte" options={PORTES} span={1} />
-      <Field label="Nome fantasia" name="nomeFantasia" span={2} />
-      <Field label="CNPJ" name="cnpj" placeholder="00.000.000/0000-00" span={2} />
-      <Field label="CNAE principal" name="cnaePrincipal" span={2} />
-      <Field label="CNAEs secundários (separar por vírgula)" name="cnaesSecundarios" span={2} />
+      <Field label="Razão social" name="razaoSocial" defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={3} />
+      <Select label="Porte" name="porte" options={PORTES} defaultValue={v.porte ?? ""} erro={e.porte} span={1} />
+      <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={2} />
+      <Field label="CNPJ" name="cnpj" placeholder="00.000.000/0000-00" defaultValue={v.cnpj ?? ""} erro={e.cnpj} span={2} />
+      <Field label="CNAE principal" name="cnaePrincipal" placeholder="ex.: 6911-7/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={2} />
+      <Field label="CNAEs secundários (separar por vírgula)" name="cnaesSecundarios" defaultValue={v.cnaesSecundarios ?? ""} erro={e.cnaesSecundarios} span={2} />
       <Select
         label="Natureza jurídica"
         name="naturezaJuridica"
-        options={[{ value: "", label: "—" }, ...OPCOES_NATUREZA_JURIDICA]}
+        options={OPCOES_NATUREZA_JURIDICA}
+        defaultValue={v.naturezaJuridica ?? ""}
+        erro={e.naturezaJuridica}
         span={2}
       />
-      <Field label="Endereço da PJ" name="enderecoPj" span={2} />
+      <Field label="Endereço da PJ" name="enderecoPj" defaultValue={v.enderecoPj ?? ""} erro={e.enderecoPj} span={2} />
 
       <div className="col-span-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
         Como analista, você não paga assinatura. Seu painel mostra todas as empresas que vincularem você como responsável,
         com cálculo automático de comissão por execução de contrato.
       </div>
-
-      {state?.erro && (
-        <div className="col-span-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {state.erro}
-        </div>
-      )}
 
       <div className="col-span-4 mt-2">
         <SubmitButton>Criar conta de analista · gratuito</SubmitButton>

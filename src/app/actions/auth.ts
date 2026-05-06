@@ -3,13 +3,27 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { criarSessao, destruirSessao, hashSenha, verificarSenha } from "@/lib/auth";
-import { loginSchema, normalizarCnpj, signupSchema } from "@/lib/validators";
+import { loginSchema, normalizarCnpj, normalizarCpf, signupAnalistaSchema, signupSchema } from "@/lib/validators";
 
-type ActionResult = { erro?: string; campos?: Record<string, string> };
+type ActionResult = {
+  erro?: string;
+  campos?: Record<string, string>;
+  valores?: Record<string, string>;
+};
+
+function valoresParaEcho(formData: FormData): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) {
+    if (k === "senha" || k === "confirmacaoSenha") continue;
+    out[k] = typeof v === "string" ? v : "";
+  }
+  return out;
+}
 
 export async function signupAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const dados = Object.fromEntries(formData);
   const parsed = signupSchema.safeParse(dados);
+  const valores = valoresParaEcho(formData);
 
   if (!parsed.success) {
     const campos: Record<string, string> = {};
@@ -17,7 +31,7 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       const k = issue.path[0]?.toString();
       if (k && !campos[k]) campos[k] = issue.message;
     }
-    return { erro: "Verifique os campos destacados.", campos };
+    return { erro: "Verifique os campos destacados.", campos, valores };
   }
 
   const v = parsed.data;
@@ -173,42 +187,44 @@ export async function logoutAction() {
 // ============================================================
 export async function signupAnalistaAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const dados = Object.fromEntries(formData);
+  const valores = valoresParaEcho(formData);
+  const parsed = signupAnalistaSchema.safeParse(dados);
 
-  const nome = String(dados.nome || "").trim();
-  const email = String(dados.email || "").trim().toLowerCase();
-  const senha = String(dados.senha || "");
-  const cpf = String(dados.cpf || "").replace(/\D/g, "");
-  const telefone = String(dados.telefone || "").trim();
-  const endereco = String(dados.endereco || "").trim();
-  const banco = String(dados.banco || "").trim();
-  const agencia = String(dados.agencia || "").trim();
-  const contaCorrente = String(dados.contaCorrente || "").trim();
-  const pix = String(dados.pix || "").trim();
+  if (!parsed.success) {
+    const campos: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const k = issue.path[0]?.toString();
+      if (k && !campos[k]) campos[k] = issue.message;
+    }
+    return { erro: "Verifique os campos destacados.", campos, valores };
+  }
 
-  // Pessoa jurídica (opcional)
-  const razaoSocial = String(dados.razaoSocial || "").trim();
-  const nomeFantasia = String(dados.nomeFantasia || "").trim();
-  const cnpjPj = String(dados.cnpj || "").replace(/\D/g, "");
-  const portePj = String(dados.porte || "").trim();
-  const cnaePrincipal = String(dados.cnaePrincipal || "").trim();
-  const cnaesSecundarios = String(dados.cnaesSecundarios || "").trim();
-  const naturezaJuridica = String(dados.naturezaJuridica || "").trim();
-  const enderecoPj = String(dados.enderecoPj || "").trim();
-
-  if (!nome || nome.length < 2) return { erro: "Nome inválido." };
-  if (!email.includes("@")) return { erro: "E-mail inválido." };
-  if (senha.length < 8) return { erro: "Senha deve ter ao menos 8 caracteres." };
-  if (cpf.length !== 11) return { erro: "CPF inválido." };
-  if (!telefone) return { erro: "Telefone obrigatório." };
-  if (!endereco) return { erro: "Endereço obrigatório." };
+  const v = parsed.data;
+  const nome = v.nome.trim();
+  const email = v.email.trim().toLowerCase();
+  const cpf = normalizarCpf(v.cpf);
+  const telefone = v.telefone.trim();
+  const endereco = v.endereco.trim();
+  const banco = (v.banco ?? "").trim();
+  const agencia = (v.agencia ?? "").trim();
+  const contaCorrente = (v.contaCorrente ?? "").trim();
+  const pix = (v.pix ?? "").trim();
+  const razaoSocial = (v.razaoSocial ?? "").trim();
+  const nomeFantasia = (v.nomeFantasia ?? "").trim();
+  const cnpjPj = v.cnpj ? normalizarCnpj(v.cnpj) : "";
+  const portePj = (v.porte ?? "").trim();
+  const cnaePrincipal = (v.cnaePrincipal ?? "").trim();
+  const cnaesSecundarios = (v.cnaesSecundarios ?? "").trim();
+  const naturezaJuridica = (v.naturezaJuridica ?? "").trim();
+  const enderecoPj = (v.enderecoPj ?? "").trim();
 
   const emailExiste = await prisma.usuario.findUnique({ where: { email } });
-  if (emailExiste) return { erro: "E-mail já cadastrado." };
+  if (emailExiste) return { erro: "E-mail já cadastrado.", campos: { email: "E-mail já cadastrado" }, valores };
 
   const cpfExiste = await prisma.analista.findUnique({ where: { cpf } });
-  if (cpfExiste) return { erro: "CPF já cadastrado como analista." };
+  if (cpfExiste) return { erro: "CPF já cadastrado como analista.", campos: { cpf: "CPF já cadastrado" }, valores };
 
-  const senhaHash = await hashSenha(senha);
+  const senhaHash = await hashSenha(v.senha);
 
   const conta = await prisma.conta.create({
     data: {

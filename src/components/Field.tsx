@@ -30,14 +30,19 @@ type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
   options: { value: string; label: string }[];
 };
 
-export function Select({ label, erro, span = 2, options, className, ...rest }: SelectProps) {
+export function Select({ label, erro, span = 2, options, className, defaultValue, ...rest }: SelectProps) {
   const spanCls =
     span === 1 ? "col-span-1" : span === 2 ? "col-span-2" : span === 3 ? "col-span-3" : "col-span-4";
+  // <select> uncontrolled só aplica defaultValue no primeiro mount.
+  // Após server action retornar valores novos, forçamos remontagem via key.
+  const selectKey = `${rest.name ?? "select"}-${String(defaultValue ?? "")}`;
   return (
     <label className={`flex flex-col gap-1 ${spanCls}`}>
       <span className="text-sm font-medium text-slate-700">{label}</span>
       <select
+        key={selectKey}
         {...rest}
+        defaultValue={defaultValue}
         className={`rounded-md border bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-200 ${
           erro ? "border-red-400" : "border-slate-300 focus:border-blue-500"
         } ${className ?? ""}`}

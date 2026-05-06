@@ -48,6 +48,71 @@ export const loginSchema = z.object({
   senha: z.string().min(1, "Senha obrigatória"),
 });
 
+const cpfRegex = /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/;
+
+// Cadastro de Analista — campos obrigatórios + bloco PJ opcional.
+// Quando QUALQUER campo PJ é preenchido, todos os obrigatórios da PJ passam a valer.
+export const signupAnalistaSchema = z
+  .object({
+    // Pessoais (obrigatórios)
+    nome: z.string().min(2, "Nome muito curto"),
+    cpf: z.string().regex(cpfRegex, "CPF inválido"),
+    email: z.string().email("E-mail inválido"),
+    senha: z.string().min(8, "Mínimo 8 caracteres"),
+    telefone: z.string().min(8, "Telefone obrigatório"),
+    endereco: z.string().min(5, "Endereço muito curto"),
+
+    // Bancários (opcionais)
+    banco: z.string().optional(),
+    agencia: z.string().optional(),
+    contaCorrente: z.string().optional(),
+    pix: z.string().optional(),
+
+    // PJ (opcional como bloco)
+    razaoSocial: z.string().optional(),
+    nomeFantasia: z.string().optional(),
+    cnpj: z.string().optional(),
+    porte: z.string().optional(),
+    cnaePrincipal: z.string().optional(),
+    cnaesSecundarios: z.string().optional(),
+    naturezaJuridica: z.string().optional(),
+    enderecoPj: z.string().optional(),
+  })
+  .superRefine((v, ctx) => {
+    const pjPreenchido = !!(
+      v.razaoSocial ||
+      v.cnpj ||
+      v.porte ||
+      v.cnaePrincipal ||
+      v.naturezaJuridica ||
+      v.enderecoPj
+    );
+    if (!pjPreenchido) return;
+
+    if (!v.razaoSocial || v.razaoSocial.length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["razaoSocial"], message: "Razão social obrigatória quando preenche PJ" });
+    }
+    if (!v.cnpj || !cnpjRegex.test(v.cnpj)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cnpj"], message: "CNPJ inválido" });
+    }
+    if (!v.porte || !(portes as readonly string[]).includes(v.porte)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["porte"], message: "Selecione o porte" });
+    }
+    if (!v.naturezaJuridica || !(naturezasJuridicas as readonly string[]).includes(v.naturezaJuridica)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["naturezaJuridica"], message: "Selecione a natureza jurídica" });
+    }
+    if (!v.cnaePrincipal || v.cnaePrincipal.length < 4) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cnaePrincipal"], message: "Informe o CNAE principal" });
+    }
+    if (!v.enderecoPj || v.enderecoPj.length < 5) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["enderecoPj"], message: "Endereço da PJ obrigatório quando preenche PJ" });
+    }
+  });
+
+export function normalizarCpf(cpf: string): string {
+  return cpf.replace(/\D/g, "");
+}
+
 export const novaEmpresaSchema = z
   .object({
     razaoSocial: z.string().min(2),
