@@ -53,7 +53,7 @@ function Header() {
       <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent" />
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center">
-          <Logo variant="md" mode="full" priority />
+          <Logo variant="md" mode="brand" priority />
         </Link>
         <nav className="hidden items-center gap-8 md:flex">
           <a href="#manifesto" className="text-sm font-medium text-[#3D434C] transition hover:text-[#9C7A2D]">Por que</a>
@@ -835,7 +835,7 @@ function Footer() {
         <div className="grid gap-12 md:grid-cols-12">
           <div className="md:col-span-5">
             <div className="flex items-center">
-              <Logo variant="md" mode="full" onDark />
+              <Logo variant="md" mode="brand" onDark />
             </div>
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-slate-400">
               Plataforma premium de gestão pós-licitação. Filial do Grupo Contratos Públicos, uma

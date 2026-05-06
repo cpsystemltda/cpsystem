@@ -7,6 +7,7 @@ import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CampoCnpj } from "@/components/CampoCnpj";
 import { CampoCep } from "@/components/CampoCep";
+import { CampoCartao } from "@/components/CampoCartao";
 import { signupAction, signupAnalistaAction, buscarAnalistasPublicos } from "@/app/actions/auth";
 import { Logo } from "@/components/Logo";
 import { OPCOES_NATUREZA_JURIDICA } from "@/lib/validators";
@@ -30,6 +31,10 @@ const PIX_TIPOS = [
 const ROTULO_CAMPO: Record<string, string> = {
   // Empresa
   plano: "Plano",
+  cartaoNumero: "Número do cartão",
+  cartaoNome: "Nome no cartão",
+  cartaoValidade: "Validade do cartão",
+  cartaoCvv: "CVV do cartão",
   nome: "Seu nome",
   email: "E-mail de acesso",
   senha: "Senha",
@@ -298,6 +303,19 @@ function FormEmpresa() {
         Ambos os planos começam com <strong>14 dias grátis</strong>. A cobrança só acontece após o trial — você
         pode trocar de plano ou cancelar a qualquer momento.
       </p>
+
+      {/* Cartão de crédito (validação Luhn + bandeira + validade no servidor) */}
+      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Forma de pagamento
+      </h2>
+      <CampoCartao
+        erros={{
+          cartaoNumero: e.cartaoNumero,
+          cartaoValidade: e.cartaoValidade,
+          cartaoCvv: e.cartaoCvv,
+          cartaoNome: e.cartaoNome,
+        }}
+      />
 
       {/* ORDEM definida pelo PO (Igor): CNPJ no topo, dados pessoais no fim */}
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">

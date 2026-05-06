@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { criarSessao, destruirSessao, hashSenha, verificarSenha } from "@/lib/auth";
 import { loginSchema, normalizarCnpj, normalizarCpf, signupAnalistaSchema, signupSchema } from "@/lib/validators";
+import { validarCartao } from "@/lib/cartao";
 
 type ActionResult = {
   erro?: string;
@@ -14,7 +15,8 @@ type ActionResult = {
 function valoresParaEcho(formData: FormData): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of formData.entries()) {
-    if (k === "senha" || k === "confirmacaoSenha") continue;
+    // Não echo de campos sensíveis: senha + dados completos do cartão
+    if (k === "senha" || k === "confirmacaoSenha" || k === "cartaoNumero" || k === "cartaoCvv") continue;
     out[k] = typeof v === "string" ? v : "";
   }
   return out;
@@ -37,6 +39,27 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   const v = parsed.data;
   const cnpj = normalizarCnpj(v.cnpj);
   const emailNorm = v.email.trim().toLowerCase();
+
+  // Valida cartão (Luhn + bandeira + validade + CVV + nome) — antes de tocar no DB
+  const cartao = validarCartao({
+    numero: v.cartaoNumero,
+    validade: v.cartaoValidade,
+    cvv: v.cartaoCvv,
+    nome: v.cartaoNome,
+  });
+  if (!cartao.ok) {
+    const campoMap: Record<string, string> = {
+      numero: "cartaoNumero",
+      validade: "cartaoValidade",
+      cvv: "cartaoCvv",
+      nome: "cartaoNome",
+    };
+    return {
+      erro: `Cartão inválido: ${cartao.mensagem}`,
+      campos: { [campoMap[cartao.campo]]: cartao.mensagem },
+      valores,
+    };
+  }
 
   // Bloqueio de email duplicado entre empresa e analista (regra de negócio do PO)
   const emailExiste = await prisma.usuario.findUnique({ where: { email: emailNorm } });
@@ -102,6 +125,21 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
           email: v.emailEmpresa,
           telefones: v.telefones,
           responsavel: v.responsavel,
+        },
+      },
+      // Cartão validado — só persistimos últimos 4 + bandeira + validade.
+      // PAN/CVV jamais tocam o disco. Tokenização real via gateway entra
+      // como melhoria futura quando ASAAS_API_KEY for configurado.
+      metodosPagamento: {
+        create: {
+          forma: "CARTAO_CREDITO",
+          apelido: `${cartao.bandeira} final ${cartao.ultimos4}`,
+          bandeira: cartao.bandeira,
+          ultimosDigitos: cartao.ultimos4,
+          validadeMes: cartao.validadeMes,
+          validadeAno: cartao.validadeAno,
+          padrao: true,
+          ativo: true,
         },
       },
     },

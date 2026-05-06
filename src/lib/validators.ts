@@ -33,6 +33,13 @@ export const signupSchema = z
 
     // Primeira empresa
     plano: z.enum(["BASICO", "PREMIUM"], { message: "Escolha um plano" }),
+
+    // Cartão (validado em detalhe pela função validarCartao no auth action)
+    cartaoNumero: z.string().min(13, "Informe o número do cartão"),
+    cartaoNome: z.string().min(4, "Informe o nome impresso no cartão"),
+    cartaoValidade: z.string().regex(/^\d{2}\/?\d{2}$/, "Validade no formato MM/AA"),
+    cartaoCvv: z.string().regex(/^\d{3,4}$/, "CVV inválido"),
+
     razaoSocial: z.string().min(2, "Informe a razão social"),
     nomeFantasia: z.string().optional(),
     cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),

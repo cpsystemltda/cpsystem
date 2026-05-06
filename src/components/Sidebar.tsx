@@ -197,7 +197,7 @@ export function Sidebar({
           className="block transition hover:opacity-80"
         >
           <div className={navigating ? "animate-spin" : ""} style={{ animationDuration: "0.8s" }}>
-            <Logo variant="sm" priority />
+            <Logo variant="sm" mode="brand" priority />
           </div>
         </Link>
       </div>
