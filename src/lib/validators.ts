@@ -23,25 +23,38 @@ export const naturezasJuridicas = [
   "OUTRA",
 ] as const;
 
-export const signupSchema = z.object({
-  // Usuário
-  nome: z.string().min(2, "Nome muito curto"),
-  email: z.string().email("E-mail inválido"),
-  senha: z.string().min(8, "Mínimo 8 caracteres"),
+export const signupSchema = z
+  .object({
+    // Usuário
+    nome: z.string().min(2, "Nome muito curto"),
+    email: z.string().email("E-mail inválido"),
+    senha: z.string().min(6, "Mínimo 6 caracteres"),
+    confirmacaoSenha: z.string().min(1, "Confirme a senha"),
 
-  // Primeira empresa
-  razaoSocial: z.string().min(2, "Informe a razão social"),
-  nomeFantasia: z.string().optional(),
-  cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
-  porte: z.enum(portes),
-  cnaePrincipal: z.string().min(4, "Informe o CNAE principal"),
-  naturezaJuridica: z.enum(naturezasJuridicas, { message: "Selecione a natureza jurídica" }),
-  endereco: z.string().min(5, "Endereço muito curto"),
-  cep: z.string().regex(cepRegex, "CEP inválido"),
-  emailEmpresa: z.string().email("E-mail da empresa inválido"),
-  telefones: z.string().min(8, "Informe ao menos um telefone"),
-  responsavel: z.string().min(2, "Informe o responsável"),
-});
+    // Primeira empresa
+    plano: z.enum(["BASICO", "PREMIUM"], { message: "Escolha um plano" }),
+    razaoSocial: z.string().min(2, "Informe a razão social"),
+    nomeFantasia: z.string().optional(),
+    cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
+    porte: z.enum(portes),
+    cnaePrincipal: z.string().optional(), // Igor: opcional, não trava cadastro
+    naturezaJuridica: z.enum(naturezasJuridicas, { message: "Selecione a natureza jurídica" }),
+    endereco: z.string().min(5, "Endereço muito curto"),
+    complemento: z.string().optional(),
+    cep: z.string().regex(cepRegex, "CEP inválido"),
+    emailEmpresa: z.string().email("E-mail da empresa inválido"),
+    telefones: z.string().min(8, "Informe ao menos um telefone"),
+    responsavel: z.string().min(2, "Informe o responsável"),
+  })
+  .superRefine((v, ctx) => {
+    if (v.senha !== v.confirmacaoSenha) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmacaoSenha"],
+        message: "Confirmação não confere com a senha",
+      });
+    }
+  });
 
 export const loginSchema = z.object({
   email: z.string().email("E-mail inválido"),
@@ -51,46 +64,51 @@ export const loginSchema = z.object({
 const cpfRegex = /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/;
 
 // Cadastro de Analista — campos obrigatórios + bloco PJ opcional.
-// Quando QUALQUER campo PJ é preenchido, todos os obrigatórios da PJ passam a valer.
+// Quando o flag "temPj" é "sim", todos os obrigatórios da PJ passam a valer.
 export const signupAnalistaSchema = z
   .object({
     // Pessoais (obrigatórios)
     nome: z.string().min(2, "Nome muito curto"),
     cpf: z.string().regex(cpfRegex, "CPF inválido"),
     email: z.string().email("E-mail inválido"),
-    senha: z.string().min(8, "Mínimo 8 caracteres"),
+    senha: z.string().min(6, "Mínimo 6 caracteres"),
+    confirmacaoSenha: z.string().min(1, "Confirme a senha"),
     telefone: z.string().min(8, "Telefone obrigatório"),
     endereco: z.string().min(5, "Endereço muito curto"),
+    complemento: z.string().optional(),
+    cep: z.string().regex(cepRegex, "CEP inválido"),
 
-    // Bancários (opcionais)
+    // Bancários (opcionais — CNAE também opcional pra não travar)
     banco: z.string().optional(),
     agencia: z.string().optional(),
     contaCorrente: z.string().optional(),
     pix: z.string().optional(),
+    pixTipo: z.string().optional(),
 
-    // PJ (opcional como bloco)
+    // PJ (controlada por flag temPj)
+    temPj: z.string().optional(), // "sim" | "nao" | undefined
     razaoSocial: z.string().optional(),
     nomeFantasia: z.string().optional(),
     cnpj: z.string().optional(),
     porte: z.string().optional(),
-    cnaePrincipal: z.string().optional(),
+    cnaePrincipal: z.string().optional(), // opcional
     cnaesSecundarios: z.string().optional(),
     naturezaJuridica: z.string().optional(),
     enderecoPj: z.string().optional(),
   })
   .superRefine((v, ctx) => {
-    const pjPreenchido = !!(
-      v.razaoSocial ||
-      v.cnpj ||
-      v.porte ||
-      v.cnaePrincipal ||
-      v.naturezaJuridica ||
-      v.enderecoPj
-    );
-    if (!pjPreenchido) return;
+    if (v.senha !== v.confirmacaoSenha) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmacaoSenha"],
+        message: "Confirmação não confere com a senha",
+      });
+    }
+
+    if (v.temPj !== "sim") return;
 
     if (!v.razaoSocial || v.razaoSocial.length < 2) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["razaoSocial"], message: "Razão social obrigatória quando preenche PJ" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["razaoSocial"], message: "Razão social obrigatória" });
     }
     if (!v.cnpj || !cnpjRegex.test(v.cnpj)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cnpj"], message: "CNPJ inválido" });
@@ -101,11 +119,8 @@ export const signupAnalistaSchema = z
     if (!v.naturezaJuridica || !(naturezasJuridicas as readonly string[]).includes(v.naturezaJuridica)) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["naturezaJuridica"], message: "Selecione a natureza jurídica" });
     }
-    if (!v.cnaePrincipal || v.cnaePrincipal.length < 4) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cnaePrincipal"], message: "Informe o CNAE principal" });
-    }
     if (!v.enderecoPj || v.enderecoPj.length < 5) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["enderecoPj"], message: "Endereço da PJ obrigatório quando preenche PJ" });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["enderecoPj"], message: "Endereço da PJ obrigatório" });
     }
   });
 

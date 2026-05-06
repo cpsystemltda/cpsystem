@@ -123,10 +123,11 @@ model Empresa {
   nomeFantasia     String?
   cnpj             String       @unique
   porte            PorteEmpresa
-  cnaePrincipal    String
+  cnaePrincipal    String?
   cnaesSecundarios String?
   naturezaJuridica String
   endereco         String
+  complemento      String?
   cep              String
   email            String
   telefones        String
@@ -161,6 +162,8 @@ model Analista {
   cpf           String   @unique
   telefone      String
   endereco      String
+  cep           String?
+  complemento   String?
   email         String
   banco         String?
   agencia       String?

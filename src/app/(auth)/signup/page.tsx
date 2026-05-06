@@ -5,6 +5,8 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Building2, UserCheck, Search, X, AlertCircle } from "lucide-react";
 import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
+import { CampoCnpj } from "@/components/CampoCnpj";
+import { CampoCep } from "@/components/CampoCep";
 import { signupAction, signupAnalistaAction, buscarAnalistasPublicos } from "@/app/actions/auth";
 import { Logo } from "@/components/Logo";
 import { OPCOES_NATUREZA_JURIDICA } from "@/lib/validators";
@@ -13,15 +15,25 @@ const PORTES = [
   { value: "MEI", label: "MEI" },
   { value: "ME", label: "Microempresa (ME)" },
   { value: "EPP", label: "Empresa de Pequeno Porte (EPP)" },
-  { value: "MEDIA", label: "Média" },
-  { value: "GRANDE", label: "Grande" },
+  { value: "GRANDE", label: "Grande porte" },
+  // "Média" removida a pedido do PO (Igor) — tabela do enum mantém pra compat
+];
+
+const PIX_TIPOS = [
+  { value: "CPF", label: "CPF" },
+  { value: "CNPJ", label: "CNPJ" },
+  { value: "EMAIL", label: "E-mail" },
+  { value: "TELEFONE", label: "Telefone" },
+  { value: "ALEATORIA", label: "Chave aleatória" },
 ];
 
 const ROTULO_CAMPO: Record<string, string> = {
   // Empresa
+  plano: "Plano",
   nome: "Seu nome",
   email: "E-mail de acesso",
   senha: "Senha",
+  confirmacaoSenha: "Confirmação de senha",
   razaoSocial: "Razão social",
   porte: "Porte",
   nomeFantasia: "Nome fantasia",
@@ -29,10 +41,11 @@ const ROTULO_CAMPO: Record<string, string> = {
   cnaePrincipal: "CNAE principal",
   naturezaJuridica: "Natureza jurídica",
   endereco: "Endereço",
+  complemento: "Complemento",
   cep: "CEP",
   emailEmpresa: "E-mail da empresa",
   telefones: "Telefone(s)",
-  responsavel: "Responsável",
+  responsavel: "Nome do responsável",
   // Analista (só os que diferem)
   cpf: "CPF",
   telefone: "Telefone",
@@ -50,12 +63,18 @@ export default function SignupPage() {
   const [tipo, setTipo] = useState<Tipo>("EMPRESA");
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-6 py-12">
-      <Link href="/" className="mb-8 block w-fit">
-        <Logo variant="md" priority />
-      </Link>
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#FAF6EC] via-white to-[#FFF8E1] px-6 py-12">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-32 top-20 h-96 w-96 rounded-full bg-[#D4AF37]/10 blur-3xl" />
+        <div className="absolute -right-32 bottom-20 h-96 w-96 rounded-full bg-[#9C7A2D]/10 blur-3xl" />
+      </div>
 
-      <h1 className="text-2xl font-bold text-slate-900">Criar conta</h1>
+      <div className="relative mx-auto w-full max-w-3xl">
+        <Link href="/" className="mx-auto mb-6 block w-fit">
+          <Logo variant="md" mode="brand" priority />
+        </Link>
+
+        <h1 className="text-center text-2xl font-bold text-slate-900">Criar conta</h1>
       <p className="mt-2 text-sm text-slate-600">Escolha o tipo de cadastro:</p>
 
       {/* Seletor de tipo */}
@@ -65,23 +84,88 @@ export default function SignupPage() {
           onClick={() => setTipo("EMPRESA")}
           icone={Building2}
           titulo="Sou empresa fornecedora"
-          texto="Vendo para o governo (B2G) e quero gerenciar meus contratos. Trial 14 dias."
+          texto="Vendo para o governo e quero gerenciar meus contratos. Teste grátis 14 dias."
         />
         <CardTipo
           ativo={tipo === "ANALISTA"}
           onClick={() => setTipo("ANALISTA")}
           icone={UserCheck}
           titulo="Sou analista de licitação"
-          texto="Atendo empresas fornecedoras. Cadastro gratuito — recebo comissão por execução."
+          texto="Atendo empresas fornecedoras. Cadastro gratuito."
         />
       </div>
 
       {tipo === "EMPRESA" ? <FormEmpresa /> : <FormAnalista />}
 
-      <p className="mt-6 text-center text-sm text-slate-600">
-        Já tem conta? <Link href="/login" className="text-blue-700 hover:underline">Entrar</Link>
-      </p>
+        <p className="mt-6 text-center text-sm text-slate-600">
+          Já tem conta? <Link href="/login" className="text-blue-700 hover:underline">Entrar</Link>
+        </p>
+      </div>
     </div>
+  );
+}
+
+function CardPlano({
+  value,
+  ativo,
+  onClick,
+  titulo,
+  preco,
+  sub,
+  descricao,
+  features,
+  destaque,
+}: {
+  value: "BASICO" | "PREMIUM";
+  ativo: boolean;
+  onClick: () => void;
+  titulo: string;
+  preco: string;
+  sub: string;
+  descricao: string;
+  features: string[];
+  destaque?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-plano={value}
+      className={`relative col-span-4 flex flex-col gap-3 rounded-2xl border-2 p-5 text-left transition md:col-span-2 ${
+        ativo
+          ? "border-blue-500 bg-blue-50/40 shadow-md"
+          : "border-slate-200 bg-white hover:border-slate-300"
+      }`}
+    >
+      {destaque && (
+        <span className="absolute -top-2.5 right-4 rounded-full bg-gradient-to-r from-[#B8860B] to-[#F4D374] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#1A1206]">
+          Recomendado
+        </span>
+      )}
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-lg font-bold text-slate-900">{titulo}</h3>
+        <div className="flex items-baseline gap-1">
+          <span className="text-2xl font-extrabold text-slate-900">{preco}</span>
+          <span className="text-xs text-slate-500">{sub}</span>
+        </div>
+      </div>
+      <p className="text-xs text-slate-600">{descricao}</p>
+      <ul className="mt-1 space-y-1">
+        {features.map((f) => (
+          <li key={f} className="flex items-start gap-1.5 text-xs text-slate-700">
+            <span className={`mt-0.5 ${ativo ? "text-blue-600" : "text-emerald-600"}`}>✓</span>
+            <span>{f}</span>
+          </li>
+        ))}
+      </ul>
+      <div
+        className={`mt-2 rounded-md px-3 py-1.5 text-center text-xs font-semibold ${
+          ativo ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+        }`}
+      >
+        {ativo ? "Plano selecionado" : "Selecionar este plano"}
+      </div>
+    </button>
   );
 }
 
@@ -119,6 +203,9 @@ function FormEmpresa() {
   const v = state?.valores ?? {};
   const errosResumo = Object.entries(e);
   const resumoRef = useRef<HTMLDivElement>(null);
+  const [plano, setPlano] = useState<"BASICO" | "PREMIUM">(
+    v.plano === "PREMIUM" ? "PREMIUM" : "BASICO"
+  );
 
   // Rola até o resumo de erros e dá foco no primeiro campo problemático
   useEffect(() => {
@@ -167,22 +254,59 @@ function FormEmpresa() {
         </div>
       )}
 
+      {/* Escolha do plano (Igor: empresa precisa escolher na hora do cadastro) */}
+      <input type="hidden" name="plano" value={plano} />
       <h2 className="col-span-4 mt-2 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Seu acesso
+        Escolha seu plano
       </h2>
-      <Field label="Seu nome" name="nome" required defaultValue={v.nome ?? ""} erro={e.nome} span={2} />
-      <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required defaultValue={v.email ?? ""} erro={e.email} span={2} />
-      <Field label="Senha (mín. 8 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
-      <div className="col-span-2" />
+      <CardPlano
+        value="BASICO"
+        ativo={plano === "BASICO"}
+        onClick={() => setPlano("BASICO")}
+        titulo="Básico"
+        preco="R$ 397"
+        sub="/mês"
+        descricao="Tudo que sua empresa precisa pra profissionalizar a gestão de contratos públicos."
+        features={[
+          "Multi-CNPJ até 4",
+          "8 módulos integrados",
+          "Extração de PDF via IA ilimitada",
+          "Dashboard com mapa interativo",
+          "Notificações no app",
+          "Suporte por chat",
+        ]}
+      />
+      <CardPlano
+        value="PREMIUM"
+        ativo={plano === "PREMIUM"}
+        onClick={() => setPlano("PREMIUM")}
+        titulo="Premium"
+        preco="R$ 997"
+        sub="/mês"
+        destaque
+        descricao="Software + força jurídica de uma das maiores escolas de Direito Administrativo do Brasil."
+        features={[
+          "Tudo do Básico, sem limites",
+          "12 consultas jurídicas/ano com especialistas",
+          "2 peças jurídicas/ano (defesa, recurso, parecer)",
+          "Notificações via WhatsApp",
+          "Suporte prioritário com SLA",
+          "Onboarding assistido",
+        ]}
+      />
+      <p className="col-span-4 -mt-2 text-xs text-slate-500">
+        Ambos os planos começam com <strong>14 dias grátis</strong>. A cobrança só acontece após o trial — você
+        pode trocar de plano ou cancelar a qualquer momento.
+      </p>
 
+      {/* ORDEM definida pelo PO (Igor): CNPJ no topo, dados pessoais no fim */}
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Empresa
       </h2>
+      <CampoCnpj defaultValue={v.cnpj ?? ""} erro={e.cnpj} />
       <Field label="Razão social" name="razaoSocial" required defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={3} />
-      <Select label="Porte" name="porte" options={PORTES} required defaultValue={v.porte ?? ""} erro={e.porte} span={1} />
-      <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={2} />
-      <Field label="CNPJ" name="cnpj" placeholder="00.000.000/0000-00" required defaultValue={v.cnpj ?? ""} erro={e.cnpj} span={2} />
-      <Field label="CNAE principal" name="cnaePrincipal" placeholder="ex.: 6201-5/01" required defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={2} />
+      <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={1} />
+      <Select label="Porte" name="porte" options={PORTES} required defaultValue={v.porte ?? ""} erro={e.porte} span={2} />
       <Select
         label="Natureza jurídica"
         name="naturezaJuridica"
@@ -192,18 +316,28 @@ function FormEmpresa() {
         erro={e.naturezaJuridica}
         span={2}
       />
+      <Field label="CNAE principal (opcional)" name="cnaePrincipal" placeholder="ex.: 6201-5/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={4} />
+      <CampoCep defaultValue={v.cep ?? ""} erro={e.cep} span={1} />
       <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={3} />
-      <Field label="CEP" name="cep" placeholder="00000-000" required defaultValue={v.cep ?? ""} erro={e.cep} span={1} />
+      <Field label="Complemento" name="complemento" placeholder="Loja, sala, andar…" defaultValue={v.complemento ?? ""} erro={e.complemento} span={4} />
       <Field label="E-mail da empresa" name="emailEmpresa" type="email" required defaultValue={v.emailEmpresa ?? ""} erro={e.emailEmpresa} span={2} />
       <Field label="Telefone(s)" name="telefones" placeholder="(61) 9 9999-9999" required defaultValue={v.telefones ?? ""} erro={e.telefones} span={2} />
-      <Field label="Responsável" name="responsavel" required defaultValue={v.responsavel ?? ""} erro={e.responsavel} span={4} />
+      <Field label="Nome do responsável" name="responsavel" required defaultValue={v.responsavel ?? ""} erro={e.responsavel} span={4} />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Analista de licitação <span className="ml-2 font-normal normal-case text-slate-400">(opcional)</span>
+        Seu acesso
+      </h2>
+      <Field label="Seu nome" name="nome" required defaultValue={v.nome ?? ""} erro={e.nome} span={4} />
+      <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required defaultValue={v.email ?? ""} erro={e.email} span={4} />
+      <Field label="Senha (mín. 6 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
+      <Field label="Confirmação de senha" name="confirmacaoSenha" type="password" required erro={e.confirmacaoSenha} span={2} />
+
+      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Possui analista de licitação? <span className="ml-2 font-normal normal-case text-slate-400">(opcional)</span>
       </h2>
       <div className="col-span-4">
         <p className="mb-3 text-xs text-slate-600">
-          Veio através de um analista? Vincule agora para que ele acompanhe seus contratos e receba comissão das execuções.
+          Vincule agora para que o analista acompanhe seus contratos e receba comissão das execuções.
           O percentual e o fixo mensal são definidos depois, em comum acordo.
         </p>
         <SeletorAnalista />
@@ -325,6 +459,8 @@ function FormAnalista() {
   const v = state?.valores ?? {};
   const errosResumo = Object.entries(e);
   const resumoRef = useRef<HTMLDivElement>(null);
+  const [temPj, setTemPj] = useState<"sim" | "nao">(v.temPj === "sim" ? "sim" : "nao");
+  const [pixTipo, setPixTipo] = useState<string>(v.pixTipo ?? "");
 
   useEffect(() => {
     if (errosResumo.length === 0) return;
@@ -377,40 +513,75 @@ function FormAnalista() {
       <Field label="Nome completo" name="nome" required defaultValue={v.nome ?? ""} erro={e.nome} span={3} />
       <Field label="CPF" name="cpf" placeholder="000.000.000-00" required defaultValue={v.cpf ?? ""} erro={e.cpf} span={1} />
       <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required defaultValue={v.email ?? ""} erro={e.email} span={2} />
-      <Field label="Senha (mín. 8)" name="senha" type="password" required erro={e.senha} span={2} />
       <Field label="Telefone" name="telefone" placeholder="(61) 9 9999-9999" required defaultValue={v.telefone ?? ""} erro={e.telefone} span={2} />
-      <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={2} />
+      <Field label="Senha (mín. 6 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
+      <Field label="Confirmação de senha" name="confirmacaoSenha" type="password" required erro={e.confirmacaoSenha} span={2} />
+
+      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Endereço <span className="ml-2 font-normal normal-case text-slate-400">(para mapearmos onde estão os analistas)</span>
+      </h2>
+      <CampoCep defaultValue={v.cep ?? ""} erro={e.cep} span={1} />
+      <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={3} />
+      <Field label="Complemento" name="complemento" placeholder="Loja, sala, andar…" defaultValue={v.complemento ?? ""} erro={e.complemento} span={4} />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Dados bancários <span className="ml-2 font-normal normal-case text-slate-400">(pra receber comissões e fixo)</span>
       </h2>
-      <Field label="Banco" name="banco" defaultValue={v.banco ?? ""} erro={e.banco} span={2} />
-      <Field label="Agência" name="agencia" defaultValue={v.agencia ?? ""} erro={e.agencia} span={1} />
-      <Field label="Conta corrente" name="contaCorrente" defaultValue={v.contaCorrente ?? ""} erro={e.contaCorrente} span={1} />
-      <Field label="PIX (chave preferencial)" name="pix" defaultValue={v.pix ?? ""} erro={e.pix} span={4} />
+      <Field label="Banco" name="banco" placeholder="ex.: 341 — Itaú" defaultValue={v.banco ?? ""} erro={e.banco} span={2} />
+      <Field label="Agência (com dígito, se houver)" name="agencia" placeholder="0000-0" defaultValue={v.agencia ?? ""} erro={e.agencia} span={1} />
+      <Field label="Conta corrente (com dígito)" name="contaCorrente" placeholder="00000-0" defaultValue={v.contaCorrente ?? ""} erro={e.contaCorrente} span={1} />
+      <Select label="Tipo de chave PIX" name="pixTipo" options={PIX_TIPOS} defaultValue={pixTipo} erro={e.pixTipo} span={2} onChange={(ev) => setPixTipo((ev.target as HTMLSelectElement).value)} />
+      <Field label="Chave PIX" name="pix" placeholder={pixTipo === "EMAIL" ? "voce@dominio.com" : pixTipo === "TELEFONE" ? "(61) 9 9999-9999" : pixTipo === "CPF" ? "000.000.000-00" : pixTipo === "CNPJ" ? "00.000.000/0000-00" : "chave"} defaultValue={v.pix ?? ""} erro={e.pix} span={2} />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Pessoa jurídica <span className="ml-2 font-normal normal-case text-slate-400">(opcional — preencha só se emite nota como PJ)</span>
+        Pessoa jurídica <span className="ml-2 font-normal normal-case text-slate-400">(emite nota como PJ?)</span>
       </h2>
-      <Field label="Razão social" name="razaoSocial" defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={3} />
-      <Select label="Porte" name="porte" options={PORTES} defaultValue={v.porte ?? ""} erro={e.porte} span={1} />
-      <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={2} />
-      <Field label="CNPJ" name="cnpj" placeholder="00.000.000/0000-00" defaultValue={v.cnpj ?? ""} erro={e.cnpj} span={2} />
-      <Field label="CNAE principal" name="cnaePrincipal" placeholder="ex.: 6911-7/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={2} />
-      <Field label="CNAEs secundários (separar por vírgula)" name="cnaesSecundarios" defaultValue={v.cnaesSecundarios ?? ""} erro={e.cnaesSecundarios} span={2} />
-      <Select
-        label="Natureza jurídica"
-        name="naturezaJuridica"
-        options={OPCOES_NATUREZA_JURIDICA}
-        defaultValue={v.naturezaJuridica ?? ""}
-        erro={e.naturezaJuridica}
-        span={2}
-      />
-      <Field label="Endereço da PJ" name="enderecoPj" defaultValue={v.enderecoPj ?? ""} erro={e.enderecoPj} span={2} />
+      <div className="col-span-4 flex items-center gap-3">
+        <input type="hidden" name="temPj" value={temPj} />
+        <button
+          type="button"
+          onClick={() => setTemPj("sim")}
+          className={`rounded-full border-2 px-5 py-2 text-sm font-semibold transition ${
+            temPj === "sim" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:border-slate-300"
+          }`}
+        >
+          Sim, emito como PJ
+        </button>
+        <button
+          type="button"
+          onClick={() => setTemPj("nao")}
+          className={`rounded-full border-2 px-5 py-2 text-sm font-semibold transition ${
+            temPj === "nao" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:border-slate-300"
+          }`}
+        >
+          Não, sou autônomo
+        </button>
+      </div>
 
-      <div className="col-span-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
-        Como analista, você não paga assinatura. Seu painel mostra todas as empresas que vincularem você como responsável,
-        com cálculo automático de comissão por execução de contrato.
+      {temPj === "sim" && (
+        <>
+          <CampoCnpj defaultValue={v.cnpj ?? ""} erro={e.cnpj} required={false} />
+          <Field label="Razão social" name="razaoSocial" defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={3} />
+          <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={1} />
+          <Select label="Porte" name="porte" options={PORTES} defaultValue={v.porte ?? ""} erro={e.porte} span={2} />
+          <Select
+            label="Natureza jurídica"
+            name="naturezaJuridica"
+            options={OPCOES_NATUREZA_JURIDICA}
+            defaultValue={v.naturezaJuridica ?? ""}
+            erro={e.naturezaJuridica}
+            span={2}
+          />
+          <Field label="CNAE principal (opcional)" name="cnaePrincipal" placeholder="ex.: 6911-7/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={2} />
+          <Field label="CNAEs secundários" name="cnaesSecundarios" placeholder="separar por vírgula" defaultValue={v.cnaesSecundarios ?? ""} erro={e.cnaesSecundarios} span={2} />
+          <Field label="Endereço da PJ" name="enderecoPj" defaultValue={v.enderecoPj ?? ""} erro={e.enderecoPj} span={4} />
+        </>
+      )}
+
+      <div className="col-span-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+        Prezado analista, no <strong>CP System</strong> você <strong>não paga assinatura</strong>. Seu painel mostrará os dados de
+        todas as empresas que o vincularem como analista de licitação, mostrando todos os dados de forma consolidada,
+        facilitando sua gestão e controle no recebimento de comissões.
       </div>
 
       <div className="col-span-4 mt-2">

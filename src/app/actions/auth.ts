@@ -36,12 +36,26 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
 
   const v = parsed.data;
   const cnpj = normalizarCnpj(v.cnpj);
+  const emailNorm = v.email.trim().toLowerCase();
 
-  const emailExiste = await prisma.usuario.findUnique({ where: { email: v.email } });
-  if (emailExiste) return { erro: "E-mail já cadastrado." };
+  // Bloqueio de email duplicado entre empresa e analista (regra de negócio do PO)
+  const emailExiste = await prisma.usuario.findUnique({ where: { email: emailNorm } });
+  if (emailExiste) {
+    return {
+      erro: "E-mail já cadastrado em outra conta (empresa ou analista).",
+      campos: { email: "E-mail já cadastrado" },
+      valores,
+    };
+  }
 
   const cnpjExiste = await prisma.empresa.findUnique({ where: { cnpj } });
-  if (cnpjExiste) return { erro: "CNPJ já cadastrado em outra conta." };
+  if (cnpjExiste) {
+    return {
+      erro: "CNPJ já cadastrado em outra conta.",
+      campos: { cnpj: "CNPJ já cadastrado" },
+      valores,
+    };
+  }
 
   const senhaHash = await hashSenha(v.senha);
   const trialAteEm = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
@@ -63,13 +77,13 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   const conta = await prisma.conta.create({
     data: {
       tipo: "EMPRESA",
-      plano: "BASICO",
+      plano: v.plano,
       statusAssinatura: "TRIAL",
       trialAteEm,
       usuarios: {
         create: {
           nome: v.nome,
-          email: v.email.toLowerCase(),
+          email: emailNorm,
           senhaHash,
           perfil: "ADMIN",
         },
@@ -80,9 +94,10 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
           nomeFantasia: v.nomeFantasia || null,
           cnpj,
           porte: v.porte,
-          cnaePrincipal: v.cnaePrincipal,
+          cnaePrincipal: v.cnaePrincipal || null,
           naturezaJuridica: v.naturezaJuridica,
           endereco: v.endereco,
+          complemento: v.complemento || null,
           cep: v.cep.replace(/\D/g, ""),
           email: v.emailEmpresa,
           telefones: v.telefones,
@@ -140,11 +155,13 @@ export async function buscarAnalistasPublicos(termo: string) {
   const cpfDigits = t.replace(/\D/g, "");
   const buscaCpf = cpfDigits.length >= 3;
 
+  // Busca case-insensitive (Igor reportou: "tirar filtro de não encontrar
+  // escrevendo minúsculo ou maiúsculo")
   const analistas = await prisma.analista.findMany({
     where: {
       ativo: true,
       OR: [
-        { nomeCompleto: { contains: t } },
+        { nomeCompleto: { contains: t, mode: "insensitive" } },
         ...(buscaCpf ? [{ cpf: { contains: cpfDigits } }] : []),
       ],
     },
@@ -240,6 +257,8 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
           cpf,
           telefone,
           endereco,
+          cep: v.cep ? v.cep.replace(/\D/g, "") : null,
+          complemento: (v.complemento ?? "").trim() || null,
           email,
           banco: banco || null,
           agencia: agencia || null,
