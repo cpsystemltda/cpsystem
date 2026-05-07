@@ -98,7 +98,10 @@ const GRUPOS_ANALISTA: Grupo[] = [
   {
     titulo: "Painel",
     itens: [
-      { href: "/painel-analista", label: "Empresas e comissões", icon: Wallet },
+      // "Dashboard" como rótulo primário do item — analista relatou que o nome
+      // anterior ("Empresas e comissões") não parecia um caminho de "voltar".
+      { href: "/painel-analista", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/painel-analista?tab=empresas", label: "Empresas vinculadas", icon: Wallet },
       { href: "/honorarios", label: "Comissões SaaS", icon: Sparkles },
       { href: "/notificacoes", label: "Notificações", icon: Bell },
     ],
