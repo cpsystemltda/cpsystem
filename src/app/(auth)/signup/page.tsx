@@ -52,7 +52,7 @@ const ROTULO_CAMPO: Record<string, string> = {
   cep: "CEP",
   emailEmpresa: "E-mail da empresa",
   telefones: "Telefone(s)",
-  responsavel: "Nome do responsável",
+  responsavel: "Nome completo",
   // Analista (só os que diferem)
   cpf: "CPF",
   telefone: "Telefone",
@@ -275,6 +275,15 @@ function FormEmpresa() {
       <h2 className="col-span-4 mt-2 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Empresa
       </h2>
+      <Field
+        label="Nome completo"
+        name="responsavel"
+        required
+        placeholder="Nome do responsável pela empresa"
+        defaultValue={v.responsavel ?? ""}
+        erro={e.responsavel}
+        span={4}
+      />
       <CampoCnpj defaultValue={v.cnpj ?? ""} erro={e.cnpj} />
       <Field label="Razão social" name="razaoSocial" required defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={2} />
       <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={4} />
@@ -312,14 +321,12 @@ function FormEmpresa() {
         erro={e.telefones}
         span={2}
       />
-      <Field label="Nome do responsável" name="responsavel" required defaultValue={v.responsavel ?? ""} erro={e.responsavel} span={4} />
-
       {/* 2) ACESSO (sem redundância: nome do usuário = responsável; e-mail de acesso = primeiro e-mail da empresa) */}
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Seu acesso
       </h2>
       <p className="col-span-4 -mt-2 text-xs text-slate-500">
-        Você vai usar o <strong>e-mail da empresa</strong> e o <strong>nome do responsável</strong> que preencheu acima
+        Você vai usar o <strong>e-mail da empresa</strong> e o <strong>seu nome completo</strong> que preencheu acima
         pra entrar no sistema. Defina aqui só uma senha:
       </p>
       <Field label="Senha (mín. 6 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
