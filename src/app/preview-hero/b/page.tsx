@@ -72,27 +72,15 @@ export default function PreviewB() {
             no B2G<span className="text-[#D4AF37]">.</span>
           </h1>
 
-          {/* Subtítulo — público duplo em 2 colunas balanceadas */}
-          <div className="mx-auto mt-10 grid max-w-4xl gap-6 sm:grid-cols-2 sm:gap-0">
-            <div className="text-center sm:px-8 sm:text-left">
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-white">
-                Para a empresa
-              </p>
-              <p className="mt-3 text-base leading-relaxed text-white/60 text-balance">
-                Do empenho ao pagamento, em uma só tela, sob a Lei 14.133.
-              </p>
-            </div>
-            <div className="text-center sm:border-l sm:border-white/[0.08] sm:px-8 sm:text-left">
-              <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#F4D374]">
-                Para o analista
-              </p>
-              <p className="mt-3 text-base leading-relaxed text-white/60 text-balance">
-                Gestão consolidada de todos os clientes <span className="font-medium text-[#F4D374]">+ comissão recorrente</span>.
-              </p>
-            </div>
-          </div>
-
-          <p className="mx-auto mt-8 max-w-xl text-sm italic text-white/45">
+          {/* Subtítulo — público duplo (Opção 3) */}
+          <p className="mx-auto mt-8 max-w-3xl text-base leading-relaxed text-white/60 text-balance sm:text-lg">
+            Para a <span className="font-semibold text-white">empresa</span> que vende ao governo:
+            do empenho ao pagamento, em uma só tela, sob a Lei 14.133.
+            <br className="hidden sm:block" />
+            Para o <span className="font-semibold text-white">analista de licitação</span>:
+            gestão consolidada de todos os clientes <span className="text-[#D4AF37]">+ comissão recorrente</span>.
+          </p>
+          <p className="mx-auto mt-4 max-w-xl text-sm text-white/40">
             A inteligência da Contratos Públicos por trás dos dois.
           </p>
 
