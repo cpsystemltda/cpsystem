@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Building2, UserCheck, Search, X, AlertCircle } from "lucide-react";
 import { Field, Select } from "@/components/Field";
@@ -68,9 +67,15 @@ const ROTULO_CAMPO: Record<string, string> = {
 type Tipo = "EMPRESA" | "ANALISTA";
 
 export default function SignupPage() {
-  const params = useSearchParams();
-  const tipoInicial: Tipo = params.get("tipo") === "ANALISTA" ? "ANALISTA" : "EMPRESA";
-  const [tipo, setTipo] = useState<Tipo>(tipoInicial);
+  const [tipo, setTipo] = useState<Tipo>("EMPRESA");
+
+  // Lê ?tipo=ANALISTA da URL no mount pra abrir já no card certo
+  // (evita useSearchParams que exige Suspense boundary no Next 15+)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tipo") === "ANALISTA") setTipo("ANALISTA");
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#FAF6EC] via-white to-[#FFF8E1] px-6 py-12">
