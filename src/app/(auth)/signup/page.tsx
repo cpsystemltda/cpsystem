@@ -218,8 +218,10 @@ function FormEmpresa() {
   const v = state?.valores ?? {};
   const errosResumo = Object.entries(e);
   const resumoRef = useRef<HTMLDivElement>(null);
-  const [plano, setPlano] = useState<"BASICO" | "PREMIUM">(
-    v.plano === "PREMIUM" ? "PREMIUM" : "BASICO"
+  // Plano começa SEM seleção (Regina: usuário precisa escolher ativamente,
+  // e a forma de pagamento só aparece depois que ele clica num plano).
+  const [plano, setPlano] = useState<"BASICO" | "PREMIUM" | null>(
+    v.plano === "PREMIUM" ? "PREMIUM" : v.plano === "BASICO" ? "BASICO" : null
   );
 
   // Rola até o resumo de erros e dá foco no primeiro campo problemático
@@ -335,10 +337,10 @@ function FormEmpresa() {
         <SeletorAnalista />
       </div>
 
-      {/* 4) PLANO + PAGAMENTO no fim — só depois de tudo preenchido */}
-      <input type="hidden" name="plano" value={plano} />
+      {/* 4) PLANO + PAGAMENTO no fim — pagamento só aparece após escolha do plano */}
+      {plano && <input type="hidden" name="plano" value={plano} />}
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Escolha seu plano
+        Escolha seu plano <span className="text-red-500">*</span>
       </h2>
       <CardPlano
         value="BASICO"
@@ -380,20 +382,35 @@ function FormEmpresa() {
         pode trocar de plano ou cancelar a qualquer momento.
       </p>
 
-      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Forma de pagamento
-      </h2>
-      <CampoCartao
-        erros={{
-          cartaoNumero: e.cartaoNumero,
-          cartaoValidade: e.cartaoValidade,
-          cartaoCvv: e.cartaoCvv,
-          cartaoNome: e.cartaoNome,
-        }}
-      />
+      {/* Forma de pagamento aparece SÓ depois que o plano foi escolhido */}
+      {plano && (
+        <>
+          <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Forma de pagamento <span className="text-red-500">*</span>
+          </h2>
+          <CampoCartao
+            erros={{
+              cartaoNumero: e.cartaoNumero,
+              cartaoValidade: e.cartaoValidade,
+              cartaoCvv: e.cartaoCvv,
+              cartaoNome: e.cartaoNome,
+            }}
+          />
+        </>
+      )}
 
       <div className="col-span-4 mt-2">
-        <SubmitButton>Criar conta de empresa · Trial 14 dias</SubmitButton>
+        {plano ? (
+          <SubmitButton>Criar conta de empresa · Trial 14 dias</SubmitButton>
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="w-full cursor-not-allowed rounded-md bg-slate-200 px-5 py-3 text-sm font-semibold text-slate-500"
+          >
+            Selecione um plano pra continuar ↑
+          </button>
+        )}
       </div>
     </form>
   );
