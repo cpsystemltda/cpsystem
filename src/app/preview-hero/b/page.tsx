@@ -73,13 +73,18 @@ export default function PreviewB() {
           </h1>
 
           {/* Subtítulo — público duplo (Opção 3) */}
-          <p className="mx-auto mt-8 max-w-3xl text-base leading-relaxed text-white/60 text-balance sm:text-lg">
-            Para a <span className="font-semibold text-white">empresa</span> que vende ao governo:
-            do empenho ao pagamento, em uma só tela, sob a Lei 14.133.
-            <br className="hidden sm:block" />
-            Para o <span className="font-semibold text-white">analista de licitação</span>:
-            gestão consolidada de todos os clientes <span className="text-[#D4AF37]">+ comissão recorrente</span>.
-          </p>
+          <div className="mx-auto mt-8 max-w-3xl space-y-5 text-base leading-relaxed text-white/60 sm:text-lg">
+            <p>
+              Para a <span className="font-semibold text-white">empresa</span> que vende ao governo:
+              <br />
+              do empenho ao pagamento, em uma só tela, sob a Lei 14.133.
+            </p>
+            <p>
+              Para o <span className="font-semibold text-white">analista de licitação</span>:
+              <br />
+              gestão consolidada de todos os clientes <span className="text-[#D4AF37]">+ comissão recorrente</span>.
+            </p>
+          </div>
           <p className="mx-auto mt-4 max-w-xl text-sm text-white/40">
             A inteligência da Contratos Públicos por trás dos dois.
           </p>
