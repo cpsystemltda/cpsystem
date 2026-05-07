@@ -6,6 +6,7 @@ import { Building2, UserCheck, Search, X, AlertCircle } from "lucide-react";
 import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CampoCnpj } from "@/components/CampoCnpj";
+import { CampoCpf } from "@/components/CampoCpf";
 import { CampoCep } from "@/components/CampoCep";
 import { CampoCartao } from "@/components/CampoCartao";
 import { CampoBanco } from "@/components/CampoBanco";
@@ -584,7 +585,7 @@ function FormAnalista() {
         Dados pessoais
       </h2>
       <Field label="Nome completo" name="nome" required defaultValue={v.nome ?? ""} erro={e.nome} span={3} />
-      <Field label="CPF" name="cpf" placeholder="000.000.000-00" required defaultValue={v.cpf ?? ""} erro={e.cpf} span={1} />
+      <CampoCpf defaultValue={v.cpf ?? ""} erro={e.cpf} span={1} />
       <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required defaultValue={v.email ?? ""} erro={e.email} span={2} />
       <Field label="Telefone" name="telefone" placeholder="(61) 9 9999-9999" required defaultValue={v.telefone ?? ""} erro={e.telefone} span={2} />
       <Field label="Senha (mín. 6 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
