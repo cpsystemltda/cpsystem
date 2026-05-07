@@ -28,21 +28,13 @@ export default function LoginPage() {
           }}
         />
 
-        <div className="relative z-10 flex w-full max-w-sm flex-col items-center text-center">
-          <Logo variant="lg" mode="brand" onDark priority />
-          <p
-            className="mt-12 text-2xl leading-snug text-white/90"
-            style={{ fontFamily: "var(--font-brand)" }}
-          >
-            Da licitação ganha
-            <br />
-            ao pagamento.
-          </p>
-          <p className="mt-6 max-w-xs text-sm leading-relaxed text-white/55">
-            Plataforma premium para empresas que vendem ao governo, sob a Lei 14.133/2021.
+        <div className="relative z-10 flex w-full max-w-md flex-col items-center text-center">
+          <Logo variant="xl" mode="brand" onDark priority />
+          <p className="mt-16 max-w-sm text-base leading-relaxed text-white/75">
+            Plataforma premium de gestão de contratos para empresas que vendem ao governo.
           </p>
           <div className="mt-12 h-px w-24 bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent" />
-          <p className="mt-6 text-[10px] font-medium uppercase tracking-[0.4em] text-[#D4AF37]/80">
+          <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.4em] text-[#D4AF37]/80">
             Contratos Públicos
           </p>
         </div>
