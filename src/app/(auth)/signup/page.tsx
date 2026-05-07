@@ -7,6 +7,7 @@ import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CampoCnpj } from "@/components/CampoCnpj";
 import { CampoCpf } from "@/components/CampoCpf";
+import { CampoTelefone } from "@/components/CampoTelefone";
 import { CampoCep } from "@/components/CampoCep";
 import { CampoCartao } from "@/components/CampoCartao";
 import { CampoBanco } from "@/components/CampoBanco";
@@ -587,7 +588,7 @@ function FormAnalista() {
       <Field label="Nome completo" name="nome" required defaultValue={v.nome ?? ""} erro={e.nome} span={3} />
       <CampoCpf defaultValue={v.cpf ?? ""} erro={e.cpf} span={1} />
       <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required defaultValue={v.email ?? ""} erro={e.email} span={2} />
-      <Field label="Telefone" name="telefone" placeholder="(61) 9 9999-9999" required defaultValue={v.telefone ?? ""} erro={e.telefone} span={2} />
+      <CampoTelefone defaultValue={v.telefone ?? ""} erro={e.telefone} span={2} />
       <Field label="Senha (mín. 6 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
       <Field label="Confirmação de senha" name="confirmacaoSenha" type="password" required erro={e.confirmacaoSenha} span={2} />
 
