@@ -34,6 +34,10 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   }
   if (emailsArray.length > 0 && !dados.emailEmpresa) dados.emailEmpresa = emailsArray[0];
   if (telefonesArray.length > 0 && !dados.telefones) dados.telefones = telefonesArray[0];
+  // O form não pede mais "nome" e "email de acesso" separados — usamos
+  // responsavel e o primeiro e-mail da empresa como credencial padrão.
+  if (!dados.nome && dados.responsavel) dados.nome = dados.responsavel;
+  if (!dados.email && dados.emailEmpresa) dados.email = dados.emailEmpresa;
   const parsed = signupSchema.safeParse(dados);
   const valores = valoresParaEcho(formData);
 

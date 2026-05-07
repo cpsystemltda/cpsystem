@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Building2, UserCheck, Search, X, AlertCircle } from "lucide-react";
 import { Field, Select } from "@/components/Field";
@@ -67,7 +68,9 @@ const ROTULO_CAMPO: Record<string, string> = {
 type Tipo = "EMPRESA" | "ANALISTA";
 
 export default function SignupPage() {
-  const [tipo, setTipo] = useState<Tipo>("EMPRESA");
+  const params = useSearchParams();
+  const tipoInicial: Tipo = params.get("tipo") === "ANALISTA" ? "ANALISTA" : "EMPRESA";
+  const [tipo, setTipo] = useState<Tipo>(tipoInicial);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#FAF6EC] via-white to-[#FFF8E1] px-6 py-12">
@@ -261,9 +264,75 @@ function FormEmpresa() {
         </div>
       )}
 
-      {/* Escolha do plano (Igor: empresa precisa escolher na hora do cadastro) */}
-      <input type="hidden" name="plano" value={plano} />
+      {/* 1) DADOS DA EMPRESA */}
       <h2 className="col-span-4 mt-2 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Empresa
+      </h2>
+      <CampoCnpj defaultValue={v.cnpj ?? ""} erro={e.cnpj} />
+      <Field label="Razão social" name="razaoSocial" required defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={2} />
+      <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={4} />
+      <Select label="Porte" name="porte" options={PORTES} required defaultValue={v.porte ?? ""} erro={e.porte} span={2} />
+      <Select
+        label="Natureza jurídica"
+        name="naturezaJuridica"
+        options={OPCOES_NATUREZA_JURIDICA}
+        required
+        defaultValue={v.naturezaJuridica ?? ""}
+        erro={e.naturezaJuridica}
+        span={2}
+      />
+      <Field label="CNAE principal (opcional)" name="cnaePrincipal" placeholder="ex.: 6201-5/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={4} />
+      <CampoCep defaultValue={v.cep ?? ""} erro={e.cep} span={1} />
+      <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={3} />
+      <Field label="Complemento" name="complemento" placeholder="Loja, sala, andar…" defaultValue={v.complemento ?? ""} erro={e.complemento} span={4} />
+      <CampoMultiplo
+        name="emailEmpresa"
+        label="E-mail da empresa"
+        tipo="email"
+        required
+        placeholder="contato@empresa.com.br"
+        defaultValues={v.emailEmpresa ? [v.emailEmpresa] : []}
+        erro={e.emailEmpresa}
+        span={2}
+      />
+      <CampoMultiplo
+        name="telefones"
+        label="Telefone(s)"
+        tipo="telefone"
+        required
+        placeholder="(61) 9 9999-9999"
+        defaultValues={v.telefones ? [v.telefones] : []}
+        erro={e.telefones}
+        span={2}
+      />
+      <Field label="Nome do responsável" name="responsavel" required defaultValue={v.responsavel ?? ""} erro={e.responsavel} span={4} />
+
+      {/* 2) ACESSO (sem redundância: nome do usuário = responsável; e-mail de acesso = primeiro e-mail da empresa) */}
+      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Seu acesso
+      </h2>
+      <p className="col-span-4 -mt-2 text-xs text-slate-500">
+        Você vai usar o <strong>e-mail da empresa</strong> e o <strong>nome do responsável</strong> que preencheu acima
+        pra entrar no sistema. Defina aqui só uma senha:
+      </p>
+      <Field label="Senha (mín. 6 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
+      <Field label="Confirmação de senha" name="confirmacaoSenha" type="password" required erro={e.confirmacaoSenha} span={2} />
+
+      {/* 3) ANALISTA VINCULADO (opcional) */}
+      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Possui analista de licitação? <span className="ml-2 font-normal normal-case text-slate-400">(opcional)</span>
+      </h2>
+      <div className="col-span-4">
+        <p className="mb-3 text-xs text-slate-600">
+          Vincule agora para que o analista acompanhe seus contratos e receba comissão das execuções.
+          O percentual e o fixo mensal são definidos depois, em comum acordo.
+        </p>
+        <SeletorAnalista />
+      </div>
+
+      {/* 4) PLANO + PAGAMENTO no fim — só depois de tudo preenchido */}
+      <input type="hidden" name="plano" value={plano} />
+      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Escolha seu plano
       </h2>
       <CardPlano
@@ -306,7 +375,6 @@ function FormEmpresa() {
         pode trocar de plano ou cancelar a qualquer momento.
       </p>
 
-      {/* Cartão de crédito (validação Luhn + bandeira + validade no servidor) */}
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Forma de pagamento
       </h2>
@@ -318,68 +386,6 @@ function FormEmpresa() {
           cartaoNome: e.cartaoNome,
         }}
       />
-
-      {/* ORDEM definida pelo PO (Igor): CNPJ no topo, dados pessoais no fim */}
-      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Empresa
-      </h2>
-      <CampoCnpj defaultValue={v.cnpj ?? ""} erro={e.cnpj} />
-      <Field label="Razão social" name="razaoSocial" required defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={3} />
-      <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={1} />
-      <Select label="Porte" name="porte" options={PORTES} required defaultValue={v.porte ?? ""} erro={e.porte} span={2} />
-      <Select
-        label="Natureza jurídica"
-        name="naturezaJuridica"
-        options={OPCOES_NATUREZA_JURIDICA}
-        required
-        defaultValue={v.naturezaJuridica ?? ""}
-        erro={e.naturezaJuridica}
-        span={2}
-      />
-      <Field label="CNAE principal (opcional)" name="cnaePrincipal" placeholder="ex.: 6201-5/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={4} />
-      <CampoCep defaultValue={v.cep ?? ""} erro={e.cep} span={1} />
-      <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={3} />
-      <Field label="Complemento" name="complemento" placeholder="Loja, sala, andar…" defaultValue={v.complemento ?? ""} erro={e.complemento} span={4} />
-      <CampoMultiplo
-        name="emailEmpresa"
-        label="E-mail da empresa"
-        tipo="email"
-        required
-        placeholder="contato@empresa.com.br"
-        defaultValues={v.emailEmpresa ? [v.emailEmpresa] : []}
-        erro={e.emailEmpresa}
-        span={2}
-      />
-      <CampoMultiplo
-        name="telefones"
-        label="Telefone(s)"
-        tipo="telefone"
-        required
-        placeholder="(61) 9 9999-9999"
-        defaultValues={v.telefones ? [v.telefones] : []}
-        erro={e.telefones}
-        span={2}
-      />
-      <Field label="Nome do responsável" name="responsavel" required defaultValue={v.responsavel ?? ""} erro={e.responsavel} span={4} />
-
-      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Seu acesso
-      </h2>
-      <Field label="Seu nome" name="nome" required defaultValue={v.nome ?? ""} erro={e.nome} span={4} />
-      <Field label="E-mail de acesso" name="email" type="email" autoComplete="email" required defaultValue={v.email ?? ""} erro={e.email} span={4} />
-      <Field label="Senha (mín. 6 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
-      <Field label="Confirmação de senha" name="confirmacaoSenha" type="password" required erro={e.confirmacaoSenha} span={2} />
-
-      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Possui analista de licitação? <span className="ml-2 font-normal normal-case text-slate-400">(opcional)</span>
-      </h2>
-      <div className="col-span-4">
-        <p className="mb-3 text-xs text-slate-600">
-          Vincule agora para que o analista acompanhe seus contratos e receba comissão das execuções.
-          O percentual e o fixo mensal são definidos depois, em comum acordo.
-        </p>
-        <SeletorAnalista />
-      </div>
 
       <div className="col-span-4 mt-2">
         <SubmitButton>Criar conta de empresa · Trial 14 dias</SubmitButton>
@@ -563,15 +569,6 @@ function FormAnalista() {
       <Field label="Complemento" name="complemento" placeholder="Loja, sala, andar…" defaultValue={v.complemento ?? ""} erro={e.complemento} span={4} />
 
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Dados bancários <span className="ml-2 font-normal normal-case text-slate-400">(pra receber comissões e fixo)</span>
-      </h2>
-      <CampoBanco defaultValue={v.banco ?? ""} erro={e.banco} span={2} />
-      <Field label="Agência (com dígito, se houver)" name="agencia" placeholder="0000-0" defaultValue={v.agencia ?? ""} erro={e.agencia} span={1} />
-      <Field label="Conta corrente (com dígito)" name="contaCorrente" placeholder="00000-0" defaultValue={v.contaCorrente ?? ""} erro={e.contaCorrente} span={1} />
-      <Select label="Tipo de chave PIX" name="pixTipo" options={PIX_TIPOS} defaultValue={pixTipo} erro={e.pixTipo} span={2} onChange={(ev) => setPixTipo((ev.target as HTMLSelectElement).value)} />
-      <Field label="Chave PIX" name="pix" placeholder={pixTipo === "EMAIL" ? "voce@dominio.com" : pixTipo === "TELEFONE" ? "(61) 9 9999-9999" : pixTipo === "CPF" ? "000.000.000-00" : pixTipo === "CNPJ" ? "00.000.000/0000-00" : "chave"} defaultValue={v.pix ?? ""} erro={e.pix} span={2} />
-
-      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Pessoa jurídica <span className="ml-2 font-normal normal-case text-slate-400">(emite nota como PJ?)</span>
       </h2>
       <div className="col-span-4 flex items-center gap-3">
@@ -615,6 +612,20 @@ function FormAnalista() {
           <Field label="Endereço da PJ" name="enderecoPj" defaultValue={v.enderecoPj ?? ""} erro={e.enderecoPj} span={4} />
         </>
       )}
+
+      <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Dados bancários
+      </h2>
+      <p className="col-span-4 -mt-2 text-xs text-slate-500">
+        {temPj === "sim"
+          ? "Use a conta da PJ que você acabou de cadastrar."
+          : "Conta de pessoa física (CPF do analista)."}
+      </p>
+      <CampoBanco defaultValue={v.banco ?? ""} erro={e.banco} span={2} />
+      <Field label="Agência (com dígito, se houver)" name="agencia" placeholder="0000-0" defaultValue={v.agencia ?? ""} erro={e.agencia} span={1} />
+      <Field label="Conta corrente (com dígito)" name="contaCorrente" placeholder="00000-0" defaultValue={v.contaCorrente ?? ""} erro={e.contaCorrente} span={1} />
+      <Select label="Tipo de chave PIX" name="pixTipo" options={PIX_TIPOS} defaultValue={pixTipo} erro={e.pixTipo} span={2} onChange={(ev) => setPixTipo((ev.target as HTMLSelectElement).value)} />
+      <Field label="Chave PIX" name="pix" placeholder={pixTipo === "EMAIL" ? "voce@dominio.com" : pixTipo === "TELEFONE" ? "(61) 9 9999-9999" : pixTipo === "CPF" ? "000.000.000-00" : pixTipo === "CNPJ" ? "00.000.000/0000-00" : "chave"} defaultValue={v.pix ?? ""} erro={e.pix} span={2} />
 
       <div className="col-span-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
         Prezado analista, no <strong>CP System</strong> você <strong>não paga assinatura</strong>. Seu painel mostrará os dados de

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { Building2, UserCheck } from "lucide-react";
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { loginAction } from "@/app/actions/auth";
@@ -9,6 +10,8 @@ import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
   const [state, formAction] = useActionState(loginAction, null);
+  // Toggle informativo: muda o link de "Criar conta" pro tipo certo no signup
+  const [tipoEscolhido, setTipoEscolhido] = useState<"EMPRESA" | "ANALISTA">("EMPRESA");
 
   return (
     <div className="relative grid min-h-screen grid-cols-1 lg:grid-cols-[5fr_6fr]">
@@ -60,7 +63,39 @@ export default function LoginPage() {
             Acesse o painel de gestão dos seus contratos.
           </p>
 
-          <form action={formAction} className="mt-10 grid grid-cols-2 gap-5">
+          {/* Botões de identificação: empresa fornecedora x analista de licitação */}
+          <div className="mt-8 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setTipoEscolhido("EMPRESA")}
+              className={`flex items-center gap-2.5 rounded-xl border-2 px-4 py-3 text-left transition ${
+                tipoEscolhido === "EMPRESA"
+                  ? "border-blue-500 bg-blue-50/40 shadow-sm"
+                  : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              <Building2
+                className={`h-5 w-5 shrink-0 ${tipoEscolhido === "EMPRESA" ? "text-blue-600" : "text-slate-500"}`}
+              />
+              <span className="text-sm font-semibold text-slate-900">Empresa</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTipoEscolhido("ANALISTA")}
+              className={`flex items-center gap-2.5 rounded-xl border-2 px-4 py-3 text-left transition ${
+                tipoEscolhido === "ANALISTA"
+                  ? "border-blue-500 bg-blue-50/40 shadow-sm"
+                  : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              <UserCheck
+                className={`h-5 w-5 shrink-0 ${tipoEscolhido === "ANALISTA" ? "text-blue-600" : "text-slate-500"}`}
+              />
+              <span className="text-sm font-semibold text-slate-900">Analista de licitações</span>
+            </button>
+          </div>
+
+          <form action={formAction} className="mt-6 grid grid-cols-2 gap-5">
             <Field label="E-mail" name="email" type="email" autoComplete="email" required span={2} />
             <Field label="Senha" name="senha" type="password" autoComplete="current-password" required span={2} />
 
@@ -74,8 +109,11 @@ export default function LoginPage() {
               <SubmitButton>Entrar</SubmitButton>
               <p className="text-center text-sm text-slate-500">
                 Não tem conta?{" "}
-                <Link href="/signup" className="font-semibold text-[#9C7A2D] hover:text-[#B8860B]">
-                  Criar conta
+                <Link
+                  href={`/signup?tipo=${tipoEscolhido}`}
+                  className="font-semibold text-[#9C7A2D] hover:text-[#B8860B]"
+                >
+                  Criar conta {tipoEscolhido === "EMPRESA" ? "de empresa" : "de analista"}
                 </Link>
               </p>
             </div>
