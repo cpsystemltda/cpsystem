@@ -1,13 +1,11 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Building2, UserCheck } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
 /**
- * PREVIEW B — Fintech premium dark refinado
- * Inspiração: Linear, Stripe, Nubank Pro.
- * Hero preto profundo, tipografia sans moderna (Geist),
- * dourado em pequenos detalhes (linha fina, pontuação),
- * sem gradientes brilhantes.
+ * PREVIEW B + Opção 3 (público duplo: empresa + analista)
+ * Hero preto profundo, copy persuasiva endereçando os 2 públicos,
+ * 2 CTAs paralelos pra capturar ambos os funis no signup.
  */
 export default function PreviewB() {
   return (
@@ -74,31 +72,40 @@ export default function PreviewB() {
             no B2G<span className="text-[#D4AF37]">.</span>
           </h1>
 
-          {/* Subtítulo curto e claro */}
-          <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-white/55 sm:text-lg">
-            A plataforma premium para empresas que vendem ao governo.
-            Atas, contratos, empenhos e IA jurídica — em um só lugar.
+          {/* Subtítulo — público duplo (Opção 3) */}
+          <p className="mx-auto mt-8 max-w-2xl text-base leading-relaxed text-white/60 sm:text-lg">
+            Para a <span className="font-semibold text-white">empresa</span> que vende ao governo:
+            do empenho ao pagamento, em uma só tela, sob a Lei 14.133.
+            <br className="hidden sm:block" />
+            Para o <span className="font-semibold text-white">analista de licitação</span>:
+            gestão consolidada de todos os clientes <span className="text-[#D4AF37]">+ comissão recorrente</span>.
+          </p>
+          <p className="mx-auto mt-4 max-w-xl text-sm text-white/40">
+            A inteligência da Contratos Públicos por trás dos dois.
           </p>
 
-          {/* CTAs limpos */}
-          <div className="mt-12 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          {/* 2 CTAs paralelos — empresa (primário) e analista (secundário dourado) */}
+          <div className="mt-12 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
             <Link
-              href="/signup"
-              className="group inline-flex items-center gap-2 rounded-md bg-white px-7 py-3.5 text-sm font-semibold text-[#050608] transition hover:bg-white/90"
+              href="/signup?tipo=EMPRESA"
+              className="group inline-flex items-center justify-center gap-2 rounded-md bg-white px-7 py-3.5 text-sm font-semibold text-[#050608] transition hover:bg-white/90"
             >
-              Assine e transforme seu negócio
+              <Building2 className="h-4 w-4" />
+              Sou empresa fornecedora
               <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
             </Link>
-            <a
-              href="#"
-              className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-7 py-3.5 text-sm font-medium text-white/80 transition hover:bg-white/[0.06] hover:text-white"
+            <Link
+              href="/signup?tipo=ANALISTA"
+              className="group inline-flex items-center justify-center gap-2 rounded-md border border-[#D4AF37]/40 bg-[#D4AF37]/[0.06] px-7 py-3.5 text-sm font-semibold text-[#F4D374] transition hover:border-[#D4AF37]/70 hover:bg-[#D4AF37]/[0.12]"
             >
-              Ver o sistema
-            </a>
+              <UserCheck className="h-4 w-4" />
+              Sou analista de licitação
+              <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+            </Link>
           </div>
 
           <p className="mt-6 text-xs text-white/40">
-            14 dias grátis · sem cartão · cancele quando quiser
+            Empresa: 14 dias grátis · sem cartão · cancele quando quiser <span className="mx-1.5 text-white/20">|</span> Analista: cadastro gratuito
           </p>
 
           {/* Linha dourada fina como assinatura */}
