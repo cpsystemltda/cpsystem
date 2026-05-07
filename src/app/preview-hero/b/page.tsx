@@ -117,7 +117,7 @@ export default function PreviewB() {
           </div>
 
           <p className="mt-6 text-xs text-white/40">
-            Empresa: 14 dias grátis · sem cartão · cancele quando quiser <span className="mx-1.5 text-white/20">|</span> Analista: cadastro gratuito
+            Empresa: 14 dias grátis · cobrança só após o trial · cancele quando quiser <span className="mx-1.5 text-white/20">|</span> Analista: cadastro gratuito
           </p>
 
           {/* Linha dourada fina como assinatura */}
