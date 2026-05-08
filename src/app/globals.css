@@ -97,10 +97,18 @@ body {
   z-index: 0;
   pointer-events: none;
   background:
-    linear-gradient(135deg, rgba(8, 8, 14, 0.55) 0%, rgba(15, 13, 30, 0.65) 100%),
-    url('https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=2400&q=85&auto=format&fit=crop');
-  background-size: cover;
-  background-position: center;
+    /* Camada 1: padrão de Flor da Vida (geometria sagrada) em dourado MUITO sutil */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.4' opacity='0.10'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E"),
+    /* Camada 2: gradient mesh quente — define a atmosfera */
+    radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.16), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.10), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.10), transparent 55%),
+    radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.14), transparent 55%),
+    radial-gradient(ellipse 800px 600px at 50% 50%, rgba(93, 216, 182, 0.06), transparent 60%),
+    /* Camada 3: base dark warm (não preto puro — tem temperatura dourada) */
+    linear-gradient(135deg, #08070C 0%, #0F0D14 35%, #14110D 75%, #0A0908 100%);
+  background-size: 240px 240px, auto, auto, auto, auto, auto, auto;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
   background-attachment: fixed;
 }
 .app-shell .bg-blobs {
@@ -391,3 +399,146 @@ body {
 .table-glass td.strong { font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
 .table-glass .row-alert { background: rgba(232, 138, 152, 0.06); }
 .table-glass .row-alert:hover { background: rgba(232, 138, 152, 0.12) !important; }
+
+/* ============================================================
+   LEGACY FALLBACK — páginas que ainda usam Tailwind light
+   Garantia Apple HIG: nenhum texto invisível em qualquer rota.
+   ============================================================ */
+
+/* Texto base do main: claro */
+.app-shell main {
+  color: var(--text-soft);
+}
+
+/* === Override de cores Tailwind slate/gray sobre o fundo dark === */
+/* Headings/labels antes "escuros" no light → claros no dark */
+.app-shell .text-slate-900,
+.app-shell .text-slate-800,
+.app-shell .text-gray-900,
+.app-shell .text-gray-800,
+.app-shell .text-zinc-900,
+.app-shell .text-zinc-800,
+.app-shell .text-neutral-900,
+.app-shell .text-neutral-800 { color: var(--text); }
+
+.app-shell .text-slate-700,
+.app-shell .text-slate-600,
+.app-shell .text-gray-700,
+.app-shell .text-gray-600,
+.app-shell .text-zinc-700,
+.app-shell .text-zinc-600,
+.app-shell .text-neutral-700,
+.app-shell .text-neutral-600 { color: var(--text-soft); }
+
+.app-shell .text-slate-500,
+.app-shell .text-slate-400,
+.app-shell .text-gray-500,
+.app-shell .text-gray-400,
+.app-shell .text-zinc-500,
+.app-shell .text-zinc-400,
+.app-shell .text-neutral-500,
+.app-shell .text-neutral-400 { color: var(--text-mute); }
+
+/* Cores Tailwind de marca: ajustar saturação pra dark mode */
+.app-shell .text-blue-700,
+.app-shell .text-blue-800,
+.app-shell .text-blue-900 { color: #6BA8FF; }
+.app-shell .text-emerald-700,
+.app-shell .text-emerald-800,
+.app-shell .text-green-700,
+.app-shell .text-green-800 { color: var(--mint); }
+.app-shell .text-amber-700,
+.app-shell .text-amber-800,
+.app-shell .text-orange-700 { color: var(--primary-bright); }
+.app-shell .text-red-700,
+.app-shell .text-red-800,
+.app-shell .text-rose-700 { color: var(--coral); }
+
+/* === Cards/seções "bg-white" do Tailwind viram glass claro flutuante ===
+   Texto interno mantém tom escuro porque Apple HIG: contraste de leitura sempre.
+   Inputs, formulários e cards permanecem legíveis sobre fundo dark. */
+.app-shell .bg-white {
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.app-shell .bg-slate-50,
+.app-shell .bg-gray-50,
+.app-shell .bg-zinc-50,
+.app-shell .bg-neutral-50 {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.app-shell .bg-slate-100,
+.app-shell .bg-gray-100 {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Dentro de cards bg-white, texto Tailwind volta ao escuro original (Apple HIG: contraste interno) */
+.app-shell .bg-white .text-slate-900,
+.app-shell .bg-white .text-slate-800,
+.app-shell .bg-white .text-gray-900,
+.app-shell .bg-white .text-gray-800,
+.app-shell .bg-slate-50 .text-slate-900,
+.app-shell .bg-slate-50 .text-slate-800 { color: #1D1D1F !important; }
+
+.app-shell .bg-white .text-slate-700,
+.app-shell .bg-white .text-slate-600,
+.app-shell .bg-white .text-gray-700,
+.app-shell .bg-white .text-gray-600 { color: #2C2C2E !important; }
+
+.app-shell .bg-white .text-slate-500,
+.app-shell .bg-white .text-slate-400,
+.app-shell .bg-white .text-gray-500,
+.app-shell .bg-white .text-gray-400 { color: #6E6E73 !important; }
+
+/* === Inputs sempre legíveis: texto escuro sobre fundo branco === */
+.app-shell input[type="text"],
+.app-shell input[type="email"],
+.app-shell input[type="password"],
+.app-shell input[type="number"],
+.app-shell input[type="tel"],
+.app-shell input[type="date"],
+.app-shell input[type="search"],
+.app-shell input[type="url"],
+.app-shell input:not([type]),
+.app-shell select,
+.app-shell textarea {
+  color: #1D1D1F;
+  background: rgba(255, 255, 255, 0.95);
+}
+.app-shell input::placeholder,
+.app-shell textarea::placeholder {
+  color: #8E8E93;
+}
+
+/* === Borders neutros === */
+.app-shell .border-slate-200,
+.app-shell .border-slate-300,
+.app-shell .border-gray-200,
+.app-shell .border-gray-300,
+.app-shell .border-zinc-200,
+.app-shell .border-neutral-200 { border-color: var(--hairline); }
+
+.app-shell .bg-white .border-slate-200,
+.app-shell .bg-white .border-slate-300,
+.app-shell .bg-white .border-gray-200,
+.app-shell .bg-white .border-gray-300 { border-color: rgba(0, 0, 0, 0.08); }
+
+/* === Divisores Tailwind === */
+.app-shell .divide-slate-100 > * + *,
+.app-shell .divide-slate-200 > * + *,
+.app-shell .divide-gray-100 > * + *,
+.app-shell .divide-gray-200 > * + * {
+  border-color: var(--hairline);
+}
+.app-shell .bg-white .divide-slate-100 > * + *,
+.app-shell .bg-white .divide-slate-200 > * + * {
+  border-color: rgba(0, 0, 0, 0.08);
+}
