@@ -24,6 +24,7 @@ import { logoutAction } from "@/app/actions/auth";
 import { SeletorVisao } from "@/components/SeletorVisao";
 import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
 import { HelpButtons } from "@/components/HelpButtons";
+import { Logo } from "@/components/Logo";
 import type { Visao } from "@/lib/visao";
 import { Crown, Users2, Activity } from "lucide-react";
 
@@ -156,7 +157,7 @@ export function Sidebar({
   return (
     <aside className="glass relative m-[18px] flex h-[calc(100vh-36px)] w-[260px] flex-col overflow-hidden">
       {/* Logo / Brand */}
-      <div className="relative border-b border-white/10 px-6 py-7 text-center">
+      <div className="relative border-b border-white/10 px-6 py-6">
         <Link
           href={
             visao === "ADMIN_PLATAFORMA"
@@ -165,25 +166,9 @@ export function Sidebar({
               ? "/painel-analista"
               : "/dashboard"
           }
-          className="block transition hover:opacity-80"
+          className="flex items-center justify-center transition hover:opacity-80"
         >
-          <div
-            className="font-serif text-[40px] leading-none"
-            style={{
-              fontFamily: "'Playfair Display', Georgia, serif",
-              fontWeight: 500,
-              letterSpacing: "-0.06em",
-              background: "linear-gradient(180deg, #FFF 0%, var(--primary-bright) 100%)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            CP
-          </div>
-          <div className="mt-1.5 text-[9px] font-semibold uppercase" style={{ letterSpacing: "0.5em", color: "var(--primary)" }}>
-            CP&nbsp;System
-          </div>
+          <Logo variant="sm" mode="brand" onDark priority />
         </Link>
         <div
           className="absolute bottom-0 left-[28%] right-[28%] h-px"

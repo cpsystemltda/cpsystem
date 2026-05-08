@@ -6,6 +6,7 @@ import { Building2, UserCheck } from "lucide-react";
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { loginAction } from "@/app/actions/auth";
+import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
   const [state, formAction] = useActionState(loginAction, null);
@@ -28,38 +29,12 @@ export default function LoginPage() {
 
       {/* Conteúdo — desktop 2 colunas (brand statement + card), mobile stack */}
       <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1200px] flex-col items-center justify-center gap-12 px-6 py-12 lg:flex-row lg:items-center lg:gap-16 lg:px-10">
-        {/* Coluna esquerda — brand statement (desktop) */}
-        <aside className="hidden flex-col text-center lg:flex lg:flex-1 lg:max-w-[480px] lg:text-left">
-          <div
-            style={{
-              fontFamily: "'Playfair Display', Georgia, serif",
-              fontWeight: 500,
-              fontSize: "120px",
-              lineHeight: 0.92,
-              letterSpacing: "-0.07em",
-              background: "linear-gradient(180deg, #FFF 0%, var(--primary-bright) 100%)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            CP
-          </div>
-          <div
-            className="mt-3"
-            style={{
-              fontSize: "12px",
-              fontWeight: 700,
-              letterSpacing: "0.5em",
-              color: "var(--primary)",
-              textTransform: "uppercase",
-            }}
-          >
-            CP&nbsp;System
-          </div>
+        {/* Coluna esquerda — brand statement (desktop) — totalmente centralizado */}
+        <aside className="hidden flex-col items-center text-center lg:flex lg:flex-1 lg:max-w-[480px]">
+          <Logo variant="xl" mode="brand" onDark priority />
 
           <p
-            className="mt-12 max-w-[400px] text-[18px] leading-relaxed"
+            className="mx-auto mt-12 max-w-[400px] text-[18px] leading-relaxed"
             style={{ color: "var(--text-soft)", letterSpacing: "-0.005em", fontWeight: 400 }}
           >
             Plataforma{" "}
@@ -79,8 +54,8 @@ export default function LoginPage() {
           </p>
 
           <div
-            className="mt-10 h-px max-w-[120px]"
-            style={{ background: "linear-gradient(90deg, var(--primary), transparent)" }}
+            className="mx-auto mt-10 h-px w-[140px]"
+            style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
           />
 
           <p
@@ -98,43 +73,13 @@ export default function LoginPage() {
         >
           <div className="relative z-[1]">
             {/* Logo — só no mobile (no desktop fica na coluna esquerda) */}
-            <div className="text-center lg:hidden">
-              <div
-                style={{
-                  fontFamily: "'Playfair Display', Georgia, serif",
-                  fontWeight: 500,
-                  fontSize: "44px",
-                  lineHeight: 1,
-                  letterSpacing: "-0.06em",
-                  background: "linear-gradient(180deg, #FFF 0%, var(--primary-bright) 100%)",
-                  WebkitBackgroundClip: "text",
-                  backgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                CP
-              </div>
-              <div
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 700,
-                  letterSpacing: "0.5em",
-                  color: "var(--primary)",
-                  marginTop: "6px",
-                  textTransform: "uppercase",
-                }}
-              >
-                CP&nbsp;System
-              </div>
-              <div
-                className="mx-auto mt-5 h-px max-w-[120px]"
-                style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
-              />
+            <div className="flex justify-center lg:hidden">
+              <Logo variant="md" mode="brand" onDark priority />
             </div>
 
             {/* Título */}
             <h1
-              className="mt-6 text-center text-[28px] font-extrabold leading-tight lg:mt-0 lg:text-left lg:text-[32px]"
+              className="mt-6 text-center text-[28px] font-extrabold leading-tight lg:mt-0 lg:text-[32px]"
               style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
             >
               Entrar na sua{" "}
@@ -151,7 +96,7 @@ export default function LoginPage() {
               </em>
             </h1>
             <p
-              className="mt-2 text-center text-[13px] lg:text-left"
+              className="mt-2 text-center text-[13px]"
               style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
             >
               Acesse o painel de gestão dos seus contratos.
