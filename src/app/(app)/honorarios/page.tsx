@@ -3,6 +3,7 @@ import { Wallet, AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, tierPorAtivos } from "@/lib/validators";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 export default async function HonorariosPage() {
   const usuario = await exigirUsuario();
@@ -60,17 +61,12 @@ export default async function HonorariosPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-50">
-          <Wallet className="h-5 w-5 text-emerald-700" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Painel de honorários</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Olá {conta.analista.nomeCompleto} — controle suas comissões e clientes ativos.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Painel · Comissões SaaS"
+        titulo="Honorários"
+        destaque={tier}
+        subtitulo={`Olá ${conta.analista.nomeCompleto} — controle suas comissões e clientes ativos.`}
+      />
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
         <Card titulo="Clientes ativos" valor={String(ativos.length)} sub={`${trial.length} em trial`} />

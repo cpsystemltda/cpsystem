@@ -3,6 +3,7 @@ import { Bell, BellOff, Check } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { marcarLidaAction, marcarTodasLidasAction, gerarAlertasPrazoAction } from "@/app/actions/notificacoesSistema";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 const ROTULO_TIPO: Record<string, string> = {
   PRAZO_PROXIMO: "Prazo próximo",
@@ -37,18 +38,13 @@ export default async function NotificacoesPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-8">
+      <PageHeader
+        eyebrow="Conta · Atividade"
+        titulo="Notificações"
+        subtitulo={naoLidas > 0 ? `${naoLidas} não lida${naoLidas !== 1 ? "s" : ""}.` : "Tudo lido."}
+      />
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50">
-            <Bell className="h-5 w-5 text-blue-700" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Notificações</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              {naoLidas > 0 ? `${naoLidas} não lida${naoLidas !== 1 ? "s" : ""}` : "Tudo lido"}.
-            </p>
-          </div>
-        </div>
+        <div className="flex items-start gap-3" />
         <div className="flex gap-2">
           {naoLidas > 0 && (
             <form action={marcarTodasLidasAction}>

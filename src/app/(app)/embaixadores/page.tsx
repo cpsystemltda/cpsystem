@@ -2,6 +2,7 @@ import { Sparkles } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { EmbaixadoresClient } from "./EmbaixadoresClient";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 export default async function EmbaixadoresPage() {
   const usuario = await exigirUsuario();
@@ -35,17 +36,12 @@ export default async function EmbaixadoresPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-violet-50">
-          <Sparkles className="h-5 w-5 text-violet-700" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Programa de embaixadores</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Analistas de licitação parceiros · comissão recorrente por tier (Bronze 3% / Prata 4% / Ouro 5% / Diamond 6%).
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Conta · Programa de parceiros"
+        titulo="Programa de"
+        destaque="embaixadores"
+        subtitulo="Analistas de licitação parceiros · comissão recorrente por tier (Bronze 3% / Prata 4% / Ouro 5% / Diamond 6%)."
+      />
 
       <div className="mt-8">
         <EmbaixadoresClient analistas={analistas} comissoes={comissoes} podeAdministrar={usuario.perfil === "ADMIN"} />

@@ -2,6 +2,7 @@ import { ScrollText, Download, Lock } from "lucide-react";
 import Link from "next/link";
 import { exigirUsuario } from "@/lib/auth";
 import { aceitarTermosAction } from "@/app/actions/equipe";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 export default async function TermosPage() {
   const usuario = await exigirUsuario();
@@ -9,17 +10,12 @@ export default async function TermosPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-8">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100">
-          <ScrollText className="h-5 w-5 text-slate-700" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Termos de uso e Política de privacidade</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Conformidade LGPD (Lei 13.709/2018) e PCI-DSS no processamento de pagamentos.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Conta · Conformidade legal"
+        titulo="Termos &"
+        destaque="LGPD"
+        subtitulo="Conformidade LGPD (Lei 13.709/2018) e PCI-DSS no processamento de pagamentos."
+      />
 
       {aceito ? (
         <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">

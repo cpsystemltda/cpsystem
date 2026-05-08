@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 const PRECO_BASICO = 397;
 const PRECO_PREMIUM = 997;
@@ -114,26 +115,18 @@ export default async function AdminPlataformaPage() {
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
       {/* Header */}
-      <div className="flex items-end justify-between gap-6">
-        <div>
-          <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-violet-700">
-            <Crown className="h-3.5 w-3.5" /> Gestor da plataforma
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-            Visão geral · CP System
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Quem usa, quem paga, quem está prestes a vencer e o que precisa da sua atenção agora.
-          </p>
-        </div>
-        <Link
-          href="/admin-plataforma/clientes"
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-        >
-          Ver todos os clientes
-          <ArrowUpRight className="h-4 w-4" />
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Gestor da plataforma"
+        titulo="Visão geral"
+        destaque="CP System"
+        subtitulo="Quem usa, quem paga, quem está prestes a vencer e o que precisa da sua atenção agora."
+        cta={
+          <Link href="/admin-plataforma/clientes" className="btn-primary">
+            Ver clientes
+            <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        }
+      />
 
       {/* KPIs hero */}
       <div className="mt-6 grid gap-4 lg:grid-cols-4">

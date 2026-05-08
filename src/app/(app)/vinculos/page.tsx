@@ -4,6 +4,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { NovoVinculoForm, EditarFixoForm, EncerrarVinculoButton, MarcarFixoPagoForm } from "./VinculoForms";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 function formatarCpf(cpf: string): string {
   const d = cpf.replace(/\D/g, "");
@@ -51,17 +52,12 @@ export default async function VinculosPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-8 py-8">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-50">
-          <UserCheck className="h-5 w-5 text-emerald-700" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Analistas vinculados</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Gerencie os analistas de licitação que atendem sua empresa, com comissão e fixo mensal.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Conta · Comissionamento"
+        titulo="Analistas"
+        destaque="vinculados"
+        subtitulo="Gerencie os analistas de licitação que atendem sua empresa, com comissão e fixo mensal."
+      />
 
       <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Vincular novo analista</h2>

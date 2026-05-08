@@ -2,6 +2,7 @@ import { Settings, Users, TrendingUp, DollarSign, AlertTriangle } from "lucide-r
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 const PRECOS = { BASICO: 397, PREMIUM: 997 };
 
@@ -42,17 +43,12 @@ export default async function AdminPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-900 text-white">
-          <Settings className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Admin do Proprietário</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Métricas SaaS da plataforma · Olá, {usuario.nome}.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Admin · Painel do PO"
+        titulo="Painel do"
+        destaque="Proprietário"
+        subtitulo={`Métricas SaaS da plataforma · Olá, ${usuario.nome}.`}
+      />
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
         <Card icone={DollarSign} titulo="MRR" valor={brl(mrr)} sub="Receita recorrente mensal" cor="emerald" />

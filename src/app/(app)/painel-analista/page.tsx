@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { calcularComissaoAnalista, listarExecucoesDoVinculo } from "@/lib/comissaoB2G";
 import { brl, formatarCnpj } from "@/lib/validators";
 import { PercentualForm } from "./PercentualForm";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 const COR_STATUS_EMPENHO: Record<string, string> = {
   EMPENHADO: "bg-slate-100 text-slate-700",
@@ -76,17 +77,11 @@ export default async function PainelAnalistaPage({
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-emerald-50">
-          <Wallet className="h-5 w-5 text-emerald-700" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Painel do analista</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Olá {analista.nomeCompleto.split(" ")[0]} — {consolidado.totalEmpresas} empresa(s) vinculada(s).
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Painel · Analista de licitações"
+        titulo={`Olá, ${analista.nomeCompleto.split(" ")[0]}.`}
+        subtitulo={`${consolidado.totalEmpresas} empresa(s) vinculada(s) — comissões, carteira e atividade consolidada.`}
+      />
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
         <Card titulo="Comissão recebida" valor={brl(consolidado.totalComissaoRecebida)} cor="emerald" sub="execuções pagas após o vínculo" />

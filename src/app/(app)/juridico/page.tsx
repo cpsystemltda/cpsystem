@@ -1,6 +1,7 @@
 import { Scale, Sparkles, Check, MessageSquare, FileSignature, Lock } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { UpgradeForm, DowngradeForm } from "./UpgradeForm";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 export default async function JuridicoPage() {
   const usuario = await exigirUsuario();
@@ -9,17 +10,12 @@ export default async function JuridicoPage() {
   if (plano !== "PREMIUM") {
     return (
       <div className="mx-auto max-w-4xl px-8 py-8">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-violet-50">
-            <Scale className="h-5 w-5 text-violet-700" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Suporte jurídico (Premium)</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Inteligência jurídica nativa do Grupo Contratos Públicos diretamente no sistema.
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="Módulo · Premium"
+          titulo="Suporte"
+          destaque="Jurídico"
+          subtitulo="Inteligência jurídica nativa do Grupo Contratos Públicos diretamente no sistema."
+        />
 
         <div className="mt-8 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-8">
           <div className="flex items-center gap-2">
@@ -64,20 +60,25 @@ export default async function JuridicoPage() {
   // PREMIUM
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-violet-50">
-          <Scale className="h-5 w-5 text-violet-700" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Painel Jurídico Premium</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Sua franquia anual de consultoria com o Grupo Contratos Públicos.
-          </p>
-        </div>
-        <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-800">
-          <Sparkles className="h-3 w-3" /> Premium ativo
-        </span>
-      </div>
+      <PageHeader
+        eyebrow="Módulo · Premium ativo"
+        titulo="Painel"
+        destaque="Jurídico"
+        subtitulo="Sua franquia anual de consultoria com o Grupo Contratos Públicos."
+        cta={
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold uppercase"
+            style={{
+              background: "rgba(212,175,55,0.14)",
+              color: "var(--primary-bright)",
+              border: "0.5px solid rgba(212,175,55,0.3)",
+              letterSpacing: "0.08em",
+            }}
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Premium ativo
+          </span>
+        }
+      />
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         <Franquia titulo="Consultas escritas" usado={0} total={12} />

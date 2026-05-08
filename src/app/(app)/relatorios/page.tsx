@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { calcularSaldoAta } from "@/lib/saldo";
 import { BarChart3, TrendingUp, Building2, AlertTriangle, Download } from "lucide-react";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 export default async function RelatoriosPage() {
   const usuario = await exigirUsuario();
@@ -80,37 +81,25 @@ export default async function RelatoriosPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-violet-50">
-            <BarChart3 className="h-5 w-5 text-violet-700" />
+      <PageHeader
+        eyebrow="Insights · Performance consolidada"
+        titulo="Relatórios de"
+        destaque="gestão"
+        subtitulo="Visão consolidada de toda a operação pública."
+        cta={
+          <div className="flex flex-wrap gap-2">
+            <a href="/api/export/atas" className="btn-secondary inline-flex">
+              <Download className="h-3.5 w-3.5" /> Atas (CSV)
+            </a>
+            <a href="/api/export/contratos" className="btn-secondary inline-flex">
+              <Download className="h-3.5 w-3.5" /> Contratos (CSV)
+            </a>
+            <a href="/api/export/empenhos" className="btn-secondary inline-flex">
+              <Download className="h-3.5 w-3.5" /> Empenhos (CSV)
+            </a>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Relatórios de gestão</h1>
-            <p className="mt-1 text-sm text-slate-600">Visão consolidada de toda a operação pública.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <a
-            href="/api/export/atas"
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Download className="h-3 w-3" /> Atas (CSV)
-          </a>
-          <a
-            href="/api/export/contratos"
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Download className="h-3 w-3" /> Contratos (CSV)
-          </a>
-          <a
-            href="/api/export/empenhos"
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Download className="h-3 w-3" /> Empenhos (CSV)
-          </a>
-        </div>
-      </div>
+        }
+      />
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
         <Card icone={Building2} cor="blue" titulo="Atas — valor registrado" valor={brl(valorTotalAtas)} sub={`${atas.length} atas`} />

@@ -3,6 +3,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { FiltroLista } from "@/components/FiltroLista";
 import type { AcaoAuditoria } from "@/generated/prisma/enums";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 const ROTULO_ACAO: Record<string, string> = {
   CRIAR: "Criou",
@@ -51,17 +52,12 @@ export default async function AuditoriaPage({
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100">
-          <ShieldCheck className="h-5 w-5 text-slate-700" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Logs de auditoria</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Registro de quem fez o quê na sua conta. Últimos 200 eventos.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Conta · Compliance"
+        titulo="Logs de"
+        destaque="auditoria"
+        subtitulo="Registro de quem fez o quê na sua conta. Últimos 200 eventos."
+      />
 
       <div className="mt-6">
         <FiltroLista

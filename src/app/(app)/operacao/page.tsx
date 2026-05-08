@@ -14,6 +14,7 @@ import {
 import { exigirUsuario } from "@/lib/auth";
 import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 import { prisma } from "@/lib/prisma";
 import { TimelineExecucao } from "@/components/TimelineExecucao";
 
@@ -116,26 +117,17 @@ export default async function OperacaoPage({
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
       <BannerEmpresaEmFoco contaId={contaId} />
-      {/* Header */}
-      <div className="flex items-end justify-between gap-6">
-        <div>
-          <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-700">
-            <Workflow className="h-3.5 w-3.5" /> Operação da equipe
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-            Tudo que precisa de ação agora
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Centraliza contratações em execução, vencimentos próximos, pendências e ocorrências. Use abas pra filtrar.
-          </p>
-        </div>
-        <Link
-          href="/contratacoes/nova"
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-        >
-          + Cadastrar
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Operação da equipe"
+        titulo="Tudo que precisa de"
+        destaque="ação"
+        subtitulo="Centraliza contratações em execução, vencimentos próximos, pendências e ocorrências. Use abas pra filtrar."
+        cta={
+          <Link href="/contratacoes/nova" className="btn-primary">
+            + Cadastrar
+          </Link>
+        }
+      />
 
       {/* Cards categoria */}
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

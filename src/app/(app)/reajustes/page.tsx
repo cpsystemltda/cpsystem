@@ -5,6 +5,7 @@ import { brl } from "@/lib/validators";
 import { TrendingUp, AlertTriangle } from "lucide-react";
 import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 export default async function ReajustesPage() {
   const usuario = await exigirUsuario();
@@ -70,17 +71,12 @@ export default async function ReajustesPage() {
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
       <BannerEmpresaEmFoco contaId={usuario.contaId} />
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50">
-          <TrendingUp className="h-5 w-5 text-blue-700" />
-        </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Reajustes de preços</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Inteligência jurídica nativa — janelas fatais, histórico consolidado e cálculo automático.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Insights · Janelas de reajuste"
+        titulo="Reajustes de"
+        destaque="preços"
+        subtitulo="Inteligência jurídica nativa — janelas fatais, histórico consolidado e cálculo automático."
+      />
 
       {janelas.length > 0 && (
         <section className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
