@@ -454,51 +454,124 @@ body {
 .app-shell .text-red-800,
 .app-shell .text-rose-700 { color: var(--coral); }
 
-/* === Cards/seções "bg-white" do Tailwind viram glass claro flutuante ===
-   Texto interno mantém tom escuro porque Apple HIG: contraste de leitura sempre.
-   Inputs, formulários e cards permanecem legíveis sobre fundo dark. */
-.app-shell .bg-white {
-  background: rgba(255, 255, 255, 0.92) !important;
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+/* === Cards/seções "bg-white" do Tailwind viram GLASS DARK ===
+   Apple HIG: um modo só (dark). Containers brancos legacy ficam glass dark
+   transparente — preserva sofisticação Liquid Glass em qualquer rota. */
+.app-shell div.bg-white,
+.app-shell section.bg-white,
+.app-shell article.bg-white,
+.app-shell aside.bg-white,
+.app-shell header.bg-white,
+.app-shell footer.bg-white,
+.app-shell main.bg-white,
+.app-shell nav.bg-white,
+.app-shell ul.bg-white,
+.app-shell li.bg-white,
+.app-shell a.bg-white,
+.app-shell label.bg-white,
+.app-shell form.bg-white,
+.app-shell tr.bg-white,
+.app-shell td.bg-white,
+.app-shell th.bg-white,
+.app-shell tbody.bg-white,
+.app-shell thead.bg-white,
+.app-shell table.bg-white {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    0 8px 24px rgba(0, 0, 0, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 4px 16px rgba(0, 0, 0, 0.25);
+  color: var(--text-soft);
 }
+
 .app-shell .bg-slate-50,
 .app-shell .bg-gray-50,
 .app-shell .bg-zinc-50,
 .app-shell .bg-neutral-50 {
-  background: rgba(255, 255, 255, 0.85) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 .app-shell .bg-slate-100,
 .app-shell .bg-gray-100 {
-  background: rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-/* Dentro de cards bg-white, texto Tailwind volta ao escuro original (Apple HIG: contraste interno) */
+/* Bgs coloridos light (cards de status) → tinted glass dark com a paleta semântica */
+.app-shell .bg-blue-50,
+.app-shell .bg-sky-50,
+.app-shell .bg-cyan-50,
+.app-shell .bg-indigo-50 {
+  background: rgba(184, 197, 214, 0.10) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.app-shell .bg-emerald-50,
+.app-shell .bg-green-50,
+.app-shell .bg-teal-50 {
+  background: rgba(93, 216, 182, 0.10) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.app-shell .bg-amber-50,
+.app-shell .bg-yellow-50,
+.app-shell .bg-orange-50 {
+  background: rgba(212, 175, 55, 0.10) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.app-shell .bg-rose-50,
+.app-shell .bg-red-50,
+.app-shell .bg-pink-50 {
+  background: rgba(232, 138, 152, 0.10) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.app-shell .bg-purple-50,
+.app-shell .bg-violet-50,
+.app-shell .bg-fuchsia-50 {
+  background: rgba(197, 180, 255, 0.10) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Bgs 100 (mais saturados) — versão um pouco mais densa */
+.app-shell .bg-blue-100,
+.app-shell .bg-sky-100,
+.app-shell .bg-indigo-100   { background: rgba(184, 197, 214, 0.16) !important; }
+.app-shell .bg-emerald-100,
+.app-shell .bg-green-100    { background: rgba(93, 216, 182, 0.16) !important; }
+.app-shell .bg-amber-100,
+.app-shell .bg-yellow-100,
+.app-shell .bg-orange-100   { background: rgba(212, 175, 55, 0.16) !important; }
+.app-shell .bg-rose-100,
+.app-shell .bg-red-100,
+.app-shell .bg-pink-100     { background: rgba(232, 138, 152, 0.16) !important; }
+.app-shell .bg-purple-100,
+.app-shell .bg-violet-100   { background: rgba(197, 180, 255, 0.16) !important; }
+
+/* Texto dentro de cards bg-white agora é CLARO (cards são dark) */
 .app-shell .bg-white .text-slate-900,
 .app-shell .bg-white .text-slate-800,
 .app-shell .bg-white .text-gray-900,
 .app-shell .bg-white .text-gray-800,
 .app-shell .bg-slate-50 .text-slate-900,
-.app-shell .bg-slate-50 .text-slate-800 { color: #1D1D1F !important; }
+.app-shell .bg-slate-50 .text-slate-800 { color: var(--text) !important; }
 
 .app-shell .bg-white .text-slate-700,
 .app-shell .bg-white .text-slate-600,
 .app-shell .bg-white .text-gray-700,
-.app-shell .bg-white .text-gray-600 { color: #2C2C2E !important; }
+.app-shell .bg-white .text-gray-600 { color: var(--text-soft) !important; }
 
 .app-shell .bg-white .text-slate-500,
 .app-shell .bg-white .text-slate-400,
 .app-shell .bg-white .text-gray-500,
-.app-shell .bg-white .text-gray-400 { color: #6E6E73 !important; }
+.app-shell .bg-white .text-gray-400 { color: var(--text-mute) !important; }
 
-/* === Inputs sempre legíveis: texto escuro sobre fundo branco === */
+/* === Inputs/forms PRESERVAM bg branco com texto escuro (UX digitação) === */
 .app-shell input[type="text"],
 .app-shell input[type="email"],
 .app-shell input[type="password"],
@@ -510,8 +583,10 @@ body {
 .app-shell input:not([type]),
 .app-shell select,
 .app-shell textarea {
-  color: #1D1D1F;
-  background: rgba(255, 255, 255, 0.95);
+  color: #1D1D1F !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
 }
 .app-shell input::placeholder,
 .app-shell textarea::placeholder {
@@ -524,21 +599,85 @@ body {
 .app-shell .border-gray-200,
 .app-shell .border-gray-300,
 .app-shell .border-zinc-200,
-.app-shell .border-neutral-200 { border-color: var(--hairline); }
+.app-shell .border-neutral-200 { border-color: var(--hairline) !important; }
 
-.app-shell .bg-white .border-slate-200,
-.app-shell .bg-white .border-slate-300,
-.app-shell .bg-white .border-gray-200,
-.app-shell .bg-white .border-gray-300 { border-color: rgba(0, 0, 0, 0.08); }
+.app-shell .border-blue-200,
+.app-shell .border-sky-200,
+.app-shell .border-indigo-200    { border-color: rgba(184, 197, 214, 0.3) !important; }
+.app-shell .border-emerald-200,
+.app-shell .border-green-200     { border-color: rgba(93, 216, 182, 0.3) !important; }
+.app-shell .border-amber-200,
+.app-shell .border-yellow-200,
+.app-shell .border-orange-200    { border-color: rgba(212, 175, 55, 0.3) !important; }
+.app-shell .border-rose-200,
+.app-shell .border-red-200,
+.app-shell .border-pink-200      { border-color: rgba(232, 138, 152, 0.3) !important; }
+.app-shell .border-purple-200,
+.app-shell .border-violet-200    { border-color: rgba(197, 180, 255, 0.3) !important; }
+
+/* Inputs: borda permanece sutil */
+.app-shell input,
+.app-shell select,
+.app-shell textarea {
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+.app-shell input:focus,
+.app-shell select:focus,
+.app-shell textarea:focus {
+  border-color: var(--primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px var(--primary-glow) !important;
+}
 
 /* === Divisores Tailwind === */
 .app-shell .divide-slate-100 > * + *,
 .app-shell .divide-slate-200 > * + *,
 .app-shell .divide-gray-100 > * + *,
 .app-shell .divide-gray-200 > * + * {
-  border-color: var(--hairline);
+  border-color: var(--hairline) !important;
 }
-.app-shell .bg-white .divide-slate-100 > * + *,
-.app-shell .bg-white .divide-slate-200 > * + * {
-  border-color: rgba(0, 0, 0, 0.08);
+
+/* === Hover states preservados em dark === */
+.app-shell .hover\:bg-slate-50:hover,
+.app-shell .hover\:bg-gray-50:hover,
+.app-shell .hover\:bg-slate-100:hover,
+.app-shell .hover\:bg-gray-100:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
 }
+.app-shell .hover\:bg-blue-50:hover,
+.app-shell .hover\:bg-blue-100:hover {
+  background: rgba(184, 197, 214, 0.10) !important;
+}
+
+/* === Botões legacy bg-blue-600 etc → dourado (cor de marca) === */
+.app-shell .bg-blue-600,
+.app-shell .bg-blue-700,
+.app-shell .bg-indigo-600,
+.app-shell .bg-indigo-700 {
+  background: linear-gradient(135deg, var(--primary-bright), var(--primary)) !important;
+  color: #0A0A0A !important;
+  box-shadow: 0 4px 14px var(--primary-glow) !important;
+}
+.app-shell .bg-blue-600:hover,
+.app-shell .bg-blue-700:hover {
+  filter: brightness(1.05);
+}
+
+/* Headings em cards → tipografia mais clean (sem mexer no que já é dark-native) */
+.app-shell h1, .app-shell h2, .app-shell h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Force shadows mais suaves para se integrar ao dark */
+.app-shell .shadow,
+.app-shell .shadow-sm,
+.app-shell .shadow-md,
+.app-shell .shadow-lg,
+.app-shell .shadow-xl {
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Border radius generoso em cards principais */
+.app-shell .rounded-lg { border-radius: 14px; }
+.app-shell .rounded-xl { border-radius: 18px; }
+.app-shell .rounded-2xl { border-radius: 22px; }
