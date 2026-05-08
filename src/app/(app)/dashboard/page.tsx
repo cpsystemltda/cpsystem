@@ -10,6 +10,14 @@ import {
   ArrowUpRight,
   Calendar,
   MapPin,
+  DollarSign,
+  CircleDollarSign,
+  Wallet,
+  CreditCard,
+  RotateCcw,
+  CheckCircle,
+  Scale,
+  Clock,
 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -17,22 +25,9 @@ import { dadosPorUf } from "@/lib/agregacaoUf";
 import { MapaBrasil } from "@/components/MapaBrasil";
 import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
-import {
-  VencimentosPorMesChart,
-  TiposObjetoChart,
-  StatusExecucaoChart,
-  ValorAcumuladoChart,
-} from "@/components/DashboardCharts";
-
-const COR_STATUS: Record<string, string> = {
-  EMPENHADO: "#94a3b8",
-  PEDIDO_RECEBIDO: "#0ea5e9",
-  EM_TRANSITO: "#6366f1",
-  ENTREGUE: "#8b5cf6",
-  NF_EMITIDA: "#f59e0b",
-  NF_ENCAMINHADA: "#ea580c",
-  PAGO: "#10b981",
-};
+import { Block } from "@/components/ui/Block";
+import { KPI, CurrencyValue } from "@/components/ui/KPI";
+import { ChartCard } from "@/components/ui/ChartCard";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -44,15 +39,23 @@ const ROTULO_STATUS: Record<string, string> = {
   PAGO: "Pago",
 };
 
+const CLASSE_STATUS: Record<string, string> = {
+  EMPENHADO: "b-empenhado",
+  PEDIDO_RECEBIDO: "b-pedido",
+  EM_TRANSITO: "b-transito",
+  ENTREGUE: "b-entregue",
+  NF_EMITIDA: "b-nf-emitida",
+  NF_ENCAMINHADA: "b-nf-encam",
+  PAGO: "b-entregue",
+};
+
 function brl(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
 }
 
-function brlCompacto(n: number): string {
-  if (n >= 1_000_000_000) return `R$ ${(n / 1_000_000_000).toFixed(2).replace(".", ",")} Bi`;
-  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} Mi`;
-  if (n >= 1_000) return `R$ ${(n / 1_000).toFixed(1).replace(".", ",")} mil`;
-  return brl(n);
+function formatDate(d: Date | null | undefined): string {
+  if (!d) return "—";
+  return d.toLocaleDateString("pt-BR");
 }
 
 export default async function DashboardPage() {
@@ -62,28 +65,36 @@ export default async function DashboardPage() {
   const empresaIdSelecionada = await lerEmpresaSelecionada();
   const hoje = new Date();
   const fimAno = new Date(hoje.getFullYear(), 11, 31);
+  const em30dias = new Date(hoje.getTime() + 30 * 86400000);
 
   const [
     qtdEmpresas,
     atasVigentes,
     contratosVigentes,
-    empenhos,
-    empenhosComItens,
+    empenhosCompletos,
     contratosVigentesDetalhe,
     atasVigentesDetalhe,
-    proximosVencimentos,
+    proximasEntregas,
     dadosUf,
+    procedimentos,
+    reajustesPendentes,
   ] = await Promise.all([
     prisma.empresa.count({ where: { contaId } }),
     prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
     prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
     prisma.empenho.findMany({
       where: { empresa: filtroEmpresa },
-      select: { id: true, status: true, vigenciaFim: true, dataPagamento: true, tipo: true },
-    }),
-    prisma.empenho.findMany({
-      where: { empresa: filtroEmpresa },
-      select: { itens: { select: { valorTotal: true } }, status: true, tipo: true },
+      select: {
+        id: true,
+        status: true,
+        tipo: true,
+        vigenciaFim: true,
+        dataPrevistaExecucao: true,
+        dataPagamento: true,
+        itens: { select: { valorTotal: true } },
+        orgaoNome: true,
+        orgaoCnpj: true,
+      },
     }),
     prisma.contrato.findMany({
       where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } },
@@ -97,11 +108,6 @@ export default async function DashboardPage() {
       where: {
         empresa: filtroEmpresa,
         status: { not: "PAGO" },
-        OR: [
-          { dataPrevistaExecucao: { gte: hoje, lte: new Date(hoje.getTime() + 30 * 86400000) } },
-          { dataPrevistaPagamento: { gte: hoje, lte: new Date(hoje.getTime() + 30 * 86400000) } },
-          { vigenciaFim: { gte: hoje, lte: new Date(hoje.getTime() + 30 * 86400000) } },
-        ],
       },
       select: {
         id: true,
@@ -111,57 +117,142 @@ export default async function DashboardPage() {
         status: true,
         vigenciaFim: true,
         dataPrevistaExecucao: true,
-        dataPrevistaPagamento: true,
         empresa: { select: { nomeFantasia: true, razaoSocial: true } },
       },
-      orderBy: { vigenciaFim: "asc" },
+      orderBy: [{ dataPrevistaExecucao: "asc" }, { vigenciaFim: "asc" }],
       take: 6,
     }),
     dadosPorUf(contaId, empresaIdSelecionada ?? undefined),
+    prisma.procedimentoApuratorio.findMany({
+      where: {
+        OR: [
+          { empenho: { empresa: filtroEmpresa } },
+          { contrato: { empresa: filtroEmpresa } },
+          { ata: { empresa: filtroEmpresa } },
+        ],
+      },
+      select: {
+        id: true,
+        assunto: true,
+        dataAbertura: true,
+        prazoDefesaDias: true,
+        arquivado: true,
+        ata: { select: { orgaoNome: true } },
+        contrato: { select: { orgaoNome: true } },
+        empenho: { select: { orgaoNome: true } },
+        penalidades: { select: { tipo: true, valor: true } },
+      },
+    }),
+    prisma.ata.count({
+      where: {
+        empresa: filtroEmpresa,
+        vigenciaFim: { gte: hoje },
+        marcoOrcamentoEstimado: { gte: hoje, lte: em30dias },
+      },
+    }).catch(() => 0),
   ]);
 
-  const valorEmCarteira =
-    contratosVigentesDetalhe.reduce(
-      (s, c) => s + c.itens.reduce((ss, i) => ss + i.valorTotal, 0),
-      0,
-    ) +
-    atasVigentesDetalhe.reduce((s, a) => s + a.itens.reduce((ss, i) => ss + i.valorTotal, 0), 0);
+  // === Cálculos financeiros (semântica do briefing) ===
+  const sumItens = (e: { itens: { valorTotal: number }[] }) =>
+    e.itens.reduce((s, i) => s + i.valorTotal, 0);
 
-  const valorPago = empenhosComItens
+  // Empenhos vigentes (não pagos, dentro da vigência)
+  const empenhosVigentes = empenhosCompletos.filter(
+    (e) => e.vigenciaFim >= hoje && e.status !== "PAGO",
+  );
+
+  const valoresContratados = empenhosVigentes.reduce((s, e) => s + sumItens(e), 0);
+
+  const valoresExecutados = empenhosCompletos
+    .filter((e) => ["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(e.status))
+    .reduce((s, e) => s + sumItens(e), 0);
+
+  const valoresAExecutar = empenhosCompletos
+    .filter((e) => ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"].includes(e.status))
+    .reduce((s, e) => s + sumItens(e), 0);
+
+  const valoresRecebidos = empenhosCompletos
     .filter((e) => e.status === "PAGO")
-    .reduce((s, e) => s + e.itens.reduce((ss, i) => ss + i.valorTotal, 0), 0);
+    .reduce((s, e) => s + sumItens(e), 0);
 
-  const valorPendente = empenhosComItens
-    .filter((e) => e.status !== "PAGO")
-    .reduce((s, e) => s + e.itens.reduce((ss, i) => ss + i.valorTotal, 0), 0);
+  const valoresAReceber = empenhosCompletos
+    .filter((e) => ["NF_EMITIDA", "NF_ENCAMINHADA"].includes(e.status))
+    .reduce((s, e) => s + sumItens(e), 0);
 
-  // Vencimentos por mês (próximo ano corrente)
+  const empenhosPagos = empenhosCompletos.filter((e) => e.status === "PAGO").length;
+  const nfsPendentes = empenhosCompletos.filter((e) =>
+    ["NF_EMITIDA", "NF_ENCAMINHADA"].includes(e.status),
+  ).length;
+
+  const totalContratado = valoresContratados + valoresRecebidos;
+  const pctExecutado =
+    totalContratado > 0 ? Math.round((valoresExecutados / totalContratado) * 100) : 0;
+
+  // Logística: empenhos em execução (status entre EMPENHADO..NF_ENCAMINHADA)
+  const empenhosEmExecucao = empenhosCompletos.filter((e) =>
+    ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO", "NF_EMITIDA", "NF_ENCAMINHADA"].includes(
+      e.status,
+    ),
+  ).length;
+
+  const contratosEmExecucao = await prisma.contrato.count({
+    where: {
+      empresa: filtroEmpresa,
+      vigenciaFim: { gte: hoje },
+      empenhos: { some: { status: { not: "PAGO" } } },
+    },
+  });
+
+  // Vencimentos por mês (ano corrente)
   const vencimentosPorMes = new Array(12).fill(0);
   for (const c of contratosVigentesDetalhe) {
     if (c.vigenciaFim <= fimAno && c.vigenciaFim >= hoje) {
       vencimentosPorMes[c.vigenciaFim.getMonth()] += 1;
     }
   }
+  const maxVenc = Math.max(1, ...vencimentosPorMes);
 
-  // Tipos de objeto (atas + contratos vigentes)
-  const tiposMap = new Map<string, number>();
-  for (const c of [...contratosVigentesDetalhe, ...atasVigentesDetalhe]) {
-    tiposMap.set(c.tipo, (tiposMap.get(c.tipo) || 0) + 1);
+  // Órgãos atendidos (distintos)
+  const orgaosUnicos = new Set(empenhosCompletos.map((e) => e.orgaoCnpj));
+  const qtdOrgaos = orgaosUnicos.size;
+
+  // Ranking de órgãos por valor contratado
+  const orgaoMap = new Map<string, { nome: string; valor: number }>();
+  for (const e of empenhosCompletos) {
+    const cur = orgaoMap.get(e.orgaoCnpj) ?? { nome: e.orgaoNome, valor: 0 };
+    cur.valor += sumItens(e);
+    orgaoMap.set(e.orgaoCnpj, cur);
   }
-  const tiposObjeto = Array.from(tiposMap.entries())
-    .map(([tipo, qtd]) => ({ tipo, qtd }))
-    .sort((a, b) => b.qtd - a.qtd);
+  const rankingOrgaos = Array.from(orgaoMap.values())
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 5);
+  const maiorRanking = rankingOrgaos[0]?.valor ?? 1;
 
-  // Status de execução (empenhos)
-  const statusMap = new Map<string, number>();
-  for (const e of empenhos) statusMap.set(e.status, (statusMap.get(e.status) || 0) + 1);
-  const statusExecucao = Array.from(statusMap.entries()).map(([status, qtd]) => ({
-    status: ROTULO_STATUS[status] || status,
-    qtd,
-    cor: COR_STATUS[status] || "#94a3b8",
-  }));
+  // Tabela clientes (órgão + UF a partir de dadosUf)
+  // Como agregação, vamos usar os 5 primeiros do ranking
+  const clientesTabela = rankingOrgaos.slice(0, 5);
 
-  const empenhosAtivos = empenhos.filter((e) => e.status !== "PAGO").length;
+  // Processos apuratórios — em andamento = não arquivado
+  const procEmAndamento = procedimentos
+    .filter((p) => !p.arquivado)
+    .map((p) => ({
+      id: p.id,
+      assunto: p.assunto,
+      orgaoNome:
+        p.empenho?.orgaoNome ?? p.contrato?.orgaoNome ?? p.ata?.orgaoNome ?? "—",
+      tipoPrincipal: (p.penalidades.find((x) => x.tipo === "MULTA")?.tipo ??
+        p.penalidades[0]?.tipo ??
+        "MULTA") as string,
+      valor: p.penalidades.reduce((s, x) => s + (x.valor ?? 0), 0),
+      prazoFinal: new Date(p.dataAbertura.getTime() + p.prazoDefesaDias * 86400000),
+    }));
+  const valorRiscoMulta = procEmAndamento.reduce((s, p) => s + p.valor, 0);
+  const proxPrazoDefesa = procEmAndamento
+    .filter((p) => p.prazoFinal >= hoje)
+    .sort((a, b) => a.prazoFinal.getTime() - b.prazoFinal.getTime())[0];
+  const diasProxPrazo = proxPrazoDefesa
+    ? Math.ceil((proxPrazoDefesa.prazoFinal.getTime() - hoje.getTime()) / 86400000)
+    : null;
 
   const trial = usuario.conta.statusAssinatura === "TRIAL" && usuario.conta.trialAteEm;
   const diasTrial = trial
@@ -169,345 +260,705 @@ export default async function DashboardPage() {
     : 0;
 
   const nomePrimeiro = usuario.nome.split(" ")[0];
+  const dataExtenso = hoje.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   return (
-    <div className="mx-auto max-w-[1400px] px-8 py-8">
+    <div className="mx-auto max-w-[1400px] px-8 py-6">
       <BannerEmpresaEmFoco contaId={contaId} />
-      {/* Header */}
-      <div className="flex items-end justify-between gap-6">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
-            Olá, {nomePrimeiro} —{" "}
-            {hoje.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+
+      {/* === Header / Topbar === */}
+      <header className="glass mb-[18px] flex items-end justify-between gap-6 rounded-[28px] px-9 py-7">
+        <div className="relative z-[1]">
+          <p
+            className="text-[11px] font-semibold uppercase"
+            style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
+          >
+            {dataExtenso}
           </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Visão consolidada das suas contratações públicas, posição financeira e logística.
+          <h1
+            className="mt-2 text-[44px] font-extrabold leading-none"
+            style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
+          >
+            Bom dia,{" "}
+            <em
+              style={{
+                fontStyle: "normal",
+                background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              {nomePrimeiro}.
+            </em>
+          </h1>
+          <p
+            className="mt-2 max-w-[580px] text-[14px]"
+            style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
+          >
+            Visão consolidada das suas contratações públicas, posição financeira e logística operacional.
           </p>
         </div>
-        <Link
-          href="/contratacoes/nova"
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-        >
+        <Link href="/contratacoes/nova" className="btn-primary">
           <Plus className="h-4 w-4" /> Nova contratação
         </Link>
-      </div>
+      </header>
 
       {trial && (
-        <div className="mt-5 flex items-center gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
-          <AlertTriangle className="h-5 w-5 text-amber-600" />
+        <div
+          className="glass-tile t-primary mb-[18px] flex items-center gap-3 rounded-[18px] px-5 py-3.5 text-sm"
+          style={{ color: "var(--text)" }}
+        >
+          <AlertTriangle className="h-5 w-5" style={{ color: "var(--primary-bright)" }} />
           <span>
             Trial gratuito · <strong>{diasTrial} dias restantes</strong>. Ative uma assinatura antes do
             término para não perder acesso.
           </span>
           <Link
             href="/conta/assinatura"
-            className="ml-auto inline-flex items-center gap-1 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+            className="ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold"
+            style={{ background: "var(--primary)", color: "#0A0A0A" }}
           >
             Ver planos <ArrowUpRight className="h-3 w-3" />
           </Link>
         </div>
       )}
 
-      {/* KPIs grandes (3 cards coloridos) */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <KpiHero
-          titulo="Contratos vigentes em " end={hoje.getFullYear()}
-          valor={(atasVigentes + contratosVigentes).toString()}
-          sub={`${atasVigentes} ata(s) + ${contratosVigentes} contrato(s)`}
-          gradient="from-cyan-500 to-teal-600"
-          icone={ClipboardList}
-        />
-        <KpiHero
-          titulo="Valor total em carteira"
-          end={hoje.getFullYear()}
-          valor={brlCompacto(valorEmCarteira)}
-          sub={`vigente até dez/${hoje.getFullYear()}`}
-          gradient="from-indigo-500 to-blue-700"
-          icone={TrendingUp}
-        />
-        <KpiHero
-          titulo="Valor já pago em"
-          end={hoje.getFullYear()}
-          valor={brlCompacto(valorPago)}
-          sub={`${empenhosComItens.filter((e) => e.status === "PAGO").length} empenho(s) pagos`}
-          gradient="from-emerald-500 to-green-700"
-          icone={TrendingUp}
-        />
-      </div>
+      {/* === Bloco I — Financeiro === */}
+      <Block numero="01" eyebrow="Performance financeira" titulo="Financeiro">
+        <div className="grid grid-cols-3 gap-3.5">
+          <KPI
+            tone="primary"
+            icon={DollarSign}
+            label="Valores contratados"
+            value={<CurrencyValue amount={valoresContratados} />}
+            meta={`${empenhosVigentes.length} empenhos vigentes`}
+          />
+          <KPI
+            tone="mint"
+            icon={TrendingUp}
+            label="Valores executados"
+            value={<CurrencyValue amount={valoresExecutados} />}
+            meta={`${pctExecutado}% do contratado`}
+          />
+          <KPI
+            tone="lavender"
+            icon={Clock}
+            label="Valores a executar"
+            value={<CurrencyValue amount={valoresAExecutar} />}
+            meta="Saldo disponível"
+          />
+          <KPI
+            tone="mint"
+            icon={CheckCircle}
+            label="Valores recebidos"
+            value={<CurrencyValue amount={valoresRecebidos} />}
+            meta={`${empenhosPagos} empenhos pagos`}
+          />
+          <KPI
+            tone="rose"
+            icon={CreditCard}
+            label="Valores a receber"
+            value={<CurrencyValue amount={valoresAReceber} />}
+            meta={`${nfsPendentes} NFs pendentes`}
+          />
+          <KPI
+            tone="coral"
+            icon={AlertTriangle}
+            label="Reajuste de preços"
+            value={
+              <>
+                {reajustesPendentes}{" "}
+                <span style={{ fontSize: "14px", color: "var(--text-mute)", fontWeight: 600 }}>
+                  vencendo
+                </span>
+              </>
+            }
+            meta="Em 30 dias ou menos"
+          />
+        </div>
 
-      {/* KPI secundários */}
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiSmall titulo="Empresas (CNPJs)" valor={qtdEmpresas} icone={Building2} href="/empresas" />
-        <KpiSmall titulo="Atas vigentes" valor={atasVigentes} icone={FileText} href="/atas" />
-        <KpiSmall titulo="Contratos ativos" valor={contratosVigentes} icone={ClipboardList} href="/contratos" />
-        <KpiSmall titulo="Empenhos em execução" valor={empenhosAtivos} icone={Truck} href="/execucao" />
-      </div>
+        <div className="mt-3.5 grid grid-cols-2 gap-3.5">
+          <ChartCard
+            title="Posição financeira"
+            subtitle="Distribuição entre os estágios do contrato"
+          >
+            <BarsPosicao
+              recebido={valoresRecebidos}
+              aReceber={valoresAReceber}
+              aExecutar={valoresAExecutar}
+            />
+          </ChartCard>
+          <ChartCard
+            title="Executado / Contratado"
+            subtitle="Quanto do total contratado já foi entregue"
+          >
+            <DonutChart pct={pctExecutado} executado={valoresExecutados} contratado={totalContratado} />
+          </ChartCard>
+        </div>
+      </Block>
 
-      {/* Mapa + valor acumulado */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
-        <Painel
-          className="lg:col-span-2"
-          titulo="Mapa de operações por estado"
-          subtitulo="Distribuição geográfica das suas empresas e contratos com órgãos públicos. Passe o mouse sobre o estado para detalhes."
-          icone={MapPin}
+      {/* === Bloco II — Atas & Contratos === */}
+      <Block numero="02" eyebrow="Instrumentos vigentes" titulo="Atas & Contratos">
+        <div className="grid grid-cols-2 gap-3.5">
+          <KPI
+            tone="primary"
+            size="hero"
+            icon={FileText}
+            label="Atas vigentes"
+            value={atasVigentes}
+            meta="Atas de Registro de Preços ativas"
+          />
+          <KPI
+            tone="mint"
+            size="hero"
+            icon={ClipboardList}
+            label="Contratos vigentes"
+            value={contratosVigentes}
+            meta="Contratos administrativos em vigor"
+          />
+        </div>
+
+        <div className="mt-3.5">
+          <ChartCard
+            title={`Vencimentos de contratos em ${hoje.getFullYear()}`}
+            subtitle="Distribuição mensal — antecipe renovações e aditivos"
+          >
+            <MesesChart dados={vencimentosPorMes} max={maxVenc} />
+          </ChartCard>
+        </div>
+      </Block>
+
+      {/* === Bloco IV — Logística === */}
+      <Block numero="03" eyebrow="Operação" titulo="Logística">
+        <div className="grid grid-cols-2 gap-3.5">
+          <KPI
+            tone="lavender"
+            size="hero"
+            icon={ClipboardList}
+            label="Contratos em execução"
+            value={contratosEmExecucao}
+            meta="Com pelo menos 1 empenho ativo"
+          />
+          <KPI
+            tone="primary"
+            size="hero"
+            icon={Truck}
+            label="Empenhos em execução"
+            value={empenhosEmExecucao}
+            meta="Não pagos / não finalizados"
+          />
+        </div>
+
+        <div className="mt-3.5">
+          <TabelaLogistica entregas={proximasEntregas} hoje={hoje} />
+        </div>
+      </Block>
+
+      {/* === Bloco V — Clientes === */}
+      <Block numero="04" eyebrow="Carteira de órgãos" titulo="Clientes atendidos">
+        <div
+          className="grid gap-3.5"
+          style={{ gridTemplateColumns: "1fr 2fr" }}
         >
-          {dadosUf.length === 0 ? (
-            <div className="grid h-[480px] place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center">
-              <div>
-                <MapPin className="mx-auto h-10 w-10 text-slate-300" />
-                <p className="mt-3 text-sm font-medium text-slate-700">Sem dados geográficos ainda</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Cadastre suas empresas com endereço completo para visualizar o mapa.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <MapaBrasil dados={dadosUf} />
-          )}
-        </Painel>
-
-        <Painel titulo="Posição financeira" subtitulo="Carteira vs executado vs pago" icone={TrendingUp}>
-          <ValorAcumuladoChart pago={valorPago} pendente={valorPendente} carteira={valorEmCarteira} />
-          <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
-            <LinhaResumo cor="#10b981" rotulo="Já pago" valor={brl(valorPago)} />
-            <LinhaResumo cor="#f59e0b" rotulo="Pendente de pagamento" valor={brl(valorPendente)} />
-            <LinhaResumo cor="#0f4c81" rotulo="Em carteira (vigente)" valor={brl(valorEmCarteira)} />
+          <KPI
+            tone="rose"
+            size="hero"
+            icon={Building2}
+            label="Órgãos atendidos"
+            value={qtdOrgaos}
+            meta="Distintos · CNPJ único"
+          />
+          <div className="glass-tile relative overflow-hidden rounded-[20px]">
+            <table className="table-glass">
+              <thead>
+                <tr>
+                  <th>Órgão</th>
+                  <th className="num">Valor contratado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clientesTabela.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} style={{ textAlign: "center", color: "var(--text-mute)" }}>
+                      Sem dados ainda.
+                    </td>
+                  </tr>
+                ) : (
+                  clientesTabela.map((c) => (
+                    <tr key={c.nome}>
+                      <td className="strong">{c.nome}</td>
+                      <td className="num strong">{brl(c.valor)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </Painel>
-      </div>
+        </div>
 
-      {/* Vencimentos + tipos */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Painel
-          titulo={`Vencimento de contratos em ${hoje.getFullYear()}`}
-          subtitulo="Distribuição mensal — antecipe renovações e aditivos"
-          icone={Calendar}
-        >
-          <VencimentosPorMesChart dados={vencimentosPorMes} />
-        </Painel>
+        <div className="mt-3.5">
+          <ChartCard
+            title="Mapa de operações por estado"
+            subtitle="Distribuição geográfica — passe o mouse sobre o estado para detalhes"
+          >
+            {dadosUf.length === 0 ? (
+              <div
+                className="grid h-[320px] place-items-center rounded-2xl"
+                style={{
+                  border: "0.5px dashed var(--hairline)",
+                  background: "rgba(255,255,255,0.02)",
+                }}
+              >
+                <div className="text-center">
+                  <MapPin className="mx-auto h-10 w-10" style={{ color: "var(--text-faint)" }} />
+                  <p
+                    className="mt-3 text-sm font-semibold"
+                    style={{ color: "var(--text-soft)" }}
+                  >
+                    Sem dados geográficos ainda
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--text-mute)" }}>
+                    Cadastre suas empresas com endereço completo para visualizar o mapa.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <MapaBrasil dados={dadosUf} />
+            )}
+          </ChartCard>
+        </div>
 
-        <Painel
-          titulo="Tipos de objeto contratado"
-          subtitulo="Composição do portfólio (atas + contratos vigentes)"
-          icone={FileText}
-        >
-          {tiposObjeto.length === 0 ? (
-            <p className="grid h-[260px] place-items-center text-sm text-slate-400">Sem dados.</p>
-          ) : (
-            <TiposObjetoChart dados={tiposObjeto} />
-          )}
-        </Painel>
-      </div>
-
-      {/* Status execução + ranking UF */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Painel
-          titulo="Status logístico dos empenhos"
-          subtitulo="Posição atual da execução"
-          icone={Truck}
-        >
-          {statusExecucao.length === 0 ? (
-            <p className="grid h-[260px] place-items-center text-sm text-slate-400">
-              Sem empenhos cadastrados ainda.
-            </p>
-          ) : (
-            <StatusExecucaoChart dados={statusExecucao} />
-          )}
-        </Painel>
-
-        <Painel
-          titulo="Ranking de estados por carteira"
-          subtitulo="Onde estão concentrados seus contratos públicos"
-          icone={MapPin}
-        >
-          {dadosUf.length === 0 ? (
-            <p className="grid h-[260px] place-items-center text-sm text-slate-400">Sem dados.</p>
-          ) : (
-            <ul className="divide-y divide-slate-100">
-              {dadosUf.slice(0, 6).map((d, i) => (
-                <li key={d.uf} className="flex items-center gap-4 py-2.5">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-slate-100 text-[11px] font-bold text-slate-700">
-                    {i + 1}
-                  </span>
-                  <span className="w-10 font-mono text-sm font-bold text-slate-900">{d.uf}</span>
-                  <div className="flex-1">
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="mt-3.5">
+          <ChartCard
+            title="Ranking de órgãos por valor contratado"
+            subtitle="Onde estão concentrados seus contratos públicos"
+          >
+            {rankingOrgaos.length === 0 ? (
+              <p
+                className="grid h-[200px] place-items-center text-sm"
+                style={{ color: "var(--text-mute)" }}
+              >
+                Sem dados.
+              </p>
+            ) : (
+              <div>
+                {rankingOrgaos.map((o, i) => (
+                  <div
+                    key={o.nome}
+                    className="flex items-center gap-5 border-b border-white/5 py-3.5 last:border-b-0"
+                  >
+                    <div
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[13px] font-extrabold"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, rgba(212,175,55,0.22), rgba(212,175,55,0.05))",
+                        border: "0.5px solid rgba(212,175,55,0.35)",
+                        color: "var(--primary-bright)",
+                        letterSpacing: "-0.04em",
+                        boxShadow: "0 0 14px rgba(212,175,55,0.18)",
+                      }}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </div>
+                    <div
+                      className="w-[220px] truncate text-[14px] font-semibold"
+                      style={{ color: "var(--text)", letterSpacing: "-0.01em" }}
+                    >
+                      {o.nome}
+                    </div>
+                    <div
+                      className="flex-1 overflow-hidden rounded-full"
+                      style={{ background: "rgba(255,255,255,0.05)", height: "8px" }}
+                    >
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600"
+                        className="h-full rounded-full"
                         style={{
-                          width: `${Math.min(100, (d.valor / Math.max(...dadosUf.map((x) => x.valor))) * 100)}%`,
+                          width: `${(o.valor / maiorRanking) * 100}%`,
+                          background:
+                            "linear-gradient(90deg, var(--primary-deep), var(--primary-bright))",
+                          boxShadow: "0 0 16px var(--primary-glow)",
                         }}
                       />
                     </div>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      {d.empresas} empresa(s) · {d.contratos} contrato(s) · {d.empenhos} empenho(s)
-                    </p>
-                  </div>
-                  <span className="w-28 text-right text-sm font-semibold text-slate-900">
-                    {brlCompacto(d.valor)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Painel>
-      </div>
-
-      {/* Próximos vencimentos */}
-      <div className="mt-4">
-        <Painel
-          titulo="Próximos vencimentos (30 dias)"
-          subtitulo="Empenhos com prazo próximo — execute ou avise o fiscal"
-          icone={AlertTriangle}
-        >
-          {proximosVencimentos.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">
-              Nenhum empenho com vencimento nos próximos 30 dias. Ótimo!
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {proximosVencimentos.map((e) => {
-                const dias = Math.ceil((e.vigenciaFim.getTime() - Date.now()) / 86400000);
-                return (
-                  <li key={e.id}>
-                    <Link
-                      href={`/execucao/${e.id}`}
-                      className="flex items-center gap-4 rounded-lg border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:shadow-sm"
+                    <div
+                      className="tabular w-[150px] text-right text-[15px] font-extrabold"
+                      style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
                     >
+                      {brl(o.valor)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ChartCard>
+        </div>
+      </Block>
+
+      {/* === Bloco VI — Processos apuratórios === */}
+      <Block
+        numero="05"
+        eyebrow="Risco & conformidade"
+        titulo="Processos apuratórios"
+        tag={procEmAndamento.length === 0 ? undefined : undefined}
+      >
+        <div className="grid grid-cols-3 gap-3.5">
+          <KPI
+            tone="coral"
+            icon={AlertTriangle}
+            label="Em andamento"
+            value={procEmAndamento.length}
+            meta="Multa, impedimento ou inidoneidade"
+          />
+          <KPI
+            tone="coral"
+            icon={DollarSign}
+            label="Risco de multa"
+            value={<CurrencyValue amount={valorRiscoMulta} />}
+            meta="Soma dos valores em apuração"
+          />
+          <KPI
+            tone="primary"
+            icon={Clock}
+            label="Próximo prazo"
+            value={
+              diasProxPrazo !== null ? (
+                <span style={{ fontSize: "26px" }}>
+                  {diasProxPrazo === 0 ? "Hoje" : `${diasProxPrazo}d`}
+                </span>
+              ) : (
+                <span style={{ fontSize: "20px" }}>Sem prazo crítico</span>
+              )
+            }
+            meta={proxPrazoDefesa ? `Defesa em ${formatDate(proxPrazoDefesa.prazoFinal)}` : "Nenhum em aberto"}
+          />
+        </div>
+
+        {procEmAndamento.length > 0 && (
+          <div className="glass-tile mt-3.5 relative overflow-hidden rounded-[20px]">
+            <table className="table-glass">
+              <thead>
+                <tr>
+                  <th>Órgão</th>
+                  <th>Tipo</th>
+                  <th>Status</th>
+                  <th>Prazo</th>
+                  <th className="num">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {procEmAndamento.slice(0, 5).map((p) => (
+                  <tr key={p.id}>
+                    <td className="strong">{p.orgaoNome}</td>
+                    <td>
                       <span
-                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg text-xs font-bold ${
-                          dias <= 7
-                            ? "bg-red-100 text-red-700"
-                            : dias <= 15
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
+                        className={`badge ${p.tipoPrincipal === "MULTA" ? "b-multa" : "b-impedimento"}`}
                       >
-                        {dias}d
+                        {p.tipoPrincipal === "MULTA"
+                          ? "Multa"
+                          : p.tipoPrincipal === "IMPEDIMENTO_LICITAR"
+                            ? "Impedimento"
+                            : p.tipoPrincipal === "DECLARACAO_INIDONEIDADE"
+                              ? "Inidoneidade"
+                              : "Advertência"}
                       </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-900">
-                          Empenho {e.numero} · {e.objeto.slice(0, 60)}
-                          {e.objeto.length > 60 ? "…" : ""}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {e.orgaoNome} · {e.empresa.nomeFantasia || e.empresa.razaoSocial} ·{" "}
-                          {ROTULO_STATUS[e.status] || e.status}
-                        </p>
-                      </div>
-                      <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Painel>
-      </div>
-    </div>
-  );
-}
-
-function KpiHero({
-  titulo,
-  end,
-  valor,
-  sub,
-  gradient,
-  icone: Icone,
-}: {
-  titulo: string;
-  end: string | number;
-  valor: string;
-  sub: string;
-  gradient: string;
-  icone: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <div
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-6 text-white shadow-lg`}
-    >
-      <div className="relative z-10">
-        <p className="text-xs font-medium uppercase tracking-wider text-white/80">
-          {titulo} {end}
-        </p>
-        <p className="mt-2 text-4xl font-bold tracking-tight">{valor}</p>
-        <p className="mt-1 text-xs text-white/80">{sub}</p>
-      </div>
-      <Icone className="absolute -right-2 -bottom-2 h-32 w-32 text-white/10" />
-    </div>
-  );
-}
-
-function KpiSmall({
-  titulo,
-  valor,
-  icone: Icone,
-  href,
-}: {
-  titulo: string;
-  valor: number;
-  icone: React.ComponentType<{ className?: string }>;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm"
-    >
-      <div className="grid h-11 w-11 place-items-center rounded-xl bg-slate-50 text-slate-600 transition group-hover:bg-blue-50 group-hover:text-blue-700">
-        <Icone className="h-5 w-5" />
-      </div>
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
-        <p className="mt-0.5 text-2xl font-bold text-slate-900">{valor}</p>
-      </div>
-    </Link>
-  );
-}
-
-function Painel({
-  titulo,
-  subtitulo,
-  icone: Icone,
-  children,
-  className = "",
-}: {
-  titulo: string;
-  subtitulo?: string;
-  icone?: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}
-    >
-      <div className="mb-4 flex items-start gap-3">
-        {Icone && (
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-600">
-            <Icone className="h-4 w-4" />
+                    </td>
+                    <td>{p.assunto}</td>
+                    <td className="num">{formatDate(p.prazoFinal)}</td>
+                    <td className="num strong">{p.valor > 0 ? brl(p.valor) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">{titulo}</h2>
-          {subtitulo && <p className="mt-0.5 text-xs text-slate-500">{subtitulo}</p>}
-        </div>
-      </div>
-      {children}
-    </section>
+      </Block>
+    </div>
   );
 }
 
-function LinhaResumo({ cor, rotulo, valor }: { cor: string; rotulo: string; valor: string }) {
+/* ============================================================
+   Sub-componentes server (gráficos puros, sem JS no cliente)
+   ============================================================ */
+
+function BarsPosicao({
+  recebido,
+  aReceber,
+  aExecutar,
+}: {
+  recebido: number;
+  aReceber: number;
+  aExecutar: number;
+}) {
+  const max = Math.max(1, recebido, aReceber, aExecutar);
+  const barras: { val: number; cor: string; rotulo: string }[] = [
+    { val: recebido, cor: "linear-gradient(180deg, var(--mint), #2EAB85)", rotulo: "Recebido" },
+    { val: aReceber, cor: "linear-gradient(180deg, var(--rose), #C18876)", rotulo: "A receber" },
+    {
+      val: aExecutar,
+      cor: "linear-gradient(180deg, var(--lavender), #8A7DAD)",
+      rotulo: "A executar",
+    },
+  ];
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="flex items-center gap-2.5">
-        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cor }} />
-        <span className="text-sm text-slate-600">{rotulo}</span>
+    <div>
+      <div
+        className="flex items-end gap-8 px-4"
+        style={{ height: "200px", borderBottom: "0.5px solid var(--hairline)" }}
+      >
+        {barras.map((b) => (
+          <div
+            key={b.rotulo}
+            className="flex flex-1 flex-col items-center justify-end gap-3"
+          >
+            <span className="tabular text-[11px] font-semibold" style={{ color: "var(--text)" }}>
+              {brlCompacto(b.val)}
+            </span>
+            <div
+              className="relative w-full max-w-[64px]"
+              style={{
+                height: `${(b.val / max) * 100}%`,
+                background: b.cor,
+                borderRadius: "10px 10px 3px 3px",
+                boxShadow: `0 0 28px ${b.rotulo === "Recebido" ? "var(--mint-glow)" : b.rotulo === "A receber" ? "var(--rose-glow)" : "var(--lavender-glow)"}`,
+              }}
+            />
+          </div>
+        ))}
       </div>
-      <span className="text-sm font-semibold text-slate-900">{valor}</span>
+      <div
+        className="mt-4 flex gap-6 px-4 text-[12px] font-medium"
+        style={{ color: "var(--text-soft)" }}
+      >
+        <Legenda cor="var(--mint)" rotulo="Recebido" />
+        <Legenda cor="var(--rose)" rotulo="A receber" />
+        <Legenda cor="var(--lavender)" rotulo="A executar" />
+      </div>
+    </div>
+  );
+}
+
+function Legenda({ cor, rotulo }: { cor: string; rotulo: string }) {
+  return (
+    <div className="flex flex-1 items-center justify-center gap-2.5">
+      <span
+        className="h-2.5 w-2.5 rounded-[3px]"
+        style={{ background: cor, boxShadow: `0 0 10px ${cor}` }}
+      />
+      <span>{rotulo}</span>
+    </div>
+  );
+}
+
+function brlCompacto(n: number): string {
+  if (n >= 1_000_000_000) return `R$ ${(n / 1_000_000_000).toFixed(2).replace(".", ",")} Bi`;
+  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} Mi`;
+  if (n >= 1_000) return `R$ ${(n / 1_000).toFixed(0)}k`;
+  return `R$ ${n.toFixed(0)}`;
+}
+
+function DonutChart({
+  pct,
+  executado,
+  contratado,
+}: {
+  pct: number;
+  executado: number;
+  contratado: number;
+}) {
+  const radius = 86;
+  const circ = 2 * Math.PI * radius;
+  const dashoffset = circ - (circ * pct) / 100;
+  return (
+    <div className="flex flex-col items-center justify-center py-4">
+      <div className="relative">
+        <svg width="220" height="220" viewBox="0 0 220 220" style={{ filter: "drop-shadow(0 0 30px var(--primary-glow))" }}>
+          <defs>
+            <linearGradient id="donutGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="var(--primary-bright)" />
+              <stop offset="100%" stopColor="var(--primary-deep)" />
+            </linearGradient>
+          </defs>
+          <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="20" />
+          <circle
+            cx="110"
+            cy="110"
+            r={radius}
+            fill="none"
+            stroke="url(#donutGrad)"
+            strokeWidth="20"
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            strokeDashoffset={dashoffset}
+            transform="rotate(-90 110 110)"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div
+            className="text-[56px] font-extrabold leading-none"
+            style={{
+              background: "linear-gradient(180deg, var(--text), var(--primary-bright))",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              letterSpacing: "-0.06em",
+            }}
+          >
+            {pct}%
+          </div>
+          <div
+            className="mt-2 text-[9px] font-extrabold uppercase"
+            style={{ letterSpacing: "0.32em", color: "var(--text-mute)" }}
+          >
+            executado
+          </div>
+        </div>
+      </div>
+      <div className="mt-3.5 text-center text-[12px] font-medium" style={{ color: "var(--text-mute)" }}>
+        {brlCompacto(executado)} executados de {brlCompacto(contratado)} contratados
+      </div>
+    </div>
+  );
+}
+
+function MesesChart({ dados, max }: { dados: number[]; max: number }) {
+  const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  return (
+    <div>
+      <div
+        className="flex items-end gap-3.5 px-3"
+        style={{ height: "180px", borderBottom: "0.5px solid var(--hairline)" }}
+      >
+        {dados.map((v, i) => {
+          const isHigh = v > max * 0.6;
+          return (
+            <div key={i} className="flex flex-1 flex-col items-center justify-end gap-2">
+              <span className="tabular text-[11px] font-semibold" style={{ color: "var(--text)" }}>
+                {v}
+              </span>
+              <div
+                className="w-full max-w-[38px]"
+                style={{
+                  height: `${(v / max) * 100}%`,
+                  background: isHigh
+                    ? "linear-gradient(180deg, var(--primary-bright), var(--primary-deep))"
+                    : "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.05))",
+                  borderRadius: "8px 8px 2px 2px",
+                  boxShadow: isHigh ? "0 0 28px var(--primary-glow)" : undefined,
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div
+        className="mt-3 flex gap-3.5 px-3 text-[11px] font-medium"
+        style={{ color: "var(--text-mute)", letterSpacing: "0.04em" }}
+      >
+        {meses.map((m) => (
+          <div key={m} className="flex-1 text-center">
+            {m}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TabelaLogistica({
+  entregas,
+  hoje,
+}: {
+  entregas: {
+    id: string;
+    numero: string;
+    objeto: string;
+    orgaoNome: string;
+    status: string;
+    vigenciaFim: Date;
+    dataPrevistaExecucao: Date | null;
+    empresa: { nomeFantasia: string | null; razaoSocial: string };
+  }[];
+  hoje: Date;
+}) {
+  const emAtraso = entregas.filter((e) => {
+    const limite = e.dataPrevistaExecucao ?? e.vigenciaFim;
+    return limite < hoje && !["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(e.status);
+  }).length;
+
+  if (entregas.length === 0) {
+    return (
+      <div
+        className="glass-tile rounded-[20px] py-10 text-center text-sm"
+        style={{ color: "var(--text-mute)" }}
+      >
+        Nenhum empenho em execução. Tudo em dia!
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-tile relative overflow-hidden rounded-[20px]">
+      <div
+        className="flex items-center justify-between border-b border-white/10 px-6 py-3.5 text-[12px] font-medium"
+        style={{ color: "var(--text-mute)", background: "rgba(0,0,0,0.18)" }}
+      >
+        <span>
+          Ordenado por <strong style={{ color: "var(--text)" }}>data limite</strong> · entregas mais próximas
+          no topo
+        </span>
+        {emAtraso > 0 && (
+          <span style={{ color: "var(--coral)", fontWeight: 700 }}>
+            ⚠ {emAtraso} em atraso
+          </span>
+        )}
+      </div>
+      <table className="table-glass">
+        <thead>
+          <tr>
+            <th>Órgão</th>
+            <th>Empenho</th>
+            <th>Data limite</th>
+            <th>Status</th>
+            <th>Atraso</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entregas.map((e) => {
+            const limite = e.dataPrevistaExecucao ?? e.vigenciaFim;
+            const diasAtraso = Math.floor((hoje.getTime() - limite.getTime()) / 86400000);
+            const atrasado = diasAtraso > 0;
+            return (
+              <tr key={e.id} className={atrasado ? "row-alert" : undefined}>
+                <td className="strong">{e.orgaoNome}</td>
+                <td className="num">EMP {e.numero}</td>
+                <td className="num">{formatDate(limite)}</td>
+                <td>
+                  <span className={`badge ${CLASSE_STATUS[e.status] ?? "b-empenhado"}`}>
+                    {ROTULO_STATUS[e.status] ?? e.status}
+                  </span>
+                </td>
+                <td>
+                  {atrasado ? (
+                    <span style={{ color: "var(--coral)", fontWeight: 700, fontSize: "12px" }}>
+                      Sim — {diasAtraso} {diasAtraso === 1 ? "dia" : "dias"}
+                    </span>
+                  ) : (
+                    <span style={{ color: "var(--mint)", fontWeight: 700, fontSize: "12px" }}>
+                      Em dia
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

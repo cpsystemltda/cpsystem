@@ -56,8 +56,9 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
   }, [dados]);
 
   const maxEmpresas = useMemo(() => Math.max(1, ...dados.map((d) => d.empresas)), [dados]);
+  // Gradient da cor base (lavender translúcido) até o dourado da marca — paleta Liquid Glass
   const colorScale = useMemo(
-    () => scaleSequential<string>(interpolateRgb("#e2e8f0", "#0f4c81")).domain([0, maxEmpresas]),
+    () => scaleSequential<string>(interpolateRgb("#5A4F6E", "#E8C875")).domain([0, maxEmpresas]),
     [maxEmpresas],
   );
 
@@ -71,7 +72,14 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
 
   if (!geo || !pathFn) {
     return (
-      <div className="grid h-[360px] place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-500">
+      <div
+        className="grid h-[360px] place-items-center rounded-2xl text-sm"
+        style={{
+          color: "var(--text-mute)",
+          background: "rgba(255,255,255,0.04)",
+          border: "0.5px solid var(--hairline)",
+        }}
+      >
         Carregando mapa do Brasil…
       </div>
     );
@@ -101,18 +109,21 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
           if (!uf) return null;
           const dado = dadosMap.get(uf);
           const valor = dado?.empresas ?? 0;
-          const fill = valor > 0 ? colorScale(valor) : "#f1f5f9";
+          const fill = valor > 0 ? colorScale(valor) : "rgba(255, 255, 255, 0.06)";
           const isHover = hover?.uf === uf;
           const d = pathFn(feature as unknown as GeoJSON.Feature) || "";
           const centroid = pathFn.centroid(feature as unknown as GeoJSON.Feature);
+          // UFs com mais valor recebem glow (drop-shadow) com a cor da marca
+          const isTop = valor >= maxEmpresas * 0.6;
           return (
             <g key={`${uf}-${i}`}>
               <path
                 d={d}
                 fill={fill}
-                stroke={isHover ? "#0f172a" : "#ffffff"}
-                strokeWidth={isHover ? 2 : 0.8}
+                stroke={isHover ? "#FFFFFF" : "rgba(255,255,255,0.18)"}
+                strokeWidth={isHover ? 1.4 : 0.6}
                 className="transition-all duration-150 cursor-pointer"
+                style={isTop ? { filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.45))" } : undefined}
                 onMouseEnter={(e) => {
                   const rect = wrapperRef.current?.getBoundingClientRect();
                   setHover({
@@ -137,10 +148,11 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
                   y={centroid[1]}
                   textAnchor="middle"
                   fontSize={valor > maxEmpresas * 0.4 ? 14 : 11}
-                  fontWeight={600}
-                  fill={valor > maxEmpresas * 0.5 ? "#fff" : "#0f172a"}
+                  fontWeight={800}
+                  fill={valor > maxEmpresas * 0.5 ? "#0A0A0A" : "#FFFFFF"}
                   pointerEvents="none"
-                  style={{ textShadow: "0 0 3px rgba(255,255,255,0.5)" }}
+                  fontFamily="Inter, sans-serif"
+                  style={{ letterSpacing: "-0.02em" }}
                 >
                   {uf}
                 </text>
@@ -150,31 +162,37 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
         })}
       </svg>
 
-      {/* Tooltip */}
+      {/* Tooltip — glass dark */}
       {hover && (
         <div
-          className="pointer-events-none absolute z-20 min-w-[220px] rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-xl"
+          className="glass-tile pointer-events-none absolute z-20 min-w-[220px] rounded-xl p-3.5 text-xs"
           style={{
             left: Math.min(hover.x + 16, (wrapperRef.current?.clientWidth ?? WIDTH) - 240),
             top: Math.max(hover.y - 60, 8),
+            background: "rgba(20, 20, 28, 0.92)",
           }}
         >
-          <p className="font-bold text-slate-900">{ESTADOS_NOMES[hover.uf] ?? hover.uf}</p>
+          <p className="font-bold" style={{ color: "var(--text)", letterSpacing: "-0.01em" }}>
+            {ESTADOS_NOMES[hover.uf] ?? hover.uf}
+          </p>
           {dadoHover ? (
             <div className="mt-2 space-y-1">
               <Linha label="Empresas atendidas" valor={dadoHover.empresas.toString()} />
               <Linha label="Contratos" valor={dadoHover.contratos.toString()} />
               <Linha label="Empenhos" valor={dadoHover.empenhos.toString()} />
-              <Linha label="Valor em carteira" valor={brl(dadoHover.valor)} cor="text-emerald-700" />
+              <Linha label="Valor em carteira" valor={brl(dadoHover.valor)} cor="var(--mint)" />
             </div>
           ) : (
-            <p className="mt-1 text-slate-500">Sem operações neste estado.</p>
+            <p className="mt-1" style={{ color: "var(--text-mute)" }}>Sem operações neste estado.</p>
           )}
         </div>
       )}
 
       {/* Legenda */}
-      <div className="mt-3 flex items-center justify-between gap-4 text-xs text-slate-600">
+      <div
+        className="mt-3 flex items-center justify-between gap-4 text-xs"
+        style={{ color: "var(--text-mute)" }}
+      >
         <div className="flex items-center gap-2">
           <span>0</span>
           <span
@@ -185,15 +203,15 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
           />
           <span>{maxEmpresas} empresas</span>
         </div>
-        <div className="flex gap-4 text-slate-500">
+        <div className="flex gap-4">
           <span>
-            <strong className="text-slate-900">{total.empresas}</strong> empresas
+            <strong style={{ color: "var(--text)" }}>{total.empresas}</strong> empresas
           </span>
           <span>
-            <strong className="text-slate-900">{total.contratos}</strong> contratos
+            <strong style={{ color: "var(--text)" }}>{total.contratos}</strong> contratos
           </span>
           <span>
-            <strong className="text-slate-900">{brl(total.valor)}</strong> em carteira
+            <strong style={{ color: "var(--text)" }}>{brl(total.valor)}</strong> em carteira
           </span>
         </div>
       </div>
@@ -204,8 +222,8 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
 function Linha({ label, valor, cor }: { label: string; valor: string; cor?: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <span className={`font-semibold ${cor ?? "text-slate-900"}`}>{valor}</span>
+      <span style={{ color: "var(--text-mute)" }}>{label}</span>
+      <span className="font-semibold" style={{ color: cor ?? "var(--text)" }}>{valor}</span>
     </div>
   );
 }

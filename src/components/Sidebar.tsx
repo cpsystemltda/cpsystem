@@ -4,62 +4,55 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  PlusCircle,
   FileText,
   ClipboardList,
   Truck,
-  TrendingUp,
   BarChart3,
   Scale,
   Settings,
   LogOut,
   Building2,
-  Sparkles,
-  Wallet,
   Users,
-  ShieldCheck,
   ScrollText,
   CreditCard,
   UserCheck,
   Bell,
+  Sparkles,
+  Wallet,
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
-import { Logo } from "@/components/Logo";
 import { SeletorVisao } from "@/components/SeletorVisao";
 import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
 import { HelpButtons } from "@/components/HelpButtons";
 import type { Visao } from "@/lib/visao";
-import { Crown, Users2, Activity, Workflow } from "lucide-react";
+import { Crown, Users2, Activity } from "lucide-react";
 
-type Item = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
+type Item = { href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> };
 type Grupo = { titulo: string; itens: Item[] };
 
-// Itens operacionais — só fazem sentido com uma empresa em foco. No modo "Todas as
-// empresas" (consolidado) só aparecem o Dashboard e os menus de configuração da conta.
+// === Visão EMPRESA com empresa em foco ===
+// Reorganizado em 3 grupos: Visão geral / Módulos / Conta (briefing aprovado)
 const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
   {
-    titulo: "Operação",
+    titulo: "Visão geral",
     itens: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/operacao", label: "Operação", icon: Workflow },
-      { href: "/contratacoes/nova", label: "Cadastrar", icon: PlusCircle },
-      { href: "/atas", label: "Atas (SRP)", icon: FileText },
-      { href: "/contratos", label: "Contratos", icon: ClipboardList },
-      { href: "/execucao", label: "Execução", icon: Truck },
-      { href: "/reajustes", label: "Reajustes", icon: TrendingUp },
+      { href: "/empresas", label: "Empresas (CNPJs)", icon: Building2 },
     ],
   },
   {
-    titulo: "Insights",
+    titulo: "Módulos",
     itens: [
+      { href: "/atas", label: "Atas de Registro de Preços", icon: FileText },
+      { href: "/contratos", label: "Contratos", icon: ClipboardList },
+      { href: "/execucao", label: "Empenhos / Fornecimentos / Execuções", icon: Truck },
+      { href: "/juridico", label: "Consultoria", icon: Scale },
       { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
-      { href: "/juridico", label: "Jurídico", icon: Scale },
     ],
   },
 ];
 
-// Versão "consolidada" — sem operação por empresa. Cliente só vê Dashboard agregado
-// e o menu pra adicionar empresas (CNPJs).
+// Versão "consolidada" — sem operação por empresa.
 const GRUPOS_EMPRESA_CONSOLIDADO: Grupo[] = [
   {
     titulo: "Visão geral",
@@ -76,11 +69,8 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
     itens: [
       { href: "/notificacoes", label: "Notificações", icon: Bell },
       { href: "/conta/assinatura", label: "Assinatura", icon: CreditCard },
-      { href: "/empresas", label: "Empresas (CNPJs)", icon: Building2 },
       { href: "/vinculos", label: "Analista vinculado", icon: UserCheck },
       { href: "/equipe", label: "Equipe", icon: Users },
-      { href: "/embaixadores", label: "Embaixadores", icon: Sparkles },
-      { href: "/auditoria", label: "Auditoria", icon: ShieldCheck },
       { href: "/termos", label: "Termos / LGPD", icon: ScrollText },
     ],
   },
@@ -97,8 +87,6 @@ const GRUPOS_ANALISTA: Grupo[] = [
   {
     titulo: "Painel",
     itens: [
-      // "Dashboard" como rótulo primário do item — analista relatou que o nome
-      // anterior ("Empresas e comissões") não parecia um caminho de "voltar".
       { href: "/painel-analista", label: "Dashboard", icon: LayoutDashboard },
       { href: "/painel-analista?tab=empresas", label: "Empresas vinculadas", icon: Wallet },
       { href: "/honorarios", label: "Comissões SaaS", icon: Sparkles },
@@ -109,7 +97,6 @@ const GRUPOS_ANALISTA: Grupo[] = [
     titulo: "Conta",
     itens: [
       { href: "/equipe", label: "Equipe", icon: Users },
-      { href: "/auditoria", label: "Auditoria", icon: ShieldCheck },
       { href: "/termos", label: "Termos / LGPD", icon: ScrollText },
     ],
   },
@@ -130,7 +117,6 @@ const GRUPOS_ADMIN_PLATAFORMA: Grupo[] = [
     itens: [
       { href: "/admin", label: "Painel do PO", icon: Settings },
       { href: "/admin/gateway", label: "Gateway de pagamento", icon: CreditCard },
-      { href: "/auditoria", label: "Auditoria", icon: ShieldCheck },
       { href: "/notificacoes", label: "Notificações", icon: Bell },
     ],
   },
@@ -163,16 +149,14 @@ export function Sidebar({
       : visao === "ANALISTA"
         ? GRUPOS_ANALISTA
         : !empresaIdSelecionada
-          ? // Nenhuma empresa selecionada (visão consolidada) → só Dashboard agregado + Conta
-            [...GRUPOS_EMPRESA_CONSOLIDADO, ...GRUPOS_EMPRESA_CONTA]
-          : // Empresa específica em foco → menu operacional completo
-            [...GRUPOS_EMPRESA_OPERACAO, ...GRUPOS_EMPRESA_CONTA];
+          ? [...GRUPOS_EMPRESA_CONSOLIDADO, ...GRUPOS_EMPRESA_CONTA]
+          : [...GRUPOS_EMPRESA_OPERACAO, ...GRUPOS_EMPRESA_CONTA];
   const inicial = nomeUsuario.trim().charAt(0).toUpperCase();
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
-      {/* Logo */}
-      <div className="flex items-center justify-center border-b border-slate-100 px-5 py-4">
+    <aside className="glass relative m-[18px] flex h-[calc(100vh-36px)] w-[260px] flex-col overflow-hidden">
+      {/* Logo / Brand */}
+      <div className="relative border-b border-white/10 px-6 py-7 text-center">
         <Link
           href={
             visao === "ADMIN_PLATAFORMA"
@@ -183,20 +167,40 @@ export function Sidebar({
           }
           className="block transition hover:opacity-80"
         >
-          <Logo variant="sm" mode="brand" priority />
+          <div
+            className="font-serif text-[40px] leading-none"
+            style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              fontWeight: 500,
+              letterSpacing: "-0.06em",
+              background: "linear-gradient(180deg, #FFF 0%, var(--primary-bright) 100%)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            CP
+          </div>
+          <div className="mt-1.5 text-[9px] font-semibold uppercase" style={{ letterSpacing: "0.5em", color: "var(--primary)" }}>
+            CP&nbsp;System
+          </div>
         </Link>
+        <div
+          className="absolute bottom-0 left-[28%] right-[28%] h-px"
+          style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
+        />
       </div>
 
       {/* Seletor de visão (super admin) */}
       {superAdmin && (
-        <div className="border-b border-slate-100 px-3 py-3">
+        <div className="border-b border-white/10 px-3 py-3">
           <SeletorVisao visaoAtual={visao} />
         </div>
       )}
 
-      {/* Seletor de empresa (só visão EMPRESA, e quando há ao menos uma empresa) */}
+      {/* Seletor de empresa */}
       {visao === "EMPRESA" && empresas.length > 0 && (
-        <div className="border-b border-slate-100 px-3 py-3">
+        <div className="border-b border-white/10 px-3 py-3">
           <SeletorEmpresa empresas={empresas} empresaIdAtual={empresaIdSelecionada} />
         </div>
       )}
@@ -205,7 +209,10 @@ export function Sidebar({
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {grupos.map((grupo, gi) => (
           <div key={grupo.titulo} className={gi > 0 ? "mt-5" : ""}>
-            <h3 className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <h3
+              className="px-3 pb-2 text-[10px] font-bold uppercase"
+              style={{ letterSpacing: "0.26em", color: "var(--text-faint)" }}
+            >
               {grupo.titulo}
             </h3>
             {grupo.itens.map((item) => {
@@ -218,23 +225,38 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`group relative mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+                  className="group relative mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium leading-tight transition"
+                  style={
                     ativo
-                      ? "bg-slate-900 text-white shadow-sm"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
+                      ? {
+                          background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                          color: "#0A0A0A",
+                          fontWeight: 700,
+                          boxShadow: "0 4px 24px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.4)",
+                        }
+                      : { color: "var(--text-soft)", letterSpacing: "-0.01em" }
+                  }
                 >
                   <Icon
-                    className={`h-4 w-4 shrink-0 ${
-                      ativo ? "text-white" : "text-slate-400 group-hover:text-slate-600"
-                    }`}
+                    className="h-[17px] w-[17px] shrink-0"
+                    style={{
+                      color: ativo ? "#0A0A0A" : "var(--primary)",
+                      strokeWidth: 1.7,
+                    }}
                   />
                   <span className="flex-1 truncate">{item.label}</span>
                   {mostrarBadge && (
                     <span
-                      className={`grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-[10px] font-bold ${
-                        ativo ? "bg-white text-slate-900" : "bg-red-500 text-white"
-                      }`}
+                      className="grid h-5 min-w-[20px] place-items-center rounded-full px-1 text-[10px] font-bold"
+                      style={
+                        ativo
+                          ? { background: "rgba(255,255,255,0.4)", color: "#0A0A0A" }
+                          : {
+                              background: "var(--coral)",
+                              color: "#fff",
+                              boxShadow: "0 0 12px var(--coral-glow)",
+                            }
+                      }
                     >
                       {qtdNotificacoesNaoLidas > 99 ? "99+" : qtdNotificacoesNaoLidas}
                     </span>
@@ -247,19 +269,29 @@ export function Sidebar({
       </nav>
 
       {/* Help buttons */}
-      <div className="border-t border-slate-100 px-3 py-3">
+      <div className="border-t border-white/10 px-3 py-3">
         <HelpButtons />
       </div>
 
       {/* Usuário + sair */}
-      <div className="border-t border-slate-100 p-3">
+      <div className="border-t border-white/10 p-3">
         <div className="mb-2 flex items-center gap-3 rounded-lg p-2">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-sm font-bold text-white">
+          <div
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-extrabold"
+            style={{
+              background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+              color: "#0A0A0A",
+              letterSpacing: "-0.04em",
+              boxShadow: "0 0 18px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.5)",
+            }}
+          >
             {inicial}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-900">{nomeUsuario}</p>
-            <p className="truncate text-[11px] text-slate-500">
+            <p className="truncate text-[13px] font-semibold" style={{ color: "var(--text)", letterSpacing: "-0.01em" }}>
+              {nomeUsuario}
+            </p>
+            <p className="truncate text-[10px]" style={{ color: "var(--text-mute)" }}>
               {tipoConta === "ANALISTA"
                 ? "Analista de licitações"
                 : empresaIdSelecionada
@@ -273,7 +305,8 @@ export function Sidebar({
         <form action={logoutAction}>
           <button
             type="submit"
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition hover:bg-white/5"
+            style={{ color: "var(--text-mute)" }}
           >
             <LogOut className="h-4 w-4" /> Sair
           </button>

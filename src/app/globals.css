@@ -1,8 +1,72 @@
 @import "tailwindcss";
 
+/* ============================================================
+   CP SYSTEM — Design tokens (Liquid Glass)
+   Source of truth visual: public/dashboard-preview.html
+   ============================================================ */
 :root {
+  /* Texto / fundos legados (light mode original) */
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Dourado ouro fino — cor da logo CP (primary) */
+  --primary:        #D4AF37;
+  --primary-bright: #E8C875;
+  --primary-deep:   #A88947;
+  --primary-glow:   rgba(212, 175, 55, 0.5);
+
+  /* Verde sage — financeiros positivos */
+  --mint:           #5DD8B6;
+  --mint-bright:    #7FE8C9;
+  --mint-deep:      #2EAB85;
+  --mint-glow:      rgba(93, 216, 182, 0.45);
+
+  /* Peach — atenção em andamento */
+  --rose:           #F0B8A8;
+  --rose-bright:    #F5CCBE;
+  --rose-glow:      rgba(240, 184, 168, 0.45);
+
+  /* Lavender — info secundária */
+  --lavender:       #C5B4FF;
+  --lavender-glow:  rgba(197, 180, 255, 0.45);
+
+  /* Azul-acinzentado neutro */
+  --sky:            #B8C5D6;
+  --sky-bright:     #D4DDE8;
+  --sky-glow:       rgba(184, 197, 214, 0.4);
+
+  /* Vermelho claro suave — negativos */
+  --coral:          #E88A98;
+  --coral-bright:   #F0A8B3;
+  --coral-deep:     #C66770;
+  --coral-glow:     rgba(232, 138, 152, 0.5);
+
+  /* Texto (dark mode é o padrão da app interna) */
+  --text:        #FFFFFF;
+  --text-soft:   #E8E5DC;
+  --text-mute:   #A8A39A;
+  --text-faint:  #5A5650;
+
+  /* Glass surfaces */
+  --glass-1:     rgba(255, 255, 255, 0.04);
+  --glass-2:     rgba(255, 255, 255, 0.06);
+  --glass-3:     rgba(255, 255, 255, 0.09);
+  --hairline:    rgba(255, 255, 255, 0.08);
+
+  /* Sombras dark */
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+
+  /* Borders */
+  --radius-sm:   10px;
+  --radius-md:   14px;
+  --radius-lg:   22px;
+  --radius-xl:   28px;
+  --radius-pill: 100px;
+
+  /* Easing iOS */
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @theme inline {
@@ -12,15 +76,318 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
 }
+
+/* ============================================================
+   BACKGROUND ATMOSFÉRICO (parte interna do app)
+   Aplicado via .app-shell — só ativo em rotas autenticadas.
+   ============================================================ */
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+  background: #050505;
+  color: var(--text);
+}
+.app-shell .bg-image {
+  position: fixed; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(135deg, rgba(8, 8, 14, 0.55) 0%, rgba(15, 13, 30, 0.65) 100%),
+    url('https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=2400&q=85&auto=format&fit=crop');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+.app-shell .bg-blobs {
+  position: fixed; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.app-shell .blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);
+  mix-blend-mode: screen;
+}
+.app-shell .blob-1 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(212, 175, 55, 0.4), transparent 70%); top: -150px; left: -100px; }
+.app-shell .blob-2 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(240, 184, 168, 0.35), transparent 70%); top: 30%; right: -150px; }
+.app-shell .blob-3 { width: 800px; height: 800px; background: radial-gradient(circle, rgba(197, 180, 255, 0.32), transparent 70%); top: 55%; left: -200px; }
+.app-shell .blob-4 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(93, 216, 182, 0.28), transparent 70%); bottom: -200px; right: 10%; }
+.app-shell .blob-5 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(184, 197, 214, 0.32), transparent 70%); top: 75%; left: 35%; }
+.app-shell .bg-blobs::after {
+  content: '';
+  position: absolute; inset: 0;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' /%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.18 0' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' /%3E%3C/svg%3E");
+}
+
+.app-shell > .app-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ============================================================
+   LIQUID GLASS — componentes base
+   ============================================================ */
+.glass {
+  position: relative;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 30px 80px -20px rgba(0, 0, 0, 0.7),
+    0 8px 30px -4px rgba(0, 0, 0, 0.4);
+}
+.glass::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.06) 30%,
+    rgba(255, 255, 255, 0) 60%,
+    rgba(255, 255, 255, 0.18) 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+.glass-tile {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.glass-tile::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 0.5px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+          mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass, .glass-tile { background: rgba(20, 20, 28, 0.85); }
+}
+
+/* ============================================================
+   TONALIDADES — cor preenche o card mantendo glass
+   ============================================================ */
+.t-primary {
+  background:
+    linear-gradient(135deg, rgba(212, 175, 55, 0.38) 0%, rgba(212, 175, 55, 0.14) 100%),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(212, 175, 55, 0.4),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.t-mint {
+  background:
+    linear-gradient(135deg, rgba(93, 216, 182, 0.38) 0%, rgba(93, 216, 182, 0.14) 100%),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(93, 216, 182, 0.4),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.t-rose {
+  background:
+    linear-gradient(135deg, rgba(240, 184, 168, 0.38) 0%, rgba(240, 184, 168, 0.14) 100%),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(240, 184, 168, 0.4),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.t-lavender {
+  background:
+    linear-gradient(135deg, rgba(197, 180, 255, 0.38) 0%, rgba(197, 180, 255, 0.14) 100%),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(197, 180, 255, 0.4),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.t-sky {
+  background:
+    linear-gradient(135deg, rgba(184, 197, 214, 0.38) 0%, rgba(184, 197, 214, 0.14) 100%),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(184, 197, 214, 0.4),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+.t-coral {
+  background:
+    linear-gradient(135deg, rgba(232, 138, 152, 0.38) 0%, rgba(232, 138, 152, 0.14) 100%),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 0.5px rgba(232, 138, 152, 0.4),
+    0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Aura no canto pra reforço de cor */
+.kpi-aura {
+  position: absolute;
+  bottom: -50%; right: -30%;
+  width: 90%; height: 130%;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(50px);
+  opacity: 0.75;
+}
+.t-primary  .kpi-aura { background: radial-gradient(circle, var(--primary), transparent 60%); }
+.t-mint     .kpi-aura { background: radial-gradient(circle, var(--mint), transparent 60%); }
+.t-rose     .kpi-aura { background: radial-gradient(circle, var(--rose), transparent 60%); }
+.t-lavender .kpi-aura { background: radial-gradient(circle, var(--lavender), transparent 60%); }
+.t-sky      .kpi-aura { background: radial-gradient(circle, var(--sky), transparent 60%); }
+.t-coral    .kpi-aura { background: radial-gradient(circle, var(--coral), transparent 60%); }
+
+/* ============================================================
+   TIPOGRAFIA UTILITÁRIA
+   ============================================================ */
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.tabular { font-variant-numeric: tabular-nums lining-nums; }
+
+/* ============================================================
+   BADGES (status pills)
+   ============================================================ */
+.badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 0.5px solid;
+  backdrop-filter: blur(10px);
+}
+.badge.b-empenhado    { color: var(--text-mute);     border-color: var(--hairline);              background: rgba(255,255,255,0.04); }
+.badge.b-pedido       { color: var(--primary-bright);border-color: rgba(212,175,55,0.4);         background: rgba(212,175,55,0.12); }
+.badge.b-transito     { color: var(--rose);          border-color: rgba(240,184,168,0.4);        background: rgba(240,184,168,0.12); }
+.badge.b-entregue     { color: var(--mint);          border-color: rgba(93,216,182,0.4);         background: rgba(93,216,182,0.12); }
+.badge.b-nf-emitida   { color: var(--lavender);      border-color: rgba(197,180,255,0.4);        background: rgba(197,180,255,0.12); }
+.badge.b-nf-encam     { color: var(--sky);           border-color: rgba(184,197,214,0.4);        background: rgba(184,197,214,0.12); }
+.badge.b-multa        { color: var(--coral);         border-color: rgba(232,138,152,0.4);        background: rgba(232,138,152,0.12); }
+.badge.b-impedimento  { color: var(--rose);          border-color: rgba(240,184,168,0.4);        background: rgba(240,184,168,0.12); }
+
+/* ============================================================
+   BOTÃO PRIMÁRIO PILL
+   ============================================================ */
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-bright), var(--primary));
+  color: #0A0A0A;
+  border: none;
+  height: 48px;
+  padding: 0 26px;
+  border-radius: var(--radius-pill);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  transition: transform 200ms var(--ease-ios), box-shadow 200ms var(--ease-ios);
+  white-space: nowrap;
+  box-shadow:
+    0 8px 32px var(--primary-glow),
+    0 1px 0 rgba(255, 255, 255, 0.5) inset;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 40px var(--primary-glow), 0 1px 0 rgba(255,255,255,0.6) inset; }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary svg { width: 14px; height: 14px; stroke-width: 2.5; }
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.5px solid var(--hairline);
+  color: var(--text);
+  height: 44px;
+  padding: 0 22px;
+  border-radius: var(--radius-pill);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 200ms var(--ease-ios);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+.app-shell ::-webkit-scrollbar { width: 8px; height: 8px; }
+.app-shell ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+.app-shell ::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================================================
+   TABLE base (dark)
+   ============================================================ */
+.table-glass {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table-glass thead th {
+  text-align: left;
+  padding: 14px 22px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 0.5px solid var(--hairline);
+}
+.table-glass tbody td {
+  padding: 16px 22px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  font-size: 13px;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+.table-glass tbody tr:last-child td { border-bottom: none; }
+.table-glass tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
+.table-glass td.num, .table-glass th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table-glass td.center, .table-glass th.center { text-align: center; }
+.table-glass td.strong { font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.table-glass .row-alert { background: rgba(232, 138, 152, 0.06); }
+.table-glass .row-alert:hover { background: rgba(232, 138, 152, 0.12) !important; }

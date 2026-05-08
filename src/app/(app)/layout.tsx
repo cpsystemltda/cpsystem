@@ -113,27 +113,39 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     : "EMPRESA";
 
   return (
-    <div className="flex h-screen">
+    <div className="app-shell flex h-screen">
+      {/* Background atmosférico Liquid Glass — fixed atrás de tudo */}
+      <div className="bg-image" aria-hidden />
+      <div className="bg-blobs" aria-hidden>
+        <div className="blob blob-1" />
+        <div className="blob blob-2" />
+        <div className="blob blob-3" />
+        <div className="blob blob-4" />
+        <div className="blob blob-5" />
+      </div>
+
       <NavigationProgress />
-      <Sidebar
-        nomeUsuario={usuario.nome}
-        nomeConta={principal}
-        tipoConta={tipoConta}
-        visao={visao}
-        superAdmin={usuario.superAdmin}
-        qtdNotificacoesNaoLidas={qtdNotificacoes}
-        empresas={empresasOpcoes}
-        empresaIdSelecionada={empresaIdSelecionada}
-      />
-      <main className="flex-1 overflow-y-auto bg-slate-50/60">
-        {tipoConta === "EMPRESA" && bloqueada && !rotaPermitidaPaywall ? (
-          <Paywall status={conta.statusAssinatura} trialExpirado={!!trialExpirado} />
-        ) : consolidadoBloqueado ? (
-          <SelecioneEmpresa />
-        ) : (
-          children
-        )}
-      </main>
+      <div className="app-content flex w-full">
+        <Sidebar
+          nomeUsuario={usuario.nome}
+          nomeConta={principal}
+          tipoConta={tipoConta}
+          visao={visao}
+          superAdmin={usuario.superAdmin}
+          qtdNotificacoesNaoLidas={qtdNotificacoes}
+          empresas={empresasOpcoes}
+          empresaIdSelecionada={empresaIdSelecionada}
+        />
+        <main className="flex-1 overflow-y-auto">
+          {tipoConta === "EMPRESA" && bloqueada && !rotaPermitidaPaywall ? (
+            <Paywall status={conta.statusAssinatura} trialExpirado={!!trialExpirado} />
+          ) : consolidadoBloqueado ? (
+            <SelecioneEmpresa />
+          ) : (
+            children
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -141,26 +153,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 function SelecioneEmpresa() {
   return (
     <div className="mx-auto max-w-2xl px-8 py-20 text-center">
-      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-blue-100">
-        <AlertTriangle className="h-8 w-8 text-blue-700" />
+      <div className="glass mx-auto inline-flex h-16 w-16 place-items-center justify-center rounded-full">
+        <AlertTriangle className="h-8 w-8" style={{ color: "var(--primary)" }} />
       </div>
-      <h1 className="mt-6 text-3xl font-bold text-slate-900">Selecione uma empresa</h1>
-      <p className="mt-3 text-base text-slate-600">
+      <h1 className="mt-6 text-3xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>
+        Selecione uma empresa
+      </h1>
+      <p className="mt-3 text-base" style={{ color: "var(--text-soft)" }}>
         Esta tela mostra dados operacionais de uma empresa específica.
         <br />
         Para acessá-la, escolha qual empresa do grupo está em foco usando o
-        seletor verde no topo da barra lateral.
+        seletor no topo da barra lateral.
       </p>
-      <p className="mt-6 text-sm text-slate-500">
+      <p className="mt-6 text-sm" style={{ color: "var(--text-mute)" }}>
         Em &ldquo;Todas as empresas&rdquo;, você só vê o painel consolidado e o cadastro de
         novos CNPJs. Operação dia a dia (Atas, Contratos, Execução etc.) acontece
         sempre dentro de uma empresa específica.
       </p>
       <div className="mt-8 flex justify-center gap-3">
-        <Link href="/dashboard" className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+        <Link href="/dashboard" className="btn-primary">
           Voltar ao Dashboard
         </Link>
-        <Link href="/empresas" className="rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <Link href="/empresas" className="btn-secondary">
           Ver empresas (CNPJs)
         </Link>
       </div>
@@ -182,20 +196,18 @@ function Paywall({ status, trialExpirado }: { status: string; trialExpirado: boo
 
   return (
     <div className="mx-auto max-w-2xl px-8 py-20 text-center">
-      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-amber-100">
-        <AlertTriangle className="h-8 w-8 text-amber-700" />
+      <div className="glass mx-auto inline-flex h-16 w-16 place-items-center justify-center rounded-full">
+        <AlertTriangle className="h-8 w-8" style={{ color: "var(--primary)" }} />
       </div>
-      <h1 className="mt-6 text-3xl font-bold text-slate-900">{titulo}</h1>
-      <p className="mt-3 text-base text-slate-600">{texto}</p>
+      <h1 className="mt-6 text-3xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>
+        {titulo}
+      </h1>
+      <p className="mt-3 text-base" style={{ color: "var(--text-soft)" }}>{texto}</p>
       <div className="mt-8 flex justify-center gap-3">
-        <Link href="/conta/assinatura" className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
-          Ir para Assinatura
-        </Link>
-        <Link href="/conta/checkout" className="rounded-md border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-          Ativar plano
-        </Link>
+        <Link href="/conta/assinatura" className="btn-primary">Ir para Assinatura</Link>
+        <Link href="/conta/checkout" className="btn-secondary">Ativar plano</Link>
       </div>
-      <p className="mt-12 text-xs text-slate-500">
+      <p className="mt-12 text-xs" style={{ color: "var(--text-mute)" }}>
         Ainda pode acessar: <strong>Empresas</strong>, <strong>Equipe</strong>, <strong>Termos / LGPD</strong>, <strong>Auditoria</strong>, <strong>Admin</strong> e <strong>Conta</strong>.
       </p>
     </div>
