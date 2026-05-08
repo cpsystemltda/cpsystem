@@ -35,20 +35,49 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
   const formKey = dados ? `auto-${dados.numero}` : "manual";
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-8">
+    <div className="mx-auto max-w-[1200px] px-8 py-8">
       <Link
         href="/contratacoes/nova"
-        className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900"
+        className="inline-flex items-center gap-1 text-sm transition"
+        style={{ color: "var(--text-mute)" }}
       >
         <ChevronLeft className="h-4 w-4" /> Voltar
       </Link>
 
-      <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-        Novo Contrato administrativo
-      </h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Cadastre um Contrato direto ou derivado de uma Ata. Quando vinculado a Ata, o sistema valida o saldo dos itens.
-      </p>
+      <header className="glass mt-4 rounded-[28px] px-9 py-7">
+        <div className="relative z-[1]">
+          <p
+            className="text-[11px] font-bold uppercase"
+            style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
+          >
+            Nova contratação · Contrato administrativo
+          </p>
+          <h1
+            className="mt-2 text-[40px] font-extrabold leading-none"
+            style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
+          >
+            Novo{" "}
+            <em
+              style={{
+                fontStyle: "normal",
+                background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Contrato
+            </em>
+          </h1>
+          <p
+            className="mt-3 max-w-[640px] text-[14px]"
+            style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
+          >
+            Direto ou derivado de uma Ata. Quando vinculado a Ata, o sistema valida o saldo dos
+            itens automaticamente.
+          </p>
+        </div>
+      </header>
 
       <div className="mt-6">
         <UploadPdfPanel
@@ -369,17 +398,21 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
         </Secao>
 
         {state?.erro && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {state.erro}
+          <div
+            className="rounded-2xl px-5 py-4 text-sm"
+            style={{
+              background: "rgba(232,138,152,0.10)",
+              border: "0.5px solid rgba(232,138,152,0.3)",
+              color: "var(--coral)",
+            }}
+          >
+            <strong>Erro ao cadastrar Contrato:</strong> {state.erro}
           </div>
         )}
 
         <div className="flex gap-3">
           <SubmitButton>Cadastrar Contrato</SubmitButton>
-          <Link
-            href="/contratacoes/nova"
-            className="rounded-md border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <Link href="/contratacoes/nova" className="btn-secondary inline-flex">
             Cancelar
           </Link>
         </div>
@@ -390,9 +423,25 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">{titulo}</h2>
-      {children}
+    <section className="glass overflow-hidden rounded-[24px]">
+      <header
+        className="relative z-[1] px-8 py-5"
+        style={{ borderBottom: "0.5px solid var(--hairline)" }}
+      >
+        <div
+          className="text-[10px] font-bold uppercase"
+          style={{ letterSpacing: "0.24em", color: "var(--primary)" }}
+        >
+          Bloco
+        </div>
+        <h2
+          className="mt-1 text-[20px] font-extrabold"
+          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+        >
+          {titulo}
+        </h2>
+      </header>
+      <div className="relative z-[1] px-8 py-6">{children}</div>
     </section>
   );
 }

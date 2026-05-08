@@ -51,14 +51,33 @@ export function UploadPdfPanel<T>({
   }
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-6 shadow-sm">
-      <div className="flex items-start gap-4">
-        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 text-white shadow-md">
-          <Sparkles className="h-5 w-5" />
+    <section
+      className="glass-tile overflow-hidden rounded-[20px] px-7 py-6"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(197,180,255,0.18), rgba(184,197,214,0.06)), rgba(255,255,255,0.03)",
+      }}
+    >
+      <div className="relative z-[1] flex items-start gap-4">
+        <div
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
+          style={{
+            background: "linear-gradient(135deg, var(--lavender), var(--sky))",
+            boxShadow: "0 4px 16px rgba(197,180,255,0.4)",
+          }}
+        >
+          <Sparkles className="h-5 w-5" style={{ color: "#0A0A0A" }} />
         </div>
         <div className="flex-1">
-          <h2 className="text-base font-semibold text-slate-900">{titulo}</h2>
-          <p className="mt-1 text-sm text-slate-600">{descricao}</p>
+          <h2
+            className="text-[18px] font-extrabold"
+            style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
+          >
+            {titulo}
+          </h2>
+          <p className="mt-1 text-[13px]" style={{ color: "var(--text-soft)" }}>
+            {descricao}
+          </p>
 
           <input
             ref={fileInputRef}
@@ -76,7 +95,7 @@ export function UploadPdfPanel<T>({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={extraindo}
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn-primary inline-flex disabled:cursor-not-allowed disabled:opacity-60"
             >
               {extraindo ? (
                 <>
@@ -86,36 +105,72 @@ export function UploadPdfPanel<T>({
               ) : (
                 <>
                   <Upload className="h-4 w-4" />
-                  {pdfNome ? "Anexar outro PDF" : "Anexar PDF"}
+                  {pdfNome ? "Outro PDF" : "Anexar PDF"}
                 </>
               )}
             </button>
             {pdfNome && !extraindo && (
-              <span className="max-w-md truncate text-xs text-slate-500">{pdfNome}</span>
+              <span
+                className="max-w-md truncate text-xs"
+                style={{ color: "var(--text-mute)" }}
+              >
+                {pdfNome}
+              </span>
             )}
             {badge && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold"
+                style={{
+                  background: "rgba(93,216,182,0.18)",
+                  color: "var(--mint)",
+                  border: "0.5px solid rgba(93,216,182,0.3)",
+                }}
+              >
                 <Check className="h-3 w-3" /> {badge}
               </span>
             )}
           </div>
 
           {erro && (
-            <div className="mt-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div
+              className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm"
+              style={{
+                background: "rgba(232,138,152,0.10)",
+                border: "0.5px solid rgba(232,138,152,0.3)",
+                color: "var(--coral)",
+              }}
+            >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{erro}</span>
             </div>
           )}
 
           {modoDemo && (
-            <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <div
+              className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-xs"
+              style={{
+                background: "rgba(212,175,55,0.10)",
+                border: "0.5px solid rgba(212,175,55,0.3)",
+                color: "var(--primary-bright)",
+              }}
+            >
               <Beaker className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                <strong>Modo demonstração ativo</strong> — dados de exemplo carregados pra você testar o
-                fluxo sem a IA real. Pra ativar a extração via IA, configure{" "}
-                <code className="rounded bg-amber-100 px-1 py-0.5 font-mono">ANTHROPIC_API_KEY</code> no
-                arquivo <code className="rounded bg-amber-100 px-1 py-0.5 font-mono">.env</code> e
-                reinicie o servidor.
+                <strong>Modo demonstração ativo</strong> — dados de exemplo pra você testar
+                o fluxo sem a IA real. Configure{" "}
+                <code
+                  className="rounded px-1 py-0.5 font-mono"
+                  style={{ background: "rgba(0,0,0,0.3)", color: "var(--primary-bright)" }}
+                >
+                  ANTHROPIC_API_KEY
+                </code>{" "}
+                no <code
+                  className="rounded px-1 py-0.5 font-mono"
+                  style={{ background: "rgba(0,0,0,0.3)", color: "var(--primary-bright)" }}
+                >
+                  .env
+                </code>{" "}
+                pra ativar a extração via IA.
               </span>
             </div>
           )}

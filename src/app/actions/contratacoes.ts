@@ -337,71 +337,82 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
         }))
       : [];
 
-  const contrato = await prisma.contrato.create({
-    data: {
-      empresaId: v.empresaId,
-      ataId: v.ataId || null,
-      tipo: v.tipo,
-      numero: v.numero,
-      numeroNotaEmpenho: v.numeroNotaEmpenho || null,
-      numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
-      processoAdministrativo: v.processoAdministrativo,
-      procedimentoSelecao: v.procedimentoSelecao,
-      numeroLicitacao: v.numeroLicitacao || null,
-      orgaoNome: v.orgaoNome,
-      orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
-      orgaoEndereco: v.orgaoEndereco,
-      orgaoEmail: v.orgaoEmail || null,
-      orgaoTelefone: v.orgaoTelefone || null,
-      objeto: v.objeto,
-      dataAssinatura: v.dataAssinatura,
-      dataPublicacao: v.dataPublicacao || null,
-      vigenciaInicio: v.vigenciaInicio,
-      vigenciaFim: v.vigenciaFim,
-      prazoEntregaDias: v.prazoEntregaDias || null,
-      prazoPagamentoDias: v.prazoPagamentoDias || null,
-      marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
-      modalidadeEntrega: v.modalidadeEntrega,
-      marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
-      marcoInicialDescricao:
-        v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
-      itens: {
-        create: v.itens.map((i) => ({
-          descricao: i.descricao,
-          unidade: i.unidade,
-          quantidade: i.quantidade,
-          marca: i.marca || null,
-          valorUnitario: i.valorUnitario,
-          valorTotal: i.quantidade * i.valorUnitario,
-          ataItemId: i.ataItemId || null,
-        })),
+  try {
+    const contrato = await prisma.contrato.create({
+      data: {
+        empresaId: v.empresaId,
+        ataId: v.ataId || null,
+        tipo: v.tipo,
+        numero: v.numero,
+        numeroNotaEmpenho: v.numeroNotaEmpenho || null,
+        numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
+        processoAdministrativo: v.processoAdministrativo,
+        procedimentoSelecao: v.procedimentoSelecao,
+        numeroLicitacao: v.numeroLicitacao || null,
+        orgaoNome: v.orgaoNome,
+        orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+        orgaoEndereco: v.orgaoEndereco,
+        orgaoEmail: v.orgaoEmail || null,
+        orgaoTelefone: v.orgaoTelefone || null,
+        objeto: v.objeto,
+        dataAssinatura: v.dataAssinatura,
+        dataPublicacao: v.dataPublicacao || null,
+        vigenciaInicio: v.vigenciaInicio,
+        vigenciaFim: v.vigenciaFim,
+        prazoEntregaDias: v.prazoEntregaDias || null,
+        prazoPagamentoDias: v.prazoPagamentoDias || null,
+        marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
+        modalidadeEntrega: v.modalidadeEntrega,
+        marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
+        marcoInicialDescricao:
+          v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
+        itens: {
+          create: v.itens.map((i) => ({
+            descricao: i.descricao,
+            unidade: i.unidade,
+            quantidade: i.quantidade,
+            marca: i.marca || null,
+            valorUnitario: i.valorUnitario,
+            valorTotal: i.quantidade * i.valorUnitario,
+            ataItemId: i.ataItemId || null,
+          })),
+        },
+        ...(parcelasParaCriar.length > 0 && { parcelas: { create: parcelasParaCriar } }),
+        ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
+          enderecosEntrega: {
+            create: v.enderecosEntrega.map((e) => ({
+              rotulo: e.rotulo || null,
+              endereco: e.endereco,
+            })),
+          },
+        }),
+        ...(v.pontosFocais && v.pontosFocais.length > 0 && {
+          pontosFocais: {
+            create: v.pontosFocais.map((p) => ({
+              funcao: p.funcao,
+              funcaoDescricao: p.funcao === "OUTRO" ? (p.funcaoDescricao || null) : null,
+              nome: p.nome,
+              email: p.email || null,
+              telefone: p.telefone || null,
+            })),
+          },
+        }),
       },
-      ...(parcelasParaCriar.length > 0 && { parcelas: { create: parcelasParaCriar } }),
-      ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
-        enderecosEntrega: {
-          create: v.enderecosEntrega.map((e) => ({
-            rotulo: e.rotulo || null,
-            endereco: e.endereco,
-          })),
-        },
-      }),
-      ...(v.pontosFocais && v.pontosFocais.length > 0 && {
-        pontosFocais: {
-          create: v.pontosFocais.map((p) => ({
-            funcao: p.funcao,
-            nome: p.nome,
-            email: p.email || null,
-            telefone: p.telefone || null,
-          })),
-        },
-      }),
-    },
-  });
+    });
 
-  revalidatePath("/contratos");
-  revalidatePath("/atas");
-  revalidatePath("/dashboard");
-  redirect(`/contratos/${contrato.id}`);
+    revalidatePath("/contratos");
+    revalidatePath("/atas");
+    revalidatePath("/dashboard");
+    redirect(`/contratos/${contrato.id}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      const msg = err.message;
+      if (msg.includes("NEXT_REDIRECT")) throw err;
+      console.error("[criarContratoAction] erro ao salvar Contrato:", msg);
+      return { erro: `Não foi possível salvar o Contrato: ${msg.slice(0, 240)}` };
+    }
+    throw err;
+  }
 }
 
 // ============================================================
@@ -504,78 +515,89 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     }
   }
 
-  const empenho = await prisma.empenho.create({
-    data: {
-      empresaId: v.empresaId,
-      ataId: v.ataId || null,
-      contratoId: v.contratoId || null,
-      tipo: v.tipo,
-      numero: v.numero,
-      processoAdministrativo: v.processoAdministrativo,
-      procedimentoSelecao: v.procedimentoSelecao,
-      numeroLicitacao: v.numeroLicitacao || null,
-      orgaoNome: v.orgaoNome,
-      orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
-      orgaoEndereco: v.orgaoEndereco,
-      orgaoEmail: v.orgaoEmail || null,
-      orgaoTelefone: v.orgaoTelefone || null,
-      objeto: v.objeto,
-      dataEmissao: v.dataEmissao,
-      vigenciaInicio: v.vigenciaInicio,
-      vigenciaFim: v.vigenciaFim,
-      prazoEntregaDias: v.prazoEntregaDias || null,
-      prazoPagamentoDias: v.prazoPagamentoDias || null,
-      numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
-      status: "EMPENHADO",
-      itens: {
-        create: v.itens.map((i) => ({
-          descricao: i.descricao,
-          unidade: i.unidade,
-          quantidade: i.quantidade,
-          marca: i.marca || null,
-          valorUnitario: i.valorUnitario,
-          valorTotal: i.quantidade * i.valorUnitario,
-          ataItemId: i.ataItemId || null,
-        })),
+  try {
+    const empenho = await prisma.empenho.create({
+      data: {
+        empresaId: v.empresaId,
+        ataId: v.ataId || null,
+        contratoId: v.contratoId || null,
+        tipo: v.tipo,
+        numero: v.numero,
+        processoAdministrativo: v.processoAdministrativo,
+        procedimentoSelecao: v.procedimentoSelecao,
+        numeroLicitacao: v.numeroLicitacao || null,
+        orgaoNome: v.orgaoNome,
+        orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+        orgaoEndereco: v.orgaoEndereco,
+        orgaoEmail: v.orgaoEmail || null,
+        orgaoTelefone: v.orgaoTelefone || null,
+        objeto: v.objeto,
+        dataEmissao: v.dataEmissao,
+        vigenciaInicio: v.vigenciaInicio,
+        vigenciaFim: v.vigenciaFim,
+        prazoEntregaDias: v.prazoEntregaDias || null,
+        prazoPagamentoDias: v.prazoPagamentoDias || null,
+        numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
+        status: "EMPENHADO",
+        itens: {
+          create: v.itens.map((i) => ({
+            descricao: i.descricao,
+            unidade: i.unidade,
+            quantidade: i.quantidade,
+            marca: i.marca || null,
+            valorUnitario: i.valorUnitario,
+            valorTotal: i.quantidade * i.valorUnitario,
+            ataItemId: i.ataItemId || null,
+          })),
+        },
+        ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
+          enderecosEntrega: {
+            create: v.enderecosEntrega.map((e) => ({
+              rotulo: e.rotulo || null,
+              endereco: e.endereco,
+            })),
+          },
+        }),
+        ...(v.pontosFocais && v.pontosFocais.length > 0 && {
+          pontosFocais: {
+            create: v.pontosFocais.map((p) => ({
+              funcao: p.funcao,
+              funcaoDescricao: p.funcao === "OUTRO" ? (p.funcaoDescricao || null) : null,
+              nome: p.nome,
+              email: p.email || null,
+              telefone: p.telefone || null,
+            })),
+          },
+        }),
       },
-      ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
-        enderecosEntrega: {
-          create: v.enderecosEntrega.map((e) => ({
-            rotulo: e.rotulo || null,
-            endereco: e.endereco,
-          })),
-        },
-      }),
-      ...(v.pontosFocais && v.pontosFocais.length > 0 && {
-        pontosFocais: {
-          create: v.pontosFocais.map((p) => ({
-            funcao: p.funcao,
-            nome: p.nome,
-            email: p.email || null,
-            telefone: p.telefone || null,
-          })),
-        },
-      }),
-    },
-  });
+    });
 
-  const valorTotalEmpenho = v.itens.reduce((s, i) => s + i.quantidade * i.valorUnitario, 0);
-  await notificarAnalistasDaEmpresa({
-    empresaId: v.empresaId,
-    tipo: "NOVA_EXECUCAO",
-    titulo: `Nova execução: empenho ${v.numero}`,
-    descricao: `${v.orgaoNome} · ${v.objeto.slice(0, 80)} · R$ ${valorTotalEmpenho.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-    link: `/painel-analista`,
-    recursoTipo: "Empenho",
-    recursoId: empenho.id,
-  });
+    const valorTotalEmpenho = v.itens.reduce((s, i) => s + i.quantidade * i.valorUnitario, 0);
+    await notificarAnalistasDaEmpresa({
+      empresaId: v.empresaId,
+      tipo: "NOVA_EXECUCAO",
+      titulo: `Nova execução: empenho ${v.numero}`,
+      descricao: `${v.orgaoNome} · ${v.objeto.slice(0, 80)} · R$ ${valorTotalEmpenho.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      link: `/painel-analista`,
+      recursoTipo: "Empenho",
+      recursoId: empenho.id,
+    });
 
-  revalidatePath("/execucao");
-  revalidatePath("/contratos");
-  revalidatePath("/atas");
-  revalidatePath("/dashboard");
-  revalidatePath("/painel-analista");
-  redirect(`/execucao/${empenho.id}`);
+    revalidatePath("/execucao");
+    revalidatePath("/contratos");
+    revalidatePath("/atas");
+    revalidatePath("/dashboard");
+    revalidatePath("/painel-analista");
+    redirect(`/execucao/${empenho.id}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      const msg = err.message;
+      if (msg.includes("NEXT_REDIRECT")) throw err;
+      console.error("[criarEmpenhoAction] erro ao salvar Empenho:", msg);
+      return { erro: `Não foi possível salvar o Empenho: ${msg.slice(0, 240)}` };
+    }
+    throw err;
+  }
 }
 
 // ============================================================

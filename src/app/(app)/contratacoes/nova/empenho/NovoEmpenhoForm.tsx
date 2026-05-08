@@ -37,15 +37,49 @@ export default function NovoEmpenhoForm({
   const formKey = dados ? `auto-${dados.numero}` : "manual";
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-8">
-      <Link href="/contratacoes/nova" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
+    <div className="mx-auto max-w-[1200px] px-8 py-8">
+      <Link
+        href="/contratacoes/nova"
+        className="inline-flex items-center gap-1 text-sm transition"
+        style={{ color: "var(--text-mute)" }}
+      >
         <ChevronLeft className="h-4 w-4" /> Voltar
       </Link>
 
-      <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">Nova Nota de Empenho</h1>
-      <p className="mt-1 text-sm text-slate-600">
-        O Empenho representa a reserva orçamentária. Pode ser livre, derivado de uma Ata (SRP) ou de um Contrato.
-      </p>
+      <header className="glass mt-4 rounded-[28px] px-9 py-7">
+        <div className="relative z-[1]">
+          <p
+            className="text-[11px] font-bold uppercase"
+            style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
+          >
+            Nova contratação · Nota de Empenho
+          </p>
+          <h1
+            className="mt-2 text-[40px] font-extrabold leading-none"
+            style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
+          >
+            Nova{" "}
+            <em
+              style={{
+                fontStyle: "normal",
+                background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Nota de Empenho
+            </em>
+          </h1>
+          <p
+            className="mt-3 max-w-[640px] text-[14px]"
+            style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
+          >
+            Reserva orçamentária. Pode ser autônoma, derivada de Ata (SRP) ou de Contrato existente.
+            Lei 14.133/2021 art. 95 — substitui o Termo de Contrato em hipóteses específicas.
+          </p>
+        </div>
+      </header>
 
       <div className="mt-6">
         <UploadPdfPanel
@@ -277,15 +311,21 @@ export default function NovoEmpenhoForm({
         </Secao>
 
         {state?.erro && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{state.erro}</div>
+          <div
+            className="rounded-2xl px-5 py-4 text-sm"
+            style={{
+              background: "rgba(232,138,152,0.10)",
+              border: "0.5px solid rgba(232,138,152,0.3)",
+              color: "var(--coral)",
+            }}
+          >
+            <strong>Erro ao cadastrar Empenho:</strong> {state.erro}
+          </div>
         )}
 
         <div className="flex gap-3">
           <SubmitButton>Cadastrar Empenho</SubmitButton>
-          <Link
-            href="/contratacoes/nova"
-            className="rounded-md border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <Link href="/contratacoes/nova" className="btn-secondary inline-flex">
             Cancelar
           </Link>
         </div>
@@ -296,9 +336,25 @@ export default function NovoEmpenhoForm({
 
 function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">{titulo}</h2>
-      {children}
+    <section className="glass overflow-hidden rounded-[24px]">
+      <header
+        className="relative z-[1] px-8 py-5"
+        style={{ borderBottom: "0.5px solid var(--hairline)" }}
+      >
+        <div
+          className="text-[10px] font-bold uppercase"
+          style={{ letterSpacing: "0.24em", color: "var(--primary)" }}
+        >
+          Bloco
+        </div>
+        <h2
+          className="mt-1 text-[20px] font-extrabold"
+          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+        >
+          {titulo}
+        </h2>
+      </header>
+      <div className="relative z-[1] px-8 py-6">{children}</div>
     </section>
   );
 }
