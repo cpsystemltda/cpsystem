@@ -24,6 +24,7 @@ function parseItens(formData: FormData) {
     marca?: string;
     valorUnitario: number;
     ataItemId?: string;
+    lote?: string;
   }[] = [];
 
   // formato: itens[0][descricao], itens[0][unidade], etc.
@@ -36,7 +37,37 @@ function parseItens(formData: FormData) {
       marca: String(formData.get(`itens[${i}][marca]`) || "") || undefined,
       valorUnitario: Number(formData.get(`itens[${i}][valorUnitario]`) || 0),
       ataItemId: String(formData.get(`itens[${i}][ataItemId]`) || "") || undefined,
+      lote: String(formData.get(`itens[${i}][lote]`) || "") || undefined,
     });
+    i++;
+  }
+  return out;
+}
+
+function parseOrgaosParticipantes(formData: FormData) {
+  const out: {
+    tipo: "PARTICIPANTE" | "CARONA";
+    nome: string;
+    cnpj: string;
+    endereco: string;
+    email?: string;
+    telefone?: string;
+  }[] = [];
+  let i = 0;
+  while (formData.has(`orgaosParticipantes[${i}][nome]`)) {
+    const nome = String(formData.get(`orgaosParticipantes[${i}][nome]`) || "").trim();
+    if (nome) {
+      out.push({
+        tipo: (String(formData.get(`orgaosParticipantes[${i}][tipo]`) || "PARTICIPANTE")) as
+          | "PARTICIPANTE"
+          | "CARONA",
+        nome,
+        cnpj: String(formData.get(`orgaosParticipantes[${i}][cnpj]`) || ""),
+        endereco: String(formData.get(`orgaosParticipantes[${i}][endereco]`) || ""),
+        email: String(formData.get(`orgaosParticipantes[${i}][email]`) || "") || undefined,
+        telefone: String(formData.get(`orgaosParticipantes[${i}][telefone]`) || "") || undefined,
+      });
+    }
     i++;
   }
   return out;
@@ -55,19 +86,32 @@ function parseEnderecosEntrega(formData: FormData) {
   return out;
 }
 
+type FuncaoFocal =
+  | "AUTORIDADE_COMPETENTE"
+  | "GESTOR"
+  | "FISCAL"
+  | "FISCAL_TECNICO"
+  | "FISCAL_ADMINISTRATIVO"
+  | "RESPONSAVEL_SETOR"
+  | "CONTATO_GERAL"
+  | "OUTRO";
+
 function parsePontosFocais(formData: FormData) {
-  const out: { funcao: "GESTOR" | "FISCAL_TECNICO" | "FISCAL_ADMINISTRATIVO" | "RESPONSAVEL_SETOR" | "CONTATO_GERAL"; nome: string; email?: string; telefone?: string }[] = [];
+  const out: {
+    funcao: FuncaoFocal;
+    funcaoDescricao?: string;
+    nome: string;
+    email?: string;
+    telefone?: string;
+  }[] = [];
   let i = 0;
   while (formData.has(`pontosFocais[${i}][nome]`)) {
     const nome = String(formData.get(`pontosFocais[${i}][nome]`) || "").trim();
     if (nome) {
       out.push({
-        funcao: String(formData.get(`pontosFocais[${i}][funcao]`) || "CONTATO_GERAL") as
-          | "GESTOR"
-          | "FISCAL_TECNICO"
-          | "FISCAL_ADMINISTRATIVO"
-          | "RESPONSAVEL_SETOR"
-          | "CONTATO_GERAL",
+        funcao: String(formData.get(`pontosFocais[${i}][funcao]`) || "CONTATO_GERAL") as FuncaoFocal,
+        funcaoDescricao:
+          String(formData.get(`pontosFocais[${i}][funcaoDescricao]`) || "") || undefined,
         nome,
         email: String(formData.get(`pontosFocais[${i}][email]`) || "") || undefined,
         telefone: String(formData.get(`pontosFocais[${i}][telefone]`) || "") || undefined,
@@ -101,7 +145,8 @@ function extrairCampos(formData: FormData) {
       k.startsWith("itens[") ||
       k.startsWith("parcelas[") ||
       k.startsWith("enderecosEntrega[") ||
-      k.startsWith("pontosFocais[")
+      k.startsWith("pontosFocais[") ||
+      k.startsWith("orgaosParticipantes[")
     )
       continue;
     obj[k] = v;
@@ -113,7 +158,10 @@ function extrairCampos(formData: FormData) {
   if (enderecosEntrega.length > 0) obj.enderecosEntrega = enderecosEntrega;
   const pontosFocais = parsePontosFocais(formData);
   if (pontosFocais.length > 0) obj.pontosFocais = pontosFocais;
+  const orgaosParticipantes = parseOrgaosParticipantes(formData);
+  if (orgaosParticipantes.length > 0) obj.orgaosParticipantes = orgaosParticipantes;
   if (obj.aceitaCarona === "on") obj.aceitaCarona = true;
+  if (obj.prazoEntregaNaoAplica === "on") obj.prazoEntregaNaoAplica = true;
   return obj;
 }
 
@@ -147,63 +195,94 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
     return { erro: "A vigência final precisa ser posterior à inicial." };
   }
 
-  const ata = await prisma.ata.create({
-    data: {
-      empresaId: v.empresaId,
-      tipo: v.tipo,
-      numero: v.numero,
-      processoAdministrativo: v.processoAdministrativo,
-      procedimentoSelecao: v.procedimentoSelecao,
-      numeroLicitacao: v.numeroLicitacao || null,
-      orgaoNome: v.orgaoNome,
-      orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
-      orgaoEndereco: v.orgaoEndereco,
-      orgaoEmail: v.orgaoEmail || null,
-      orgaoTelefone: v.orgaoTelefone || null,
-      objeto: v.objeto,
-      dataAssinatura: v.dataAssinatura,
-      dataPublicacao: v.dataPublicacao || null,
-      vigenciaInicio: v.vigenciaInicio,
-      vigenciaFim: v.vigenciaFim,
-      prazoEntregaDias: v.prazoEntregaDias || null,
-      prazoPagamentoDias: v.prazoPagamentoDias || null,
-      marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
-      aceitaCarona: !!v.aceitaCarona,
-      idAtaPncp: v.idAtaPncp || null,
-      itens: {
-        create: v.itens.map((i) => ({
-          descricao: i.descricao,
-          unidade: i.unidade,
-          quantidade: i.quantidade,
-          marca: i.marca || null,
-          valorUnitario: i.valorUnitario,
-          valorTotal: i.quantidade * i.valorUnitario,
-        })),
+  try {
+    const ata = await prisma.ata.create({
+      data: {
+        empresaId: v.empresaId,
+        tipo: v.tipo,
+        numero: v.numero,
+        processoAdministrativo: v.processoAdministrativo,
+        procedimentoSelecao: v.procedimentoSelecao,
+        numeroLicitacao: v.numeroLicitacao || null,
+        orgaoNome: v.orgaoNome,
+        orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+        orgaoEndereco: v.orgaoEndereco,
+        orgaoEmail: v.orgaoEmail || null,
+        orgaoTelefone: v.orgaoTelefone || null,
+        objeto: v.objeto,
+        dataAssinatura: v.dataAssinatura,
+        dataPublicacao: v.dataPublicacao || null,
+        vigenciaInicio: v.vigenciaInicio,
+        vigenciaFim: v.vigenciaFim,
+        prazoEntregaDias: v.prazoEntregaNaoAplica ? null : (v.prazoEntregaDias || null),
+        prazoEntregaNaoAplica: !!v.prazoEntregaNaoAplica,
+        prazoPagamentoDias: v.prazoPagamentoDias || null,
+        marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
+        marcoReajusteOrigem: v.marcoReajusteOrigem || null,
+        aceitaCarona: !!v.aceitaCarona,
+        idAtaPncp: v.idAtaPncp || null,
+        itens: {
+          create: v.itens.map((i) => ({
+            descricao: i.descricao,
+            unidade: i.unidade,
+            quantidade: i.quantidade,
+            marca: i.marca || null,
+            valorUnitario: i.valorUnitario,
+            valorTotal: i.quantidade * i.valorUnitario,
+            lote: i.lote || null,
+          })),
+        },
+        ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
+          enderecosEntrega: {
+            create: v.enderecosEntrega.map((e) => ({
+              rotulo: e.rotulo || null,
+              endereco: e.endereco,
+            })),
+          },
+        }),
+        ...(v.pontosFocais && v.pontosFocais.length > 0 && {
+          pontosFocais: {
+            create: v.pontosFocais.map((p) => ({
+              funcao: p.funcao,
+              funcaoDescricao: p.funcao === "OUTRO" ? (p.funcaoDescricao || null) : null,
+              nome: p.nome,
+              email: p.email || null,
+              telefone: p.telefone || null,
+            })),
+          },
+        }),
+        ...(v.orgaosParticipantes && v.orgaosParticipantes.length > 0 && {
+          orgaos: {
+            create: v.orgaosParticipantes.map((o) => ({
+              tipo: o.tipo,
+              nome: o.nome,
+              cnpj: normalizarCnpj(o.cnpj),
+              endereco: o.endereco,
+              email: o.email || null,
+              telefone: o.telefone || null,
+            })),
+          },
+        }),
       },
-      ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
-        enderecosEntrega: {
-          create: v.enderecosEntrega.map((e) => ({
-            rotulo: e.rotulo || null,
-            endereco: e.endereco,
-          })),
-        },
-      }),
-      ...(v.pontosFocais && v.pontosFocais.length > 0 && {
-        pontosFocais: {
-          create: v.pontosFocais.map((p) => ({
-            funcao: p.funcao,
-            nome: p.nome,
-            email: p.email || null,
-            telefone: p.telefone || null,
-          })),
-        },
-      }),
-    },
-  });
+    });
 
-  revalidatePath("/atas");
-  revalidatePath("/dashboard");
-  redirect(`/atas/${ata.id}`);
+    revalidatePath("/atas");
+    revalidatePath("/dashboard");
+    redirect(`/atas/${ata.id}`);
+  } catch (err) {
+    // Bug PDF: "preenchi tudo mas não cadastrou" — log + retornar erro humanizado
+    // Erros mais comuns: duplicidade de número, FK inválida, campo obrigatório vazio
+    if (err instanceof Error) {
+      const msg = err.message;
+      // redirect() do Next.js dispara erro NEXT_REDIRECT — relançar
+      if (msg.includes("NEXT_REDIRECT")) throw err;
+      console.error("[criarAtaAction] erro ao salvar Ata:", msg);
+      return {
+        erro: `Não foi possível salvar a Ata: ${msg.slice(0, 240)}`,
+      };
+    }
+    throw err;
+  }
 }
 
 // ============================================================

@@ -2,17 +2,336 @@
 
 import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
-import { ChevronLeft, Sparkles, Upload, Check, AlertCircle, Loader2, Plus, Trash2, MapPin, Users } from "lucide-react";
-import { Field, Select } from "@/components/Field";
+import {
+  ChevronLeft,
+  Sparkles,
+  Upload,
+  Check,
+  AlertCircle,
+  Loader2,
+  Plus,
+  Trash2,
+  MapPin,
+  Users,
+  Building2,
+  FileText,
+  Calendar,
+  Package,
+} from "lucide-react";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor } from "@/components/ItensEditor";
 import { criarAtaAction } from "@/app/actions/contratacoes";
 import { extrairAtaPdfAction } from "@/app/actions/iaExtracao";
-import { OPCOES_PROCEDIMENTO, OPCOES_TIPO } from "@/lib/validators";
+import {
+  OPCOES_PROCEDIMENTO,
+  OPCOES_TIPO,
+  OPCOES_FUNCAO_PONTO_FOCAL,
+  OPCOES_MARCO_REAJUSTE,
+} from "@/lib/validators";
 import type { AtaExtraida } from "@/lib/extrairAta";
 
 type EmpresaOpt = { value: string; label: string };
 
+/* ============================================================
+   Helpers de máscara
+   ============================================================ */
+function formatarCnpjInput(valor: string): string {
+  const d = valor.replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 2) return d;
+  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
+  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
+function formatarCepInput(valor: string): string {
+  const d = valor.replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 5) return d;
+  return `${d.slice(0, 5)}-${d.slice(5)}`;
+}
+
+/* ============================================================
+   Form Components
+   ============================================================ */
+function FieldGlass({
+  label,
+  name,
+  type = "text",
+  placeholder,
+  required,
+  erro,
+  defaultValue,
+  span = 1,
+  value,
+  onChange,
+  disabled,
+  helper,
+}: {
+  label: string;
+  name?: string;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+  erro?: string;
+  defaultValue?: string | number;
+  span?: 1 | 2 | 3 | 4;
+  value?: string;
+  onChange?: (v: string) => void;
+  disabled?: boolean;
+  helper?: string;
+}) {
+  const colSpan = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" }[span];
+  return (
+    <label className={`${colSpan} block`}>
+      <span
+        className="mb-1.5 block text-[11px] font-bold uppercase"
+        style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+      >
+        {label}
+        {required && <span style={{ color: "var(--primary)" }}> *</span>}
+      </span>
+      <input
+        type={type}
+        name={name}
+        placeholder={placeholder}
+        required={required}
+        defaultValue={value === undefined ? defaultValue : undefined}
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        disabled={disabled}
+        className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+      />
+      {helper && (
+        <span className="mt-1 block text-[11px]" style={{ color: "var(--text-mute)" }}>
+          {helper}
+        </span>
+      )}
+      {erro && (
+        <span className="mt-1 block text-[12px] font-semibold" style={{ color: "var(--coral)" }}>
+          {erro}
+        </span>
+      )}
+    </label>
+  );
+}
+
+function SelectGlass({
+  label,
+  name,
+  options,
+  required,
+  erro,
+  defaultValue,
+  span = 1,
+  value,
+  onChange,
+}: {
+  label: string;
+  name: string;
+  options: { value: string; label: string }[];
+  required?: boolean;
+  erro?: string;
+  defaultValue?: string;
+  span?: 1 | 2 | 3 | 4;
+  value?: string;
+  onChange?: (v: string) => void;
+}) {
+  const colSpan = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" }[span];
+  return (
+    <label className={`${colSpan} block`}>
+      <span
+        className="mb-1.5 block text-[11px] font-bold uppercase"
+        style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+      >
+        {label}
+        {required && <span style={{ color: "var(--primary)" }}> *</span>}
+      </span>
+      <select
+        name={name}
+        required={required}
+        defaultValue={value === undefined ? defaultValue ?? "" : undefined}
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+      >
+        <option value="">— Selecione —</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {erro && (
+        <span className="mt-1 block text-[12px] font-semibold" style={{ color: "var(--coral)" }}>
+          {erro}
+        </span>
+      )}
+    </label>
+  );
+}
+
+/* CNPJ controlado com máscara */
+function CnpjInput({
+  label,
+  name,
+  required,
+  erro,
+  defaultValue,
+  span = 2,
+}: {
+  label: string;
+  name: string;
+  required?: boolean;
+  erro?: string;
+  defaultValue?: string;
+  span?: 1 | 2 | 3 | 4;
+}) {
+  const [val, setVal] = useState(defaultValue ? formatarCnpjInput(defaultValue) : "");
+  return (
+    <FieldGlass
+      label={label}
+      name={name}
+      placeholder="00.000.000/0000-00"
+      required={required}
+      erro={erro}
+      span={span}
+      value={val}
+      onChange={(v) => setVal(formatarCnpjInput(v))}
+    />
+  );
+}
+
+/* CEP com lookup automático ViaCEP */
+function CepInput({
+  label,
+  name,
+  required,
+  defaultValue,
+  span = 1,
+  onResolve,
+}: {
+  label: string;
+  name: string;
+  required?: boolean;
+  defaultValue?: string;
+  span?: 1 | 2 | 3 | 4;
+  onResolve?: (data: { logradouro: string; bairro: string; cidade: string; uf: string }) => void;
+}) {
+  const [val, setVal] = useState(defaultValue ? formatarCepInput(defaultValue) : "");
+  const [carregando, setCarregando] = useState(false);
+
+  async function buscar(cepFmt: string) {
+    const cep = cepFmt.replace(/\D/g, "");
+    if (cep.length !== 8) return;
+    setCarregando(true);
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await r.json();
+      if (!data.erro && onResolve) {
+        onResolve({
+          logradouro: data.logradouro || "",
+          bairro: data.bairro || "",
+          cidade: data.localidade || "",
+          uf: data.uf || "",
+        });
+      }
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  return (
+    <label className={`col-span-${span} block`}>
+      <span
+        className="mb-1.5 block text-[11px] font-bold uppercase"
+        style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+      >
+        {label}
+        {required && <span style={{ color: "var(--primary)" }}> *</span>}
+      </span>
+      <div className="relative">
+        <input
+          type="text"
+          name={name}
+          placeholder="00000-000"
+          required={required}
+          value={val}
+          onChange={(e) => {
+            const f = formatarCepInput(e.target.value);
+            setVal(f);
+            if (f.replace(/\D/g, "").length === 8) buscar(f);
+          }}
+          className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+        />
+        {carregando && (
+          <Loader2
+            className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin"
+            style={{ color: "var(--primary)" }}
+          />
+        )}
+      </div>
+    </label>
+  );
+}
+
+/* ============================================================
+   Bloco da seção (glass dark)
+   ============================================================ */
+function SecaoGlass({
+  numero,
+  titulo,
+  subtitulo,
+  icone: Icone,
+  children,
+}: {
+  numero: string;
+  titulo: string;
+  subtitulo?: string;
+  icone?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="glass overflow-hidden rounded-[24px]">
+      <header
+        className="relative z-[1] flex items-center gap-4 px-8 py-5"
+        style={{ borderBottom: "0.5px solid var(--hairline)" }}
+      >
+        <div
+          className="grid h-9 w-9 place-items-center rounded-full text-[13px] font-extrabold"
+          style={{
+            background: "linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.06))",
+            border: "0.5px solid rgba(212,175,55,0.4)",
+            color: "var(--primary-bright)",
+            letterSpacing: "-0.04em",
+          }}
+        >
+          {numero}
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            {Icone && <Icone className="h-4 w-4" style={{ color: "var(--primary)" }} />}
+            <h2
+              className="text-[20px] font-extrabold"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+            >
+              {titulo}
+            </h2>
+          </div>
+          {subtitulo && (
+            <p className="mt-1 text-[12px]" style={{ color: "var(--text-mute)" }}>
+              {subtitulo}
+            </p>
+          )}
+        </div>
+      </header>
+      <div className="relative z-[1] px-8 py-6">{children}</div>
+    </section>
+  );
+}
+
+/* ============================================================
+   Form principal
+   ============================================================ */
 export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
   const [state, formAction] = useActionState(criarAtaAction, null);
   const e = state?.campos ?? {};
@@ -22,16 +341,22 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
   const [dados, setDados] = useState<AtaExtraida | null>(null);
   const [pdfNome, setPdfNome] = useState<string | null>(null);
 
+  // Estados controlados (PDF apontamentos)
+  const [prazoNaoAplica, setPrazoNaoAplica] = useState(false);
+  const [marcoOrigem, setMarcoOrigem] = useState<string>("");
+  const [temParticipantes, setTemParticipantes] = useState(false);
+
+  // Endereço auto-preenchido pelo CEP do órgão gerenciador
+  const [orgaoEndereco, setOrgaoEndereco] = useState("");
+
   async function handleArquivo(file: File) {
     setExtraindo(true);
     setExtracaoErro(null);
     setPdfNome(file.name);
-
     const fd = new FormData();
     fd.append("pdf", file);
     const res = await extrairAtaPdfAction(fd);
     setExtraindo(false);
-
     if (!res.ok) {
       setExtracaoErro(res.erro);
       return;
@@ -39,39 +364,83 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
     setDados(res.dados);
   }
 
-  // key força re-render do form quando dados extraídos mudam (preenche defaultValue)
   const formKey = dados ? `auto-${pdfNome}` : "manual";
 
   return (
-    <div className="mx-auto max-w-5xl px-8 py-8">
+    <div className="mx-auto max-w-[1200px] px-8 py-8">
       <Link
         href="/contratacoes/nova"
-        className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900"
+        className="inline-flex items-center gap-1 text-sm transition"
+        style={{ color: "var(--text-mute)" }}
       >
         <ChevronLeft className="h-4 w-4" /> Voltar
       </Link>
 
-      <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-        Nova Ata de Registro de Preços
-      </h1>
-      <p className="mt-1 text-sm text-slate-600">
-        Cadastre os dados da Ata e os itens que registram preço. O saldo é abatido conforme você gera Contratos e Empenhos.
-      </p>
+      {/* Header */}
+      <header className="glass mt-4 rounded-[28px] px-9 py-7">
+        <div className="relative z-[1]">
+          <p
+            className="text-[11px] font-bold uppercase"
+            style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
+          >
+            Nova contratação · Ata de Registro de Preços
+          </p>
+          <h1
+            className="mt-2 text-[40px] font-extrabold leading-none"
+            style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
+          >
+            Cadastre sua{" "}
+            <em
+              style={{
+                fontStyle: "normal",
+                background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Ata
+            </em>
+          </h1>
+          <p
+            className="mt-3 max-w-[640px] text-[14px]"
+            style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
+          >
+            Os itens registram preço e quantidade. O saldo é abatido automaticamente conforme você
+            gera Contratos e Empenhos.
+          </p>
+        </div>
+      </header>
 
-      {/* Bloco de upload + extração automática */}
-      <section className="mt-6 overflow-hidden rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-6 shadow-sm">
-        <div className="flex items-start gap-4">
-          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 text-white shadow-md">
-            <Sparkles className="h-5 w-5" />
+      {/* Upload PDF — IA extrai automático */}
+      <section
+        className="glass-tile mt-5 overflow-hidden rounded-[20px] px-7 py-6"
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(197,180,255,0.18), rgba(184,197,214,0.06)), rgba(255,255,255,0.03)",
+        }}
+      >
+        <div className="relative z-[1] flex items-start gap-4">
+          <div
+            className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
+            style={{
+              background: "linear-gradient(135deg, var(--lavender), var(--sky))",
+              boxShadow: "0 4px 16px rgba(197,180,255,0.4)",
+            }}
+          >
+            <Sparkles className="h-5 w-5" style={{ color: "#0A0A0A" }} />
           </div>
           <div className="flex-1">
-            <h2 className="text-base font-semibold text-slate-900">
-              Preencher automaticamente a partir do PDF da Ata
+            <h2
+              className="text-[18px] font-extrabold"
+              style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
+            >
+              Preencher automaticamente a partir do PDF
             </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Anexe o PDF original da Ata. A IA extrai número, processo, órgão, vigência, prazos e a lista completa de itens. Você confere e edita antes de salvar.
+            <p className="mt-1 text-[13px]" style={{ color: "var(--text-soft)" }}>
+              Anexe o PDF original. A IA extrai número, processo, órgão, vigência, prazos e itens.
+              Você confere e edita antes de salvar.
             </p>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -82,38 +451,51 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
                 if (f) handleArquivo(f);
               }}
             />
-
             <div className="mt-4 flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={extraindo}
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-primary inline-flex"
               >
                 {extraindo ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Extraindo dados…
+                    <Loader2 className="h-4 w-4 animate-spin" /> Extraindo dados…
                   </>
                 ) : (
                   <>
                     <Upload className="h-4 w-4" />
-                    {pdfNome ? "Anexar outro PDF" : "Anexar PDF da Ata"}
+                    {pdfNome ? "Outro PDF" : "Anexar PDF da Ata"}
                   </>
                 )}
               </button>
               {pdfNome && !extraindo && (
-                <span className="text-xs text-slate-500 truncate max-w-md">{pdfNome}</span>
+                <span className="truncate max-w-md text-xs" style={{ color: "var(--text-mute)" }}>
+                  {pdfNome}
+                </span>
               )}
               {dados && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                  <Check className="h-3 w-3" /> {dados.itens.length} item(ns) preenchido(s)
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold"
+                  style={{
+                    background: "rgba(93,216,182,0.18)",
+                    color: "var(--mint)",
+                    border: "0.5px solid rgba(93,216,182,0.3)",
+                  }}
+                >
+                  <Check className="h-3 w-3" /> {dados.itens.length} item(ns) preenchidos
                 </span>
               )}
             </div>
-
             {extracaoErro && (
-              <div className="mt-3 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div
+                className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm"
+                style={{
+                  background: "rgba(232,138,152,0.10)",
+                  border: "0.5px solid rgba(232,138,152,0.3)",
+                  color: "var(--coral)",
+                }}
+              >
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{extracaoErro}</span>
               </div>
@@ -122,20 +504,25 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
         </div>
       </section>
 
-      <form key={formKey} action={formAction} className="mt-8 space-y-8">
-        <Secao titulo="Identificação">
+      <form key={formKey} action={formAction} className="mt-6 space-y-5">
+        {/* === 2.1 IDENTIFICAÇÃO === */}
+        <SecaoGlass
+          numero="01"
+          titulo="Identificação"
+          subtitulo="Dados básicos da Ata — apenas o essencial."
+          icone={FileText}
+        >
           <div className="grid grid-cols-4 gap-4">
-            <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} />
-            <Select
-              label="Tipo de objeto"
-              name="tipo"
-              options={OPCOES_TIPO}
+            <SelectGlass
+              label="Empresa"
+              name="empresaId"
+              options={empresas}
               required
-              erro={e.tipo}
+              erro={e.empresaId}
               span={2}
             />
-            <Field
-              label="Número da Ata (nº/ano)"
+            <FieldGlass
+              label="Número da Ata"
               name="numero"
               placeholder="42/2026"
               required
@@ -143,15 +530,23 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               span={1}
               defaultValue={dados?.numero}
             />
-            <Field
+            <FieldGlass
               label="Processo administrativo"
               name="processoAdministrativo"
               required
               erro={e.processoAdministrativo}
-              span={2}
+              span={1}
               defaultValue={dados?.processoAdministrativo}
             />
-            <Select
+            <SelectGlass
+              label="Tipo de objeto"
+              name="tipo"
+              options={OPCOES_TIPO}
+              required
+              erro={e.tipo}
+              span={2}
+            />
+            <SelectGlass
               label="Procedimento de seleção"
               name="procedimentoSelecao"
               options={OPCOES_PROCEDIMENTO}
@@ -160,34 +555,42 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               span={1}
               defaultValue={dados?.procedimentoSelecao}
             />
-            <Field
-              label="Nº da Licitação (opcional)"
+            <FieldGlass
+              label="Nº do Pregão Eletrônico"
               name="numeroLicitacao"
+              placeholder="123/2025"
               erro={e.numeroLicitacao}
-              span={2}
+              span={1}
               defaultValue={dados?.numeroLicitacao ?? ""}
             />
-            <Field
-              label="ID Ata no PNCP (opcional)"
+            <FieldGlass
+              label="ID Ata no PNCP"
               name="idAtaPncp"
+              helper="Opcional — preencha se já estiver publicado no PNCP"
               erro={e.idAtaPncp}
               span={2}
               defaultValue={dados?.idAtaPncp ?? ""}
             />
-            <Field
+            <FieldGlass
               label="Objeto (descrição geral)"
               name="objeto"
               required
               erro={e.objeto}
-              span={4}
+              span={2}
               defaultValue={dados?.objeto}
             />
           </div>
-        </Secao>
+        </SecaoGlass>
 
-        <Secao titulo="Órgão gerenciador">
+        {/* === 2.2 ÓRGÃO GERENCIADOR === */}
+        <SecaoGlass
+          numero="02"
+          titulo="Órgão gerenciador"
+          subtitulo="Órgão que gerencia a Ata. CNPJ é formatado automaticamente."
+          icone={Building2}
+        >
           <div className="grid grid-cols-4 gap-4">
-            <Field
+            <FieldGlass
               label="Nome do órgão"
               name="orgaoNome"
               required
@@ -195,24 +598,34 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               span={2}
               defaultValue={dados?.orgaoNome}
             />
-            <Field
+            <CnpjInput
               label="CNPJ do órgão"
               name="orgaoCnpj"
-              placeholder="00.000.000/0000-00"
               required
               erro={e.orgaoCnpj}
               span={2}
               defaultValue={dados?.orgaoCnpj}
             />
-            <Field
+            <CepInput
+              label="CEP do órgão"
+              name="orgaoCep"
+              span={1}
+              onResolve={(d) => {
+                const enderecoBase = `${d.logradouro}, ${d.bairro}, ${d.cidade}/${d.uf}`;
+                setOrgaoEndereco(enderecoBase);
+              }}
+            />
+            <FieldGlass
               label="Endereço"
               name="orgaoEndereco"
               required
               erro={e.orgaoEndereco}
-              span={4}
+              span={3}
+              value={orgaoEndereco}
+              onChange={setOrgaoEndereco}
               defaultValue={dados?.orgaoEndereco}
             />
-            <Field
+            <FieldGlass
               label="E-mail"
               name="orgaoEmail"
               type="email"
@@ -220,7 +633,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               span={2}
               defaultValue={dados?.orgaoEmail ?? ""}
             />
-            <Field
+            <FieldGlass
               label="Telefone"
               name="orgaoTelefone"
               erro={e.orgaoTelefone}
@@ -228,11 +641,56 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               defaultValue={dados?.orgaoTelefone ?? ""}
             />
           </div>
-        </Secao>
+        </SecaoGlass>
 
-        <Secao titulo="Datas e prazos">
+        {/* === 2.3 ÓRGÃOS PARTICIPANTES === */}
+        <SecaoGlass
+          numero="03"
+          titulo="Órgãos participantes"
+          subtitulo="Órgãos que aderiram formalmente à Ata desde a publicação."
+          icone={Users}
+        >
+          <fieldset className="mb-4">
+            <div className="flex items-center gap-6">
+              <span
+                className="text-[13px] font-semibold"
+                style={{ color: "var(--text-soft)" }}
+              >
+                Esta Ata possui órgão(s) participante(s)?
+              </span>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="temParticipantes"
+                  checked={!temParticipantes}
+                  onChange={() => setTemParticipantes(false)}
+                />
+                <span style={{ color: "var(--text-soft)" }}>Não</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="temParticipantes"
+                  checked={temParticipantes}
+                  onChange={() => setTemParticipantes(true)}
+                />
+                <span style={{ color: "var(--text-soft)" }}>Sim</span>
+              </label>
+            </div>
+          </fieldset>
+
+          {temParticipantes && <OrgaosParticipantesEditor />}
+        </SecaoGlass>
+
+        {/* === 2.4 DATAS E PRAZOS === */}
+        <SecaoGlass
+          numero="04"
+          titulo="Datas e prazos"
+          subtitulo="Vigência, prazos e marco de reajuste."
+          icone={Calendar}
+        >
           <div className="grid grid-cols-4 gap-4">
-            <Field
+            <FieldGlass
               label="Data de assinatura"
               name="dataAssinatura"
               type="date"
@@ -241,7 +699,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               span={1}
               defaultValue={dados?.dataAssinatura}
             />
-            <Field
+            <FieldGlass
               label="Data de publicação"
               name="dataPublicacao"
               type="date"
@@ -249,7 +707,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               span={1}
               defaultValue={dados?.dataPublicacao ?? ""}
             />
-            <Field
+            <FieldGlass
               label="Vigência — início"
               name="vigenciaInicio"
               type="date"
@@ -258,7 +716,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               span={1}
               defaultValue={dados?.vigenciaInicio}
             />
-            <Field
+            <FieldGlass
               label="Vigência — fim"
               name="vigenciaFim"
               type="date"
@@ -267,82 +725,172 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               span={1}
               defaultValue={dados?.vigenciaFim}
             />
-            <Field
-              label="Prazo de entrega (dias)"
-              name="prazoEntregaDias"
-              type="number"
-              min="0"
-              erro={e.prazoEntregaDias}
-              span={1}
-              defaultValue={dados?.prazoEntregaDias?.toString() ?? ""}
-            />
-            <Field
+
+            {/* Prazo de entrega com toggle "não se aplica" */}
+            <div className="col-span-2">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Prazo de entrega
+              </span>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  name="prazoEntregaDias"
+                  min="0"
+                  placeholder="Dias"
+                  disabled={prazoNaoAplica}
+                  defaultValue={dados?.prazoEntregaDias?.toString() ?? ""}
+                  className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
+                  style={{ opacity: prazoNaoAplica ? 0.5 : 1 }}
+                />
+                <label
+                  className="flex cursor-pointer items-center gap-2 rounded-full px-4 py-2.5 text-xs font-bold uppercase"
+                  style={{
+                    background: prazoNaoAplica
+                      ? "rgba(212,175,55,0.18)"
+                      : "rgba(255,255,255,0.04)",
+                    border: prazoNaoAplica
+                      ? "0.5px solid rgba(212,175,55,0.4)"
+                      : "0.5px solid var(--hairline)",
+                    color: prazoNaoAplica ? "var(--primary-bright)" : "var(--text-mute)",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    name="prazoEntregaNaoAplica"
+                    checked={prazoNaoAplica}
+                    onChange={(ev) => setPrazoNaoAplica(ev.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  Não se aplica
+                </label>
+              </div>
+              <span className="mt-1 block text-[11px]" style={{ color: "var(--text-mute)" }}>
+                Use &ldquo;Não se aplica&rdquo; em Atas de locação ou eventos com data fixa.
+              </span>
+            </div>
+
+            <FieldGlass
               label="Prazo de pagamento (dias)"
               name="prazoPagamentoDias"
               type="number"
-              min="0"
-              erro={e.prazoPagamentoDias}
-              span={1}
               defaultValue={dados?.prazoPagamentoDias?.toString() ?? ""}
-            />
-            <Field
-              label="Marco do orçamento estimado (gera alerta de reajuste em +1 ano)"
-              name="marcoOrcamentoEstimado"
-              type="date"
-              erro={e.marcoOrcamentoEstimado}
               span={2}
             />
-            <label className="col-span-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+
+            {/* Marco de reajuste — seletor + data */}
+            <div className="col-span-4">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Marco de reajuste
+                <span className="ml-2 font-normal normal-case tracking-normal" style={{ color: "var(--text-mute)" }}>
+                  · usado para calcular quando você terá direito ao reajuste de preços
+                </span>
+              </span>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  name="marcoReajusteOrigem"
+                  value={marcoOrigem}
+                  onChange={(ev) => setMarcoOrigem(ev.target.value)}
+                  className="rounded-xl px-4 py-3 text-sm font-medium"
+                >
+                  <option value="">— Origem —</option>
+                  {OPCOES_MARCO_REAJUSTE.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  name="marcoOrcamentoEstimado"
+                  disabled={marcoOrigem === "OMISSA" || marcoOrigem === ""}
+                  className="rounded-xl px-4 py-3 text-sm font-medium"
+                  style={{ opacity: marcoOrigem === "OMISSA" || marcoOrigem === "" ? 0.5 : 1 }}
+                  placeholder="dd/mm/aaaa"
+                />
+              </div>
+            </div>
+
+            {/* Carona */}
+            <label
+              className="col-span-4 flex items-start gap-3 rounded-2xl px-4 py-3.5 text-sm"
+              style={{
+                background: "rgba(212,175,55,0.08)",
+                border: "0.5px solid rgba(212,175,55,0.25)",
+              }}
+            >
               <input
                 type="checkbox"
                 name="aceitaCarona"
-                className="mt-0.5 rounded border-slate-300"
+                className="mt-0.5"
                 defaultChecked={dados?.aceitaCarona}
               />
-              <span className="text-amber-900">
+              <span style={{ color: "var(--text-soft)" }}>
                 Esta Ata aceita adesão (carona) por outros órgãos.
                 <br />
-                <span className="text-xs">
-                  Lei 14.133/2021 art. 86: limite de <strong>50% por órgão</strong> e
-                  <strong> 100% no total</strong>. O sistema monitora os limites automaticamente
-                  conforme caronas vão sendo registradas.
+                <span className="text-xs" style={{ color: "var(--text-mute)" }}>
+                  Lei 14.133/2021 art. 86 — limite de <strong style={{ color: "var(--primary-bright)" }}>50% por órgão</strong> e{" "}
+                  <strong style={{ color: "var(--primary-bright)" }}>200% no total</strong>. Sistema monitora os limites automaticamente.
                 </span>
               </span>
             </label>
           </div>
-        </Secao>
+        </SecaoGlass>
 
-        <Secao titulo="Endereços de entrega" icone={MapPin}>
-          <p className="mb-3 text-xs text-slate-600">
-            Cadastre todos os endereços onde o órgão pode pedir entrega. O contrato e os
-            empenhos derivados poderão referenciar qualquer um deles.
-          </p>
+        {/* === 2.5 ENDEREÇOS DE ENTREGA === */}
+        <SecaoGlass
+          numero="05"
+          titulo="Endereços de entrega"
+          subtitulo="Onde o órgão pode pedir entrega. CEP busca automaticamente."
+          icone={MapPin}
+        >
           <EnderecosEntregaEditor />
-        </Secao>
+        </SecaoGlass>
 
-        <Secao titulo="Pontos focais do órgão" icone={Users}>
-          <p className="mb-3 text-xs text-slate-600">
-            Pessoas-chave para gestão e fiscalização do contrato (Lei 14.133, art. 117).
-            Adicione pelo menos o Gestor — Fiscais Técnico e Administrativo são recomendados.
-          </p>
+        {/* === 2.6 PONTOS FOCAIS === */}
+        <SecaoGlass
+          numero="06"
+          titulo="Pontos focais do órgão"
+          subtitulo="Pessoas-chave para gestão e fiscalização (Lei 14.133, art. 117)."
+          icone={Users}
+        >
           <PontosFocaisEditor />
-        </Secao>
+        </SecaoGlass>
 
-        <Secao titulo="Itens registrados">
+        {/* === 2.7 ITENS REGISTRADOS === */}
+        <SecaoGlass
+          numero="07"
+          titulo="Itens registrados"
+          subtitulo="Agrupe os itens por lote. Valor unitário com máscara automática."
+          icone={Package}
+        >
           <ItensEditor itensIniciais={dados?.itens} />
-        </Secao>
+        </SecaoGlass>
 
         {state?.erro && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {state.erro}
+          <div
+            className="rounded-2xl px-5 py-4 text-sm"
+            style={{
+              background: "rgba(232,138,152,0.10)",
+              border: "0.5px solid rgba(232,138,152,0.3)",
+              color: "var(--coral)",
+            }}
+          >
+            <strong>Erro ao cadastrar Ata:</strong> {state.erro}
           </div>
         )}
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 pt-2">
           <SubmitButton>Cadastrar Ata</SubmitButton>
           <Link
             href="/contratacoes/nova"
-            className="rounded-md border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="btn-secondary inline-flex"
           >
             Cancelar
           </Link>
@@ -352,64 +900,86 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
   );
 }
 
-function Secao({
-  titulo,
-  icone: Icone,
-  children,
-}: {
-  titulo: string;
-  icone?: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        {Icone && <Icone className="h-4 w-4 text-slate-400" />}
-        {titulo}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
+/* ============================================================
+   Sub-editor: Endereços de entrega (com busca CEP)
+   ============================================================ */
 function EnderecosEntregaEditor() {
-  const [enderecos, setEnderecos] = useState<{ rotulo: string; endereco: string }[]>([
-    { rotulo: "", endereco: "" },
+  const [enderecos, setEnderecos] = useState<{ rotulo: string; endereco: string; cep: string }[]>([
+    { rotulo: "", endereco: "", cep: "" },
   ]);
 
-  const atualizar = (idx: number, campo: "rotulo" | "endereco", valor: string) => {
-    setEnderecos((prev) => prev.map((e, i) => (i === idx ? { ...e, [campo]: valor } : e)));
+  const atualizar = (idx: number, patch: Partial<{ rotulo: string; endereco: string; cep: string }>) => {
+    setEnderecos((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
   };
-  const adicionar = () => setEnderecos((prev) => [...prev, { rotulo: "", endereco: "" }]);
+  const adicionar = () =>
+    setEnderecos((prev) => [...prev, { rotulo: "", endereco: "", cep: "" }]);
   const remover = (idx: number) =>
     setEnderecos((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
 
+  async function buscarCep(idx: number, cepFormatado: string) {
+    const cep = cepFormatado.replace(/\D/g, "");
+    if (cep.length !== 8) return;
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await r.json();
+      if (!data.erro) {
+        const enderecoAtual = enderecos[idx]?.endereco ?? "";
+        const enderecoNovo = `${data.logradouro || ""}, ${data.bairro || ""}, ${data.localidade || ""}/${data.uf || ""}`;
+        // Só preenche se ainda não foi mexido
+        if (!enderecoAtual || enderecoAtual.length < 10) {
+          atualizar(idx, { endereco: enderecoNovo });
+        }
+      }
+    } catch {
+      // silencioso
+    }
+  }
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {enderecos.map((e, idx) => (
-        <div key={idx} className="grid grid-cols-12 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div
+          key={idx}
+          className="grid grid-cols-12 gap-2 rounded-2xl px-3 py-3"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "0.5px solid var(--hairline)",
+          }}
+        >
           <input
             type="text"
             placeholder="Rótulo (ex: Almoxarifado central)"
             name={`enderecosEntrega[${idx}][rotulo]`}
             value={e.rotulo}
-            onChange={(ev) => atualizar(idx, "rotulo", ev.currentTarget.value)}
-            className="col-span-3 rounded-md border border-slate-300 px-3 py-2 text-sm"
+            onChange={(ev) => atualizar(idx, { rotulo: ev.currentTarget.value })}
+            className="col-span-3 rounded-md px-3 py-2 text-sm"
           />
           <input
             type="text"
-            placeholder="Endereço completo (rua, nº, bairro, cidade/UF, CEP)"
+            placeholder="CEP"
+            value={e.cep}
+            onChange={(ev) => {
+              const f = formatarCepInput(ev.target.value);
+              atualizar(idx, { cep: f });
+              if (f.replace(/\D/g, "").length === 8) buscarCep(idx, f);
+            }}
+            className="col-span-2 rounded-md px-3 py-2 text-sm"
+          />
+          <input
+            type="text"
+            placeholder="Endereço completo (rua, nº, bairro, cidade/UF)"
             name={`enderecosEntrega[${idx}][endereco]`}
             value={e.endereco}
-            onChange={(ev) => atualizar(idx, "endereco", ev.currentTarget.value)}
-            className="col-span-8 rounded-md border border-slate-300 px-3 py-2 text-sm"
+            onChange={(ev) => atualizar(idx, { endereco: ev.currentTarget.value })}
+            className="col-span-6 rounded-md px-3 py-2 text-sm"
           />
           <button
             type="button"
             onClick={() => remover(idx)}
             disabled={enderecos.length <= 1}
-            className="col-span-1 grid place-items-center rounded-md text-slate-400 hover:bg-white hover:text-red-600 disabled:opacity-40"
-            title="Remover endereço"
+            className="col-span-1 grid place-items-center rounded-md disabled:opacity-30"
+            style={{ color: "var(--text-mute)" }}
+            title="Remover"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -418,54 +988,266 @@ function EnderecosEntregaEditor() {
       <button
         type="button"
         onClick={adicionar}
-        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
+        style={{
+          background: "rgba(255,255,255,0.06)",
+          color: "var(--text-soft)",
+          border: "0.5px solid var(--hairline)",
+        }}
       >
-        <Plus className="h-3.5 w-3.5" /> Adicionar endereço de entrega
+        <Plus className="h-3.5 w-3.5" /> Adicionar endereço
       </button>
     </div>
   );
 }
 
-const FUNCOES_PADRAO: { funcao: "GESTOR" | "FISCAL_TECNICO" | "FISCAL_ADMINISTRATIVO"; rotulo: string }[] = [
-  { funcao: "GESTOR", rotulo: "Gestor do contrato" },
-  { funcao: "FISCAL_TECNICO", rotulo: "Fiscal técnico" },
-  { funcao: "FISCAL_ADMINISTRATIVO", rotulo: "Fiscal administrativo" },
-];
-
+/* ============================================================
+   Sub-editor: Pontos Focais (sem pré-designações fixas)
+   ============================================================ */
 function PontosFocaisEditor() {
+  const [pessoas, setPessoas] = useState<
+    {
+      nome: string;
+      email: string;
+      telefone: string;
+      funcao: string;
+      funcaoDescricao: string;
+    }[]
+  >([{ nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" }]);
+
+  const atualizar = (idx: number, patch: Partial<(typeof pessoas)[0]>) => {
+    setPessoas((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
+  };
+  const adicionar = () =>
+    setPessoas((prev) => [
+      ...prev,
+      { nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" },
+    ]);
+  const remover = (idx: number) =>
+    setPessoas((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+
   return (
     <div className="space-y-3">
-      {FUNCOES_PADRAO.map((f, idx) => (
-        <div key={f.funcao} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              {f.rotulo}
-            </span>
-            <span className="text-[10px] text-slate-400">opcional</span>
-          </div>
-          <input type="hidden" name={`pontosFocais[${idx}][funcao]`} value={f.funcao} />
-          <div className="grid grid-cols-3 gap-2">
+      {pessoas.map((p, idx) => (
+        <div
+          key={idx}
+          className="rounded-2xl px-4 py-4"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "0.5px solid var(--hairline)",
+          }}
+        >
+          <div className="grid grid-cols-12 gap-3">
             <input
               type="text"
-              placeholder="Nome"
               name={`pontosFocais[${idx}][nome]`}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Nome"
+              value={p.nome}
+              onChange={(ev) => atualizar(idx, { nome: ev.target.value })}
+              className="col-span-3 rounded-md px-3 py-2 text-sm"
             />
             <input
               type="email"
-              placeholder="E-mail"
               name={`pontosFocais[${idx}][email]`}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              placeholder="E-mail"
+              value={p.email}
+              onChange={(ev) => atualizar(idx, { email: ev.target.value })}
+              className="col-span-3 rounded-md px-3 py-2 text-sm"
             />
             <input
               type="text"
-              placeholder="Telefone"
               name={`pontosFocais[${idx}][telefone]`}
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Telefone"
+              value={p.telefone}
+              onChange={(ev) => atualizar(idx, { telefone: ev.target.value })}
+              className="col-span-2 rounded-md px-3 py-2 text-sm"
+            />
+            <select
+              name={`pontosFocais[${idx}][funcao]`}
+              value={p.funcao}
+              onChange={(ev) => atualizar(idx, { funcao: ev.target.value })}
+              className="col-span-3 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">— Função —</option>
+              {OPCOES_FUNCAO_PONTO_FOCAL.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => remover(idx)}
+              disabled={pessoas.length <= 1}
+              className="col-span-1 grid place-items-center rounded-md disabled:opacity-30"
+              style={{ color: "var(--text-mute)" }}
+              title="Remover"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+          {/* Quando função = OUTRO, mostra campo de descrição */}
+          {p.funcao === "OUTRO" && (
+            <div className="mt-3">
+              <input
+                type="text"
+                name={`pontosFocais[${idx}][funcaoDescricao]`}
+                placeholder="Especifique a função (ex: Coordenador técnico)"
+                value={p.funcaoDescricao}
+                onChange={(ev) => atualizar(idx, { funcaoDescricao: ev.target.value })}
+                className="w-full rounded-md px-3 py-2 text-sm"
+              />
+            </div>
+          )}
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={adicionar}
+        className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
+        style={{
+          background: "rgba(255,255,255,0.06)",
+          color: "var(--text-soft)",
+          border: "0.5px solid var(--hairline)",
+        }}
+      >
+        <Plus className="h-3.5 w-3.5" /> Adicionar pessoa
+      </button>
+    </div>
+  );
+}
+
+/* ============================================================
+   Sub-editor: Órgãos Participantes (briefing 2.3)
+   ============================================================ */
+function OrgaosParticipantesEditor() {
+  const [orgaos, setOrgaos] = useState<
+    { tipo: string; nome: string; cnpj: string; endereco: string; cep: string; email: string; telefone: string }[]
+  >([{ tipo: "PARTICIPANTE", nome: "", cnpj: "", endereco: "", cep: "", email: "", telefone: "" }]);
+
+  const atualizar = (idx: number, patch: Partial<(typeof orgaos)[0]>) => {
+    setOrgaos((prev) => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
+  };
+  const adicionar = () =>
+    setOrgaos((prev) => [
+      ...prev,
+      { tipo: "PARTICIPANTE", nome: "", cnpj: "", endereco: "", cep: "", email: "", telefone: "" },
+    ]);
+  const remover = (idx: number) =>
+    setOrgaos((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+
+  async function buscarCep(idx: number, cepFormatado: string) {
+    const cep = cepFormatado.replace(/\D/g, "");
+    if (cep.length !== 8) return;
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await r.json();
+      if (!data.erro) {
+        atualizar(idx, {
+          endereco: `${data.logradouro || ""}, ${data.bairro || ""}, ${data.localidade || ""}/${data.uf || ""}`,
+        });
+      }
+    } catch {
+      // silencioso
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {orgaos.map((o, idx) => (
+        <div
+          key={idx}
+          className="rounded-2xl px-4 py-4"
+          style={{
+            background: "rgba(255,255,255,0.03)",
+            border: "0.5px solid var(--hairline)",
+          }}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <span
+              className="text-[10px] font-bold uppercase"
+              style={{ letterSpacing: "0.18em", color: "var(--primary)" }}
+            >
+              Órgão {idx + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => remover(idx)}
+              disabled={orgaos.length <= 1}
+              className="rounded-md p-1.5 disabled:opacity-30"
+              style={{ color: "var(--text-mute)" }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <input type="hidden" name={`orgaosParticipantes[${idx}][tipo]`} value={o.tipo} />
+          <div className="grid grid-cols-12 gap-3">
+            <input
+              type="text"
+              name={`orgaosParticipantes[${idx}][nome]`}
+              placeholder="Nome do órgão"
+              value={o.nome}
+              onChange={(ev) => atualizar(idx, { nome: ev.target.value })}
+              className="col-span-7 rounded-md px-3 py-2 text-sm"
+            />
+            <input
+              type="text"
+              name={`orgaosParticipantes[${idx}][cnpj]`}
+              placeholder="00.000.000/0000-00"
+              value={o.cnpj}
+              onChange={(ev) => atualizar(idx, { cnpj: formatarCnpjInput(ev.target.value) })}
+              className="col-span-5 rounded-md px-3 py-2 text-sm"
+            />
+            <input
+              type="text"
+              placeholder="CEP"
+              value={o.cep}
+              onChange={(ev) => {
+                const f = formatarCepInput(ev.target.value);
+                atualizar(idx, { cep: f });
+                if (f.replace(/\D/g, "").length === 8) buscarCep(idx, f);
+              }}
+              className="col-span-2 rounded-md px-3 py-2 text-sm"
+            />
+            <input
+              type="text"
+              name={`orgaosParticipantes[${idx}][endereco]`}
+              placeholder="Endereço completo"
+              value={o.endereco}
+              onChange={(ev) => atualizar(idx, { endereco: ev.target.value })}
+              className="col-span-10 rounded-md px-3 py-2 text-sm"
+            />
+            <input
+              type="email"
+              name={`orgaosParticipantes[${idx}][email]`}
+              placeholder="E-mail"
+              value={o.email}
+              onChange={(ev) => atualizar(idx, { email: ev.target.value })}
+              className="col-span-7 rounded-md px-3 py-2 text-sm"
+            />
+            <input
+              type="text"
+              name={`orgaosParticipantes[${idx}][telefone]`}
+              placeholder="Telefone"
+              value={o.telefone}
+              onChange={(ev) => atualizar(idx, { telefone: ev.target.value })}
+              className="col-span-5 rounded-md px-3 py-2 text-sm"
             />
           </div>
         </div>
       ))}
+      <button
+        type="button"
+        onClick={adicionar}
+        className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
+        style={{
+          background: "rgba(212, 175, 55, 0.14)",
+          color: "var(--primary-bright)",
+          border: "0.5px solid rgba(212, 175, 55, 0.3)",
+        }}
+      >
+        <Plus className="h-3.5 w-3.5" /> Adicionar órgão participante
+      </button>
     </div>
   );
 }

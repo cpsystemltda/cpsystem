@@ -332,6 +332,15 @@ enum FuncaoPontoFocal {
   FISCAL_ADMINISTRATIVO
   RESPONSAVEL_SETOR
   CONTATO_GERAL
+  AUTORIDADE_COMPETENTE
+  FISCAL
+  OUTRO
+}
+
+enum MarcoReajusteOrigem {
+  ORCAMENTO_ESTIMADO
+  ASSINATURA
+  OMISSA
 }
 
 model Ata {
@@ -355,8 +364,11 @@ model Ata {
   vigenciaInicio         DateTime
   vigenciaFim            DateTime
   prazoEntregaDias       Int?
+  prazoEntregaNaoAplica  Boolean   @default(false)
   prazoPagamentoDias     Int?
   marcoOrcamentoEstimado DateTime?
+  // Origem do marco de reajuste (briefing PDF — Cadastro Ata 2.4)
+  marcoReajusteOrigem    MarcoReajusteOrigem?
 
   aceitaCarona  Boolean @default(false)
   idAtaPncp     String?
@@ -391,6 +403,8 @@ model AtaItem {
   valorUnitario Float
   valorTotal    Float
   moeda         Moeda   @default(BRL)
+  // Lote (briefing PDF — Cadastro Ata 2.7: itens agrupados em lotes)
+  lote          String?
 
   ataId String
   ata   Ata    @relation(fields: [ataId], references: [id], onDelete: Cascade)
@@ -443,6 +457,8 @@ model EnderecoEntrega {
 model PontoFocal {
   id        String           @id @default(cuid())
   funcao    FuncaoPontoFocal
+  // Descrição livre quando funcao = OUTRO (briefing PDF — Cadastro Ata 2.6)
+  funcaoDescricao String?
   nome      String
   email     String?
   telefone  String?

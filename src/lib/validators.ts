@@ -202,6 +202,7 @@ const itemSchema = z.object({
   marca: z.string().optional(),
   valorUnitario: z.coerce.number().positive("Valor unitário > 0"),
   ataItemId: z.string().optional(),
+  lote: z.string().optional(), // briefing PDF 2.7 — agrupar em lotes
 });
 
 const contratacaoBase = z.object({
@@ -229,9 +230,58 @@ const enderecoEntregaSchema = z.object({
   endereco: z.string().min(5, "Endereço muito curto"),
 });
 
+export const funcoesPontoFocal = [
+  "AUTORIDADE_COMPETENTE",
+  "GESTOR",
+  "FISCAL",
+  "FISCAL_TECNICO",
+  "FISCAL_ADMINISTRATIVO",
+  "RESPONSAVEL_SETOR",
+  "CONTATO_GERAL",
+  "OUTRO",
+] as const;
+
+export const ROTULO_FUNCAO_PONTO_FOCAL: Record<(typeof funcoesPontoFocal)[number], string> = {
+  AUTORIDADE_COMPETENTE: "Autoridade competente (signatário)",
+  GESTOR: "Gestor",
+  FISCAL: "Fiscal",
+  FISCAL_TECNICO: "Fiscal técnico",
+  FISCAL_ADMINISTRATIVO: "Fiscal administrativo",
+  RESPONSAVEL_SETOR: "Responsável de setor",
+  CONTATO_GERAL: "Contato geral",
+  OUTRO: "Outro (especificar)",
+};
+
+export const OPCOES_FUNCAO_PONTO_FOCAL = (
+  Object.entries(ROTULO_FUNCAO_PONTO_FOCAL) as [string, string][]
+).map(([value, label]) => ({ value, label }));
+
 const pontoFocalSchema = z.object({
-  funcao: z.enum(["GESTOR", "FISCAL_TECNICO", "FISCAL_ADMINISTRATIVO", "RESPONSAVEL_SETOR", "CONTATO_GERAL"]),
+  funcao: z.enum(funcoesPontoFocal),
+  funcaoDescricao: z.string().optional(), // quando funcao = OUTRO
   nome: z.string().min(2, "Informe o nome"),
+  email: z.string().email().optional().or(z.literal("")),
+  telefone: z.string().optional(),
+});
+
+// Origem do marco de reajuste (briefing PDF 2.4)
+export const marcosReajusteOrigem = ["ORCAMENTO_ESTIMADO", "ASSINATURA", "OMISSA"] as const;
+export const ROTULO_MARCO_REAJUSTE: Record<(typeof marcosReajusteOrigem)[number], string> = {
+  ORCAMENTO_ESTIMADO: "Data do orçamento estimado",
+  ASSINATURA: "Data de assinatura da Ata",
+  OMISSA: "Omissa (não definida na Ata)",
+};
+export const OPCOES_MARCO_REAJUSTE = (
+  Object.entries(ROTULO_MARCO_REAJUSTE) as [string, string][]
+).map(([value, label]) => ({ value, label }));
+
+// Órgão participante / carona (briefing PDF 2.3)
+export const tiposOrgaoNaAta = ["PARTICIPANTE", "CARONA"] as const;
+const orgaoNaAtaSchema = z.object({
+  tipo: z.enum(tiposOrgaoNaAta).default("PARTICIPANTE"),
+  nome: z.string().min(2, "Nome do órgão obrigatório"),
+  cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
+  endereco: z.string().min(5, "Endereço obrigatório"),
   email: z.string().email().optional().or(z.literal("")),
   telefone: z.string().optional(),
 });
@@ -242,8 +292,14 @@ export const novaAtaSchema = contratacaoBase.extend({
   dataPublicacao: z.coerce.date().optional(),
   aceitaCarona: z.coerce.boolean().optional(),
   idAtaPncp: z.string().optional(),
+  // 2.4 — toggle "não se aplica" no prazo de entrega
+  prazoEntregaNaoAplica: z.coerce.boolean().optional(),
+  // 2.4 — origem do marco de reajuste
+  marcoReajusteOrigem: z.enum(marcosReajusteOrigem).optional(),
   enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
   pontosFocais: z.array(pontoFocalSchema).optional(),
+  // 2.3 — órgãos participantes
+  orgaosParticipantes: z.array(orgaoNaAtaSchema).optional(),
   itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
 });
 
