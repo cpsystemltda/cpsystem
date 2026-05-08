@@ -212,6 +212,32 @@ export default async function DashboardPage() {
   }
   const maxVenc = Math.max(1, ...vencimentosPorMes);
 
+  // Contratos contínuos (briefing Igor): só tipos contínuos, agrupados em faixas
+  // de vencimento (alertas de renovação). Sem "renovação automática" (não existe).
+  const continuoTipos = ["FORNECIMENTO_CONTINUO", "SERVICOS_CONTINUOS"];
+  const contratosContinuos = contratosVigentesDetalhe.filter((c) =>
+    continuoTipos.includes(c.tipo as string),
+  );
+  const faixasContinuos = {
+    ate30: 0,
+    de30a60: 0,
+    de60a90: 0,
+    de90a180: 0,
+    ate12meses: 0,
+    acima12meses: 0,
+  };
+  for (const c of contratosContinuos) {
+    const dias = Math.ceil((c.vigenciaFim.getTime() - hoje.getTime()) / 86400000);
+    if (dias < 0) continue;
+    if (dias <= 30) faixasContinuos.ate30 += 1;
+    else if (dias <= 60) faixasContinuos.de30a60 += 1;
+    else if (dias <= 90) faixasContinuos.de60a90 += 1;
+    else if (dias <= 180) faixasContinuos.de90a180 += 1;
+    else if (dias <= 365) faixasContinuos.ate12meses += 1;
+    else faixasContinuos.acima12meses += 1;
+  }
+  const totalContinuos = contratosContinuos.length;
+
   // Órgãos atendidos (distintos)
   const orgaosUnicos = new Set(empenhosCompletos.map((e) => e.orgaoCnpj));
   const qtdOrgaos = orgaosUnicos.size;
@@ -434,8 +460,53 @@ export default async function DashboardPage() {
         </div>
       </Block>
 
+      {/* === Bloco III — Contratos contínuos (alertas de renovação) === */}
+      <Block
+        numero="03"
+        eyebrow="Recorrentes · alertas de renovação"
+        titulo="Contratos contínuos"
+      >
+        <div className="grid grid-cols-3 gap-3.5" style={{ marginBottom: "18px" }}>
+          <KPI
+            tone="primary"
+            icon={ClipboardList}
+            label="Contínuos vigentes"
+            value={totalContinuos}
+            meta={`${faixasContinuos.ate30 + faixasContinuos.de30a60 + faixasContinuos.de60a90} a renovar nos próximos 90 dias`}
+          />
+          <KPI
+            tone="coral"
+            icon={AlertTriangle}
+            label="Crítico (≤ 30 dias)"
+            value={faixasContinuos.ate30}
+            meta="Inicie a tratativa imediatamente"
+          />
+          <KPI
+            tone="rose"
+            icon={Clock}
+            label="Próximos a renovar (60–90d)"
+            value={faixasContinuos.de30a60 + faixasContinuos.de60a90}
+            meta="Janela ideal de tratativa"
+          />
+        </div>
+
+        <ChartCard
+          title="Vencimentos por faixa"
+          subtitle="Antecipe renovações pelas janelas críticas"
+        >
+          <FaixasVencimentoChart
+            ate30={faixasContinuos.ate30}
+            de30a60={faixasContinuos.de30a60}
+            de60a90={faixasContinuos.de60a90}
+            de90a180={faixasContinuos.de90a180}
+            ate12meses={faixasContinuos.ate12meses}
+            acima12meses={faixasContinuos.acima12meses}
+          />
+        </ChartCard>
+      </Block>
+
       {/* === Bloco IV — Logística === */}
-      <Block numero="03" eyebrow="Operação" titulo="Logística">
+      <Block numero="04" eyebrow="Operação" titulo="Logística">
         <div className="grid grid-cols-2 gap-3.5">
           <KPI
             tone="lavender"
@@ -461,7 +532,7 @@ export default async function DashboardPage() {
       </Block>
 
       {/* === Bloco V — Clientes === */}
-      <Block numero="04" eyebrow="Carteira de órgãos" titulo="Clientes atendidos">
+      <Block numero="05" eyebrow="Carteira de órgãos" titulo="Clientes atendidos">
         <div
           className="grid gap-3.5"
           style={{ gridTemplateColumns: "1fr 2fr" }}
@@ -602,7 +673,7 @@ export default async function DashboardPage() {
 
       {/* === Bloco VI — Processos apuratórios === */}
       <Block
-        numero="05"
+        numero="06"
         eyebrow="Risco & conformidade"
         titulo="Processos apuratórios"
         tag={procEmAndamento.length === 0 ? undefined : undefined}
@@ -822,6 +893,79 @@ function DonutChart({
       <div className="mt-3.5 text-center text-[12px] font-medium" style={{ color: "var(--text-mute)" }}>
         {brlCompacto(executado)} executados de {brlCompacto(contratado)} contratados
       </div>
+    </div>
+  );
+}
+
+function FaixasVencimentoChart({
+  ate30,
+  de30a60,
+  de60a90,
+  de90a180,
+  ate12meses,
+  acima12meses,
+}: {
+  ate30: number;
+  de30a60: number;
+  de60a90: number;
+  de90a180: number;
+  ate12meses: number;
+  acima12meses: number;
+}) {
+  const faixas: { rotulo: string; valor: number; cor: string; glow: string }[] = [
+    { rotulo: "Em menos de 30 dias", valor: ate30, cor: "var(--coral)", glow: "var(--coral-glow)" },
+    { rotulo: "Entre 30 e 60 dias", valor: de30a60, cor: "var(--rose)", glow: "var(--rose-glow)" },
+    { rotulo: "Entre 60 e 90 dias", valor: de60a90, cor: "var(--primary)", glow: "var(--primary-glow)" },
+    { rotulo: "Entre 90 e 180 dias", valor: de90a180, cor: "var(--lavender)", glow: "var(--lavender-glow)" },
+    { rotulo: "Em até 12 meses", valor: ate12meses, cor: "var(--sky)", glow: "var(--sky-glow)" },
+    { rotulo: "Acima de 12 meses", valor: acima12meses, cor: "var(--mint)", glow: "var(--mint-glow)" },
+  ];
+  const max = Math.max(1, ...faixas.map((f) => f.valor));
+
+  return (
+    <div className="flex flex-col gap-3">
+      {faixas.map((f) => {
+        const pct = (f.valor / max) * 100;
+        return (
+          <div key={f.rotulo} className="flex items-center gap-4">
+            <div
+              className="w-[180px] shrink-0 text-[12px] font-medium"
+              style={{ color: "var(--text-soft)", letterSpacing: "-0.005em" }}
+            >
+              {f.rotulo}
+            </div>
+            <div
+              className="relative flex-1 overflow-hidden rounded-full"
+              style={{ background: "rgba(255,255,255,0.04)", height: "20px" }}
+            >
+              <div
+                className="absolute inset-y-0 left-0 flex items-center justify-end pr-2.5 rounded-full"
+                style={{
+                  width: `${pct}%`,
+                  background: `linear-gradient(90deg, ${f.cor}99, ${f.cor})`,
+                  boxShadow: `0 0 16px ${f.glow}`,
+                  minWidth: f.valor > 0 ? "32px" : "0",
+                }}
+              >
+                {f.valor > 0 && (
+                  <span
+                    className="text-[11px] font-extrabold"
+                    style={{ color: "#0A0A0A", letterSpacing: "-0.02em" }}
+                  >
+                    {f.valor}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div
+              className="w-[40px] text-right text-[14px] font-extrabold tabular-nums"
+              style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
+            >
+              {f.valor}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
