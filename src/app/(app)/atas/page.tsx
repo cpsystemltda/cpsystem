@@ -7,6 +7,7 @@ import { FiltroLista } from "@/components/FiltroLista";
 import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { KpiVencimentos } from "@/components/KpiVencimentos";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 export default async function AtasPage({
   searchParams,
@@ -80,18 +81,17 @@ export default async function AtasPage({
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
       <BannerEmpresaEmFoco contaId={usuario.contaId} />
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Atas de Registro de Preços</h1>
-          <p className="mt-1 text-sm text-slate-600">{atasComSaldo.length} ata(s) {q && `correspondendo a "${q}"`}.</p>
-        </div>
-        <Link
-          href="/contratacoes/nova/ata"
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" /> Nova Ata
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Sistema de Registro de Preços"
+        titulo="Atas de"
+        destaque="Registro"
+        subtitulo={`${atasComSaldo.length} ata(s)${q ? ` correspondendo a "${q}"` : ""}.`}
+        cta={
+          <Link href="/contratacoes/nova/ata" className="btn-primary">
+            <Plus className="h-4 w-4" /> Nova Ata
+          </Link>
+        }
+      />
 
       <div className="mt-6">
         <KpiVencimentos

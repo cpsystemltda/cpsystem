@@ -6,6 +6,7 @@ import { brl } from "@/lib/validators";
 import { FiltroLista } from "@/components/FiltroLista";
 import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -65,18 +66,17 @@ export default async function ExecucaoPage({ searchParams }: { searchParams: Pro
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
       <BannerEmpresaEmFoco contaId={usuario.contaId} />
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Execução / Logística</h1>
-          <p className="mt-1 text-sm text-slate-600">{empenhos.length} empenho(s).</p>
-        </div>
-        <Link
-          href="/contratacoes/nova/empenho"
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" /> Novo Empenho
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Operação · Logística"
+        titulo="Empenhos &"
+        destaque="Execução"
+        subtitulo={`${empenhos.length} empenho(s) — entregas, NFs e pagamentos.`}
+        cta={
+          <Link href="/contratacoes/nova/empenho" className="btn-primary">
+            <Plus className="h-4 w-4" /> Novo Empenho
+          </Link>
+        }
+      />
 
       <div className="mt-6">
         <FiltroLista

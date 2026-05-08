@@ -6,6 +6,7 @@ import { ContratosBrowser, type ContratoCard } from "@/components/ContratosBrows
 import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { KpiVencimentos } from "@/components/KpiVencimentos";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 function classifica(vigenciaFim: Date): ContratoCard["status"] {
   const hoje = new Date();
@@ -108,23 +109,17 @@ export default async function ContratosPage({
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
       <BannerEmpresaEmFoco contaId={usuario.contaId} />
-      <div className="flex items-end justify-between gap-6">
-        <div>
-          <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
-            <ClipboardList className="h-3.5 w-3.5" /> Módulo 4 · Contratos
-          </p>
-          <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">Contratos</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {todos.length} contrato(s) cadastrado(s) · Use as abas pra filtrar por status.
-          </p>
-        </div>
-        <Link
-          href="/contratacoes/nova/contrato"
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
-        >
-          <Plus className="h-4 w-4" /> Cadastrar contrato
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Módulo · Contratos"
+        titulo="Contratos"
+        destaque="administrativos"
+        subtitulo={`${todos.length} contrato(s) cadastrado(s) · use as abas pra filtrar por status.`}
+        cta={
+          <Link href="/contratacoes/nova/contrato" className="btn-primary">
+            <Plus className="h-4 w-4" /> Novo contrato
+          </Link>
+        }
+      />
 
       <div className="mt-6">
         <KpiVencimentos

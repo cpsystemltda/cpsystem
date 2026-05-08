@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Building2, Plus } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { PageHeader } from "@/components/ui/SecaoGlass";
 
 const LIMITE = 4;
 
@@ -22,26 +23,31 @@ export default async function EmpresasPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-8 py-8">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Empresas</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Gerencie os CNPJs do seu grupo econômico. Você está usando {empresas.length} de {LIMITE} CNPJs incluídos no plano.
-          </p>
-        </div>
-        {podeAdicionar ? (
-          <Link
-            href="/empresas/nova"
-            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4" /> Adicionar CNPJ
-          </Link>
-        ) : (
-          <span className="rounded-md bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800">
-            Limite atingido — fale com a equipe comercial para CNPJs adicionais
-          </span>
-        )}
-      </div>
+      <PageHeader
+        eyebrow="Visão geral · Grupo econômico"
+        titulo="Empresas"
+        destaque="(CNPJs)"
+        subtitulo={`Gerencie os CNPJs do seu grupo. Usando ${empresas.length} de ${LIMITE} CNPJs incluídos no plano.`}
+        cta={
+          podeAdicionar ? (
+            <Link href="/empresas/nova" className="btn-primary">
+              <Plus className="h-4 w-4" /> Adicionar CNPJ
+            </Link>
+          ) : (
+            <span
+              className="rounded-full px-4 py-2 text-xs font-bold uppercase"
+              style={{
+                background: "rgba(212,175,55,0.14)",
+                color: "var(--primary-bright)",
+                border: "0.5px solid rgba(212,175,55,0.3)",
+                letterSpacing: "0.08em",
+              }}
+            >
+              Limite atingido — fale com o comercial
+            </span>
+          )
+        }
+      />
 
       <div className="mt-8 grid gap-4">
         {empresas.map((e) => (

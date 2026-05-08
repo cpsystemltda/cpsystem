@@ -6,126 +6,242 @@ import { Building2, UserCheck } from "lucide-react";
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { loginAction } from "@/app/actions/auth";
-import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
   const [state, formAction] = useActionState(loginAction, null);
-  // Toggle informativo: muda o link de "Criar conta" pro tipo certo no signup
   const [tipoEscolhido, setTipoEscolhido] = useState<"EMPRESA" | "ANALISTA">("EMPRESA");
 
   return (
-    <div className="relative grid min-h-screen grid-cols-1 lg:grid-cols-[5fr_6fr]">
-      {/* Painel de marca — esquerda (lg+) */}
-      <aside className="relative hidden flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#1A1206] via-[#0C1019] to-[#1F232B] px-12 py-20 lg:flex">
-        {/* Halo dourado sutil */}
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-40 -top-40 h-[36rem] w-[36rem] rounded-full bg-[#D4AF37]/15 blur-3xl" />
-          <div className="absolute -bottom-40 -right-32 h-[32rem] w-[32rem] rounded-full bg-[#B8860B]/10 blur-3xl" />
-        </div>
-        {/* Pattern muito sutil em diagonal */}
+    <div className="auth-shell relative min-h-screen overflow-hidden">
+      {/* Background atmosférico (mesma estética do app interno) */}
+      <div
+        aria-hidden
+        className="fixed inset-0 z-0 pointer-events-none"
+        style={{
+          background:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.4' opacity='0.10'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E\"), radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.18), transparent 55%), radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.12), transparent 55%), radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.12), transparent 55%), radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.16), transparent 55%), linear-gradient(135deg, #08070C 0%, #0F0D14 35%, #14110D 75%, #0A0908 100%)",
+          backgroundSize: "240px 240px, auto, auto, auto, auto, auto",
+          backgroundRepeat: "repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat",
+          backgroundAttachment: "fixed",
+        }}
+      />
+
+      {/* Conteúdo */}
+      <div className="relative z-[1] flex min-h-screen items-center justify-center px-6 py-12">
         <div
-          className="pointer-events-none absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(45deg, #D4AF37 0px, #D4AF37 1px, transparent 1px, transparent 22px)",
-          }}
-        />
-
-        <div className="relative z-10 flex w-full max-w-md flex-col items-center text-center">
-          <Logo variant="xl" mode="brand" onDark priority />
-          <p className="mt-16 max-w-sm text-base leading-relaxed text-white/75">
-            Plataforma premium de gestão de contratos para empresas que vendem ao governo.
-          </p>
-          <div className="mt-12 h-px w-24 bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent" />
-          <p className="mt-6 text-[11px] font-medium uppercase tracking-[0.4em] text-[#D4AF37]/80">
-            Contratos Públicos
-          </p>
-        </div>
-      </aside>
-
-      {/* Painel do formulário — direita / única em mobile */}
-      <main className="relative flex flex-col items-center justify-center bg-gradient-to-b from-white via-[#FBF8F0] to-white px-6 py-16 sm:px-10">
-        {/* Logo só no mobile (no desktop fica no painel lateral) */}
-        <div className="lg:hidden">
-          <Link href="/" className="block">
-            <Logo variant="md" mode="brand" priority />
-          </Link>
-        </div>
-
-        <div className="w-full max-w-md">
-          <h1
-            className="mt-10 text-center text-3xl text-[#2D3340] lg:mt-0"
-            style={{ fontFamily: "var(--font-brand)", letterSpacing: "0.02em" }}
-          >
-            Entrar na sua conta
-          </h1>
-          <p className="mt-3 text-center text-sm text-slate-500">
-            Acesse o painel de gestão dos seus contratos.
-          </p>
-
-          {/* Botões de identificação: empresa fornecedora x analista de licitação */}
-          <div className="mt-8 grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setTipoEscolhido("EMPRESA")}
-              className={`flex items-center gap-2.5 rounded-xl border-2 px-4 py-3 text-left transition ${
-                tipoEscolhido === "EMPRESA"
-                  ? "border-blue-500 bg-blue-50/40 shadow-sm"
-                  : "border-slate-200 bg-white hover:border-slate-300"
-              }`}
-            >
-              <Building2
-                className={`h-5 w-5 shrink-0 ${tipoEscolhido === "EMPRESA" ? "text-blue-600" : "text-slate-500"}`}
-              />
-              <span className="text-sm font-semibold text-slate-900">Empresa</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTipoEscolhido("ANALISTA")}
-              className={`flex items-center gap-2.5 rounded-xl border-2 px-4 py-3 text-left transition ${
-                tipoEscolhido === "ANALISTA"
-                  ? "border-blue-500 bg-blue-50/40 shadow-sm"
-                  : "border-slate-200 bg-white hover:border-slate-300"
-              }`}
-            >
-              <UserCheck
-                className={`h-5 w-5 shrink-0 ${tipoEscolhido === "ANALISTA" ? "text-blue-600" : "text-slate-500"}`}
-              />
-              <span className="text-sm font-semibold text-slate-900">Analista de licitações</span>
-            </button>
-          </div>
-
-          <form action={formAction} className="mt-6 grid grid-cols-2 gap-5">
-            <Field label="E-mail" name="email" type="email" autoComplete="email" required span={2} />
-            <Field label="Senha" name="senha" type="password" autoComplete="current-password" required span={2} />
-
-            {state?.erro && (
-              <div className="col-span-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {state.erro}
+          className="glass w-full max-w-[460px] overflow-hidden rounded-[28px] px-9 py-10"
+          style={{ color: "var(--text-soft)" }}
+        >
+          <div className="relative z-[1]">
+            {/* Logo */}
+            <div className="text-center">
+              <div
+                style={{
+                  fontFamily: "'Playfair Display', Georgia, serif",
+                  fontWeight: 500,
+                  fontSize: "44px",
+                  lineHeight: 1,
+                  letterSpacing: "-0.06em",
+                  background: "linear-gradient(180deg, #FFF 0%, var(--primary-bright) 100%)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                CP
               </div>
-            )}
-
-            <div className="col-span-2 mt-2 flex flex-col gap-4">
-              <SubmitButton>Entrar</SubmitButton>
-              <p className="text-center text-sm text-slate-500">
-                Não tem conta?{" "}
-                <Link
-                  href={`/signup?tipo=${tipoEscolhido}`}
-                  className="font-semibold text-[#9C7A2D] hover:text-[#B8860B]"
-                >
-                  Criar conta {tipoEscolhido === "EMPRESA" ? "de empresa" : "de analista"}
-                </Link>
-              </p>
+              <div
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  letterSpacing: "0.5em",
+                  color: "var(--primary)",
+                  marginTop: "6px",
+                  textTransform: "uppercase",
+                }}
+              >
+                CP&nbsp;System
+              </div>
+              <div
+                className="mx-auto mt-5 h-px max-w-[120px]"
+                style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
+              />
             </div>
-          </form>
 
-          <div className="mt-12 flex items-center justify-center gap-3 text-[10px] uppercase tracking-[0.3em] text-slate-400">
-            <span className="h-px w-8 bg-slate-200" />
-            <span>LGPD · Auditável · BR</span>
-            <span className="h-px w-8 bg-slate-200" />
+            {/* Título */}
+            <h1
+              className="mt-6 text-center text-[28px] font-extrabold leading-tight"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+            >
+              Entrar na sua{" "}
+              <em
+                style={{
+                  fontStyle: "normal",
+                  background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                conta
+              </em>
+            </h1>
+            <p
+              className="mt-2 text-center text-[13px]"
+              style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
+            >
+              Acesse o painel de gestão dos seus contratos.
+            </p>
+
+            {/* Toggle Empresa / Analista */}
+            <div className="mt-7 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setTipoEscolhido("EMPRESA")}
+                className="flex items-center justify-center gap-2 rounded-2xl px-4 py-3 transition"
+                style={
+                  tipoEscolhido === "EMPRESA"
+                    ? {
+                        background:
+                          "linear-gradient(135deg, rgba(212,175,55,0.22), rgba(212,175,55,0.06)), rgba(255,255,255,0.03)",
+                        border: "0.5px solid rgba(212,175,55,0.45)",
+                        boxShadow: "0 0 24px rgba(212,175,55,0.18), inset 0 1px 0 rgba(255,255,255,0.18)",
+                        color: "var(--text)",
+                      }
+                    : {
+                        background: "rgba(255,255,255,0.04)",
+                        border: "0.5px solid var(--hairline)",
+                        color: "var(--text-mute)",
+                      }
+                }
+              >
+                <Building2
+                  className="h-[18px] w-[18px] shrink-0"
+                  style={{
+                    color:
+                      tipoEscolhido === "EMPRESA" ? "var(--primary-bright)" : "var(--text-mute)",
+                    strokeWidth: 1.7,
+                  }}
+                />
+                <span className="text-[13px] font-bold">Empresa</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTipoEscolhido("ANALISTA")}
+                className="flex items-center justify-center gap-2 rounded-2xl px-4 py-3 transition"
+                style={
+                  tipoEscolhido === "ANALISTA"
+                    ? {
+                        background:
+                          "linear-gradient(135deg, rgba(212,175,55,0.22), rgba(212,175,55,0.06)), rgba(255,255,255,0.03)",
+                        border: "0.5px solid rgba(212,175,55,0.45)",
+                        boxShadow: "0 0 24px rgba(212,175,55,0.18), inset 0 1px 0 rgba(255,255,255,0.18)",
+                        color: "var(--text)",
+                      }
+                    : {
+                        background: "rgba(255,255,255,0.04)",
+                        border: "0.5px solid var(--hairline)",
+                        color: "var(--text-mute)",
+                      }
+                }
+              >
+                <UserCheck
+                  className="h-[18px] w-[18px] shrink-0"
+                  style={{
+                    color:
+                      tipoEscolhido === "ANALISTA" ? "var(--primary-bright)" : "var(--text-mute)",
+                    strokeWidth: 1.7,
+                  }}
+                />
+                <span className="text-[13px] font-bold">Analista</span>
+              </button>
+            </div>
+
+            {/* Form */}
+            <form action={formAction} className="mt-6 grid grid-cols-1 gap-5">
+              <Field
+                label="E-mail"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                span={4}
+              />
+              <Field
+                label="Senha"
+                name="senha"
+                type="password"
+                autoComplete="current-password"
+                required
+                span={4}
+              />
+
+              {state?.erro && (
+                <div
+                  className="rounded-2xl px-4 py-3 text-sm"
+                  style={{
+                    background: "rgba(232,138,152,0.10)",
+                    border: "0.5px solid rgba(232,138,152,0.3)",
+                    color: "var(--coral)",
+                  }}
+                >
+                  {state.erro}
+                </div>
+              )}
+
+              <div className="mt-2">
+                <SubmitButton>Entrar</SubmitButton>
+              </div>
+            </form>
+
+            <p
+              className="mt-6 text-center text-[13px]"
+              style={{ color: "var(--text-mute)" }}
+            >
+              Não tem conta?{" "}
+              <Link
+                href={`/signup?tipo=${tipoEscolhido}`}
+                className="font-bold transition"
+                style={{ color: "var(--primary-bright)" }}
+              >
+                Criar conta {tipoEscolhido === "EMPRESA" ? "de empresa" : "de analista"}
+              </Link>
+            </p>
+
+            {/* Footer */}
+            <div
+              className="mt-8 flex items-center justify-center gap-3 text-[10px] uppercase"
+              style={{
+                letterSpacing: "0.3em",
+                color: "var(--text-faint)",
+              }}
+            >
+              <span className="h-px w-8" style={{ background: "var(--hairline)" }} />
+              <span>LGPD · Auditável · BR</span>
+              <span className="h-px w-8" style={{ background: "var(--hairline)" }} />
+            </div>
           </div>
         </div>
-      </main>
+      </div>
+
+      {/* Inputs e botões precisam herdar paleta dark mesmo fora de .app-shell */}
+      <style jsx>{`
+        .auth-shell :global(input[type="email"]),
+        .auth-shell :global(input[type="password"]),
+        .auth-shell :global(input[type="text"]) {
+          background: rgba(255, 255, 255, 0.95);
+          color: #1d1d1f;
+          border: 0.5px solid rgba(0, 0, 0, 0.12);
+        }
+        .auth-shell :global(input::placeholder) {
+          color: #8e8e93;
+        }
+        .auth-shell :global(input:focus) {
+          outline: none;
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+      `}</style>
     </div>
   );
 }
