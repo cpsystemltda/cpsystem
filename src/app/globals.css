@@ -681,3 +681,94 @@ body {
 .app-shell .rounded-lg { border-radius: 14px; }
 .app-shell .rounded-xl { border-radius: 18px; }
 .app-shell .rounded-2xl { border-radius: 22px; }
+
+/* ============================================================
+   DROPDOWNS / MENUS FLUTUANTES — fundo OPACO obrigatório
+   Apple HIG: overlays nunca podem ser translúcidos sobre conteúdo.
+   ============================================================ */
+.app-shell .absolute.bg-white,
+.app-shell .fixed.bg-white,
+.app-shell [role="menu"].bg-white,
+.app-shell [role="listbox"].bg-white,
+.app-shell [role="dialog"].bg-white {
+  background: rgba(22, 22, 30, 0.96) !important;
+  backdrop-filter: blur(40px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  color: var(--text-soft);
+}
+
+/* Texto dentro de dropdowns: claro */
+.app-shell .absolute.bg-white .text-slate-900,
+.app-shell .fixed.bg-white .text-slate-900,
+.app-shell .absolute.bg-white .text-slate-800,
+.app-shell .fixed.bg-white .text-slate-800 { color: var(--text) !important; }
+
+.app-shell .absolute.bg-white .text-slate-700,
+.app-shell .fixed.bg-white .text-slate-700,
+.app-shell .absolute.bg-white .text-slate-600,
+.app-shell .fixed.bg-white .text-slate-600 { color: var(--text-soft) !important; }
+
+.app-shell .absolute.bg-white .text-slate-500,
+.app-shell .fixed.bg-white .text-slate-500,
+.app-shell .absolute.bg-white .text-slate-400,
+.app-shell .fixed.bg-white .text-slate-400 { color: var(--text-mute) !important; }
+
+/* Sub-headers dentro de dropdown (bg-slate-50) ficam um pouco mais escuros pra dar separação */
+.app-shell .absolute.bg-white .bg-slate-50,
+.app-shell .fixed.bg-white .bg-slate-50,
+.app-shell .absolute.bg-white .bg-gray-50,
+.app-shell .fixed.bg-white .bg-gray-50 {
+  background: rgba(0, 0, 0, 0.25) !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+/* Borders dentro de dropdown */
+.app-shell .absolute.bg-white .border-slate-100,
+.app-shell .fixed.bg-white .border-slate-100,
+.app-shell .absolute.bg-white .border-slate-200,
+.app-shell .fixed.bg-white .border-slate-200 {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Hover de items em dropdown */
+.app-shell .absolute.bg-white .hover\:bg-slate-50:hover,
+.app-shell .fixed.bg-white .hover\:bg-slate-50:hover,
+.app-shell .absolute.bg-white .hover\:bg-gray-50:hover,
+.app-shell .fixed.bg-white .hover\:bg-gray-50:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Item ativo em dropdown — usa dourado da marca em vez de violet */
+.app-shell .absolute.bg-white .bg-violet-50,
+.app-shell .fixed.bg-white .bg-violet-50,
+.app-shell .absolute.bg-white .bg-purple-50,
+.app-shell .fixed.bg-white .bg-purple-50 {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(212, 175, 55, 0.06)) !important;
+  border-left: 2px solid var(--primary) !important;
+}
+
+/* Cores de ícone violet (admin) — manter contexto mas saturadas em dark */
+.app-shell .absolute.bg-white .text-violet-600,
+.app-shell .fixed.bg-white .text-violet-600,
+.app-shell .absolute.bg-white .text-violet-700 { color: var(--primary-bright) !important; }
+
+/* Cards de cor light dentro de dropdown — tinted dark */
+.app-shell .absolute.bg-white .bg-blue-100,
+.app-shell .fixed.bg-white .bg-blue-100 { background: rgba(184, 197, 214, 0.18) !important; }
+.app-shell .absolute.bg-white .text-blue-700,
+.app-shell .fixed.bg-white .text-blue-700 { color: var(--sky-bright) !important; }
+.app-shell .absolute.bg-white .bg-emerald-100,
+.app-shell .fixed.bg-white .bg-emerald-100 { background: rgba(93, 216, 182, 0.18) !important; }
+.app-shell .absolute.bg-white .text-emerald-700,
+.app-shell .fixed.bg-white .text-emerald-700 { color: var(--mint) !important; }
+
+/* Borda dos sub-headers (top/bottom) */
+.app-shell .absolute.bg-white .border-t,
+.app-shell .fixed.bg-white .border-t { border-top-color: rgba(255, 255, 255, 0.08) !important; }
+.app-shell .absolute.bg-white .border-b,
+.app-shell .fixed.bg-white .border-b { border-bottom-color: rgba(255, 255, 255, 0.08) !important; }
