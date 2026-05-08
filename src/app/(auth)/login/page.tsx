@@ -26,15 +26,79 @@ export default function LoginPage() {
         }}
       />
 
-      {/* Conteúdo */}
-      <div className="relative z-[1] flex min-h-screen items-center justify-center px-6 py-12">
+      {/* Conteúdo — desktop 2 colunas (brand statement + card), mobile stack */}
+      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1200px] flex-col items-center justify-center gap-12 px-6 py-12 lg:flex-row lg:items-center lg:gap-16 lg:px-10">
+        {/* Coluna esquerda — brand statement (desktop) */}
+        <aside className="hidden flex-col text-center lg:flex lg:flex-1 lg:max-w-[480px] lg:text-left">
+          <div
+            style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              fontWeight: 500,
+              fontSize: "120px",
+              lineHeight: 0.92,
+              letterSpacing: "-0.07em",
+              background: "linear-gradient(180deg, #FFF 0%, var(--primary-bright) 100%)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            CP
+          </div>
+          <div
+            className="mt-3"
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              letterSpacing: "0.5em",
+              color: "var(--primary)",
+              textTransform: "uppercase",
+            }}
+          >
+            CP&nbsp;System
+          </div>
+
+          <p
+            className="mt-12 max-w-[400px] text-[18px] leading-relaxed"
+            style={{ color: "var(--text-soft)", letterSpacing: "-0.005em", fontWeight: 400 }}
+          >
+            Plataforma{" "}
+            <em
+              style={{
+                fontStyle: "normal",
+                background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                fontWeight: 700,
+              }}
+            >
+              premium
+            </em>{" "}
+            de gestão de contratos para empresas que vendem ao governo.
+          </p>
+
+          <div
+            className="mt-10 h-px max-w-[120px]"
+            style={{ background: "linear-gradient(90deg, var(--primary), transparent)" }}
+          />
+
+          <p
+            className="mt-5 text-[11px] font-bold uppercase"
+            style={{ color: "var(--primary)", letterSpacing: "0.4em", opacity: 0.8 }}
+          >
+            Contratos Públicos
+          </p>
+        </aside>
+
+        {/* Coluna direita — card de login (mantém o que foi aprovado) */}
         <div
-          className="glass w-full max-w-[460px] overflow-hidden rounded-[28px] px-9 py-10"
+          className="glass w-full max-w-[460px] overflow-hidden rounded-[28px] px-9 py-10 lg:flex-shrink-0"
           style={{ color: "var(--text-soft)" }}
         >
           <div className="relative z-[1]">
-            {/* Logo */}
-            <div className="text-center">
+            {/* Logo — só no mobile (no desktop fica na coluna esquerda) */}
+            <div className="text-center lg:hidden">
               <div
                 style={{
                   fontFamily: "'Playfair Display', Georgia, serif",
@@ -70,7 +134,7 @@ export default function LoginPage() {
 
             {/* Título */}
             <h1
-              className="mt-6 text-center text-[28px] font-extrabold leading-tight"
+              className="mt-6 text-center text-[28px] font-extrabold leading-tight lg:mt-0 lg:text-left lg:text-[32px]"
               style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
             >
               Entrar na sua{" "}
@@ -87,7 +151,7 @@ export default function LoginPage() {
               </em>
             </h1>
             <p
-              className="mt-2 text-center text-[13px]"
+              className="mt-2 text-center text-[13px] lg:text-left"
               style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
             >
               Acesse o painel de gestão dos seus contratos.
