@@ -55,8 +55,12 @@ export default async function AdminPlataformaPage() {
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   const inicioMesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
 
+  // Filtro: ignorar contas de super admin (Igor/Regina) — não são clientes pagantes
+  const semSuperAdmin = { usuarios: { none: { superAdmin: true } } };
+
   const [contas, contasUltimoMes, atividadeRecente] = await Promise.all([
     prisma.conta.findMany({
+      where: semSuperAdmin,
       include: {
         empresas: { select: { razaoSocial: true, nomeFantasia: true } },
         analista: { select: { nomeCompleto: true } },
@@ -71,6 +75,7 @@ export default async function AdminPlataformaPage() {
     }),
     prisma.conta.count({
       where: {
+        ...semSuperAdmin,
         criadoEm: { gte: inicioMesPassado, lt: inicioMes },
         tipo: "EMPRESA",
       },

@@ -42,14 +42,17 @@ export default async function AdminAtividadePage({
   const q = (sp.q || "").trim();
 
   const eventos = await prisma.logAuditoria.findMany({
-    where: q
-      ? {
-          OR: [
-            { recurso: { contains: q, mode: "insensitive" } },
-            { resumo: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
+    where: {
+      // Ignora atividade dos super admins (Igor/Regina) — atividade é
+      // pra monitorar uso dos clientes, não dos próprios gestores.
+      conta: { usuarios: { none: { superAdmin: true } } },
+      ...(q && {
+        OR: [
+          { recurso: { contains: q, mode: "insensitive" } },
+          { resumo: { contains: q, mode: "insensitive" } },
+        ],
+      }),
+    },
     take: 200,
     orderBy: { criadoEm: "desc" },
   });

@@ -37,7 +37,11 @@ export default async function AdminFinanceiroPage() {
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
 
   const empresas = await prisma.conta.findMany({
-    where: { tipo: "EMPRESA" },
+    where: {
+      tipo: "EMPRESA",
+      // Ignora super admins (Igor/Regina) — não são clientes pagantes
+      usuarios: { none: { superAdmin: true } },
+    },
     include: {
       empresas: { select: { nomeFantasia: true, razaoSocial: true } },
       embaixador: { select: { id: true, nomeCompleto: true } },

@@ -43,6 +43,8 @@ export default async function AdminClientesPage({
 
   const contas = await prisma.conta.findMany({
     where: {
+      // Ignora super admins (Igor/Regina) — não são clientes pagantes
+      usuarios: { none: { superAdmin: true } },
       ...(statusFiltro && { statusAssinatura: statusFiltro as "TRIAL" | "ATIVA" | "INADIMPLENTE" | "CANCELADA" }),
       ...(tipo === "EMPRESA" && { tipo: "EMPRESA" }),
       ...(tipo === "ANALISTA" && { tipo: "ANALISTA" }),

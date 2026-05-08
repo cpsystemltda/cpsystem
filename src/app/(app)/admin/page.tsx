@@ -10,18 +10,22 @@ export default async function AdminPage() {
   const usuario = await exigirUsuario();
   // Em produção: gate por role/perfil. Aqui no MVP, qualquer usuário acessa pra demonstração.
 
+  // Filtro: ignora super admins (Igor/Regina) — não são clientes pagantes
+  const semSuperAdmin = { usuarios: { none: { superAdmin: true } } };
+
   const [contas, empresas, totalAtas, totalContratos, totalEmpenhos] = await Promise.all([
     prisma.conta.findMany({
+      where: semSuperAdmin,
       include: {
         usuarios: { select: { nome: true, email: true } },
         empresas: { select: { id: true } },
       },
       orderBy: { criadoEm: "desc" },
     }),
-    prisma.empresa.count(),
-    prisma.ata.count(),
-    prisma.contrato.count(),
-    prisma.empenho.count(),
+    prisma.empresa.count({ where: { conta: semSuperAdmin } }),
+    prisma.ata.count({ where: { empresa: { conta: semSuperAdmin } } }),
+    prisma.contrato.count({ where: { empresa: { conta: semSuperAdmin } } }),
+    prisma.empenho.count({ where: { empresa: { conta: semSuperAdmin } } }),
   ]);
 
   const ativas = contas.filter((c) => c.statusAssinatura === "ATIVA");
