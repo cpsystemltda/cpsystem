@@ -407,6 +407,14 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
   // Endereço auto-preenchido pelo CEP do órgão gerenciador
   const [orgaoEndereco, setOrgaoEndereco] = useState("");
 
+  // Vigência fim controlada — pra warnar quando o usuário escolhe data no passado
+  // (caso reportado pela Regina: cadastrou Ata e ela não apareceu como vigente
+  // porque a vigenciaFim já tinha passado).
+  const [vigenciaFim, setVigenciaFim] = useState<string>("");
+  const vigenciaFimNoPassado = vigenciaFim
+    ? new Date(vigenciaFim + "T23:59:59") < new Date()
+    : false;
+
   async function handleArquivo(file: File) {
     setExtraindo(true);
     setExtracaoErro(null);
@@ -821,8 +829,29 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               required
               erro={e.vigenciaFim}
               span={1}
-              defaultValue={dados?.vigenciaFim}
+              value={vigenciaFim || (v.vigenciaFim as string) || dados?.vigenciaFim || ""}
+              onChange={setVigenciaFim}
             />
+            {vigenciaFimNoPassado && (
+              <div
+                className="col-span-2 flex items-start gap-2.5 rounded-[12px] px-4 py-3 text-sm"
+                style={{
+                  background: "rgba(212,175,55,0.18)",
+                  border: "0.5px solid rgba(168,137,71,0.5)",
+                  color: "var(--primary-deep)",
+                }}
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-extrabold">Atenção: a vigência final está no passado.</p>
+                  <p className="mt-1 text-[13px]" style={{ color: "var(--text-soft)" }}>
+                    A Ata será cadastrada como <strong>vencida</strong> e não vai aparecer nos KPIs
+                    "Atas vigentes" / "Valores contratados" do dashboard. Se a vigência ainda está
+                    ativa, ajuste a data.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Prazo de entrega com toggle "não se aplica" */}
             <div className="col-span-2">

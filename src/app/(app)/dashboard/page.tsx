@@ -71,6 +71,8 @@ export default async function DashboardPage() {
     qtdEmpresas,
     atasVigentes,
     contratosVigentes,
+    atasVencidas,
+    contratosVencidos,
     empenhosCompletos,
     contratosVigentesDetalhe,
     atasVigentesDetalhe,
@@ -82,6 +84,8 @@ export default async function DashboardPage() {
     prisma.empresa.count({ where: { contaId } }),
     prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
     prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
+    prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { lt: hoje } } }),
+    prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { lt: hoje } } }),
     prisma.empenho.findMany({
       where: { empresa: filtroEmpresa },
       select: {
@@ -483,7 +487,9 @@ export default async function DashboardPage() {
                     .slice()
                     .sort((a, b) => a.vigenciaFim.getTime() - b.vigenciaFim.getTime())[0]
                     .vigenciaFim.toLocaleDateString("pt-BR")}`
-                : "Atas de Registro de Preços ativas"
+                : atasVencidas > 0
+                  ? `Nenhuma vigente · ${atasVencidas} vencida(s)`
+                  : "Atas de Registro de Preços ativas"
             }
           />
           <KPI
@@ -492,9 +498,43 @@ export default async function DashboardPage() {
             icon={ClipboardList}
             label="Contratos vigentes"
             value={contratosVigentes}
-            meta="Contratos administrativos em vigor"
+            meta={
+              contratosVigentes === 0 && contratosVencidos > 0
+                ? `Nenhum vigente · ${contratosVencidos} vencido(s)`
+                : "Contratos administrativos em vigor"
+            }
           />
         </div>
+
+        {(atasVencidas > 0 || contratosVencidos > 0) && (
+          <div
+            className="glass-tile mt-3.5 flex items-start gap-3 rounded-[16px] px-5 py-4 text-sm"
+            style={{
+              background: "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.06)), rgba(255,255,255,0.5)",
+              border: "0.5px solid rgba(168,137,71,0.4)",
+              color: "var(--text-soft)",
+            }}
+          >
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--primary-deep)" }} />
+            <div>
+              <p className="font-extrabold" style={{ color: "var(--primary-deep)" }}>
+                Você tem {atasVencidas} ata{atasVencidas !== 1 ? "s" : ""} e {contratosVencidos} contrato
+                {contratosVencidos !== 1 ? "s" : ""} com vigência expirada.
+              </p>
+              <p className="mt-1 text-[13px]" style={{ color: "var(--text-soft)" }}>
+                Atas/Contratos vencidos não entram nas métricas vigentes do dashboard. Para reativar, edite a vigência em{" "}
+                <Link href="/atas?status=vencidas" className="font-bold underline" style={{ color: "var(--primary-deep)" }}>
+                  Atas → Vencidas
+                </Link>{" "}
+                ou{" "}
+                <Link href="/contratos?status=vencidas" className="font-bold underline" style={{ color: "var(--primary-deep)" }}>
+                  Contratos → Vencidos
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="mt-3.5">
           <ChartCard
