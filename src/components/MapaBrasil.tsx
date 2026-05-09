@@ -162,17 +162,25 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
         })}
       </svg>
 
-      {/* Tooltip — glass dark */}
+      {/* Tooltip — glass clean */}
       {hover && (
         <div
-          className="glass-tile pointer-events-none absolute z-20 min-w-[220px] rounded-xl p-3.5 text-xs"
+          className="pointer-events-none absolute z-20 min-w-[230px] rounded-[14px] px-4 py-3 text-xs"
           style={{
-            left: Math.min(hover.x + 16, (wrapperRef.current?.clientWidth ?? WIDTH) - 240),
+            left: Math.min(hover.x + 16, (wrapperRef.current?.clientWidth ?? WIDTH) - 250),
             top: Math.max(hover.y - 60, 8),
-            background: "rgba(20, 20, 28, 0.92)",
+            background: "rgba(255, 255, 255, 0.96)",
+            backdropFilter: "blur(20px) saturate(160%)",
+            WebkitBackdropFilter: "blur(20px) saturate(160%)",
+            border: "0.5px solid rgba(15,14,12,0.12)",
+            boxShadow: "0 12px 32px -8px rgba(20,16,8,0.18), 0 2px 8px rgba(20,16,8,0.06)",
+            color: "var(--text)",
           }}
         >
-          <p className="font-bold" style={{ color: "var(--text)", letterSpacing: "-0.01em" }}>
+          <p
+            className="text-[13px] font-extrabold"
+            style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
+          >
             {ESTADOS_NOMES[hover.uf] ?? hover.uf}
           </p>
           {dadoHover ? (
@@ -180,10 +188,16 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
               <Linha label="Empresas atendidas" valor={dadoHover.empresas.toString()} />
               <Linha label="Contratos" valor={dadoHover.contratos.toString()} />
               <Linha label="Empenhos" valor={dadoHover.empenhos.toString()} />
-              <Linha label="Valor em carteira" valor={brl(dadoHover.valor)} cor="var(--mint)" />
+              <Linha
+                label="Valor em carteira"
+                valor={brl(dadoHover.valor)}
+                cor="var(--mint-deep)"
+              />
             </div>
           ) : (
-            <p className="mt-1" style={{ color: "var(--text-mute)" }}>Sem operações neste estado.</p>
+            <p className="mt-1" style={{ color: "var(--text-mute)" }}>
+              Sem operações neste estado.
+            </p>
           )}
         </div>
       )}
@@ -222,8 +236,10 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
 function Linha({ label, valor, cor }: { label: string; valor: string; cor?: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span style={{ color: "var(--text-mute)" }}>{label}</span>
-      <span className="font-semibold" style={{ color: cor ?? "var(--text)" }}>{valor}</span>
+      <span style={{ color: "var(--text-soft)" }}>{label}</span>
+      <span className="font-extrabold tabular" style={{ color: cor ?? "var(--text)" }}>
+        {valor}
+      </span>
     </div>
   );
 }
