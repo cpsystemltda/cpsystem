@@ -171,8 +171,21 @@ export function ItensEditor({
       )}
 
       <div className="overflow-x-auto rounded-xl" style={{ border: "0.5px solid var(--hairline)" }}>
-        <table className="w-full text-sm">
-          <thead style={{ background: "rgba(0,0,0,0.18)" }}>
+        <table className="w-full text-sm" style={{ minWidth: "1080px" }}>
+          {/* colgroup garante que Descrição domine o espaço — ela é o único campo
+             texto longo da linha; demais colunas têm largura fixa enxuta */}
+          <colgroup>
+            {permitirLotes && <col style={{ width: "72px" }} />}
+            {ataItens && <col style={{ width: "180px" }} />}
+            <col />{/* Descrição — pega o restante */}
+            <col style={{ width: "72px" }} />{/* Un. */}
+            <col style={{ width: "92px" }} />{/* Qtd. */}
+            <col style={{ width: "112px" }} />{/* Marca */}
+            <col style={{ width: "128px" }} />{/* Valor unit. */}
+            <col style={{ width: "120px" }} />{/* Total */}
+            <col style={{ width: "44px" }} />{/* Excluir */}
+          </colgroup>
+          <thead style={{ background: "rgba(15,14,12,0.04)" }}>
             <tr>
               {permitirLotes && (
                 <th
@@ -270,12 +283,15 @@ export function ItensEditor({
                   </td>
                 )}
                 <td className="px-3 py-2">
-                  <input
+                  <textarea
                     name={`itens[${idx}][descricao]`}
                     value={l.descricao}
                     onChange={(ev) => update(idx, { descricao: ev.target.value })}
                     required
-                    className="w-full rounded-md px-2.5 py-1.5 text-xs"
+                    rows={1}
+                    placeholder="Descrição completa do item ou serviço…"
+                    className="w-full rounded-md px-2.5 py-2 text-xs resize-y"
+                    style={{ minHeight: "36px", lineHeight: "1.4" }}
                   />
                 </td>
                 <td className="px-3 py-2">

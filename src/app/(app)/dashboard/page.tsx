@@ -102,7 +102,14 @@ export default async function DashboardPage() {
     }),
     prisma.ata.findMany({
       where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } },
-      select: { tipo: true, vigenciaFim: true, itens: { select: { valorTotal: true } } },
+      select: {
+        tipo: true,
+        vigenciaFim: true,
+        orgaoNome: true,
+        orgaoCnpj: true,
+        itens: { select: { valorTotal: true } },
+        orgaos: { select: { cnpj: true, nome: true } },
+      },
     }),
     prisma.empenho.findMany({
       where: {
@@ -161,7 +168,21 @@ export default async function DashboardPage() {
     (e) => e.vigenciaFim >= hoje && e.status !== "PAGO",
   );
 
-  const valoresContratados = empenhosVigentes.reduce((s, e) => s + sumItens(e), 0);
+  // Valor total das Atas vigentes (Sistema de Registro de Preços)
+  const valorTotalAtasVigentes = atasVigentesDetalhe.reduce(
+    (s, a) => s + a.itens.reduce((ss, it) => ss + it.valorTotal, 0),
+    0,
+  );
+
+  // Valor total dos Contratos vigentes
+  const valorTotalContratosVigentes = contratosVigentesDetalhe.reduce(
+    (s, c) => s + c.itens.reduce((ss, it) => ss + it.valorTotal, 0),
+    0,
+  );
+
+  // Valor total contratado: Atas + Contratos vigentes (carteira disponível pra execução).
+  // Empenhos derivam destes instrumentos — não soma separadamente pra evitar dupla contagem.
+  const valoresContratados = valorTotalAtasVigentes + valorTotalContratosVigentes;
 
   const valoresExecutados = empenhosCompletos
     .filter((e) => ["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(e.status))
@@ -203,11 +224,16 @@ export default async function DashboardPage() {
     },
   });
 
-  // Vencimentos por mês (ano corrente)
+  // Vencimentos por mês (ano corrente) — Atas + Contratos
   const vencimentosPorMes = new Array(12).fill(0);
   for (const c of contratosVigentesDetalhe) {
     if (c.vigenciaFim <= fimAno && c.vigenciaFim >= hoje) {
       vencimentosPorMes[c.vigenciaFim.getMonth()] += 1;
+    }
+  }
+  for (const a of atasVigentesDetalhe) {
+    if (a.vigenciaFim <= fimAno && a.vigenciaFim >= hoje) {
+      vencimentosPorMes[a.vigenciaFim.getMonth()] += 1;
     }
   }
   const maxVenc = Math.max(1, ...vencimentosPorMes);
@@ -238,16 +264,29 @@ export default async function DashboardPage() {
   }
   const totalContinuos = contratosContinuos.length;
 
-  // Órgãos atendidos (distintos)
-  const orgaosUnicos = new Set(empenhosCompletos.map((e) => e.orgaoCnpj));
+  // Órgãos atendidos (distintos) — empenhos + Atas (gerenciador + participantes)
+  const orgaosUnicos = new Set<string>(empenhosCompletos.map((e) => e.orgaoCnpj));
+  for (const a of atasVigentesDetalhe) {
+    if (a.orgaoCnpj) orgaosUnicos.add(a.orgaoCnpj);
+    for (const op of a.orgaos) {
+      if (op.cnpj) orgaosUnicos.add(op.cnpj);
+    }
+  }
   const qtdOrgaos = orgaosUnicos.size;
 
-  // Ranking de órgãos por valor contratado
+  // Ranking de órgãos por valor contratado — soma empenhos + atas vigentes
   const orgaoMap = new Map<string, { nome: string; valor: number }>();
   for (const e of empenhosCompletos) {
     const cur = orgaoMap.get(e.orgaoCnpj) ?? { nome: e.orgaoNome, valor: 0 };
     cur.valor += sumItens(e);
     orgaoMap.set(e.orgaoCnpj, cur);
+  }
+  for (const a of atasVigentesDetalhe) {
+    if (!a.orgaoCnpj) continue;
+    const valorAta = a.itens.reduce((s, it) => s + it.valorTotal, 0);
+    const cur = orgaoMap.get(a.orgaoCnpj) ?? { nome: a.orgaoNome, valor: 0 };
+    cur.valor += valorAta;
+    orgaoMap.set(a.orgaoCnpj, cur);
   }
   const rankingOrgaos = Array.from(orgaoMap.values())
     .sort((a, b) => b.valor - a.valor)
@@ -363,7 +402,7 @@ export default async function DashboardPage() {
             icon={DollarSign}
             label="Valores contratados"
             value={<CurrencyValue amount={valoresContratados} />}
-            meta={`${empenhosVigentes.length} empenhos vigentes`}
+            meta={`${atasVigentes} ata(s) + ${contratosVigentes} contrato(s) vigente(s)`}
           />
           <KPI
             tone="mint"
@@ -438,7 +477,14 @@ export default async function DashboardPage() {
             icon={FileText}
             label="Atas vigentes"
             value={atasVigentes}
-            meta="Atas de Registro de Preços ativas"
+            meta={
+              atasVigentesDetalhe.length > 0
+                ? `Próx. vencimento: ${atasVigentesDetalhe
+                    .slice()
+                    .sort((a, b) => a.vigenciaFim.getTime() - b.vigenciaFim.getTime())[0]
+                    .vigenciaFim.toLocaleDateString("pt-BR")}`
+                : "Atas de Registro de Preços ativas"
+            }
           />
           <KPI
             tone="mint"

@@ -14,7 +14,13 @@ import {
 } from "@/lib/validators";
 import { salvarArquivo } from "@/lib/uploads";
 
-type ActionResult = { erro?: string; campos?: Record<string, string> };
+type ActionResult = {
+  erro?: string;
+  campos?: Record<string, string>;
+  // Valores brutos do FormData — preservados após erro pra não apagar o que
+  // o usuário já tinha preenchido. Inclui itens, órgãos, endereços etc.
+  valores?: Record<string, unknown>;
+};
 
 function parseItens(formData: FormData) {
   const out: {
