@@ -110,6 +110,7 @@ const GRUPOS_ADMIN_PLATAFORMA: Grupo[] = [
       { href: "/admin-plataforma", label: "Visão geral", icon: Crown },
       { href: "/admin-plataforma/clientes", label: "Clientes", icon: Users2 },
       { href: "/admin-plataforma/analistas", label: "Analistas", icon: UserCheck },
+      { href: "/painel-analista", label: "Painel do analista", icon: LayoutDashboard },
       { href: "/admin-plataforma/financeiro", label: "Financeiro · MRR", icon: Wallet },
       { href: "/admin-plataforma/atividade", label: "Atividade", icon: Activity },
     ],

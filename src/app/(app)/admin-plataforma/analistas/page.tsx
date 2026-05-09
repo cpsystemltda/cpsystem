@@ -185,7 +185,14 @@ export default async function AdminAnalistasPage() {
               {linhas.map((l) => (
                 <tr key={l.id}>
                   <td className="strong" style={{ verticalAlign: "top" }}>
-                    <div style={{ color: "var(--text)" }}>{l.nome}</div>
+                    <Link
+                      href={`/painel-analista?analistaId=${l.id}`}
+                      className="font-extrabold underline-offset-2 hover:underline"
+                      style={{ color: "var(--text)" }}
+                      title="Ver painel desse analista"
+                    >
+                      {l.nome}
+                    </Link>
                     <div className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>
                       {l.cpfMascarado}
                     </div>

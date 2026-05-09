@@ -28,39 +28,107 @@ function statusSimples(s: string): "Emitida" | "Pendente" | "Paga" {
 export default async function PainelAnalistaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vinculo?: string; cnpj?: string }>;
+  searchParams: Promise<{ vinculo?: string; cnpj?: string; analistaId?: string }>;
 }) {
   const usuario = await exigirUsuario();
   const sp = await searchParams;
 
-  if (usuario.conta.tipo !== "ANALISTA") {
+  // Bloqueio: precisa ser ANALISTA OU superAdmin
+  if (usuario.conta.tipo !== "ANALISTA" && !usuario.superAdmin) {
     return (
       <div className="mx-auto max-w-3xl px-8 py-12 text-center">
-        <Wallet className="mx-auto h-10 w-10 text-slate-400" />
-        <h1 className="mt-4 text-2xl font-bold text-slate-900">Painel exclusivo de analistas</h1>
-        <p className="mt-2 text-sm text-slate-600">
+        <Wallet className="mx-auto h-10 w-10" style={{ color: "var(--text-mute)" }} />
+        <h1 className="mt-4 text-2xl font-bold" style={{ color: "var(--text)" }}>
+          Painel exclusivo de analistas
+        </h1>
+        <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
           Esta área é exclusiva para contas do tipo Analista de Licitação.
         </p>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm" style={{ color: "var(--text-mute)" }}>
           Sua conta é do tipo <strong>{usuario.conta.tipo}</strong>. Pra gerenciar analistas vinculados,{" "}
-          <Link href="/vinculos" className="text-blue-700 hover:underline">vá em Vínculos</Link>.
+          <Link href="/vinculos" style={{ color: "var(--primary-deep)" }} className="font-bold underline">vá em Vínculos</Link>.
         </p>
       </div>
     );
   }
 
-  const analista = await prisma.analista.findUnique({ where: { contaId: usuario.contaId } });
+  // Resolve qual analista exibir:
+  // - ANALISTA logado: o próprio (via contaId)
+  // - SUPER ADMIN: pelo query param ?analistaId=X (ou tela de seleção se omisso)
+  let analista =
+    usuario.conta.tipo === "ANALISTA"
+      ? await prisma.analista.findUnique({ where: { contaId: usuario.contaId } })
+      : sp.analistaId
+        ? await prisma.analista.findUnique({ where: { id: sp.analistaId } })
+        : null;
+
+  // Super admin sem analistaId — mostra lista de seleção (preview da rede).
+  if (usuario.superAdmin && !analista) {
+    const analistas = await prisma.analista.findMany({
+      orderBy: { criadoEm: "desc" },
+      include: { vinculos: { where: { status: "ATIVO" }, select: { id: true } } },
+    });
+    return (
+      <div className="mx-auto max-w-4xl px-8 py-8">
+        <PageHeader
+          eyebrow="Adm CP System · Preview"
+          titulo="Painel do"
+          destaque="Analista"
+          subtitulo="Selecione abaixo qual analista deseja visualizar — você verá o painel exatamente como ele vê ao logar."
+        />
+        <div className="mt-6 grid gap-3">
+          {analistas.length === 0 ? (
+            <div
+              className="glass-tile rounded-[18px] p-12 text-center"
+              style={{ border: "0.5px dashed var(--hairline)" }}
+            >
+              <p className="text-sm" style={{ color: "var(--text-soft)" }}>
+                Nenhum analista cadastrado na plataforma.
+              </p>
+            </div>
+          ) : (
+            analistas.map((a) => (
+              <Link
+                key={a.id}
+                href={`/painel-analista?analistaId=${a.id}`}
+                className="glass-tile group flex items-center justify-between gap-4 rounded-[16px] px-5 py-4 transition hover:-translate-y-0.5"
+              >
+                <div>
+                  <h3 className="text-[15px] font-extrabold" style={{ color: "var(--text)" }}>
+                    {a.nomeCompleto}
+                  </h3>
+                  <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
+                    {a.email} · {a.vinculos.length} vínculo(s) ativo(s) · cadastrado em{" "}
+                    {a.criadoEm.toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                <span className="text-sm font-bold" style={{ color: "var(--primary-deep)" }}>
+                  Ver painel →
+                </span>
+              </Link>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (!analista) {
     return (
       <div className="mx-auto max-w-3xl px-8 py-12 text-center">
-        <AlertCircle className="mx-auto h-10 w-10 text-amber-500" />
-        <h1 className="mt-4 text-2xl font-bold text-slate-900">Perfil de analista não encontrado</h1>
-        <p className="mt-2 text-sm text-slate-600">Entre em contato com o suporte.</p>
+        <AlertCircle className="mx-auto h-10 w-10" style={{ color: "var(--primary-deep)" }} />
+        <h1 className="mt-4 text-2xl font-bold" style={{ color: "var(--text)" }}>
+          Perfil de analista não encontrado
+        </h1>
+        <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
+          Entre em contato com o suporte.
+        </p>
       </div>
     );
   }
 
   const consolidado = await calcularComissaoAnalista(analista.id);
+  const ehPreviewAdmin = usuario.superAdmin && usuario.conta.tipo !== "ANALISTA";
   const vinculoSelecionado = sp.vinculo
     ? consolidado.empresas.find((e) => e.vinculoId === sp.vinculo)
     : null;
@@ -78,6 +146,41 @@ export default async function PainelAnalistaPage({
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
+      {ehPreviewAdmin && (
+        <div
+          className="glass-tile mb-4 flex items-center justify-between gap-3 rounded-[14px] px-4 py-3 text-sm"
+          style={{
+            background: "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.06)), rgba(255,255,255,0.5)",
+            border: "0.5px solid rgba(168,137,71,0.4)",
+            color: "var(--text-soft)",
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[10px] font-extrabold uppercase"
+              style={{
+                letterSpacing: "0.16em",
+                background: "var(--primary)",
+                color: "#0A0A0A",
+              }}
+            >
+              Admin · Preview
+            </span>
+            <span style={{ color: "var(--text-soft)" }}>
+              Visualizando como{" "}
+              <strong style={{ color: "var(--primary-deep)" }}>{analista.nomeCompleto}</strong>{" "}
+              vê o painel dele.
+            </span>
+          </div>
+          <Link
+            href="/painel-analista"
+            className="text-xs font-bold underline transition hover:opacity-70"
+            style={{ color: "var(--primary-deep)" }}
+          >
+            Trocar analista
+          </Link>
+        </div>
+      )}
       <PageHeader
         eyebrow="Painel · Analista de licitações"
         titulo={`Olá, ${analista.nomeCompleto.split(" ")[0]}.`}
