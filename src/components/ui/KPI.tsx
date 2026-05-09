@@ -47,38 +47,45 @@ export function KPI({
   const isHero = size === "hero";
   return (
     <div
-      className={`glass-tile relative overflow-hidden t-${tone} ${isHero ? "rounded-[22px] px-6 py-6" : "rounded-[18px] px-5 py-5"}`}
+      className={`glass-tile relative overflow-hidden t-${tone} ${isHero ? "rounded-[20px] px-6 py-5" : "rounded-[18px] px-5 py-5"}`}
     >
       <div className="kpi-aura" />
       <div className="relative z-[1]">
-        {Icon && (
-          <div
-            className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl"
-            style={{ background: ICON_BG[tone] }}
+        {/* Header: ícone + label na mesma linha */}
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <div
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
+              style={{ background: ICON_BG[tone] }}
+            >
+              <Icon className="h-5 w-5" style={{ color: ICON_COLOR[tone], strokeWidth: 2 }} />
+            </div>
+          )}
+          <h3
+            className={`flex-1 leading-tight ${isHero ? "text-[17px]" : "text-[15px]"} font-extrabold`}
+            style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
           >
-            <Icon className="h-[18px] w-[18px]" style={{ color: ICON_COLOR[tone], strokeWidth: 2 }} />
-          </div>
-        )}
-        <div
-          className="text-[12px] font-bold uppercase"
-          style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
-        >
-          {label}
+            {label}
+          </h3>
         </div>
+
+        {/* Valor */}
         <div
-          className={`tabular mt-2 ${isHero ? "text-[64px] leading-[0.9]" : "text-[36px] leading-none"} font-extrabold`}
+          className={`tabular mt-3 ${isHero ? "text-[44px] leading-[0.95]" : "text-[34px] leading-none"} font-extrabold`}
           style={{
             background: VALUE_GRADIENT[tone],
             WebkitBackgroundClip: "text",
             backgroundClip: "text",
             WebkitTextFillColor: "transparent",
-            letterSpacing: isHero ? "-0.06em" : "-0.045em",
+            letterSpacing: "-0.045em",
           }}
         >
           {value}
         </div>
+
+        {/* Meta */}
         {meta && (
-          <div className="mt-3 text-[13px] font-semibold" style={{ color: "var(--text-soft)" }}>
+          <div className="mt-2 text-[12px] font-semibold" style={{ color: "var(--text-soft)" }}>
             {meta}
           </div>
         )}

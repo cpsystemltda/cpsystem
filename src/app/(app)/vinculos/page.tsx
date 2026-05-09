@@ -59,9 +59,14 @@ export default async function VinculosPage() {
         subtitulo="Gerencie os analistas de licitação que atendem sua empresa, com comissão e fixo mensal."
       />
 
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Vincular novo analista</h2>
-        <p className="mt-1 text-xs text-slate-500">
+      <section className="glass mt-6 rounded-[20px] px-6 py-5">
+        <h2
+          className="text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
+          Vincular novo analista
+        </h2>
+        <p className="mt-2 text-[13px]" style={{ color: "var(--text-soft)" }}>
           A regra de comissão considera execuções a partir da <strong>data de início</strong>. Execuções anteriores ficam de
           fora. Defina o percentual inicial — o analista pode ajustá-lo no painel dele depois.
         </p>
@@ -70,14 +75,25 @@ export default async function VinculosPage() {
         </div>
       </section>
 
-      <section className="mt-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <section className="mt-6">
+        <h2
+          className="mb-3 text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
           Vínculos ({vinculos.length})
         </h2>
         {vinculos.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-            <Briefcase className="mx-auto h-10 w-10 text-slate-400" />
-            <p className="mt-4 text-sm text-slate-600">Nenhum analista vinculado ainda.</p>
+          <div
+            className="rounded-[20px] p-12 text-center"
+            style={{
+              background: "var(--glass-1)",
+              border: "0.5px dashed var(--hairline)",
+            }}
+          >
+            <Briefcase className="mx-auto h-10 w-10" style={{ color: "var(--text-mute)" }} />
+            <p className="mt-4 text-sm" style={{ color: "var(--text-soft)" }}>
+              Nenhum analista vinculado ainda.
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -86,7 +102,7 @@ export default async function VinculosPage() {
               return (
                 <div
                   key={v.id}
-                  className={`rounded-xl border bg-white p-5 ${v.status === "ATIVO" ? "border-slate-200" : "border-slate-200 opacity-70"}`}
+                  className={`glass-tile rounded-[18px] px-5 py-5 ${v.status === "ATIVO" ? "" : "opacity-70"}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
