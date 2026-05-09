@@ -126,28 +126,44 @@ export default function NovaEmpresaPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-8 py-8">
-      <Link href="/empresas" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
+      <Link
+        href="/empresas"
+        className="inline-flex items-center gap-1 text-sm font-semibold transition hover:opacity-70"
+        style={{ color: "var(--text-soft)" }}
+      >
         <ChevronLeft className="h-4 w-4" /> Voltar para Empresas
       </Link>
 
-      <h1 className="mt-4 flex items-center gap-2 text-3xl font-bold text-slate-900">
-        <Plus className="h-7 w-7 text-blue-600" /> Adicionar CNPJ
+      <h1
+        className="mt-4 flex items-center gap-3 text-[32px] font-extrabold leading-none"
+        style={{ color: "var(--text)", letterSpacing: "-0.04em" }}
+      >
+        <span
+          className="inline-flex h-10 w-10 items-center justify-center rounded-[12px]"
+          style={{ background: "rgba(212,175,55,0.18)", color: "var(--primary-deep)" }}
+        >
+          <Plus className="h-5 w-5" />
+        </span>
+        Adicionar CNPJ
       </h1>
-      <p className="mt-1 text-sm text-slate-600">
+      <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
         Inclua mais uma empresa do seu grupo econômico. A assinatura cobre até 4 CNPJs;
         a partir do 5º há cobrança adicional.
       </p>
 
-      {/* Upload zone */}
-      <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-blue-800">
-          <Sparkles className="h-4 w-4" />
-          Preencher automaticamente com IA
-        </div>
-        <p className="mt-1 text-xs text-slate-600">
-          Envie o cartão CNPJ, contrato social ou qualquer documento com dados da empresa (PDF ou imagem).
-          A IA extrai os campos — você revisa e completa o restante.
-        </p>
+      {/* Upload zone — IA */}
+      <div className="glass-tile t-lavender mt-6 rounded-[20px] px-5 py-5">
+        <div className="kpi-aura" />
+        <div className="relative z-[1]">
+          <div className="flex items-center gap-2 text-[15px] font-extrabold" style={{ color: "var(--text)", letterSpacing: "-0.015em" }}>
+            <Sparkles className="h-4 w-4" style={{ color: "#8E73E0" }} />
+            Preencher automaticamente com IA
+          </div>
+          <p className="mt-1.5 text-[13px]" style={{ color: "var(--text-soft)" }}>
+            Envie o <strong>cartão CNPJ</strong>, <strong>comprovante de inscrição</strong> ou{" "}
+            <strong>contrato social</strong> — documentos com dados cadastrais. A IA extrai os campos;
+            você revisa e completa.
+          </p>
 
         {!arquivo ? (
           <button
@@ -159,23 +175,36 @@ export default function NovaEmpresaPage() {
               const f = ev.dataTransfer.files[0];
               if (f) selecionarArquivo(f);
             }}
-            className="mt-3 flex w-full cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-blue-300 bg-white py-6 text-center transition hover:border-blue-500 hover:bg-blue-50"
+            className="mt-3 flex w-full cursor-pointer flex-col items-center gap-2 rounded-[14px] py-6 text-center transition hover:bg-white/30"
+            style={{
+              background: "rgba(255,255,255,0.4)",
+              border: "1.5px dashed rgba(142,115,224,0.4)",
+            }}
           >
-            <FileText className="h-8 w-8 text-blue-400" />
-            <span className="text-sm text-slate-600">
+            <FileText className="h-8 w-8" style={{ color: "#8E73E0" }} />
+            <span className="text-sm" style={{ color: "var(--text-soft)" }}>
               Arraste um arquivo ou{" "}
-              <span className="font-medium text-blue-600">clique para selecionar</span>
+              <span className="font-bold" style={{ color: "#8E73E0" }}>clique para selecionar</span>
             </span>
-            <span className="text-xs text-slate-400">PDF, JPG, PNG ou WEBP · máx. 10 MB</span>
+            <span className="text-xs" style={{ color: "var(--text-mute)" }}>
+              PDF, JPG, PNG ou WEBP · máx. 10 MB
+            </span>
           </button>
         ) : (
-          <div className="mt-3 flex items-center gap-3 rounded-lg border border-blue-200 bg-white px-4 py-3">
-            <FileText className="h-5 w-5 shrink-0 text-blue-500" />
-            <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{arquivo.name}</span>
+          <div
+            className="mt-3 flex items-center gap-3 rounded-[12px] px-4 py-3"
+            style={{
+              background: "rgba(255,255,255,0.6)",
+              border: "0.5px solid var(--hairline)",
+            }}
+          >
+            <FileText className="h-5 w-5 shrink-0" style={{ color: "#8E73E0" }} />
+            <span className="min-w-0 flex-1 truncate text-sm" style={{ color: "var(--text)" }}>{arquivo.name}</span>
             <button
               type="button"
               onClick={removerArquivo}
-              className="shrink-0 text-slate-400 hover:text-slate-700"
+              className="shrink-0 transition hover:opacity-70"
+              style={{ color: "var(--text-mute)" }}
               aria-label="Remover arquivo"
             >
               <X className="h-4 w-4" />
@@ -184,7 +213,8 @@ export default function NovaEmpresaPage() {
               type="button"
               onClick={extrairComIA}
               disabled={carregando}
-              className="flex shrink-0 items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              className="btn-primary flex shrink-0 items-center gap-1.5 disabled:opacity-60"
+              style={{ height: "36px", padding: "0 14px", fontSize: "13px" }}
             >
               {carregando ? (
                 <>
@@ -200,26 +230,58 @@ export default function NovaEmpresaPage() {
         )}
 
         {erroUpload && (
-          <p className="mt-2 text-xs text-red-600">{erroUpload}</p>
+          <div
+            className="mt-3 rounded-[12px] px-4 py-3 text-sm font-semibold"
+            style={{
+              background: "rgba(232,138,152,0.18)",
+              border: "0.5px solid rgba(198,103,112,0.5)",
+              color: "var(--coral-deep)",
+            }}
+          >
+            {erroUpload}
+          </div>
         )}
 
-        {camposPreenchidos !== null && (
-          <p className="mt-2 text-xs text-green-700">
+        {camposPreenchidos !== null && camposPreenchidos > 0 && (
+          <div
+            className="mt-3 rounded-[12px] px-4 py-3 text-sm font-semibold"
+            style={{
+              background: "rgba(93,216,182,0.18)",
+              border: "0.5px solid rgba(46,171,133,0.5)",
+              color: "var(--mint-deep)",
+            }}
+          >
             ✓ {camposPreenchidos} campo{camposPreenchidos !== 1 ? "s" : ""} preenchido
             {camposPreenchidos !== 1 ? "s" : ""} automaticamente. Revise e complete os campos em branco.
-          </p>
+          </div>
         )}
 
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".pdf,image/jpeg,image/png,image/webp"
-          className="hidden"
-          onChange={(ev) => {
-            const f = ev.target.files?.[0];
-            if (f) selecionarArquivo(f);
-          }}
-        />
+        {camposPreenchidos === 0 && (
+          <div
+            className="mt-3 rounded-[12px] px-4 py-3 text-sm font-semibold"
+            style={{
+              background: "rgba(212,175,55,0.18)",
+              border: "0.5px solid rgba(168,137,71,0.5)",
+              color: "var(--primary-deep)",
+            }}
+          >
+            A IA não encontrou dados cadastrais nesse documento. Tente um <strong>cartão CNPJ</strong>{" "}
+            (Receita Federal), <strong>comprovante de inscrição</strong> ou <strong>contrato social</strong> —
+            contratos administrativos não trazem CNAE, e-mail e telefone da empresa.
+          </div>
+        )}
+
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(ev) => {
+              const f = ev.target.files?.[0];
+              if (f) selecionarArquivo(f);
+            }}
+          />
+        </div>
       </div>
 
       <form action={formAction} noValidate className="mt-6 grid grid-cols-4 gap-4">
@@ -256,11 +318,12 @@ export default function NovaEmpresaPage() {
         <Field label="Responsável" name="responsavel" required erro={e.responsavel} span={2}
           value={vals.responsavel} onChange={set("responsavel")} />
 
-        <div className="col-span-4 mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <h2 className="text-sm font-semibold text-slate-800">
-            Acesso do responsável <span className="ml-2 font-normal normal-case text-slate-500">(opcional)</span>
+        <div className="glass-tile col-span-4 mt-4 rounded-[18px] px-5 py-5">
+          <h2 className="text-sm font-extrabold" style={{ color: "var(--text)" }}>
+            Acesso do responsável{" "}
+            <span className="ml-2 font-semibold" style={{ color: "var(--text-mute)" }}>(opcional)</span>
           </h2>
-          <p className="mt-1 text-xs text-slate-600">
+          <p className="mt-1.5 text-xs" style={{ color: "var(--text-soft)" }}>
             Se preencher senha + confirmação, o sistema cria um usuário operacional
             com o e-mail acima — esse responsável poderá entrar e ver somente esta empresa.
             Deixe em branco se você mesmo (titular da conta) for operar.
@@ -284,17 +347,21 @@ export default function NovaEmpresaPage() {
         </div>
 
         {state?.erro && (
-          <div className="col-span-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div
+            className="col-span-4 rounded-[12px] px-4 py-3 text-sm font-semibold"
+            style={{
+              background: "rgba(232,138,152,0.18)",
+              border: "0.5px solid rgba(198,103,112,0.5)",
+              color: "var(--coral-deep)",
+            }}
+          >
             {state.erro}
           </div>
         )}
 
         <div className="col-span-4 mt-2 flex gap-3">
           <SubmitButton>Cadastrar empresa</SubmitButton>
-          <Link
-            href="/empresas"
-            className="rounded-md border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <Link href="/empresas" className="btn-secondary">
             Cancelar
           </Link>
         </div>
