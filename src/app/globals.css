@@ -127,14 +127,14 @@ textarea:focus {
   z-index: 0;
   pointer-events: none;
   background:
-    /* Camada 1: padrão de Flor da Vida (geometria sagrada) em dourado MUITO sutil */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.5' opacity='0.06'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E"),
-    /* Camada 2: gradient mesh quente — define a atmosfera (alpha reduzido para fundo claro) */
-    radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.08), transparent 55%),
-    radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.05), transparent 55%),
-    radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.05), transparent 55%),
-    radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.07), transparent 55%),
-    radial-gradient(ellipse 800px 600px at 50% 50%, rgba(93, 216, 182, 0.03), transparent 60%),
+    /* Camada 1: padrão de Flor da Vida (geometria sagrada) em dourado — visível para o glass filtrar */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.6' opacity='0.12'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E"),
+    /* Camada 2: gradient mesh quente — define a atmosfera (visível para o glass filtrar) */
+    radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.16), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.10), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.10), transparent 55%),
+    radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.14), transparent 55%),
+    radial-gradient(ellipse 800px 600px at 50% 50%, rgba(93, 216, 182, 0.06), transparent 60%),
     /* Camada 3: base creme warm (família de /(auth)/login) */
     linear-gradient(135deg, #FAF7F0 0%, #FFFEF9 50%, #F5EFDD 100%);
   background-size: 240px 240px, auto, auto, auto, auto, auto, auto;
@@ -153,11 +153,11 @@ textarea:focus {
   filter: blur(180px);
   mix-blend-mode: multiply;
 }
-.app-shell .blob-1 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(212, 175, 55, 0.18), transparent 70%); top: -150px; left: -100px; }
-.app-shell .blob-2 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(240, 184, 168, 0.16), transparent 70%); top: 30%; right: -150px; }
-.app-shell .blob-3 { width: 800px; height: 800px; background: radial-gradient(circle, rgba(197, 180, 255, 0.14), transparent 70%); top: 55%; left: -200px; }
-.app-shell .blob-4 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(93, 216, 182, 0.12), transparent 70%); bottom: -200px; right: 10%; }
-.app-shell .blob-5 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(184, 197, 214, 0.14), transparent 70%); top: 75%; left: 35%; }
+.app-shell .blob-1 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(212, 175, 55, 0.32), transparent 70%); top: -150px; left: -100px; }
+.app-shell .blob-2 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(240, 184, 168, 0.28), transparent 70%); top: 30%; right: -150px; }
+.app-shell .blob-3 { width: 800px; height: 800px; background: radial-gradient(circle, rgba(197, 180, 255, 0.24), transparent 70%); top: 55%; left: -200px; }
+.app-shell .blob-4 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(93, 216, 182, 0.22), transparent 70%); bottom: -200px; right: 10%; }
+.app-shell .blob-5 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(184, 197, 214, 0.24), transparent 70%); top: 75%; left: 35%; }
 .app-shell .bg-blobs::after {
   content: '';
   position: absolute; inset: 0;
@@ -176,12 +176,13 @@ textarea:focus {
    ============================================================ */
 .glass {
   position: relative;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(32px) saturate(150%);
+  -webkit-backdrop-filter: blur(32px) saturate(150%);
   border-radius: var(--radius-xl);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 0 0.5px rgba(15, 14, 12, 0.06),
     0 24px 60px -20px rgba(20, 16, 8, 0.10),
     0 8px 24px -4px rgba(20, 16, 8, 0.06);
 }
@@ -205,12 +206,13 @@ textarea:focus {
 
 .glass-tile {
   position: relative;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px) saturate(130%);
-  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(28px) saturate(140%);
+  -webkit-backdrop-filter: blur(28px) saturate(140%);
   border-radius: var(--radius-lg);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 0 0.5px rgba(15, 14, 12, 0.06),
     0 2px 8px rgba(20, 16, 8, 0.04),
     0 12px 32px -8px rgba(20, 16, 8, 0.08);
 }
@@ -237,59 +239,59 @@ textarea:focus {
 .t-primary {
   background:
     linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.04) 100%),
-    rgba(255, 255, 255, 0.7);
+    rgba(255, 255, 255, 0.40);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(212, 175, 55, 0.55),
     0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-mint {
   background:
     linear-gradient(135deg, rgba(93, 216, 182, 0.12) 0%, rgba(93, 216, 182, 0.04) 100%),
-    rgba(255, 255, 255, 0.7);
+    rgba(255, 255, 255, 0.40);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(93, 216, 182, 0.55),
     0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-rose {
   background:
     linear-gradient(135deg, rgba(240, 184, 168, 0.12) 0%, rgba(240, 184, 168, 0.04) 100%),
-    rgba(255, 255, 255, 0.7);
+    rgba(255, 255, 255, 0.40);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(240, 184, 168, 0.55),
     0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-lavender {
   background:
     linear-gradient(135deg, rgba(197, 180, 255, 0.12) 0%, rgba(197, 180, 255, 0.04) 100%),
-    rgba(255, 255, 255, 0.7);
+    rgba(255, 255, 255, 0.40);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(197, 180, 255, 0.55),
     0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-sky {
   background:
     linear-gradient(135deg, rgba(184, 197, 214, 0.12) 0%, rgba(184, 197, 214, 0.04) 100%),
-    rgba(255, 255, 255, 0.7);
+    rgba(255, 255, 255, 0.40);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(184, 197, 214, 0.55),
     0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-coral {
   background:
     linear-gradient(135deg, rgba(232, 138, 152, 0.12) 0%, rgba(232, 138, 152, 0.04) 100%),
-    rgba(255, 255, 255, 0.7);
+    rgba(255, 255, 255, 0.40);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(232, 138, 152, 0.55),
     0 2px 12px rgba(20, 16, 8, 0.06);
 }
 
-/* Aura no canto pra reforço de cor (sutil em fundo claro) */
+/* Aura no canto pra reforço de cor — vai através do glass como halo de luz */
 .kpi-aura {
   position: absolute;
   bottom: -50%; right: -30%;
@@ -297,8 +299,8 @@ textarea:focus {
   border-radius: 50%;
   pointer-events: none;
   z-index: 0;
-  filter: blur(80px);
-  opacity: 0.18;
+  filter: blur(60px);
+  opacity: 0.32;
 }
 .t-primary  .kpi-aura { background: radial-gradient(circle, var(--primary), transparent 60%); }
 .t-mint     .kpi-aura { background: radial-gradient(circle, var(--mint), transparent 60%); }

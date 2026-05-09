@@ -60,13 +60,13 @@ export function KPI({
           </div>
         )}
         <div
-          className="text-[10px] font-bold uppercase"
-          style={{ letterSpacing: "0.22em", color: "var(--text-mute)" }}
+          className="text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
         >
           {label}
         </div>
         <div
-          className={`tabular mt-2.5 ${isHero ? "text-[64px] leading-[0.9]" : "text-[36px] leading-none"} font-extrabold`}
+          className={`tabular mt-2 ${isHero ? "text-[64px] leading-[0.9]" : "text-[36px] leading-none"} font-extrabold`}
           style={{
             background: VALUE_GRADIENT[tone],
             WebkitBackgroundClip: "text",
@@ -78,7 +78,7 @@ export function KPI({
           {value}
         </div>
         {meta && (
-          <div className="mt-3 text-[12px] font-medium" style={{ color: "var(--text-soft)" }}>
+          <div className="mt-3 text-[13px] font-semibold" style={{ color: "var(--text-soft)" }}>
             {meta}
           </div>
         )}

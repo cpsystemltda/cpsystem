@@ -139,14 +139,14 @@ export default async function AdminPlataformaPage() {
           titulo="MRR atual"
           valor={brlCompacto(mrr)}
           sub={`${ativasEmpresa.length} assinaturas ativas`}
-          gradient="from-emerald-500 to-green-700"
+          tone="mint"
           icone={Wallet}
         />
         <KpiHero
           titulo="ARR projetado"
           valor={brlCompacto(arr)}
           sub="MRR × 12"
-          gradient="from-blue-500 to-indigo-700"
+          tone="primary"
           icone={TrendingUp}
         />
         <KpiHero
@@ -155,14 +155,14 @@ export default async function AdminPlataformaPage() {
           sub={`${novasEsteMes} novos este mês ${
             crescimentoPct !== 0 ? `(${crescimentoPct > 0 ? "+" : ""}${crescimentoPct.toFixed(0)}% vs mês passado)` : ""
           }`}
-          gradient="from-violet-500 to-fuchsia-700"
+          tone="lavender"
           icone={Users2}
         />
         <KpiHero
           titulo="Churn rate"
           valor={`${churnRate.toFixed(1)}%`}
           sub={`${canceladas.length} cancelamento(s)`}
-          gradient={churnRate > 5 ? "from-red-500 to-rose-700" : "from-slate-700 to-slate-900"}
+          tone={churnRate > 5 ? "coral" : "primary"}
           icone={Activity}
         />
       </div>
@@ -373,23 +373,33 @@ function KpiHero({
   titulo,
   valor,
   sub,
-  gradient,
+  tone,
   icone: Icone,
 }: {
   titulo: string;
   valor: string;
   sub: string;
-  gradient: string;
+  tone: "primary" | "mint" | "lavender" | "coral";
   icone: React.ComponentType<{ className?: string }>;
 }) {
   return (
-    <div
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${gradient} p-5 text-white shadow-lg`}
-    >
-      <p className="text-[10px] font-bold uppercase tracking-wider text-white/80">{titulo}</p>
-      <p className="mt-1.5 text-3xl font-bold tracking-tight">{valor}</p>
-      <p className="mt-1 text-[11px] text-white/80">{sub}</p>
-      <Icone className="absolute -right-2 -bottom-2 h-24 w-24 text-white/10" />
+    <div className={`glass-tile t-${tone} relative overflow-hidden rounded-[18px] px-5 py-5`}>
+      <div className="kpi-aura" />
+      <div className="relative z-[1]">
+        <p className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}>
+          {titulo}
+        </p>
+        <p
+          className="mt-2 text-[36px] font-extrabold leading-none tabular"
+          style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
+        >
+          {valor}
+        </p>
+        <p className="mt-2 text-[13px] font-semibold" style={{ color: "var(--text-soft)" }}>
+          {sub}
+        </p>
+      </div>
+      <Icone className="absolute -right-3 -bottom-3 h-20 w-20 text-[color:var(--text)] opacity-[0.06]" />
     </div>
   );
 }
@@ -412,27 +422,46 @@ function StatusCard({
   alertaTexto?: string;
 }) {
   const map = {
-    emerald: "bg-emerald-100 text-emerald-700",
-    red: "bg-red-100 text-red-700",
-    violet: "bg-violet-100 text-violet-700",
-    slate: "bg-slate-100 text-slate-600",
+    emerald: { iconBg: "rgba(93, 216, 182, 0.18)", iconColor: "var(--mint-deep)" },
+    red: { iconBg: "rgba(232, 138, 152, 0.18)", iconColor: "var(--coral-deep)" },
+    violet: { iconBg: "rgba(197, 180, 255, 0.18)", iconColor: "#8E73E0" },
+    slate: { iconBg: "rgba(184, 197, 214, 0.20)", iconColor: "#6F8BAA" },
   };
+  const tint = map[cor];
   return (
     <Link
       href={link}
-      className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm"
+      className="glass-tile group flex items-center gap-4 rounded-[16px] px-4 py-4 transition hover:-translate-y-px"
     >
-      <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${map[cor]}`}>
-        <Icone className="h-5 w-5" />
+      <div
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]"
+        style={{ background: tint.iconBg }}
+      >
+        <Icone className="h-[18px] w-[18px]" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
-        <p className="mt-0.5 text-2xl font-bold text-slate-900">{qtd}</p>
+        <p
+          className="text-[11px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+        >
+          {titulo}
+        </p>
+        <p
+          className="mt-1 text-[24px] font-extrabold tabular leading-none"
+          style={{ color: "var(--text)", letterSpacing: "-0.04em" }}
+        >
+          {qtd}
+        </p>
         {alerta && alerta > 0 && alertaTexto && (
-          <p className="mt-0.5 text-[10px] font-medium text-amber-700">{alertaTexto}</p>
+          <p className="mt-1 text-[11px] font-semibold" style={{ color: "var(--primary-deep)" }}>
+            {alertaTexto}
+          </p>
         )}
       </div>
-      <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-700" />
+      <ArrowUpRight
+        className="h-4 w-4 shrink-0 transition group-hover:translate-x-0.5"
+        style={{ color: tint.iconColor }}
+      />
     </Link>
   );
 }
@@ -451,19 +480,33 @@ function Painel({
   className?: string;
 }) {
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
-      <div className="mb-4 flex items-start gap-3">
-        {Icone && (
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-50 text-slate-600">
-            <Icone className="h-4 w-4" />
+    <section className={`glass relative overflow-hidden rounded-[20px] px-6 py-5 ${className}`}>
+      <div className="relative z-[1]">
+        <div className="mb-4 flex items-start gap-3">
+          {Icone && (
+            <div
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px]"
+              style={{ background: "rgba(212,175,55,0.18)", color: "var(--primary-deep)" }}
+            >
+              <Icone className="h-4 w-4" />
+            </div>
+          )}
+          <div>
+            <h2
+              className="text-[17px] font-extrabold"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+            >
+              {titulo}
+            </h2>
+            {subtitulo && (
+              <p className="mt-0.5 text-[12px] font-medium" style={{ color: "var(--text-soft)" }}>
+                {subtitulo}
+              </p>
+            )}
           </div>
-        )}
-        <div>
-          <h2 className="text-base font-semibold text-slate-900">{titulo}</h2>
-          {subtitulo && <p className="mt-0.5 text-xs text-slate-500">{subtitulo}</p>}
         </div>
+        {children}
       </div>
-      {children}
     </section>
   );
 }
