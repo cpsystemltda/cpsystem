@@ -116,7 +116,7 @@ export default async function ExecucaoPage({ searchParams }: { searchParams: Pro
               <Link
                 key={e.id}
                 href={`/execucao/${e.id}`}
-                className="block rounded-xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-sm"
+                className="glass-tile group block rounded-[18px] px-5 py-5 transition hover:-translate-y-0.5"
               >
                 <div className="flex items-start justify-between gap-6">
                   <div className="flex items-start gap-3 flex-1 min-w-0">

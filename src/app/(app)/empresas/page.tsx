@@ -51,7 +51,7 @@ export default async function EmpresasPage() {
 
       <div className="mt-8 grid gap-4">
         {empresas.map((e) => (
-          <div key={e.id} className="rounded-xl border border-slate-200 bg-white p-5">
+          <div key={e.id} className="glass-tile rounded-[18px] px-5 py-5">
             <div className="flex items-start gap-4">
               <div className="grid h-10 w-10 place-items-center rounded-md bg-blue-50">
                 <Building2 className="h-5 w-5 text-blue-700" />

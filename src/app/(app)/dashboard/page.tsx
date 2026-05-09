@@ -336,6 +336,17 @@ export default async function DashboardPage() {
     year: "numeric",
   });
 
+  // Saudação por hora local — Brasil/SP (server pode rodar em UTC, então
+  // forçamos timezone explícito pra "Bom dia/Boa tarde/Boa noite" bater).
+  const horaSP = Number(
+    new Date().toLocaleString("en-US", {
+      timeZone: "America/Sao_Paulo",
+      hour: "numeric",
+      hour12: false,
+    }),
+  );
+  const saudacao = horaSP < 12 ? "Bom dia" : horaSP < 18 ? "Boa tarde" : "Boa noite";
+
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-6">
       <BannerEmpresaEmFoco contaId={contaId} />
@@ -353,11 +364,11 @@ export default async function DashboardPage() {
             className="mt-2 text-[44px] font-extrabold leading-none"
             style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
           >
-            Bom dia,{" "}
+            {saudacao},{" "}
             <em
               style={{
                 fontStyle: "normal",
-                background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -407,6 +418,7 @@ export default async function DashboardPage() {
             label="Valores contratados"
             value={<CurrencyValue amount={valoresContratados} />}
             meta={`${atasVigentes} ata(s) + ${contratosVigentes} contrato(s) vigente(s)`}
+            href="/atas?status=vigentes"
           />
           <KPI
             tone="mint"
@@ -414,6 +426,7 @@ export default async function DashboardPage() {
             label="Valores executados"
             value={<CurrencyValue amount={valoresExecutados} />}
             meta={`${pctExecutado}% do contratado`}
+            href="/execucao"
           />
           <KPI
             tone="lavender"
@@ -421,6 +434,7 @@ export default async function DashboardPage() {
             label="Valores a executar"
             value={<CurrencyValue amount={valoresAExecutar} />}
             meta="Saldo disponível"
+            href="/execucao"
           />
           <KPI
             tone="mint"
@@ -428,6 +442,7 @@ export default async function DashboardPage() {
             label="Valores recebidos"
             value={<CurrencyValue amount={valoresRecebidos} />}
             meta={`${empenhosPagos} empenhos pagos`}
+            href="/execucao"
           />
           <KPI
             tone="rose"
@@ -435,6 +450,7 @@ export default async function DashboardPage() {
             label="Valores a receber"
             value={<CurrencyValue amount={valoresAReceber} />}
             meta={`${nfsPendentes} NFs pendentes`}
+            href="/execucao"
           />
           <KPI
             tone="coral"
@@ -449,6 +465,7 @@ export default async function DashboardPage() {
               </>
             }
             meta="Em 30 dias ou menos"
+            href="/reajustes"
           />
         </div>
 
@@ -491,6 +508,7 @@ export default async function DashboardPage() {
                   ? `Nenhuma vigente · ${atasVencidas} vencida(s)`
                   : "Atas de Registro de Preços ativas"
             }
+            href="/atas?status=vigentes"
           />
           <KPI
             tone="mint"
@@ -503,6 +521,7 @@ export default async function DashboardPage() {
                 ? `Nenhum vigente · ${contratosVencidos} vencido(s)`
                 : "Contratos administrativos em vigor"
             }
+            href="/contratos?status=vigentes"
           />
         </div>
 
@@ -559,6 +578,7 @@ export default async function DashboardPage() {
             label="Contínuos vigentes"
             value={totalContinuos}
             meta={`${faixasContinuos.ate30 + faixasContinuos.de30a60 + faixasContinuos.de60a90} a renovar nos próximos 90 dias`}
+            href="/contratos?status=vigentes"
           />
           <KPI
             tone="coral"
@@ -566,6 +586,7 @@ export default async function DashboardPage() {
             label="Crítico (≤ 30 dias)"
             value={faixasContinuos.ate30}
             meta="Inicie a tratativa imediatamente"
+            href="/contratos?alerta=30"
           />
           <KPI
             tone="rose"
@@ -573,6 +594,7 @@ export default async function DashboardPage() {
             label="Próximos a renovar (60–90d)"
             value={faixasContinuos.de30a60 + faixasContinuos.de60a90}
             meta="Janela ideal de tratativa"
+            href="/contratos?alerta=90"
           />
         </div>
 
@@ -601,6 +623,7 @@ export default async function DashboardPage() {
             label="Contratos em execução"
             value={contratosEmExecucao}
             meta="Com pelo menos 1 empenho ativo"
+            href="/contratos?status=vigentes"
           />
           <KPI
             tone="primary"
@@ -609,6 +632,7 @@ export default async function DashboardPage() {
             label="Empenhos em execução"
             value={empenhosEmExecucao}
             meta="Não pagos / não finalizados"
+            href="/execucao"
           />
         </div>
 

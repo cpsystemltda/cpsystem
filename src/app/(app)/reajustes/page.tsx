@@ -91,7 +91,7 @@ export default async function ReajustesPage() {
               <li key={`${j.tipo}-${j.id}`}>
                 <Link
                   href={j.href}
-                  className="flex items-center justify-between rounded-lg border border-amber-200 bg-white p-3 hover:border-amber-400"
+                  className="glass-tile t-primary flex items-center justify-between rounded-[14px] px-4 py-3 transition hover:-translate-y-0.5"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{j.titulo}</p>

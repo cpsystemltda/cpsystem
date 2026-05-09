@@ -82,7 +82,7 @@ export default async function HonorariosPage() {
         </div>
       )}
 
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5">
+      <section className="glass mt-6 rounded-[20px] px-6 py-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Meus clientes ({contasIndicadas.length})</h2>
         {contasIndicadas.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">Nenhum cliente indicado ainda.</p>
@@ -124,7 +124,7 @@ export default async function HonorariosPage() {
         )}
       </section>
 
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5">
+      <section className="glass mt-6 rounded-[20px] px-6 py-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Histórico de comissões ({comissoes.length})</h2>
         {comissoes.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">Nenhuma comissão registrada.</p>
@@ -168,7 +168,7 @@ export default async function HonorariosPage() {
 function Card({ titulo, valor, sub, cor }: { titulo: string; valor: string; sub: string; cor?: "amber" | "emerald" }) {
   const corCls = cor === "amber" ? "text-amber-700" : cor === "emerald" ? "text-emerald-700" : "text-slate-900";
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="glass-tile rounded-[18px] px-5 py-5">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
       <p className={`mt-2 text-2xl font-bold ${corCls}`}>{valor}</p>
       <p className="mt-1 text-xs text-slate-500">{sub}</p>

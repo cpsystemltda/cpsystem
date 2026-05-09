@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 export type Tone = "primary" | "mint" | "rose" | "lavender" | "sky" | "coral";
 
@@ -36,6 +38,7 @@ export function KPI({
   value,
   meta,
   size = "md",
+  href,
 }: {
   tone: Tone;
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -43,11 +46,16 @@ export function KPI({
   value: ReactNode;
   meta?: ReactNode;
   size?: "md" | "hero";
+  /** Quando passado, o card inteiro vira um Link clicável */
+  href?: string;
 }) {
   const isHero = size === "hero";
+  const RootEl = href ? (Link as React.ElementType) : ("div" as React.ElementType);
   return (
-    <div
-      className={`glass-tile relative overflow-hidden t-${tone} ${isHero ? "rounded-[20px] px-6 py-5" : "rounded-[18px] px-5 py-5"}`}
+    <RootEl
+      {...(href ? { href } : {})}
+      className={`glass-tile group relative block overflow-hidden t-${tone} ${isHero ? "rounded-[20px] px-6 py-5" : "rounded-[18px] px-5 py-5"} ${href ? "transition hover:-translate-y-0.5 cursor-pointer" : ""}`}
+      title={href ? `Abrir ${label.toLowerCase()}` : undefined}
     >
       <div className="kpi-aura" />
       <div className="relative z-[1]">
@@ -67,6 +75,12 @@ export function KPI({
           >
             {label}
           </h3>
+          {href && (
+            <ArrowRight
+              className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+              style={{ color: ICON_COLOR[tone], strokeWidth: 2 }}
+            />
+          )}
         </div>
 
         {/* Valor */}
@@ -90,7 +104,7 @@ export function KPI({
           </div>
         )}
       </div>
-    </div>
+    </RootEl>
   );
 }
 

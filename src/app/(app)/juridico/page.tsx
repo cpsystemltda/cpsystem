@@ -40,7 +40,7 @@ export default async function JuridicoPage() {
             <Beneficio icone={Sparkles} titulo="Desconto em peças avulsas" texto="Demandas extras (ex.: mandados de segurança) com preço especial." />
           </div>
 
-          <div className="mt-8 flex items-center justify-between rounded-xl bg-white p-5 shadow-sm">
+          <div className="glass-tile mt-6 flex items-center justify-between rounded-[18px] px-5 py-5">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Investimento mensal</p>
               <p className="mt-1 text-3xl font-bold text-slate-900">R$ 997<span className="text-base font-normal text-slate-500">/mês</span></p>
@@ -86,7 +86,7 @@ export default async function JuridicoPage() {
         <Franquia titulo="SLA primeiro atendimento" usado={"4h"} total={"úteis"} percentual={null} />
       </div>
 
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6">
+      <section className="glass mt-6 rounded-[20px] px-6 py-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Solicitar atendimento</h2>
         <p className="mt-2 text-sm text-slate-600">
           Em breve você poderá abrir solicitações jurídicas diretamente daqui. Hoje, contate a equipe pelo WhatsApp comercial:
@@ -116,7 +116,7 @@ function Beneficio({
   texto: string;
 }) {
   return (
-    <div className="flex gap-3 rounded-lg bg-white/70 p-3">
+    <div className="glass-tile flex gap-3 rounded-[14px] px-4 py-3">
       <Icone className="mt-0.5 h-5 w-5 text-violet-600" />
       <div>
         <p className="text-sm font-semibold text-slate-900">{titulo}</p>
@@ -139,7 +139,7 @@ function Franquia({
 }) {
   const pct = percentual !== undefined ? percentual : typeof usado === "number" && typeof total === "number" ? (usado / total) * 100 : 0;
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="glass-tile rounded-[18px] px-5 py-5">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
       <p className="mt-2 text-2xl font-bold text-slate-900">
         {usado}{" "}

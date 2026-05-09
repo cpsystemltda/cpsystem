@@ -170,7 +170,7 @@ export default async function OperacaoPage({
       </div>
 
       {/* Conteúdo da aba */}
-      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="glass mt-6 rounded-[20px] px-6 py-5">
         {aba === "execucao" && (
           <>
             <CabecalhoAba
@@ -432,8 +432,8 @@ function CardCategoria({
   return (
     <Link
       href={href}
-      className={`group rounded-2xl border-2 bg-white p-4 transition ${
-        ativa ? `${c.border} shadow-md` : "border-slate-200 hover:border-slate-300"
+      className={`glass-tile group rounded-[18px] px-4 py-4 transition ${
+        ativa ? "t-primary -translate-y-0.5" : "hover:-translate-y-0.5"
       }`}
     >
       <div className="flex items-start justify-between">

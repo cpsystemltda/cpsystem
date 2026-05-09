@@ -90,13 +90,13 @@ export default async function TermosPage() {
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             <Link
               href="/equipe"
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 hover:border-blue-300"
+              className="glass-tile flex items-center gap-2 rounded-[12px] px-4 py-3 text-sm transition hover:-translate-y-0.5"
             >
               <Download className="h-4 w-4" /> Exportar meus dados
             </Link>
             <a
               href="mailto:dpo@contratospublicos.com.br?subject=Solicita%C3%A7%C3%A3o%20de%20exclus%C3%A3o%20LGPD"
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700 hover:border-red-300"
+              className="glass-tile flex items-center gap-2 rounded-[12px] px-4 py-3 text-sm transition hover:-translate-y-0.5"
             >
               <Lock className="h-4 w-4" /> Solicitar exclusão da conta
             </a>
