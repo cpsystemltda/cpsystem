@@ -1,20 +1,21 @@
 import Link from "next/link";
-import { Wallet, TrendingUp, Briefcase, AlertCircle, Receipt } from "lucide-react";
+import { Wallet, TrendingUp, Briefcase, AlertCircle, Receipt, Coins } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularComissaoAnalista, listarExecucoesDoVinculo } from "@/lib/comissaoB2G";
 import { brl, formatarCnpj } from "@/lib/validators";
 import { PercentualForm } from "./PercentualForm";
 import { PageHeader } from "@/components/ui/SecaoGlass";
+import { KPI } from "@/components/ui/KPI";
 
-const COR_STATUS_EMPENHO: Record<string, string> = {
-  EMPENHADO: "bg-slate-100 text-slate-700",
-  PEDIDO_RECEBIDO: "bg-blue-100 text-blue-700",
-  EM_TRANSITO: "bg-indigo-100 text-indigo-700",
-  ENTREGUE: "bg-violet-100 text-violet-700",
-  NF_EMITIDA: "bg-amber-100 text-amber-800",
-  NF_ENCAMINHADA: "bg-orange-100 text-orange-800",
-  PAGO: "bg-emerald-100 text-emerald-800",
+const STATUS_BADGE: Record<string, string> = {
+  EMPENHADO: "b-empenhado",
+  PEDIDO_RECEBIDO: "b-pedido",
+  EM_TRANSITO: "b-transito",
+  ENTREGUE: "b-entregue",
+  NF_EMITIDA: "b-nf-emitida",
+  NF_ENCAMINHADA: "b-nf-encam",
+  PAGO: "b-entregue",
 };
 
 // Status simplificado pra UI do analista (Emitida/Pendente/Paga)
@@ -83,24 +84,35 @@ export default async function PainelAnalistaPage({
         subtitulo={`${consolidado.totalEmpresas} empresa(s) vinculada(s) — comissões, carteira e atividade consolidada.`}
       />
 
-      <div className="mt-8 grid gap-4 md:grid-cols-4">
-        <Card titulo="Comissão recebida" valor={brl(consolidado.totalComissaoRecebida)} cor="emerald" sub="execuções pagas após o vínculo" />
-        <Card titulo="Comissão a receber" valor={brl(consolidado.totalComissaoAReceber)} cor="amber" sub="execuções pendentes" />
-        <Card titulo="Carteira contratada" valor={brl(consolidado.totalCarteiraContratada)} sub="atas + contratos vigentes" />
-        <Card titulo="Fixo mensal ativo" valor={brl(consolidado.totalFixoMensalAtivo)} sub={`${consolidado.empresas.filter((e) => e.status === "ATIVO").length} vínculos ativos`} />
+      <div className="mt-6 grid gap-4 md:grid-cols-4">
+        <KPI tone="mint" icon={Wallet} label="Comissão recebida" value={brl(consolidado.totalComissaoRecebida)} meta="execuções pagas após o vínculo" />
+        <KPI tone="primary" icon={Coins} label="Comissão a receber" value={brl(consolidado.totalComissaoAReceber)} meta="execuções pendentes" />
+        <KPI tone="lavender" icon={Briefcase} label="Carteira contratada" value={brl(consolidado.totalCarteiraContratada)} meta="atas + contratos vigentes" />
+        <KPI tone="sky" icon={Receipt} label="Fixo mensal ativo" value={brl(consolidado.totalFixoMensalAtivo)} meta={`${consolidado.empresas.filter((e) => e.status === "ATIVO").length} vínculos ativos`} />
       </div>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Empresas vinculadas</h2>
+        <h2
+          className="mb-3 text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
+          Empresas vinculadas
+        </h2>
         {consolidado.empresas.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-            <Briefcase className="mx-auto h-10 w-10 text-slate-400" />
-            <h3 className="mt-4 text-lg font-semibold text-slate-900">Nenhuma empresa vinculou você ainda</h3>
-            <p className="mt-2 text-sm text-slate-600">
+          <div
+            className="glass-tile rounded-[20px] p-12 text-center"
+            style={{ border: "0.5px dashed var(--hairline)" }}
+          >
+            <Briefcase className="mx-auto h-10 w-10" style={{ color: "var(--text-mute)" }} />
+            <h3 className="mt-4 text-[18px] font-extrabold" style={{ color: "var(--text)", letterSpacing: "-0.02em" }}>
+              Nenhuma empresa vinculou você ainda
+            </h3>
+            <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
               Quando uma empresa fornecedora cadastrar você como analista responsável, ela aparece aqui.
             </p>
-            <p className="mt-2 text-xs text-slate-500">
-              Compartilhe seu CPF: <strong>{formatarCpf(analista.cpf)}</strong>
+            <p className="mt-3 text-xs" style={{ color: "var(--text-mute)" }}>
+              Compartilhe seu CPF:{" "}
+              <strong style={{ color: "var(--primary-deep)" }}>{formatarCpf(analista.cpf)}</strong>
             </p>
           </div>
         ) : (
@@ -110,61 +122,92 @@ export default async function PainelAnalistaPage({
               return (
                 <div
                   key={e.vinculoId}
-                  className={`rounded-xl border bg-white p-5 ${ativo ? "border-blue-400 shadow-sm" : "border-slate-200"}`}
+                  className={`glass-tile rounded-[18px] px-5 py-5 ${ativo ? "t-primary" : ""}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-slate-900">{e.empresaPrincipalNome}</h3>
-                        <span
-                          className={`rounded px-2 py-0.5 text-[10px] font-medium ${
-                            e.status === "ATIVO" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
-                          }`}
+                        <h3
+                          className="text-[17px] font-extrabold"
+                          style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
                         >
+                          {e.empresaPrincipalNome}
+                        </h3>
+                        <span className={`badge ${e.status === "ATIVO" ? "b-entregue" : "b-empenhado"}`}>
                           {e.status}
                         </span>
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs" style={{ color: "var(--text-soft)" }}>
                           {e.cnpjsCount} CNPJ{e.cnpjsCount !== 1 ? "s" : ""}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
                         Vínculo desde {e.dataInicio.toLocaleDateString("pt-BR")} · {e.totalExecucoes} execuções ({e.totalExecucoesPagas} pagas)
                       </p>
                       <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
                         <div>
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">Recebido</p>
-                          <p className="font-bold text-emerald-700">{brl(e.comissaoRecebida)}</p>
+                          <p
+                            className="text-[10px] font-bold uppercase"
+                            style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+                          >
+                            Recebido
+                          </p>
+                          <p className="text-[15px] font-extrabold tabular" style={{ color: "var(--mint-deep)" }}>
+                            {brl(e.comissaoRecebida)}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">A receber</p>
-                          <p className="font-bold text-amber-700">{brl(e.comissaoAReceber)}</p>
+                          <p
+                            className="text-[10px] font-bold uppercase"
+                            style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+                          >
+                            A receber
+                          </p>
+                          <p className="text-[15px] font-extrabold tabular" style={{ color: "var(--primary-deep)" }}>
+                            {brl(e.comissaoAReceber)}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase tracking-wide text-slate-500">Carteira</p>
-                          <p className="font-bold text-slate-900">{brl(e.carteiraContratada)}</p>
+                          <p
+                            className="text-[10px] font-bold uppercase"
+                            style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+                          >
+                            Carteira
+                          </p>
+                          <p className="text-[15px] font-extrabold tabular" style={{ color: "var(--text)" }}>
+                            {brl(e.carteiraContratada)}
+                          </p>
                         </div>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
                       <div>
-                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Comissão</p>
+                        <p
+                          className="text-[10px] font-bold uppercase"
+                          style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+                        >
+                          Comissão
+                        </p>
                         {e.status === "ATIVO" ? (
                           <PercentualForm vinculoId={e.vinculoId} valorAtual={e.percentual} />
                         ) : (
-                          <p className="text-sm font-bold">{e.percentual}%</p>
+                          <p className="text-sm font-extrabold" style={{ color: "var(--text)" }}>{e.percentual}%</p>
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-slate-500">Fixo mensal</p>
-                        <p className="text-sm font-medium">{brl(e.fixoMensal)}</p>
+                        <p
+                          className="text-[10px] font-bold uppercase"
+                          style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+                        >
+                          Fixo mensal
+                        </p>
+                        <p className="text-sm font-semibold" style={{ color: "var(--text-soft)" }}>
+                          {brl(e.fixoMensal)}
+                        </p>
                       </div>
                       <Link
                         href={ativo ? "/painel-analista" : `/painel-analista?vinculo=${e.vinculoId}`}
-                        className={`rounded-md border px-3 py-1.5 text-xs font-medium transition ${
-                          ativo
-                            ? "border-blue-500 bg-blue-50 text-blue-700"
-                            : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-                        }`}
+                        className={ativo ? "btn-primary" : "btn-secondary"}
+                        style={ativo ? { height: "32px", padding: "0 14px", fontSize: "12px" } : { height: "32px", padding: "0 14px", fontSize: "12px" }}
                       >
                         {ativo ? "Esconder execuções" : "Ver execuções"}
                       </Link>
@@ -180,7 +223,10 @@ export default async function PainelAnalistaPage({
       {vinculoSelecionado && (
         <section className="mt-8">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            <h2
+              className="text-[12px] font-bold uppercase"
+              style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+            >
               Execuções de {vinculoSelecionado.empresaPrincipalNome} ({execucoesFiltradas.length})
             </h2>
             {cnpjsDoVinculo.length > 1 && (
@@ -192,7 +238,7 @@ export default async function PainelAnalistaPage({
                   else url.searchParams.delete("cnpj");
                   window.location.href = url.toString();
                 }}
-                className="rounded border border-slate-300 px-2 py-1 text-xs"
+                className="rounded-[10px] px-3 py-1.5 text-xs"
               >
                 <option value="">Todos os CNPJs</option>
                 {cnpjsDoVinculo.map((c) => (
@@ -205,20 +251,23 @@ export default async function PainelAnalistaPage({
           </div>
 
           {execucoesFiltradas.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+            <p
+              className="glass-tile rounded-[16px] p-6 text-center text-sm"
+              style={{ color: "var(--text-soft)", border: "0.5px dashed var(--hairline)" }}
+            >
               Nenhuma execução nesse filtro.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <div className="glass overflow-hidden rounded-[20px]">
+              <table className="table-glass">
+                <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left">Identificador</th>
-                    <th className="px-4 py-2 text-left">CNPJ</th>
-                    <th className="px-4 py-2 text-left">Órgão</th>
-                    <th className="px-4 py-2 text-left">Status</th>
-                    <th className="px-4 py-2 text-right">Valor</th>
-                    <th className="px-4 py-2 text-right">Comissão ({vinculoSelecionado.percentual}%)</th>
+                    <th>Identificador</th>
+                    <th>CNPJ</th>
+                    <th>Órgão</th>
+                    <th>Status</th>
+                    <th className="num">Valor</th>
+                    <th className="num">Comissão ({vinculoSelecionado.percentual}%)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,23 +276,27 @@ export default async function PainelAnalistaPage({
                     const comissao = valor * (vinculoSelecionado.percentual / 100);
                     const ss = statusSimples(e.status);
                     return (
-                      <tr key={e.id} className="border-t border-slate-100">
-                        <td className="px-4 py-2">
-                          <div className="font-medium">{e.identificador || `Empenho ${e.numero}`}</div>
-                          <div className="text-[10px] text-slate-500">{e.objeto.slice(0, 50)}</div>
+                      <tr key={e.id}>
+                        <td>
+                          <div className="strong" style={{ color: "var(--text)" }}>
+                            {e.identificador || `Empenho ${e.numero}`}
+                          </div>
+                          <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+                            {e.objeto.slice(0, 50)}
+                          </div>
                         </td>
-                        <td className="px-4 py-2 text-xs text-slate-600 font-mono">{formatarCnpj(e.empresa.cnpj)}</td>
-                        <td className="px-4 py-2 text-xs">{e.orgaoNome}</td>
-                        <td className="px-4 py-2">
-                          <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${COR_STATUS_EMPENHO[e.status]}`}>
-                            {ss}
-                          </span>
+                        <td className="text-xs font-mono">{formatarCnpj(e.empresa.cnpj)}</td>
+                        <td className="text-xs">{e.orgaoNome}</td>
+                        <td>
+                          <span className={`badge ${STATUS_BADGE[e.status] ?? "b-empenhado"}`}>{ss}</span>
                         </td>
-                        <td className="px-4 py-2 text-right">{brl(valor)}</td>
+                        <td className="num strong">{brl(valor)}</td>
                         <td
-                          className={`px-4 py-2 text-right font-medium ${
-                            ss === "Paga" ? "text-emerald-700" : "text-amber-700"
-                          }`}
+                          className="num"
+                          style={{
+                            fontWeight: 700,
+                            color: ss === "Paga" ? "var(--mint-deep)" : "var(--primary-deep)",
+                          }}
                         >
                           {brl(comissao)}
                         </td>
@@ -256,17 +309,6 @@ export default async function PainelAnalistaPage({
           )}
         </section>
       )}
-    </div>
-  );
-}
-
-function Card({ titulo, valor, sub, cor }: { titulo: string; valor: string; sub: string; cor?: "emerald" | "amber" }) {
-  const corCls = cor === "emerald" ? "text-emerald-700" : cor === "amber" ? "text-amber-700" : "text-slate-900";
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
-      <p className={`mt-2 text-2xl font-bold ${corCls}`}>{valor}</p>
-      <p className="mt-1 text-xs text-slate-500">{sub}</p>
     </div>
   );
 }
