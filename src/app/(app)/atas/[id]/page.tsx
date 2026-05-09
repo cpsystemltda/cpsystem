@@ -180,40 +180,136 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
 function TabelaSaldoItens({
   saldo,
 }: {
-  saldo: { itens: { ataItemId: string; descricao: string; unidade: string; quantidadeTotal: number; quantidadeUsada: number; quantidadeDisponivel: number; valorUnitario: number; valorDisponivel: number }[] };
+  saldo: {
+    itens: {
+      ataItemId: string;
+      descricao: string;
+      unidade: string;
+      lote: string | null;
+      quantidadeTotal: number;
+      quantidadeUsada: number;
+      quantidadeDisponivel: number;
+      valorUnitario: number;
+      valorDisponivel: number;
+    }[];
+  };
 }) {
+  // Agrupa itens por lote — ordem de aparição preservada (Lote 1, 2, 3...
+  // conforme primeira ocorrência); itens sem lote vão para "Itens isolados".
+  const grupos = new Map<string, typeof saldo.itens>();
+  const ITENS_ISOLADOS = "__isolados__";
+  for (const it of saldo.itens) {
+    const chave = it.lote && it.lote.trim() ? it.lote.trim() : ITENS_ISOLADOS;
+    const arr = grupos.get(chave) ?? [];
+    arr.push(it);
+    grupos.set(chave, arr);
+  }
+  // Renderiza lotes na ordem natural numérica quando possível, senão alfabética;
+  // "Itens isolados" sempre por último.
+  const chavesOrdenadas = Array.from(grupos.keys())
+    .filter((k) => k !== ITENS_ISOLADOS)
+    .sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      return a.localeCompare(b, "pt-BR", { numeric: true });
+    });
+  if (grupos.has(ITENS_ISOLADOS)) chavesOrdenadas.push(ITENS_ISOLADOS);
+
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-          <tr>
-            <th className="px-4 py-2 text-left">Descrição</th>
-            <th className="px-4 py-2 text-left">Un.</th>
-            <th className="px-4 py-2 text-right">Qtd. registrada</th>
-            <th className="px-4 py-2 text-right">Qtd. usada</th>
-            <th className="px-4 py-2 text-right">Qtd. disponível</th>
-            <th className="px-4 py-2 text-right">Valor unit.</th>
-            <th className="px-4 py-2 text-right">Valor disponível</th>
-          </tr>
-        </thead>
-        <tbody>
-          {saldo.itens.map((it) => (
-            <tr key={it.ataItemId} className="border-t border-slate-100">
-              <td className="px-4 py-2">{it.descricao}</td>
-              <td className="px-4 py-2 text-slate-600">{it.unidade}</td>
-              <td className="px-4 py-2 text-right">{it.quantidadeTotal}</td>
-              <td className="px-4 py-2 text-right text-slate-600">{it.quantidadeUsada}</td>
-              <td className="px-4 py-2 text-right">
-                <span className={it.quantidadeDisponivel === 0 ? "text-red-600 font-medium" : "text-emerald-700 font-medium"}>
-                  {it.quantidadeDisponivel}
+    <div className="space-y-5">
+      {chavesOrdenadas.map((chave) => {
+        const itens = grupos.get(chave) ?? [];
+        const tituloGrupo = chave === ITENS_ISOLADOS ? "Itens isolados" : `Lote ${chave}`;
+        const subtotalQtd = itens.reduce((s, it) => s + it.quantidadeTotal, 0);
+        const subtotalDisp = itens.reduce((s, it) => s + it.valorDisponivel, 0);
+        return (
+          <section key={chave} className="glass overflow-hidden rounded-[20px]">
+            <header
+              className="flex items-center justify-between gap-3 px-6 py-3"
+              style={{ borderBottom: "0.5px solid var(--hairline)" }}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[12px] font-extrabold"
+                  style={{
+                    background:
+                      chave === ITENS_ISOLADOS
+                        ? "rgba(15,14,12,0.06)"
+                        : "rgba(212,175,55,0.18)",
+                    border:
+                      chave === ITENS_ISOLADOS
+                        ? "0.5px solid var(--hairline)"
+                        : "0.5px solid rgba(168,137,71,0.5)",
+                    color:
+                      chave === ITENS_ISOLADOS ? "var(--text-mute)" : "var(--primary-deep)",
+                  }}
+                >
+                  {chave === ITENS_ISOLADOS ? "—" : chave}
                 </span>
-              </td>
-              <td className="px-4 py-2 text-right text-slate-600">{brl(it.valorUnitario)}</td>
-              <td className="px-4 py-2 text-right font-medium">{brl(it.valorDisponivel)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <h3
+                  className="text-[14px] font-extrabold"
+                  style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
+                >
+                  {tituloGrupo}
+                </h3>
+                <span className="text-xs" style={{ color: "var(--text-soft)" }}>
+                  {itens.length} item{itens.length !== 1 ? "ns" : ""} · {subtotalQtd} unidade{subtotalQtd !== 1 ? "s" : ""} · {brl(subtotalDisp)} disponível
+                </span>
+              </div>
+            </header>
+            <table className="table-glass">
+              <colgroup>
+                <col />
+                <col style={{ width: "72px" }} />
+                <col style={{ width: "120px" }} />
+                <col style={{ width: "120px" }} />
+                <col style={{ width: "130px" }} />
+                <col style={{ width: "120px" }} />
+                <col style={{ width: "140px" }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th>Un.</th>
+                  <th className="num">Qtd. registrada</th>
+                  <th className="num">Qtd. usada</th>
+                  <th className="num">Qtd. disponível</th>
+                  <th className="num">Valor unit.</th>
+                  <th className="num">Valor disponível</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itens.map((it) => (
+                  <tr key={it.ataItemId}>
+                    <td className="strong" title={it.descricao} style={{ whiteSpace: "normal" }}>
+                      {it.descricao}
+                    </td>
+                    <td>{it.unidade}</td>
+                    <td className="num">{it.quantidadeTotal}</td>
+                    <td className="num">{it.quantidadeUsada}</td>
+                    <td className="num">
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          color:
+                            it.quantidadeDisponivel === 0
+                              ? "var(--coral-deep)"
+                              : "var(--mint-deep)",
+                        }}
+                      >
+                        {it.quantidadeDisponivel}
+                      </span>
+                    </td>
+                    <td className="num">{brl(it.valorUnitario)}</td>
+                    <td className="num strong">{brl(it.valorDisponivel)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        );
+      })}
     </div>
   );
 }

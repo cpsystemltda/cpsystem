@@ -144,12 +144,16 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
 
+  // Empresa "em foco": cookie selecionou OU só existe 1 empresa cadastrada
+  // (nesse caso, não faz sentido tela "consolidada" — toda operação é dela).
+  const temEmpresaEmFoco = !!empresaIdSelecionada || empresas.length === 1;
+
   const grupos =
     visao === "ADMIN_PLATAFORMA"
       ? GRUPOS_ADMIN_PLATAFORMA
       : visao === "ANALISTA"
         ? GRUPOS_ANALISTA
-        : !empresaIdSelecionada
+        : !temEmpresaEmFoco
           ? [...GRUPOS_EMPRESA_CONSOLIDADO, ...GRUPOS_EMPRESA_CONTA]
           : [...GRUPOS_EMPRESA_OPERACAO, ...GRUPOS_EMPRESA_CONTA];
   const inicial = nomeUsuario.trim().charAt(0).toUpperCase();

@@ -191,14 +191,26 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
       const k = issue.path.join(".");
       if (!campos[k]) campos[k] = issue.message;
     }
-    return { erro: "Verifique os campos destacados.", campos };
+    return { erro: "Verifique os campos destacados.", campos, valores: dados };
   }
 
   const v = parsed.data;
-  await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
+  try {
+    await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
+  } catch (err) {
+    return {
+      erro: err instanceof Error ? err.message : "Empresa inválida.",
+      campos: { empresaId: "Selecione uma empresa válida." },
+      valores: dados,
+    };
+  }
 
   if (v.vigenciaFim < v.vigenciaInicio) {
-    return { erro: "A vigência final precisa ser posterior à inicial." };
+    return {
+      erro: "A vigência final precisa ser posterior à inicial.",
+      campos: { vigenciaFim: "Deve ser posterior à vigência inicial." },
+      valores: dados,
+    };
   }
 
   try {
@@ -285,6 +297,7 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
       console.error("[criarAtaAction] erro ao salvar Ata:", msg);
       return {
         erro: `Não foi possível salvar a Ata: ${msg.slice(0, 240)}`,
+        valores: dados,
       };
     }
     throw err;

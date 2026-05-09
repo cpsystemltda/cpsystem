@@ -141,6 +141,13 @@ export function ItensEditor({
 
   return (
     <div>
+      {permitirLotes && (
+        <datalist id="lotes-sugeridos">
+          {lotesUnicos.map((lote) => (
+            <option key={lote} value={lote} />
+          ))}
+        </datalist>
+      )}
       {permitirLotes && lotesUnicos.length > 0 && (
         <div
           className="mb-3 flex flex-wrap items-center gap-2 rounded-xl px-4 py-3 text-xs"
@@ -255,12 +262,14 @@ export function ItensEditor({
                       value={l.lote}
                       onChange={(ev) => update(idx, { lote: ev.target.value })}
                       placeholder="—"
+                      list="lotes-sugeridos"
                       className="w-16 rounded-md px-2 py-1.5 text-center text-xs font-bold"
                       style={{
                         background: l.lote ? "rgba(212,175,55,0.18)" : "rgba(15,14,12,0.04)",
                         color: l.lote ? "var(--primary-deep)" : "var(--text-mute)",
                         border: "0.5px solid rgba(168,137,71,0.35)",
                       }}
+                      title="Itens com o mesmo número de lote são agrupados na visualização. Deixe vazio para item isolado."
                     />
                   </td>
                 )}

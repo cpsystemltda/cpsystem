@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   Sparkles,
@@ -332,14 +332,72 @@ function SecaoGlass({
 /* ============================================================
    Form principal
    ============================================================ */
+// Rótulos amigáveis pra cada path de erro do schema, mostrados na lista
+// de erros no topo do form.
+const ROTULO_CAMPO: Record<string, string> = {
+  empresaId: "Empresa",
+  numero: "Número da Ata",
+  processoAdministrativo: "Processo administrativo",
+  procedimentoSelecao: "Procedimento de seleção",
+  numeroLicitacao: "Nº do Pregão Eletrônico",
+  idAtaPncp: "ID Ata no PNCP",
+  tipo: "Tipo de objeto",
+  objeto: "Objeto",
+  orgaoNome: "Nome do órgão",
+  orgaoCnpj: "CNPJ do órgão",
+  orgaoEndereco: "Endereço do órgão",
+  orgaoEmail: "E-mail do órgão",
+  orgaoTelefone: "Telefone do órgão",
+  dataAssinatura: "Data de assinatura",
+  dataPublicacao: "Data de publicação",
+  vigenciaInicio: "Vigência (início)",
+  vigenciaFim: "Vigência (fim)",
+  prazoEntregaDias: "Prazo de entrega",
+  prazoPagamentoDias: "Prazo de pagamento",
+  marcoOrcamentoEstimado: "Data inicial do marco",
+  marcoReajusteOrigem: "Marco de reajuste",
+  itens: "Itens registrados",
+  enderecosEntrega: "Endereços de entrega",
+  pontosFocais: "Pontos focais",
+  orgaosParticipantes: "Órgãos participantes",
+};
+
+function rotularErro(path: string): string {
+  // Caminhos aninhados (itens.0.descricao) → "Item 1 · Descrição"
+  const partes = path.split(".");
+  const root = partes[0];
+  if (partes.length >= 2 && /^\d+$/.test(partes[1])) {
+    const idx = Number(partes[1]) + 1;
+    const sub = partes[2] ? ` · ${partes[2]}` : "";
+    return `${ROTULO_CAMPO[root] ?? root} ${idx}${sub}`;
+  }
+  return ROTULO_CAMPO[path] ?? path;
+}
+
 export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
   const [state, formAction] = useActionState(criarAtaAction, null);
   const e = state?.campos ?? {};
+  const v = (state?.valores ?? {}) as Record<string, string>;
+  const errosResumo = Object.entries(e);
+  const resumoRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [extraindo, setExtraindo] = useState(false);
   const [extracaoErro, setExtracaoErro] = useState<string | null>(null);
   const [dados, setDados] = useState<AtaExtraida | null>(null);
   const [pdfNome, setPdfNome] = useState<string | null>(null);
+
+  // Após erro de validação: rola até o resumo de erros e foca o primeiro
+  // campo problemático
+  useEffect(() => {
+    if (errosResumo.length === 0) return;
+    resumoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const primeiro = errosResumo[0]?.[0];
+    if (primeiro) {
+      const sel = primeiro.includes(".") ? primeiro.split(".")[0] : primeiro;
+      const el = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${sel}"]`);
+      el?.focus({ preventScroll: true });
+    }
+  }, [state]);
 
   // Estados controlados (PDF apontamentos)
   const [prazoNaoAplica, setPrazoNaoAplica] = useState(false);
@@ -505,6 +563,46 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
       </section>
 
       <form key={formKey} action={formAction} className="mt-6 space-y-5">
+        {/* Resumo de erros — clicável, scroll-into-view + focus */}
+        {(state?.erro || errosResumo.length > 0) && (
+          <div
+            ref={resumoRef}
+            className="rounded-[16px] px-5 py-4 text-sm"
+            style={{
+              background: "rgba(232,138,152,0.18)",
+              border: "0.5px solid rgba(198,103,112,0.5)",
+              color: "var(--coral-deep)",
+            }}
+          >
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="flex-1">
+                <p className="font-extrabold">{state?.erro ?? "Verifique os campos abaixo:"}</p>
+                {errosResumo.length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {errosResumo.map(([campo, msg]) => (
+                      <li key={campo}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sel = campo.includes(".") ? campo.split(".")[0] : campo;
+                            const el = document.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${sel}"]`);
+                            el?.focus();
+                            el?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          }}
+                          className="text-left underline hover:opacity-80"
+                        >
+                          <strong>{rotularErro(campo)}</strong>: {msg}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* === 2.1 IDENTIFICAÇÃO === */}
         <SecaoGlass
           numero="01"
@@ -528,7 +626,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               required
               erro={e.numero}
               span={1}
-              defaultValue={dados?.numero}
+              defaultValue={(v.numero as string) ?? dados?.numero}
             />
             <FieldGlass
               label="Processo administrativo"
@@ -536,7 +634,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               required
               erro={e.processoAdministrativo}
               span={1}
-              defaultValue={dados?.processoAdministrativo}
+              defaultValue={(v.processoAdministrativo as string) ?? dados?.processoAdministrativo}
             />
             <SelectGlass
               label="Tipo de objeto"
@@ -577,7 +675,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               required
               erro={e.objeto}
               span={2}
-              defaultValue={dados?.objeto}
+              defaultValue={(v.objeto as string) ?? dados?.objeto}
             />
           </div>
         </SecaoGlass>
