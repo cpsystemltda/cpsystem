@@ -8,6 +8,13 @@ import { PercentualForm } from "./PercentualForm";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { KPI } from "@/components/ui/KPI";
 
+// Formato compacto pra valores grandes — evita corte no KPI ("R$ 1,2 Mi" em vez de "R$ 1.234.567,89")
+function brlCompacto(n: number): string {
+  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} Mi`;
+  if (n >= 10_000) return `R$ ${(n / 1_000).toFixed(1).replace(".", ",")} mil`;
+  return brl(n);
+}
+
 const STATUS_BADGE: Record<string, string> = {
   EMPENHADO: "b-empenhado",
   PEDIDO_RECEBIDO: "b-pedido",
@@ -188,10 +195,10 @@ export default async function PainelAnalistaPage({
       />
 
       <div className="mt-6 grid gap-4 md:grid-cols-4">
-        <KPI tone="mint" icon={Wallet} label="Comissão recebida" value={brl(consolidado.totalComissaoRecebida)} meta="execuções pagas após o vínculo" />
-        <KPI tone="primary" icon={Coins} label="Comissão a receber" value={brl(consolidado.totalComissaoAReceber)} meta="execuções pendentes" />
-        <KPI tone="lavender" icon={Briefcase} label="Carteira contratada" value={brl(consolidado.totalCarteiraContratada)} meta="atas + contratos vigentes" />
-        <KPI tone="sky" icon={Receipt} label="Fixo mensal ativo" value={brl(consolidado.totalFixoMensalAtivo)} meta={`${consolidado.empresas.filter((e) => e.status === "ATIVO").length} vínculos ativos`} />
+        <KPI tone="mint" icon={Wallet} label="Comissão recebida" value={brlCompacto(consolidado.totalComissaoRecebida)} meta="execuções pagas após o vínculo" />
+        <KPI tone="primary" icon={Coins} label="Comissão a receber" value={brlCompacto(consolidado.totalComissaoAReceber)} meta="execuções pendentes" />
+        <KPI tone="lavender" icon={Briefcase} label="Carteira contratada" value={brlCompacto(consolidado.totalCarteiraContratada)} meta="atas + contratos vigentes" />
+        <KPI tone="sky" icon={Receipt} label="Fixo mensal ativo" value={brlCompacto(consolidado.totalFixoMensalAtivo)} meta={`${consolidado.empresas.filter((e) => e.status === "ATIVO").length} vínculos ativos`} />
       </div>
 
       <section className="mt-8">

@@ -88,13 +88,16 @@ export function KPI({
 
         {/* Valor */}
         <div
-          className={`tabular mt-3 ${isHero ? "text-[44px] leading-[0.95]" : "text-[34px] leading-none"} font-extrabold`}
+          className={`tabular mt-3 ${isHero ? "text-[44px] leading-[0.95]" : "text-[30px] leading-none"} font-extrabold`}
           style={{
             background: VALUE_GRADIENT[tone],
             WebkitBackgroundClip: "text",
             backgroundClip: "text",
             WebkitTextFillColor: "transparent",
             letterSpacing: "-0.045em",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {value}
