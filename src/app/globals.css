@@ -238,8 +238,8 @@ textarea:focus {
    ============================================================ */
 .t-primary {
   background:
-    linear-gradient(135deg, rgba(212, 175, 55, 0.28) 0%, rgba(212, 175, 55, 0.10) 100%),
-    rgba(255, 255, 255, 0.35);
+    linear-gradient(135deg, rgba(212, 175, 55, 0.42) 0%, rgba(212, 175, 55, 0.16) 100%),
+    rgba(255, 255, 255, 0.32);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(212, 175, 55, 0.55),
@@ -247,8 +247,8 @@ textarea:focus {
 }
 .t-mint {
   background:
-    linear-gradient(135deg, rgba(93, 216, 182, 0.28) 0%, rgba(93, 216, 182, 0.10) 100%),
-    rgba(255, 255, 255, 0.35);
+    linear-gradient(135deg, rgba(93, 216, 182, 0.42) 0%, rgba(93, 216, 182, 0.16) 100%),
+    rgba(255, 255, 255, 0.32);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(93, 216, 182, 0.55),
@@ -256,8 +256,8 @@ textarea:focus {
 }
 .t-rose {
   background:
-    linear-gradient(135deg, rgba(240, 184, 168, 0.32) 0%, rgba(240, 184, 168, 0.12) 100%),
-    rgba(255, 255, 255, 0.35);
+    linear-gradient(135deg, rgba(240, 184, 168, 0.46) 0%, rgba(240, 184, 168, 0.18) 100%),
+    rgba(255, 255, 255, 0.32);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(240, 184, 168, 0.55),
@@ -265,8 +265,8 @@ textarea:focus {
 }
 .t-lavender {
   background:
-    linear-gradient(135deg, rgba(197, 180, 255, 0.28) 0%, rgba(197, 180, 255, 0.10) 100%),
-    rgba(255, 255, 255, 0.35);
+    linear-gradient(135deg, rgba(197, 180, 255, 0.44) 0%, rgba(197, 180, 255, 0.16) 100%),
+    rgba(255, 255, 255, 0.32);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(197, 180, 255, 0.55),
@@ -274,8 +274,8 @@ textarea:focus {
 }
 .t-sky {
   background:
-    linear-gradient(135deg, rgba(184, 197, 214, 0.32) 0%, rgba(184, 197, 214, 0.12) 100%),
-    rgba(255, 255, 255, 0.35);
+    linear-gradient(135deg, rgba(184, 197, 214, 0.46) 0%, rgba(184, 197, 214, 0.18) 100%),
+    rgba(255, 255, 255, 0.32);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(184, 197, 214, 0.55),
@@ -283,8 +283,8 @@ textarea:focus {
 }
 .t-coral {
   background:
-    linear-gradient(135deg, rgba(232, 138, 152, 0.30) 0%, rgba(232, 138, 152, 0.10) 100%),
-    rgba(255, 255, 255, 0.35);
+    linear-gradient(135deg, rgba(232, 138, 152, 0.44) 0%, rgba(232, 138, 152, 0.16) 100%),
+    rgba(255, 255, 255, 0.32);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 0.5px rgba(232, 138, 152, 0.55),

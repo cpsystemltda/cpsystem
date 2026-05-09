@@ -54,12 +54,22 @@ export default async function AssinaturaPage() {
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
       <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-50">
-          <CreditCard className="h-5 w-5 text-blue-700" />
+        <div
+          className="grid h-10 w-10 place-items-center rounded-[12px]"
+          style={{ background: "rgba(212,175,55,0.18)" }}
+        >
+          <CreditCard className="h-5 w-5" style={{ color: "var(--primary-deep)" }} />
         </div>
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Assinatura e cobrança</h1>
-          <p className="mt-1 text-sm text-slate-600">Gerencie seu plano, método de pagamento e histórico de faturas.</p>
+          <h1
+            className="text-[32px] font-extrabold leading-none"
+            style={{ color: "var(--text)", letterSpacing: "-0.04em" }}
+          >
+            Assinatura e cobrança
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
+            Gerencie seu plano, método de pagamento e histórico de faturas.
+          </p>
         </div>
       </div>
 
@@ -74,11 +84,19 @@ export default async function AssinaturaPage() {
       )}
 
       {/* Card do plano atual */}
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6">
+      <section className="glass mt-6 rounded-[20px] px-6 py-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Plano atual</p>
-            <h2 className="mt-1 text-2xl font-bold text-slate-900">
+            <p
+              className="text-[12px] font-bold uppercase"
+              style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+            >
+              Plano atual
+            </p>
+            <h2
+              className="mt-2 text-[24px] font-extrabold leading-tight"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+            >
               {ROTULO_PLANO[conta.plano as "BASICO" | "PREMIUM"]} — {brl(PRECO[conta.plano as "BASICO" | "PREMIUM"])}/mês
             </h2>
             <div className="mt-2 flex items-center gap-2">
@@ -139,8 +157,13 @@ export default async function AssinaturaPage() {
       </section>
 
       {/* Métodos de pagamento */}
-      <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Métodos de pagamento salvos</h2>
+      <section className="glass mt-4 rounded-[20px] px-6 py-5">
+        <h2
+          className="text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
+          Métodos de pagamento salvos
+        </h2>
         {conta.metodosPagamento.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">Nenhum método salvo. PIX e boleto são gerados sob demanda.</p>
         ) : (
@@ -173,8 +196,15 @@ export default async function AssinaturaPage() {
       </section>
 
       {/* Histórico de cobranças */}
-      <section className="mt-6 rounded-xl border border-slate-200 bg-white">
-        <h2 className="border-b border-slate-100 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <section className="glass mt-4 overflow-hidden rounded-[20px]">
+        <h2
+          className="px-6 py-4 text-[12px] font-bold uppercase"
+          style={{
+            letterSpacing: "0.18em",
+            color: "var(--primary-deep)",
+            borderBottom: "0.5px solid var(--hairline)",
+          }}
+        >
           Histórico de cobranças
         </h2>
         {conta.cobrancas.length === 0 ? (
@@ -221,9 +251,17 @@ export default async function AssinaturaPage() {
 
       {/* Cancelar */}
       {conta.statusAssinatura !== "CANCELADA" && (
-        <section className="mt-6 rounded-xl border border-red-200 bg-red-50/30 p-5">
-          <h2 className="text-sm font-semibold text-red-900">Zona de perigo</h2>
-          <p className="mt-1 text-xs text-red-700">
+        <section
+          className="glass-tile mt-4 rounded-[18px] px-5 py-4"
+          style={{
+            background: "linear-gradient(135deg, rgba(232,138,152,0.18), rgba(232,138,152,0.06)), rgba(255,255,255,0.5)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6), inset 0 0 0 0.5px rgba(198,103,112,0.4), 0 2px 8px rgba(20,16,8,0.04)",
+          }}
+        >
+          <h2 className="text-sm font-extrabold" style={{ color: "var(--coral-deep)" }}>
+            Zona de perigo
+          </h2>
+          <p className="mt-1 text-xs" style={{ color: "var(--coral-deep)" }}>
             Cancelar a assinatura interrompe a cobrança no próximo ciclo. Seus dados continuam disponíveis por 30 dias antes
             de serem removidos (LGPD art. 16).
           </p>

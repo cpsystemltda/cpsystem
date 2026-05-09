@@ -48,10 +48,7 @@ export default async function NotificacoesPage() {
         <div className="flex gap-2">
           {naoLidas > 0 && (
             <form action={marcarTodasLidasAction}>
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
+              <button type="submit" className="btn-secondary">
                 <Check className="h-3 w-3" /> Marcar todas como lidas
               </button>
             </form>
@@ -63,10 +60,7 @@ export default async function NotificacoesPage() {
                 await gerarAlertasPrazoAction();
               }}
             >
-              <button
-                type="submit"
-                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
+              <button type="submit" className="btn-secondary">
                 Gerar alertas de prazo
               </button>
             </form>
@@ -75,21 +69,24 @@ export default async function NotificacoesPage() {
       </div>
 
       {notificacoes.length === 0 ? (
-        <div className="mt-12 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-          <BellOff className="mx-auto h-10 w-10 text-slate-400" />
-          <p className="mt-4 text-sm text-slate-600">Sem notificações por enquanto.</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <div
+          className="glass-tile mt-6 rounded-[20px] p-12 text-center"
+          style={{ border: "0.5px dashed var(--hairline)" }}
+        >
+          <BellOff className="mx-auto h-10 w-10" style={{ color: "var(--text-mute)" }} />
+          <p className="mt-4 text-sm font-semibold" style={{ color: "var(--text-soft)" }}>
+            Sem notificações por enquanto.
+          </p>
+          <p className="mt-1 text-xs" style={{ color: "var(--text-mute)" }}>
             Você será avisado de prazos próximos, mudanças de status e novos vínculos.
           </p>
         </div>
       ) : (
-        <ul className="mt-8 space-y-2">
+        <ul className="mt-6 space-y-2">
           {notificacoes.map((n) => (
             <li
               key={n.id}
-              className={`rounded-xl border p-4 ${
-                n.lida ? "border-slate-200 bg-white opacity-80" : "border-blue-200 bg-blue-50/30"
-              }`}
+              className={`glass-tile rounded-[16px] px-4 py-4 ${n.lida ? "opacity-75" : "t-primary"}`}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">

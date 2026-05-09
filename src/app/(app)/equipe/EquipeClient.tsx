@@ -23,8 +23,11 @@ export function EquipeClient({ membros, meuId, ehAdmin }: { membros: Membro[]; m
 
   return (
     <div className="space-y-6">
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+      <section className="glass rounded-[20px] px-6 py-5">
+        <h2
+          className="flex items-center gap-2 text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
           <Users className="h-4 w-4" /> Membros da equipe ({membros.length})
         </h2>
         <table className="mt-3 w-full text-sm">
@@ -84,8 +87,11 @@ export function EquipeClient({ membros, meuId, ehAdmin }: { membros: Membro[]; m
       </section>
 
       {ehAdmin && (
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        <section className="glass rounded-[20px] px-6 py-5">
+          <h2
+            className="flex items-center gap-2 text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
             <UserPlus className="h-4 w-4" /> Convidar membro
           </h2>
           <form action={formAction} className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -109,8 +115,11 @@ export function EquipeClient({ membros, meuId, ehAdmin }: { membros: Membro[]; m
         </section>
       )}
 
-      <section className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
-        <h3 className="font-semibold text-slate-700">Sobre os perfis</h3>
+      <section
+        className="glass-tile rounded-[16px] px-5 py-4 text-xs"
+        style={{ color: "var(--text-soft)" }}
+      >
+        <h3 className="font-extrabold" style={{ color: "var(--text)" }}>Sobre os perfis</h3>
         <ul className="mt-2 space-y-1">
           <li>
             <strong>Admin:</strong> acesso completo · gerencia equipe, planos, embaixadores, audita logs.
