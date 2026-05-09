@@ -1,10 +1,16 @@
 import Link from "next/link";
-import { Crown, UserCheck, Users2, Wallet, Sparkles, ArrowUpRight } from "lucide-react";
+import { Crown, UserCheck, Users2, Wallet, Sparkles, Building2, Briefcase, Coins, TrendingUp } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { KPI } from "@/components/ui/KPI";
+
+function brlCompacto(n: number): string {
+  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} Mi`;
+  if (n >= 10_000) return `R$ ${(n / 1_000).toFixed(1).replace(".", ",")} mil`;
+  return brl(n);
+}
 
 function formatarCpf(cpf: string): string {
   const d = cpf.replace(/\D/g, "");
@@ -37,7 +43,8 @@ export default async function AdminAnalistasPage() {
     );
   }
 
-  // Busca todos os analistas + vínculos + comissões em uma única query
+  // Busca todos os analistas + vínculos + execuções (empenhos) das empresas vinculadas
+  // pra calcular comissão variável (% sobre execuções com criadoEm >= vinculo.dataInicio).
   const analistas = await prisma.analista.findMany({
     include: {
       conta: { select: { id: true, statusAssinatura: true, criadoEm: true } },
@@ -45,7 +52,8 @@ export default async function AdminAnalistasPage() {
         include: {
           conta: {
             select: {
-              empresas: { select: { nomeFantasia: true, razaoSocial: true } },
+              id: true,
+              empresas: { select: { id: true, nomeFantasia: true, razaoSocial: true } },
               statusAssinatura: true,
             },
           },
@@ -55,6 +63,48 @@ export default async function AdminAnalistasPage() {
     },
     orderBy: { criadoEm: "desc" },
   });
+
+  // Calcula em paralelo, por vínculo, comissão variável paga vs a pagar
+  // baseado em execuções (empenhos) das empresas da conta com criadoEm >= dataInicio.
+  // Também calcula carteira contratada (atas + contratos vigentes).
+  const hojeAgora = new Date();
+  type ResumoVinculo = { vinculoId: string; comissaoPaga: number; comissaoAPagar: number; carteira: number };
+  const resumoVinculo = new Map<string, ResumoVinculo>();
+  for (const a of analistas) {
+    for (const v of a.vinculos) {
+      const empresaIds = v.conta.empresas.map((e) => e.id);
+      if (empresaIds.length === 0) {
+        resumoVinculo.set(v.id, { vinculoId: v.id, comissaoPaga: 0, comissaoAPagar: 0, carteira: 0 });
+        continue;
+      }
+      const [empenhos, atas, contratos] = await Promise.all([
+        prisma.empenho.findMany({
+          where: { empresaId: { in: empresaIds }, criadoEm: { gte: v.dataInicio } },
+          select: { status: true, itens: { select: { valorTotal: true } } },
+        }),
+        prisma.ata.findMany({
+          where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hojeAgora } },
+          select: { itens: { select: { valorTotal: true } } },
+        }),
+        prisma.contrato.findMany({
+          where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hojeAgora } },
+          select: { itens: { select: { valorTotal: true } } },
+        }),
+      ]);
+      let pago = 0;
+      let aPagar = 0;
+      for (const e of empenhos) {
+        const valor = e.itens.reduce((s, i) => s + i.valorTotal, 0);
+        const com = (valor * v.percentualComissao) / 100;
+        if (e.status === "PAGO") pago += com;
+        else aPagar += com;
+      }
+      const carteira =
+        atas.reduce((s, a) => s + a.itens.reduce((ss, it) => ss + it.valorTotal, 0), 0) +
+        contratos.reduce((s, c) => s + c.itens.reduce((ss, it) => ss + it.valorTotal, 0), 0);
+      resumoVinculo.set(v.id, { vinculoId: v.id, comissaoPaga: pago, comissaoAPagar: aPagar, carteira });
+    }
+  }
 
   // Agregações por analista
   type Linha = {
@@ -72,6 +122,9 @@ export default async function AdminAnalistasPage() {
     fixoMensalAtivo: number;
     fixoPagoAcumulado: number;
     percentualMedio: number;
+    comissaoVarPaga: number;
+    comissaoVarAPagar: number;
+    carteiraSobGestao: number;
   };
 
   const linhas: Linha[] = analistas.map((a) => {
@@ -87,6 +140,18 @@ export default async function AdminAnalistasPage() {
     const clientesAtendidos = ativos
       .map((v) => v.conta.empresas[0]?.nomeFantasia || v.conta.empresas[0]?.razaoSocial)
       .filter(Boolean) as string[];
+    const comissaoVarPaga = a.vinculos.reduce(
+      (s, v) => s + (resumoVinculo.get(v.id)?.comissaoPaga ?? 0),
+      0,
+    );
+    const comissaoVarAPagar = ativos.reduce(
+      (s, v) => s + (resumoVinculo.get(v.id)?.comissaoAPagar ?? 0),
+      0,
+    );
+    const carteiraSobGestao = ativos.reduce(
+      (s, v) => s + (resumoVinculo.get(v.id)?.carteira ?? 0),
+      0,
+    );
     return {
       id: a.id,
       nome: a.nomeCompleto,
@@ -102,18 +167,33 @@ export default async function AdminAnalistasPage() {
       fixoMensalAtivo,
       fixoPagoAcumulado,
       percentualMedio,
+      comissaoVarPaga,
+      comissaoVarAPagar,
+      carteiraSobGestao,
     };
   });
 
-  // KPIs agregados
+  // KPIs agregados da rede
   const totalAnalistas = linhas.length;
   const ativos = linhas.filter((l) => l.ativo).length;
   const totalVinculosAtivos = linhas.reduce((s, l) => s + l.vinculosAtivos, 0);
   const fixoMensalRedeAtivo = linhas.reduce((s, l) => s + l.fixoMensalAtivo, 0);
   const fixoPagoAcumuladoTotal = linhas.reduce((s, l) => s + l.fixoPagoAcumulado, 0);
+  const comissaoVarPagaTotal = linhas.reduce((s, l) => s + l.comissaoVarPaga, 0);
+  const comissaoVarAPagarTotal = linhas.reduce((s, l) => s + l.comissaoVarAPagar, 0);
+  const carteiraSobGestaoTotal = linhas.reduce((s, l) => s + l.carteiraSobGestao, 0);
   const novosUltimos30 = linhas.filter(
     (l) => Date.now() - l.criadoEm.getTime() < 30 * 86400000,
   ).length;
+  // Empresas únicas atendidas pela rede (contas distintas com vínculo ativo)
+  const contasComVinculoAtivo = new Set<string>();
+  for (const a of analistas) for (const v of a.vinculos) if (v.status === "ATIVO") contasComVinculoAtivo.add(v.conta.id);
+  const empresasUnicas = contasComVinculoAtivo.size;
+  const ticketMedioCarteira = ativos > 0 ? carteiraSobGestaoTotal / ativos : 0;
+  // Top 3 por carteira sob gestão
+  const top3 = [...linhas].sort((a, b) => b.carteiraSobGestao - a.carteiraSobGestao).slice(0, 3);
+  const totalDesembolsado = fixoPagoAcumuladoTotal + comissaoVarPagaTotal;
+  const totalAPagar = fixoMensalRedeAtivo + comissaoVarAPagarTotal;
 
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
@@ -129,13 +209,64 @@ export default async function AdminAnalistasPage() {
         }
       />
 
-      {/* KPIs */}
+      {/* KPIs primários — escala da rede */}
       <div className="mt-6 grid gap-4 lg:grid-cols-4">
-        <KPI tone="primary" icon={UserCheck} label="Total de analistas" value={totalAnalistas} meta={`${ativos} ativos · ${totalAnalistas - ativos} inativos`} />
+        <KPI tone="primary" icon={UserCheck} label="Total de analistas" value={totalAnalistas} meta={`${ativos} ativos · ${totalAnalistas - ativos} inativos`} href="/admin-plataforma/analistas" />
         <KPI tone="mint" icon={Sparkles} label="Novos (30 dias)" value={novosUltimos30} meta="Cadastrados no último mês" />
-        <KPI tone="lavender" icon={Users2} label="Vínculos ativos" value={totalVinculosAtivos} meta="Empresas atendidas pela rede" />
-        <KPI tone="sky" icon={Wallet} label="Fixo mensal da rede" value={brl(fixoMensalRedeAtivo)} meta={`Acumulado pago: ${brl(fixoPagoAcumuladoTotal)}`} />
+        <KPI tone="lavender" icon={Users2} label="Vínculos ativos" value={totalVinculosAtivos} meta={`${empresasUnicas} empresa(s) única(s) atendida(s)`} />
+        <KPI tone="sky" icon={Building2} label="Empresas únicas" value={empresasUnicas} meta="Contas com pelo menos 1 vínculo ativo" />
       </div>
+
+      {/* KPIs financeiros — desembolso da plataforma com a rede */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-4">
+        <KPI tone="lavender" icon={Briefcase} label="Carteira sob gestão" value={brlCompacto(carteiraSobGestaoTotal)} meta={`Ticket médio/analista: ${brlCompacto(ticketMedioCarteira)}`} />
+        <KPI tone="mint" icon={Wallet} label="Já pago à rede" value={brlCompacto(totalDesembolsado)} meta={`Fixo: ${brlCompacto(fixoPagoAcumuladoTotal)} · Variável: ${brlCompacto(comissaoVarPagaTotal)}`} />
+        <KPI tone="rose" icon={Coins} label="A pagar (próximos)" value={brlCompacto(totalAPagar)} meta={`Fixo/mês: ${brlCompacto(fixoMensalRedeAtivo)} · Variável: ${brlCompacto(comissaoVarAPagarTotal)}`} />
+        <KPI tone="primary" icon={TrendingUp} label="% comissão médio" value={`${linhas.filter((l) => l.percentualMedio > 0).length === 0 ? 0 : (linhas.filter((l) => l.percentualMedio > 0).reduce((s, l) => s + l.percentualMedio, 0) / Math.max(1, linhas.filter((l) => l.percentualMedio > 0).length)).toFixed(1)}%`} meta="Média entre analistas com vínculo ativo" />
+      </div>
+
+      {/* Top 3 por carteira sob gestão */}
+      {top3.length > 0 && top3[0].carteiraSobGestao > 0 && (
+        <section className="glass mt-6 rounded-[20px] px-6 py-5">
+          <h2
+            className="text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
+            Top analistas por carteira sob gestão
+          </h2>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            {top3.map((l, i) => (
+              <Link
+                key={l.id}
+                href={`/painel-analista?analistaId=${l.id}`}
+                className={`glass-tile group block rounded-[16px] px-5 py-4 transition hover:-translate-y-0.5 ${i === 0 ? "t-primary" : i === 1 ? "t-mint" : "t-lavender"}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-extrabold"
+                    style={{
+                      background: "rgba(212,175,55,0.25)",
+                      border: "0.5px solid rgba(168,137,71,0.5)",
+                      color: "var(--primary-deep)",
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <h3 className="text-[14px] font-extrabold" style={{ color: "var(--text)" }}>
+                    {l.nome}
+                  </h3>
+                </div>
+                <p className="mt-2 text-[22px] font-extrabold tabular leading-none" style={{ color: "var(--text)", letterSpacing: "-0.04em" }}>
+                  {brlCompacto(l.carteiraSobGestao)}
+                </p>
+                <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
+                  {l.vinculosAtivos} vínculo(s) · {l.percentualMedio.toFixed(1)}% médio · pago acum. {brlCompacto(l.fixoPagoAcumulado + l.comissaoVarPaga)}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Tabela de analistas */}
       <section className="glass mt-8 overflow-hidden rounded-[20px]">
@@ -158,16 +289,18 @@ export default async function AdminAnalistasPage() {
             Nenhum analista cadastrado ainda.
           </p>
         ) : (
-          <table className="table-glass" style={{ minWidth: "1200px", tableLayout: "fixed" }}>
+          <table className="table-glass" style={{ minWidth: "1500px", tableLayout: "fixed" }}>
             <colgroup>
-              <col style={{ width: "auto", minWidth: "240px" }} />
+              <col style={{ width: "auto", minWidth: "220px" }} />
+              <col style={{ width: "90px" }} />
               <col style={{ width: "100px" }} />
+              <col style={{ width: "90px" }} />
+              <col style={{ width: "90px" }} />
               <col style={{ width: "120px" }} />
-              <col style={{ width: "100px" }} />
+              <col style={{ width: "130px" }} />
+              <col style={{ width: "130px" }} />
               <col style={{ width: "120px" }} />
-              <col style={{ width: "140px" }} />
-              <col style={{ width: "140px" }} />
-              <col style={{ width: "auto", minWidth: "200px" }} />
+              <col style={{ width: "auto", minWidth: "180px" }} />
             </colgroup>
             <thead>
               <tr>
@@ -177,8 +310,10 @@ export default async function AdminAnalistasPage() {
                 <th className="num">Vínculos</th>
                 <th className="num">% médio</th>
                 <th className="num">Fixo/mês</th>
-                <th className="num">Acumulado pago</th>
-                <th>Clientes ativos</th>
+                <th className="num">Carteira gestão</th>
+                <th className="num">Comissão paga</th>
+                <th className="num">A pagar</th>
+                <th>Clientes</th>
               </tr>
             </thead>
             <tbody>
@@ -222,9 +357,15 @@ export default async function AdminAnalistasPage() {
                   <td className="num">
                     {l.percentualMedio > 0 ? `${l.percentualMedio.toFixed(1)}%` : "—"}
                   </td>
-                  <td className="num strong">{l.fixoMensalAtivo > 0 ? brl(l.fixoMensalAtivo) : "—"}</td>
+                  <td className="num strong">{l.fixoMensalAtivo > 0 ? brlCompacto(l.fixoMensalAtivo) : "—"}</td>
+                  <td className="num" style={{ color: "var(--text)", fontWeight: 700 }}>
+                    {l.carteiraSobGestao > 0 ? brlCompacto(l.carteiraSobGestao) : "—"}
+                  </td>
                   <td className="num" style={{ color: "var(--mint-deep)", fontWeight: 700 }}>
-                    {brl(l.fixoPagoAcumulado)}
+                    {brlCompacto(l.fixoPagoAcumulado + l.comissaoVarPaga)}
+                  </td>
+                  <td className="num" style={{ color: l.comissaoVarAPagar > 0 ? "var(--primary-deep)" : "var(--text-mute)", fontWeight: 700 }}>
+                    {l.comissaoVarAPagar > 0 ? brlCompacto(l.comissaoVarAPagar) : "—"}
                   </td>
                   <td className="text-xs" style={{ color: "var(--text-soft)" }}>
                     {l.clientesAtendidos.length === 0
