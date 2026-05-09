@@ -69,53 +69,150 @@ export default async function PainelAnalistaPage({
         ? await prisma.analista.findUnique({ where: { id: sp.analistaId } })
         : null;
 
-  // Super admin sem analistaId — mostra lista de seleção (preview da rede).
+  // Super admin sem analistaId — dashboard consolidado da rede + lista de seleção.
   if (usuario.superAdmin && !analista) {
     const analistas = await prisma.analista.findMany({
       orderBy: { criadoEm: "desc" },
-      include: { vinculos: { where: { status: "ATIVO" }, select: { id: true } } },
+      include: {
+        vinculos: {
+          include: {
+            conta: { select: { id: true, empresas: { select: { id: true } } } },
+            fixosPagos: { where: { paga: true }, select: { valor: true } },
+          },
+        },
+      },
     });
+
+    // Agregação consolidada da rede
+    const hojeAgora = new Date();
+    let totalCarteira = 0;
+    let totalComissaoPaga = 0;
+    let totalComissaoAPagar = 0;
+    let totalFixoMensal = 0;
+    let totalFixoPagoAcum = 0;
+    let totalVinculosAtivos = 0;
+    const contasUnicas = new Set<string>();
+
+    for (const a of analistas) {
+      for (const v of a.vinculos) {
+        if (v.status === "ATIVO") {
+          totalVinculosAtivos++;
+          totalFixoMensal += v.fixoMensal;
+          contasUnicas.add(v.conta.id);
+        }
+        totalFixoPagoAcum += v.fixosPagos.reduce((s, f) => s + (f.valor ?? 0), 0);
+
+        const empresaIds = v.conta.empresas.map((e) => e.id);
+        if (empresaIds.length === 0) continue;
+        const [empenhos, atas, contratos] = await Promise.all([
+          prisma.empenho.findMany({
+            where: { empresaId: { in: empresaIds }, criadoEm: { gte: v.dataInicio } },
+            select: { status: true, itens: { select: { valorTotal: true } } },
+          }),
+          v.status === "ATIVO"
+            ? prisma.ata.findMany({
+                where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hojeAgora } },
+                select: { itens: { select: { valorTotal: true } } },
+              })
+            : Promise.resolve([]),
+          v.status === "ATIVO"
+            ? prisma.contrato.findMany({
+                where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hojeAgora } },
+                select: { itens: { select: { valorTotal: true } } },
+              })
+            : Promise.resolve([]),
+        ]);
+        for (const e of empenhos) {
+          const valor = e.itens.reduce((s, i) => s + i.valorTotal, 0);
+          const com = (valor * v.percentualComissao) / 100;
+          if (e.status === "PAGO") totalComissaoPaga += com;
+          else if (v.status === "ATIVO") totalComissaoAPagar += com;
+        }
+        if (v.status === "ATIVO") {
+          totalCarteira +=
+            atas.reduce((s, a2) => s + a2.itens.reduce((ss, it) => ss + it.valorTotal, 0), 0) +
+            contratos.reduce((s, c) => s + c.itens.reduce((ss, it) => ss + it.valorTotal, 0), 0);
+        }
+      }
+    }
+
+    const totalAnalistas = analistas.length;
+    const ativos = analistas.filter((a) => a.ativo).length;
+    const novos30 = analistas.filter((a) => Date.now() - a.criadoEm.getTime() < 30 * 86400000).length;
+
     return (
-      <div className="mx-auto max-w-4xl px-8 py-8">
+      <div className="mx-auto max-w-[1280px] px-8 py-8">
         <PageHeader
-          eyebrow="Adm CP System · Preview"
-          titulo="Painel do"
-          destaque="Analista"
-          subtitulo="Selecione abaixo qual analista deseja visualizar — você verá o painel exatamente como ele vê ao logar."
+          eyebrow="Adm CP System · Rede"
+          titulo="Painel da rede de"
+          destaque="Analistas"
+          subtitulo={`Visão geral consolidada de ${totalAnalistas} analista${totalAnalistas !== 1 ? "s" : ""} cadastrado${totalAnalistas !== 1 ? "s" : ""} — depois selecione um para visualizar o painel individual.`}
+          cta={
+            <Link href="/admin-plataforma/analistas" className="btn-secondary">
+              Ver listagem completa →
+            </Link>
+          }
         />
-        <div className="mt-6 grid gap-3">
-          {analistas.length === 0 ? (
-            <div
-              className="glass-tile rounded-[18px] p-12 text-center"
-              style={{ border: "0.5px dashed var(--hairline)" }}
-            >
-              <p className="text-sm" style={{ color: "var(--text-soft)" }}>
-                Nenhum analista cadastrado na plataforma.
-              </p>
-            </div>
-          ) : (
-            analistas.map((a) => (
-              <Link
-                key={a.id}
-                href={`/painel-analista?analistaId=${a.id}`}
-                className="glass-tile group flex items-center justify-between gap-4 rounded-[16px] px-5 py-4 transition hover:-translate-y-0.5"
-              >
-                <div>
-                  <h3 className="text-[15px] font-extrabold" style={{ color: "var(--text)" }}>
-                    {a.nomeCompleto}
-                  </h3>
-                  <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
-                    {a.email} · {a.vinculos.length} vínculo(s) ativo(s) · cadastrado em{" "}
-                    {a.criadoEm.toLocaleDateString("pt-BR")}
-                  </p>
-                </div>
-                <span className="text-sm font-bold" style={{ color: "var(--primary-deep)" }}>
-                  Ver painel →
-                </span>
-              </Link>
-            ))
-          )}
+
+        {/* KPIs consolidados — escala da rede */}
+        <div className="mt-6 grid gap-4 lg:grid-cols-4">
+          <KPI tone="primary" icon={Wallet} label="Analistas" value={totalAnalistas} meta={`${ativos} ativos · ${novos30} novos (30d)`} />
+          <KPI tone="lavender" icon={Briefcase} label="Empresas atendidas" value={contasUnicas.size} meta={`${totalVinculosAtivos} vínculo(s) ativo(s)`} />
+          <KPI tone="mint" icon={Coins} label="Carteira sob gestão" value={brlCompacto(totalCarteira)} meta="atas + contratos vigentes" />
+          <KPI tone="sky" icon={Receipt} label="Fixo mensal recorrente" value={brlCompacto(totalFixoMensal)} meta={`Acumulado pago: ${brlCompacto(totalFixoPagoAcum + totalComissaoPaga)}`} />
         </div>
+
+        {/* KPIs financeiros — desembolso */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <KPI tone="mint" icon={Wallet} label="Já pago à rede (acumulado)" value={brlCompacto(totalFixoPagoAcum + totalComissaoPaga)} meta={`Fixo: ${brlCompacto(totalFixoPagoAcum)} · Variável: ${brlCompacto(totalComissaoPaga)}`} />
+          <KPI tone="rose" icon={Coins} label="A pagar (pendente)" value={brlCompacto(totalFixoMensal + totalComissaoAPagar)} meta={`Fixo/mês: ${brlCompacto(totalFixoMensal)} · Comissão variável: ${brlCompacto(totalComissaoAPagar)}`} />
+        </div>
+
+        {/* Lista de analistas pra selecionar */}
+        <section className="mt-8">
+          <h2
+            className="mb-3 text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
+            Selecione um analista para ver o painel individual
+          </h2>
+          <div className="grid gap-3">
+            {analistas.length === 0 ? (
+              <div
+                className="glass-tile rounded-[18px] p-12 text-center"
+                style={{ border: "0.5px dashed var(--hairline)" }}
+              >
+                <p className="text-sm" style={{ color: "var(--text-soft)" }}>
+                  Nenhum analista cadastrado na plataforma.
+                </p>
+              </div>
+            ) : (
+              analistas.map((a) => {
+                const ativosCount = a.vinculos.filter((v) => v.status === "ATIVO").length;
+                return (
+                  <Link
+                    key={a.id}
+                    href={`/painel-analista?analistaId=${a.id}`}
+                    className="glass-tile group flex items-center justify-between gap-4 rounded-[16px] px-5 py-4 transition hover:-translate-y-0.5"
+                  >
+                    <div>
+                      <h3 className="text-[15px] font-extrabold" style={{ color: "var(--text)" }}>
+                        {a.nomeCompleto}
+                      </h3>
+                      <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
+                        {a.email} · {ativosCount} vínculo(s) ativo(s) · cadastrado em{" "}
+                        {a.criadoEm.toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                    <span className="text-sm font-bold" style={{ color: "var(--primary-deep)" }}>
+                      Ver painel →
+                    </span>
+                  </Link>
+                );
+              })
+            )}
+          </div>
+        </section>
       </div>
     );
   }
