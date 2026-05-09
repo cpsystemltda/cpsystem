@@ -291,6 +291,18 @@ textarea:focus {
     0 2px 12px rgba(20, 16, 8, 0.06);
 }
 
+/* Pulso suave — KPIs que precisam de atenção (reajustes, vencimentos críticos) */
+@keyframes pulseAtencao {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(212,175,55,0.0), 0 2px 8px rgba(20,16,8,0.04), 0 12px 32px -8px rgba(20,16,8,0.08); }
+  50%      { transform: scale(1.012); box-shadow: 0 0 0 8px rgba(212,175,55,0.12), 0 4px 16px rgba(212,175,55,0.18), 0 12px 32px -8px rgba(20,16,8,0.10); }
+}
+.pulse-atencao {
+  animation: pulseAtencao 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-atencao { animation: none; }
+}
+
 /* Aura no canto pra reforço de cor — vai através do glass como halo de luz */
 .kpi-aura {
   position: absolute;

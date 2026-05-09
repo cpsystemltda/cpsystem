@@ -228,17 +228,27 @@ export default async function DashboardPage() {
     },
   });
 
-  // Vencimentos por mês (ano corrente) — Atas + Contratos
+  // Vencimentos por mês — janela rolling de 12 meses a partir de hoje
+  // (antes era ano corrente; meses passados ficavam sempre 0).
   const vencimentosPorMes = new Array(12).fill(0);
+  const rotulosMeses: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    const ref = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+    rotulosMeses.push(ref.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""));
+  }
+  const fimJanela = new Date(hoje.getFullYear(), hoje.getMonth() + 12, 0);
+  function bucketIndex(d: Date): number {
+    return (d.getFullYear() - hoje.getFullYear()) * 12 + (d.getMonth() - hoje.getMonth());
+  }
   for (const c of contratosVigentesDetalhe) {
-    if (c.vigenciaFim <= fimAno && c.vigenciaFim >= hoje) {
-      vencimentosPorMes[c.vigenciaFim.getMonth()] += 1;
-    }
+    if (c.vigenciaFim < hoje || c.vigenciaFim > fimJanela) continue;
+    const idx = bucketIndex(c.vigenciaFim);
+    if (idx >= 0 && idx < 12) vencimentosPorMes[idx] += 1;
   }
   for (const a of atasVigentesDetalhe) {
-    if (a.vigenciaFim <= fimAno && a.vigenciaFim >= hoje) {
-      vencimentosPorMes[a.vigenciaFim.getMonth()] += 1;
-    }
+    if (a.vigenciaFim < hoje || a.vigenciaFim > fimJanela) continue;
+    const idx = bucketIndex(a.vigenciaFim);
+    if (idx >= 0 && idx < 12) vencimentosPorMes[idx] += 1;
   }
   const maxVenc = Math.max(1, ...vencimentosPorMes);
 
@@ -466,6 +476,7 @@ export default async function DashboardPage() {
             }
             meta="Em 30 dias ou menos"
             href="/reajustes"
+            pulse={reajustesPendentes > 0}
           />
         </div>
 
@@ -557,10 +568,10 @@ export default async function DashboardPage() {
 
         <div className="mt-3.5">
           <ChartCard
-            title={`Vencimentos de contratos em ${hoje.getFullYear()}`}
-            subtitle="Distribuição mensal — antecipe renovações e aditivos"
+            title="Vencimentos nos próximos 12 meses"
+            subtitle="Janela rolling a partir de hoje — antecipe renovações e aditivos"
           >
-            <MesesChart dados={vencimentosPorMes} max={maxVenc} />
+            <MesesChart dados={vencimentosPorMes} max={maxVenc} rotulos={rotulosMeses} />
           </ChartCard>
         </div>
       </Block>
@@ -587,6 +598,7 @@ export default async function DashboardPage() {
             value={faixasContinuos.ate30}
             meta="Inicie a tratativa imediatamente"
             href="/contratos?alerta=30"
+            pulse={faixasContinuos.ate30 > 0}
           />
           <KPI
             tone="rose"
@@ -877,14 +889,10 @@ function BarsPosicao({
   aExecutar: number;
 }) {
   const max = Math.max(1, recebido, aReceber, aExecutar);
-  const barras: { val: number; cor: string; rotulo: string }[] = [
-    { val: recebido, cor: "linear-gradient(180deg, var(--mint), #2EAB85)", rotulo: "Recebido" },
-    { val: aReceber, cor: "linear-gradient(180deg, var(--rose), #C18876)", rotulo: "A receber" },
-    {
-      val: aExecutar,
-      cor: "linear-gradient(180deg, var(--lavender), #8A7DAD)",
-      rotulo: "A executar",
-    },
+  const barras: { val: number; cor: string; rotulo: string; glow: string }[] = [
+    { val: recebido, cor: "linear-gradient(180deg, var(--mint), #2EAB85)", rotulo: "Recebido", glow: "var(--mint-glow)" },
+    { val: aReceber, cor: "linear-gradient(180deg, var(--rose), #C18876)", rotulo: "A receber", glow: "var(--rose-glow)" },
+    { val: aExecutar, cor: "linear-gradient(180deg, var(--lavender), #8A7DAD)", rotulo: "A executar", glow: "var(--lavender-glow)" },
   ];
   return (
     <div>
@@ -892,25 +900,29 @@ function BarsPosicao({
         className="flex items-end gap-8 px-4"
         style={{ height: "200px", borderBottom: "0.5px solid var(--hairline)" }}
       >
-        {barras.map((b) => (
-          <div
-            key={b.rotulo}
-            className="flex flex-1 flex-col items-center justify-end gap-3"
-          >
-            <span className="tabular text-[11px] font-semibold" style={{ color: "var(--text)" }}>
-              {brlCompacto(b.val)}
-            </span>
+        {barras.map((b) => {
+          const alturaPx = Math.max(2, Math.round((b.val / max) * 170));
+          return (
             <div
-              className="relative w-full max-w-[64px]"
-              style={{
-                height: `${(b.val / max) * 100}%`,
-                background: b.cor,
-                borderRadius: "10px 10px 3px 3px",
-                boxShadow: `0 0 28px ${b.rotulo === "Recebido" ? "var(--mint-glow)" : b.rotulo === "A receber" ? "var(--rose-glow)" : "var(--lavender-glow)"}`,
-              }}
-            />
-          </div>
-        ))}
+              key={b.rotulo}
+              className="flex flex-1 flex-col items-center justify-end gap-3"
+              style={{ height: "100%" }}
+            >
+              <span className="tabular text-[11px] font-semibold" style={{ color: "var(--text)" }}>
+                {brlCompacto(b.val)}
+              </span>
+              <div
+                className="relative w-full max-w-[64px]"
+                style={{
+                  height: `${alturaPx}px`,
+                  background: b.cor,
+                  borderRadius: "10px 10px 3px 3px",
+                  boxShadow: `0 0 28px ${b.glow}`,
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
       <div
         className="mt-4 flex gap-6 px-4 text-[12px] font-medium"
@@ -1080,8 +1092,9 @@ function FaixasVencimentoChart({
   );
 }
 
-function MesesChart({ dados, max }: { dados: number[]; max: number }) {
-  const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+function MesesChart({ dados, max, rotulos }: { dados: number[]; max: number; rotulos?: string[] }) {
+  const mesesFallback = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const meses = rotulos ?? mesesFallback;
   return (
     <div>
       <div
@@ -1090,15 +1103,20 @@ function MesesChart({ dados, max }: { dados: number[]; max: number }) {
       >
         {dados.map((v, i) => {
           const isHigh = v > max * 0.6;
+          const alturaPx = v === 0 ? 0 : Math.max(4, Math.round((v / max) * 150));
           return (
-            <div key={i} className="flex flex-1 flex-col items-center justify-end gap-2">
+            <div
+              key={i}
+              className="flex flex-1 flex-col items-center justify-end gap-2"
+              style={{ height: "100%" }}
+            >
               <span className="tabular text-[11px] font-semibold" style={{ color: "var(--text)" }}>
                 {v}
               </span>
               <div
                 className="w-full max-w-[38px]"
                 style={{
-                  height: `${(v / max) * 100}%`,
+                  height: `${alturaPx}px`,
                   background: isHigh
                     ? "linear-gradient(180deg, var(--primary), var(--primary-deep))"
                     : "linear-gradient(180deg, rgba(15,14,12,0.16), rgba(15,14,12,0.06))",
@@ -1111,11 +1129,11 @@ function MesesChart({ dados, max }: { dados: number[]; max: number }) {
         })}
       </div>
       <div
-        className="mt-3 flex gap-3.5 px-3 text-[11px] font-medium"
+        className="mt-3 flex gap-3.5 px-3 text-[11px] font-medium capitalize"
         style={{ color: "var(--text-mute)", letterSpacing: "0.04em" }}
       >
-        {meses.map((m) => (
-          <div key={m} className="flex-1 text-center">
+        {meses.map((m, i) => (
+          <div key={`${m}-${i}`} className="flex-1 text-center">
             {m}
           </div>
         ))}

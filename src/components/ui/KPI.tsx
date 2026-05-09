@@ -39,6 +39,7 @@ export function KPI({
   meta,
   size = "md",
   href,
+  pulse,
 }: {
   tone: Tone;
   icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -48,13 +49,15 @@ export function KPI({
   size?: "md" | "hero";
   /** Quando passado, o card inteiro vira um Link clicável */
   href?: string;
+  /** Pulso suave indicando atenção (reajustes, vencimentos críticos) */
+  pulse?: boolean;
 }) {
   const isHero = size === "hero";
   const RootEl = href ? (Link as React.ElementType) : ("div" as React.ElementType);
   return (
     <RootEl
       {...(href ? { href } : {})}
-      className={`glass-tile group relative block overflow-hidden t-${tone} ${isHero ? "rounded-[20px] px-6 py-5" : "rounded-[18px] px-5 py-5"} ${href ? "transition hover:-translate-y-0.5 cursor-pointer" : ""}`}
+      className={`glass-tile group relative block overflow-hidden t-${tone} ${isHero ? "rounded-[20px] px-6 py-5" : "rounded-[18px] px-5 py-5"} ${href ? "transition hover:-translate-y-0.5 cursor-pointer" : ""} ${pulse ? "pulse-atencao" : ""}`}
       title={href ? `Abrir ${label.toLowerCase()}` : undefined}
     >
       <div className="kpi-aura" />
