@@ -10,6 +10,7 @@ import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { OrgaosTab, EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
+import { LerMais } from "@/components/LerMais";
 
 export default async function AtaDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -258,15 +259,15 @@ function TabelaSaldoItens({
                 </span>
               </div>
             </header>
-            <table className="table-glass">
+            <table className="table-glass" style={{ minWidth: "1100px", tableLayout: "fixed" }}>
               <colgroup>
-                <col />
-                <col style={{ width: "72px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "130px" }} />
-                <col style={{ width: "120px" }} />
-                <col style={{ width: "140px" }} />
+                <col style={{ width: "auto", minWidth: "320px" }} />
+                <col style={{ width: "64px" }} />
+                <col style={{ width: "104px" }} />
+                <col style={{ width: "104px" }} />
+                <col style={{ width: "112px" }} />
+                <col style={{ width: "108px" }} />
+                <col style={{ width: "128px" }} />
               </colgroup>
               <thead>
                 <tr>
@@ -282,8 +283,12 @@ function TabelaSaldoItens({
               <tbody>
                 {itens.map((it) => (
                   <tr key={it.ataItemId}>
-                    <td className="strong" title={it.descricao} style={{ whiteSpace: "normal" }}>
-                      {it.descricao}
+                    <td
+                      className="strong"
+                      title={it.descricao}
+                      style={{ whiteSpace: "normal", wordBreak: "break-word", verticalAlign: "top" }}
+                    >
+                      <LerMais texto={it.descricao} limite={140} />
                     </td>
                     <td>{it.unidade}</td>
                     <td className="num">{it.quantidadeTotal}</td>
