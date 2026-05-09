@@ -69,9 +69,9 @@ export default async function JuridicoPage() {
           <span
             className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold uppercase"
             style={{
-              background: "rgba(212,175,55,0.14)",
-              color: "var(--primary-bright)",
-              border: "0.5px solid rgba(212,175,55,0.3)",
+              background: "rgba(212,175,55,0.18)",
+              color: "var(--primary-deep)",
+              border: "0.5px solid rgba(168,137,71,0.4)",
               letterSpacing: "0.08em",
             }}
           >

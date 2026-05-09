@@ -55,7 +55,7 @@ export function UploadPdfPanel<T>({
       className="glass-tile overflow-hidden rounded-[20px] px-7 py-6"
       style={{
         background:
-          "linear-gradient(135deg, rgba(197,180,255,0.18), rgba(184,197,214,0.06)), rgba(255,255,255,0.03)",
+          "linear-gradient(135deg, rgba(197,180,255,0.12), rgba(184,197,214,0.04)), var(--glass-2)",
       }}
     >
       <div className="relative z-[1] flex items-start gap-4">
@@ -151,7 +151,7 @@ export function UploadPdfPanel<T>({
               style={{
                 background: "rgba(212,175,55,0.10)",
                 border: "0.5px solid rgba(212,175,55,0.3)",
-                color: "var(--primary-bright)",
+                color: "var(--primary-deep)",
               }}
             >
               <Beaker className="mt-0.5 h-4 w-4 shrink-0" />
@@ -160,13 +160,13 @@ export function UploadPdfPanel<T>({
                 o fluxo sem a IA real. Configure{" "}
                 <code
                   className="rounded px-1 py-0.5 font-mono"
-                  style={{ background: "rgba(0,0,0,0.3)", color: "var(--primary-bright)" }}
+                  style={{ background: "rgba(15,14,12,0.06)", color: "var(--primary-deep)" }}
                 >
                   ANTHROPIC_API_KEY
                 </code>{" "}
                 no <code
                   className="rounded px-1 py-0.5 font-mono"
-                  style={{ background: "rgba(0,0,0,0.3)", color: "var(--primary-bright)" }}
+                  style={{ background: "rgba(15,14,12,0.06)", color: "var(--primary-deep)" }}
                 >
                   .env
                 </code>{" "}

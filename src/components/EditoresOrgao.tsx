@@ -59,7 +59,7 @@ export function EnderecosEntregaEditor() {
           key={idx}
           className="grid grid-cols-12 gap-2 rounded-2xl px-3 py-3"
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
@@ -115,7 +115,7 @@ export function EnderecosEntregaEditor() {
         onClick={adicionar}
         className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
         style={{
-          background: "rgba(255,255,255,0.06)",
+          background: "rgba(255,255,255,0.8)",
           color: "var(--text-soft)",
           border: "0.5px solid var(--hairline)",
         }}
@@ -160,7 +160,7 @@ export function PontosFocaisEditor() {
           key={idx}
           className="rounded-2xl px-4 py-4"
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
@@ -233,7 +233,7 @@ export function PontosFocaisEditor() {
         onClick={adicionar}
         className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
         style={{
-          background: "rgba(255,255,255,0.06)",
+          background: "rgba(255,255,255,0.8)",
           color: "var(--text-soft)",
           border: "0.5px solid var(--hairline)",
         }}

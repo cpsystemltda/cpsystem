@@ -157,7 +157,7 @@ export function Sidebar({
   return (
     <aside className="glass relative m-[18px] flex h-[calc(100vh-36px)] w-[260px] flex-col overflow-hidden">
       {/* Logo / Brand */}
-      <div className="relative border-b border-white/10 px-6 py-6">
+      <div className="relative border-b border-[color:var(--hairline)] px-6 py-6">
         <Link
           href={
             visao === "ADMIN_PLATAFORMA"
@@ -178,14 +178,14 @@ export function Sidebar({
 
       {/* Seletor de visão (super admin) */}
       {superAdmin && (
-        <div className="border-b border-white/10 px-3 py-3">
+        <div className="border-b border-[color:var(--hairline)] px-3 py-3">
           <SeletorVisao visaoAtual={visao} />
         </div>
       )}
 
       {/* Seletor de empresa */}
       {visao === "EMPRESA" && empresas.length > 0 && (
-        <div className="border-b border-white/10 px-3 py-3">
+        <div className="border-b border-[color:var(--hairline)] px-3 py-3">
           <SeletorEmpresa empresas={empresas} empresaIdAtual={empresaIdSelecionada} />
         </div>
       )}
@@ -254,12 +254,12 @@ export function Sidebar({
       </nav>
 
       {/* Help buttons */}
-      <div className="border-t border-white/10 px-3 py-3">
+      <div className="border-t border-[color:var(--hairline)] px-3 py-3">
         <HelpButtons />
       </div>
 
       {/* Usuário + sair */}
-      <div className="border-t border-white/10 p-3">
+      <div className="border-t border-[color:var(--hairline)] p-3">
         <div className="mb-2 flex items-center gap-3 rounded-lg p-2">
           <div
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-extrabold"

@@ -41,22 +41,22 @@
   --coral-deep:     #C66770;
   --coral-glow:     rgba(232, 138, 152, 0.5);
 
-  /* Texto (dark mode é o padrão da app interna) */
-  --text:        #FFFFFF;
-  --text-soft:   #E8E5DC;
-  --text-mute:   #A8A39A;
-  --text-faint:  #5A5650;
+  /* Texto (clean mode — fundos claros com glass) */
+  --text:        #0F0E0C;
+  --text-soft:   #3A3833;
+  --text-mute:   #6B6760;
+  --text-faint:  #A8A39A;
 
-  /* Glass surfaces */
-  --glass-1:     rgba(255, 255, 255, 0.04);
-  --glass-2:     rgba(255, 255, 255, 0.06);
-  --glass-3:     rgba(255, 255, 255, 0.09);
-  --hairline:    rgba(255, 255, 255, 0.08);
+  /* Glass surfaces — branco mais opaco (Nubank-style: cards quase sólidos) */
+  --glass-1:     rgba(255, 255, 255, 0.55);
+  --glass-2:     rgba(255, 255, 255, 0.72);
+  --glass-3:     rgba(255, 255, 255, 0.85);
+  --hairline:    rgba(15, 14, 12, 0.08);
 
-  /* Sombras dark */
-  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+  /* Sombras warm (não preto neutro — herda da paleta dourada) */
+  --shadow-sm: 0 2px 8px rgba(20, 16, 8, 0.06);
+  --shadow-md: 0 8px 24px rgba(20, 16, 8, 0.08);
+  --shadow-lg: 0 24px 60px -20px rgba(20, 16, 8, 0.12);
 
   /* Borders */
   --radius-sm:   10px;
@@ -83,13 +83,43 @@ body {
 }
 
 /* ============================================================
+   INPUTS — borda permanente (regra base global)
+   Garante que nenhum campo desapareça sobre fundo claro/glass.
+   Componentes podem sobrescrever via Tailwind (border-*) sem
+   precisar declarar a borda do zero.
+   ============================================================ */
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="color"]):not([type="range"]),
+select,
+textarea {
+  border: 1px solid rgba(15, 14, 12, 0.16);
+  background: #FFFFFF;
+  color: #0F0E0C;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="color"]):not([type="range"])::placeholder,
+textarea::placeholder {
+  color: #8E8E93;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="color"]):not([type="range"]):hover,
+select:hover,
+textarea:hover {
+  border-color: rgba(15, 14, 12, 0.28);
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="color"]):not([type="range"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.25);
+}
+
+/* ============================================================
    BACKGROUND ATMOSFÉRICO (parte interna do app)
    Aplicado via .app-shell — só ativo em rotas autenticadas.
    ============================================================ */
 .app-shell {
   position: relative;
   min-height: 100vh;
-  background: #050505;
+  background: #FAF7F0;
   color: var(--text);
 }
 .app-shell .bg-image {
@@ -98,15 +128,15 @@ body {
   pointer-events: none;
   background:
     /* Camada 1: padrão de Flor da Vida (geometria sagrada) em dourado MUITO sutil */
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.4' opacity='0.10'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E"),
-    /* Camada 2: gradient mesh quente — define a atmosfera */
-    radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.16), transparent 55%),
-    radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.10), transparent 55%),
-    radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.10), transparent 55%),
-    radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.14), transparent 55%),
-    radial-gradient(ellipse 800px 600px at 50% 50%, rgba(93, 216, 182, 0.06), transparent 60%),
-    /* Camada 3: base dark warm (não preto puro — tem temperatura dourada) */
-    linear-gradient(135deg, #08070C 0%, #0F0D14 35%, #14110D 75%, #0A0908 100%);
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.5' opacity='0.06'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E"),
+    /* Camada 2: gradient mesh quente — define a atmosfera (alpha reduzido para fundo claro) */
+    radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.08), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.05), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.05), transparent 55%),
+    radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.07), transparent 55%),
+    radial-gradient(ellipse 800px 600px at 50% 50%, rgba(93, 216, 182, 0.03), transparent 60%),
+    /* Camada 3: base creme warm (família de /(auth)/login) */
+    linear-gradient(135deg, #FAF7F0 0%, #FFFEF9 50%, #F5EFDD 100%);
   background-size: 240px 240px, auto, auto, auto, auto, auto, auto;
   background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
   background-attachment: fixed;
@@ -120,20 +150,20 @@ body {
 .app-shell .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(140px);
-  mix-blend-mode: screen;
+  filter: blur(180px);
+  mix-blend-mode: multiply;
 }
-.app-shell .blob-1 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(212, 175, 55, 0.4), transparent 70%); top: -150px; left: -100px; }
-.app-shell .blob-2 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(240, 184, 168, 0.35), transparent 70%); top: 30%; right: -150px; }
-.app-shell .blob-3 { width: 800px; height: 800px; background: radial-gradient(circle, rgba(197, 180, 255, 0.32), transparent 70%); top: 55%; left: -200px; }
-.app-shell .blob-4 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(93, 216, 182, 0.28), transparent 70%); bottom: -200px; right: 10%; }
-.app-shell .blob-5 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(184, 197, 214, 0.32), transparent 70%); top: 75%; left: 35%; }
+.app-shell .blob-1 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(212, 175, 55, 0.18), transparent 70%); top: -150px; left: -100px; }
+.app-shell .blob-2 { width: 600px; height: 600px; background: radial-gradient(circle, rgba(240, 184, 168, 0.16), transparent 70%); top: 30%; right: -150px; }
+.app-shell .blob-3 { width: 800px; height: 800px; background: radial-gradient(circle, rgba(197, 180, 255, 0.14), transparent 70%); top: 55%; left: -200px; }
+.app-shell .blob-4 { width: 700px; height: 700px; background: radial-gradient(circle, rgba(93, 216, 182, 0.12), transparent 70%); bottom: -200px; right: 10%; }
+.app-shell .blob-5 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(184, 197, 214, 0.14), transparent 70%); top: 75%; left: 35%; }
 .app-shell .bg-blobs::after {
   content: '';
   position: absolute; inset: 0;
-  opacity: 0.4;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' /%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.18 0' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' /%3E%3C/svg%3E");
+  opacity: 0.25;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' /%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.18 0' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' /%3E%3C/svg%3E");
 }
 
 .app-shell > .app-content {
@@ -146,15 +176,14 @@ body {
    ============================================================ */
 .glass {
   position: relative;
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
   border-radius: var(--radius-xl);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 30px 80px -20px rgba(0, 0, 0, 0.7),
-    0 8px 30px -4px rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 24px 60px -20px rgba(20, 16, 8, 0.10),
+    0 8px 24px -4px rgba(20, 16, 8, 0.06);
 }
 .glass::before {
   content: '';
@@ -162,10 +191,10 @@ body {
   border-radius: inherit;
   padding: 1px;
   background: linear-gradient(135deg,
-    rgba(255, 255, 255, 0.3) 0%,
-    rgba(255, 255, 255, 0.06) 30%,
-    rgba(255, 255, 255, 0) 60%,
-    rgba(255, 255, 255, 0.18) 100%
+    rgba(15, 14, 12, 0.08) 0%,
+    rgba(15, 14, 12, 0.04) 30%,
+    rgba(15, 14, 12, 0) 60%,
+    rgba(15, 14, 12, 0.02) 100%
   );
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -176,20 +205,21 @@ body {
 
 .glass-tile {
   position: relative;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(30px) saturate(160%);
-  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
   border-radius: var(--radius-lg);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 4px 16px rgba(0, 0, 0, 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 2px 8px rgba(20, 16, 8, 0.04),
+    0 12px 32px -8px rgba(20, 16, 8, 0.08);
 }
 .glass-tile::before {
   content: '';
   position: absolute; inset: 0;
   border-radius: inherit;
   padding: 0.5px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04));
+  background: linear-gradient(135deg, rgba(15, 14, 12, 0.08), rgba(15, 14, 12, 0.02));
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
           mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
@@ -198,7 +228,7 @@ body {
 }
 
 @supports not (backdrop-filter: blur(1px)) {
-  .glass, .glass-tile { background: rgba(20, 20, 28, 0.85); }
+  .glass, .glass-tile { background: rgba(255, 255, 255, 0.95); }
 }
 
 /* ============================================================
@@ -206,60 +236,60 @@ body {
    ============================================================ */
 .t-primary {
   background:
-    linear-gradient(135deg, rgba(212, 175, 55, 0.38) 0%, rgba(212, 175, 55, 0.14) 100%),
-    rgba(255, 255, 255, 0.03);
+    linear-gradient(135deg, rgba(212, 175, 55, 0.12) 0%, rgba(212, 175, 55, 0.04) 100%),
+    rgba(255, 255, 255, 0.7);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(212, 175, 55, 0.4),
-    0 4px 20px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 0.5px rgba(212, 175, 55, 0.55),
+    0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-mint {
   background:
-    linear-gradient(135deg, rgba(93, 216, 182, 0.38) 0%, rgba(93, 216, 182, 0.14) 100%),
-    rgba(255, 255, 255, 0.03);
+    linear-gradient(135deg, rgba(93, 216, 182, 0.12) 0%, rgba(93, 216, 182, 0.04) 100%),
+    rgba(255, 255, 255, 0.7);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(93, 216, 182, 0.4),
-    0 4px 20px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 0.5px rgba(93, 216, 182, 0.55),
+    0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-rose {
   background:
-    linear-gradient(135deg, rgba(240, 184, 168, 0.38) 0%, rgba(240, 184, 168, 0.14) 100%),
-    rgba(255, 255, 255, 0.03);
+    linear-gradient(135deg, rgba(240, 184, 168, 0.12) 0%, rgba(240, 184, 168, 0.04) 100%),
+    rgba(255, 255, 255, 0.7);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(240, 184, 168, 0.4),
-    0 4px 20px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 0.5px rgba(240, 184, 168, 0.55),
+    0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-lavender {
   background:
-    linear-gradient(135deg, rgba(197, 180, 255, 0.38) 0%, rgba(197, 180, 255, 0.14) 100%),
-    rgba(255, 255, 255, 0.03);
+    linear-gradient(135deg, rgba(197, 180, 255, 0.12) 0%, rgba(197, 180, 255, 0.04) 100%),
+    rgba(255, 255, 255, 0.7);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(197, 180, 255, 0.4),
-    0 4px 20px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 0.5px rgba(197, 180, 255, 0.55),
+    0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-sky {
   background:
-    linear-gradient(135deg, rgba(184, 197, 214, 0.38) 0%, rgba(184, 197, 214, 0.14) 100%),
-    rgba(255, 255, 255, 0.03);
+    linear-gradient(135deg, rgba(184, 197, 214, 0.12) 0%, rgba(184, 197, 214, 0.04) 100%),
+    rgba(255, 255, 255, 0.7);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(184, 197, 214, 0.4),
-    0 4px 20px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 0.5px rgba(184, 197, 214, 0.55),
+    0 2px 12px rgba(20, 16, 8, 0.06);
 }
 .t-coral {
   background:
-    linear-gradient(135deg, rgba(232, 138, 152, 0.38) 0%, rgba(232, 138, 152, 0.14) 100%),
-    rgba(255, 255, 255, 0.03);
+    linear-gradient(135deg, rgba(232, 138, 152, 0.12) 0%, rgba(232, 138, 152, 0.04) 100%),
+    rgba(255, 255, 255, 0.7);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 0 0.5px rgba(232, 138, 152, 0.4),
-    0 4px 20px rgba(0, 0, 0, 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 0.5px rgba(232, 138, 152, 0.55),
+    0 2px 12px rgba(20, 16, 8, 0.06);
 }
 
-/* Aura no canto pra reforço de cor */
+/* Aura no canto pra reforço de cor (sutil em fundo claro) */
 .kpi-aura {
   position: absolute;
   bottom: -50%; right: -30%;
@@ -267,8 +297,8 @@ body {
   border-radius: 50%;
   pointer-events: none;
   z-index: 0;
-  filter: blur(50px);
-  opacity: 0.75;
+  filter: blur(80px);
+  opacity: 0.18;
 }
 .t-primary  .kpi-aura { background: radial-gradient(circle, var(--primary), transparent 60%); }
 .t-mint     .kpi-aura { background: radial-gradient(circle, var(--mint), transparent 60%); }
@@ -303,14 +333,14 @@ body {
   border: 0.5px solid;
   backdrop-filter: blur(10px);
 }
-.badge.b-empenhado    { color: var(--text-mute);     border-color: var(--hairline);              background: rgba(255,255,255,0.04); }
-.badge.b-pedido       { color: var(--primary-bright);border-color: rgba(212,175,55,0.4);         background: rgba(212,175,55,0.12); }
-.badge.b-transito     { color: var(--rose);          border-color: rgba(240,184,168,0.4);        background: rgba(240,184,168,0.12); }
-.badge.b-entregue     { color: var(--mint);          border-color: rgba(93,216,182,0.4);         background: rgba(93,216,182,0.12); }
-.badge.b-nf-emitida   { color: var(--lavender);      border-color: rgba(197,180,255,0.4);        background: rgba(197,180,255,0.12); }
-.badge.b-nf-encam     { color: var(--sky);           border-color: rgba(184,197,214,0.4);        background: rgba(184,197,214,0.12); }
-.badge.b-multa        { color: var(--coral);         border-color: rgba(232,138,152,0.4);        background: rgba(232,138,152,0.12); }
-.badge.b-impedimento  { color: var(--rose);          border-color: rgba(240,184,168,0.4);        background: rgba(240,184,168,0.12); }
+.badge.b-empenhado    { color: var(--text-mute);     border-color: var(--hairline);              background: rgba(15,14,12,0.04); }
+.badge.b-pedido       { color: var(--primary-deep);  border-color: rgba(168,137,71,0.5);         background: rgba(212,175,55,0.18); }
+.badge.b-transito     { color: #C66B4A;              border-color: rgba(198,107,74,0.5);         background: rgba(240,184,168,0.18); }
+.badge.b-entregue     { color: var(--mint-deep);     border-color: rgba(46,171,133,0.5);         background: rgba(93,216,182,0.18); }
+.badge.b-nf-emitida   { color: #8E73E0;              border-color: rgba(142,115,224,0.5);        background: rgba(197,180,255,0.18); }
+.badge.b-nf-encam     { color: #6F8BAA;              border-color: rgba(111,139,170,0.5);        background: rgba(184,197,214,0.18); }
+.badge.b-multa        { color: var(--coral-deep);    border-color: rgba(198,103,112,0.5);        background: rgba(232,138,152,0.18); }
+.badge.b-impedimento  { color: #C66B4A;              border-color: rgba(198,107,74,0.5);         background: rgba(240,184,168,0.18); }
 
 /* ============================================================
    BOTÃO PRIMÁRIO PILL
@@ -341,9 +371,9 @@ body {
 .btn-primary svg { width: 14px; height: 14px; stroke-width: 2.5; }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.8);
   border: 0.5px solid var(--hairline);
-  color: var(--text);
+  color: var(--text-soft);
   height: 44px;
   padding: 0 22px;
   border-radius: var(--radius-pill);
@@ -357,18 +387,20 @@ body {
   transition: all 200ms var(--ease-ios);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 1px 4px rgba(20,16,8,0.04);
 }
-.btn-secondary:hover { background: rgba(255, 255, 255, 0.1); }
+.btn-secondary:hover { background: rgba(255, 255, 255, 1); border-color: rgba(15,14,12,0.16); }
 
 /* ============================================================
    SCROLLBAR
    ============================================================ */
 .app-shell ::-webkit-scrollbar { width: 8px; height: 8px; }
-.app-shell ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 4px; }
+.app-shell ::-webkit-scrollbar-thumb { background: rgba(15, 14, 12, 0.12); border-radius: 4px; }
+.app-shell ::-webkit-scrollbar-thumb:hover { background: rgba(15, 14, 12, 0.20); }
 .app-shell ::-webkit-scrollbar-track { background: transparent; }
 
 /* ============================================================
-   TABLE base (dark)
+   TABLE base (clean)
    ============================================================ */
 .table-glass {
   width: 100%;
@@ -382,393 +414,78 @@ body {
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--text-mute);
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(15, 14, 12, 0.04);
   border-bottom: 0.5px solid var(--hairline);
 }
 .table-glass tbody td {
   padding: 16px 22px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 0.5px solid var(--hairline);
   font-size: 13px;
   color: var(--text-soft);
   font-weight: 500;
 }
 .table-glass tbody tr:last-child td { border-bottom: none; }
-.table-glass tbody tr:hover { background: rgba(255, 255, 255, 0.025); }
+.table-glass tbody tr:hover { background: rgba(15, 14, 12, 0.025); }
 .table-glass td.num, .table-glass th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .table-glass td.center, .table-glass th.center { text-align: center; }
 .table-glass td.strong { font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
-.table-glass .row-alert { background: rgba(232, 138, 152, 0.06); }
-.table-glass .row-alert:hover { background: rgba(232, 138, 152, 0.12) !important; }
+.table-glass .row-alert { background: rgba(232, 138, 152, 0.08); }
+.table-glass .row-alert:hover { background: rgba(232, 138, 152, 0.14) !important; }
 
 /* ============================================================
-   LEGACY FALLBACK — páginas que ainda usam Tailwind light
-   Garantia Apple HIG: nenhum texto invisível em qualquer rota.
+   COMPAT LAYER (clean mode)
+   Mantém apenas o essencial: política de marca (bg-blue-* → dourado),
+   focus ring nos inputs, tipografia padronizada, sombras warm.
+   No clean mode, Tailwind original (bg-white, text-slate-*) faz o
+   trabalho naturalmente — overrides agressivos foram removidos.
    ============================================================ */
 
-/* Texto base do main: claro */
-.app-shell main {
-  color: var(--text-soft);
-}
+/* Texto base do main (legibilidade default em fundo claro) */
+.app-shell main { color: var(--text-soft); }
 
-/* === Override de cores Tailwind slate/gray sobre o fundo dark === */
-/* Headings/labels antes "escuros" no light → claros no dark */
-.app-shell .text-slate-900,
-.app-shell .text-slate-800,
-.app-shell .text-gray-900,
-.app-shell .text-gray-800,
-.app-shell .text-zinc-900,
-.app-shell .text-zinc-800,
-.app-shell .text-neutral-900,
-.app-shell .text-neutral-800 { color: var(--text); }
-
-.app-shell .text-slate-700,
-.app-shell .text-slate-600,
-.app-shell .text-gray-700,
-.app-shell .text-gray-600,
-.app-shell .text-zinc-700,
-.app-shell .text-zinc-600,
-.app-shell .text-neutral-700,
-.app-shell .text-neutral-600 { color: var(--text-soft); }
-
-.app-shell .text-slate-500,
-.app-shell .text-slate-400,
-.app-shell .text-gray-500,
-.app-shell .text-gray-400,
-.app-shell .text-zinc-500,
-.app-shell .text-zinc-400,
-.app-shell .text-neutral-500,
-.app-shell .text-neutral-400 { color: var(--text-mute); }
-
-/* Cores Tailwind de marca: ajustar saturação pra dark mode */
-.app-shell .text-blue-700,
-.app-shell .text-blue-800,
-.app-shell .text-blue-900 { color: #6BA8FF; }
-.app-shell .text-emerald-700,
-.app-shell .text-emerald-800,
-.app-shell .text-green-700,
-.app-shell .text-green-800 { color: var(--mint); }
-.app-shell .text-amber-700,
-.app-shell .text-amber-800,
-.app-shell .text-orange-700 { color: var(--primary-bright); }
-.app-shell .text-red-700,
-.app-shell .text-red-800,
-.app-shell .text-rose-700 { color: var(--coral); }
-
-/* === Cards/seções "bg-white" do Tailwind viram GLASS DARK ===
-   Apple HIG: um modo só (dark). Containers brancos legacy ficam glass dark
-   transparente — preserva sofisticação Liquid Glass em qualquer rota. */
-.app-shell div.bg-white,
-.app-shell section.bg-white,
-.app-shell article.bg-white,
-.app-shell aside.bg-white,
-.app-shell header.bg-white,
-.app-shell footer.bg-white,
-.app-shell main.bg-white,
-.app-shell nav.bg-white,
-.app-shell ul.bg-white,
-.app-shell li.bg-white,
-.app-shell a.bg-white,
-.app-shell label.bg-white,
-.app-shell form.bg-white,
-.app-shell tr.bg-white,
-.app-shell td.bg-white,
-.app-shell th.bg-white,
-.app-shell tbody.bg-white,
-.app-shell thead.bg-white,
-.app-shell table.bg-white {
-  background: rgba(255, 255, 255, 0.05) !important;
-  backdrop-filter: blur(30px) saturate(160%);
-  -webkit-backdrop-filter: blur(30px) saturate(160%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 4px 16px rgba(0, 0, 0, 0.25);
-  color: var(--text-soft);
-}
-
-.app-shell .bg-slate-50,
-.app-shell .bg-gray-50,
-.app-shell .bg-zinc-50,
-.app-shell .bg-neutral-50 {
-  background: rgba(255, 255, 255, 0.04) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.app-shell .bg-slate-100,
-.app-shell .bg-gray-100 {
-  background: rgba(255, 255, 255, 0.06) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-/* Bgs coloridos light (cards de status) → tinted glass dark com a paleta semântica */
-.app-shell .bg-blue-50,
-.app-shell .bg-sky-50,
-.app-shell .bg-cyan-50,
-.app-shell .bg-indigo-50 {
-  background: rgba(184, 197, 214, 0.10) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.app-shell .bg-emerald-50,
-.app-shell .bg-green-50,
-.app-shell .bg-teal-50 {
-  background: rgba(93, 216, 182, 0.10) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.app-shell .bg-amber-50,
-.app-shell .bg-yellow-50,
-.app-shell .bg-orange-50 {
-  background: rgba(212, 175, 55, 0.10) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.app-shell .bg-rose-50,
-.app-shell .bg-red-50,
-.app-shell .bg-pink-50 {
-  background: rgba(232, 138, 152, 0.10) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.app-shell .bg-purple-50,
-.app-shell .bg-violet-50,
-.app-shell .bg-fuchsia-50 {
-  background: rgba(197, 180, 255, 0.10) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-/* Bgs 100 (mais saturados) — versão um pouco mais densa */
-.app-shell .bg-blue-100,
-.app-shell .bg-sky-100,
-.app-shell .bg-indigo-100   { background: rgba(184, 197, 214, 0.16) !important; }
-.app-shell .bg-emerald-100,
-.app-shell .bg-green-100    { background: rgba(93, 216, 182, 0.16) !important; }
-.app-shell .bg-amber-100,
-.app-shell .bg-yellow-100,
-.app-shell .bg-orange-100   { background: rgba(212, 175, 55, 0.16) !important; }
-.app-shell .bg-rose-100,
-.app-shell .bg-red-100,
-.app-shell .bg-pink-100     { background: rgba(232, 138, 152, 0.16) !important; }
-.app-shell .bg-purple-100,
-.app-shell .bg-violet-100   { background: rgba(197, 180, 255, 0.16) !important; }
-
-/* Texto dentro de cards bg-white agora é CLARO (cards são dark) */
-.app-shell .bg-white .text-slate-900,
-.app-shell .bg-white .text-slate-800,
-.app-shell .bg-white .text-gray-900,
-.app-shell .bg-white .text-gray-800,
-.app-shell .bg-slate-50 .text-slate-900,
-.app-shell .bg-slate-50 .text-slate-800 { color: var(--text) !important; }
-
-.app-shell .bg-white .text-slate-700,
-.app-shell .bg-white .text-slate-600,
-.app-shell .bg-white .text-gray-700,
-.app-shell .bg-white .text-gray-600 { color: var(--text-soft) !important; }
-
-.app-shell .bg-white .text-slate-500,
-.app-shell .bg-white .text-slate-400,
-.app-shell .bg-white .text-gray-500,
-.app-shell .bg-white .text-gray-400 { color: var(--text-mute) !important; }
-
-/* === Inputs/forms PRESERVAM bg branco com texto escuro (UX digitação) === */
-.app-shell input[type="text"],
-.app-shell input[type="email"],
-.app-shell input[type="password"],
-.app-shell input[type="number"],
-.app-shell input[type="tel"],
-.app-shell input[type="date"],
-.app-shell input[type="search"],
-.app-shell input[type="url"],
-.app-shell input:not([type]),
-.app-shell select,
-.app-shell textarea {
-  color: #1D1D1F !important;
-  background: rgba(255, 255, 255, 0.95) !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-.app-shell input::placeholder,
-.app-shell textarea::placeholder {
-  color: #8E8E93;
-}
-
-/* === Borders neutros === */
-.app-shell .border-slate-200,
-.app-shell .border-slate-300,
-.app-shell .border-gray-200,
-.app-shell .border-gray-300,
-.app-shell .border-zinc-200,
-.app-shell .border-neutral-200 { border-color: var(--hairline) !important; }
-
-.app-shell .border-blue-200,
-.app-shell .border-sky-200,
-.app-shell .border-indigo-200    { border-color: rgba(184, 197, 214, 0.3) !important; }
-.app-shell .border-emerald-200,
-.app-shell .border-green-200     { border-color: rgba(93, 216, 182, 0.3) !important; }
-.app-shell .border-amber-200,
-.app-shell .border-yellow-200,
-.app-shell .border-orange-200    { border-color: rgba(212, 175, 55, 0.3) !important; }
-.app-shell .border-rose-200,
-.app-shell .border-red-200,
-.app-shell .border-pink-200      { border-color: rgba(232, 138, 152, 0.3) !important; }
-.app-shell .border-purple-200,
-.app-shell .border-violet-200    { border-color: rgba(197, 180, 255, 0.3) !important; }
-
-/* Inputs: borda permanece sutil */
-.app-shell input,
-.app-shell select,
-.app-shell textarea {
-  border-color: rgba(0, 0, 0, 0.12) !important;
-}
-.app-shell input:focus,
-.app-shell select:focus,
-.app-shell textarea:focus {
-  border-color: var(--primary) !important;
-  outline: none !important;
-  box-shadow: 0 0 0 3px var(--primary-glow) !important;
-}
-
-/* === Divisores Tailwind === */
-.app-shell .divide-slate-100 > * + *,
-.app-shell .divide-slate-200 > * + *,
-.app-shell .divide-gray-100 > * + *,
-.app-shell .divide-gray-200 > * + * {
-  border-color: var(--hairline) !important;
-}
-
-/* === Hover states preservados em dark === */
-.app-shell .hover\:bg-slate-50:hover,
-.app-shell .hover\:bg-gray-50:hover,
-.app-shell .hover\:bg-slate-100:hover,
-.app-shell .hover\:bg-gray-100:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-}
-.app-shell .hover\:bg-blue-50:hover,
-.app-shell .hover\:bg-blue-100:hover {
-  background: rgba(184, 197, 214, 0.10) !important;
-}
-
-/* === Botões legacy bg-blue-600 etc → dourado (cor de marca) === */
+/* Política de marca: nada de azul corporativo — botões "azul" viram dourado */
 .app-shell .bg-blue-600,
 .app-shell .bg-blue-700,
 .app-shell .bg-indigo-600,
 .app-shell .bg-indigo-700 {
   background: linear-gradient(135deg, var(--primary-bright), var(--primary)) !important;
   color: #0A0A0A !important;
-  box-shadow: 0 4px 14px var(--primary-glow) !important;
+  box-shadow: 0 4px 14px rgba(212,175,55,0.25) !important;
 }
 .app-shell .bg-blue-600:hover,
-.app-shell .bg-blue-700:hover {
-  filter: brightness(1.05);
+.app-shell .bg-blue-700:hover { filter: brightness(1.03); }
+
+/* Focus ring dourado em inputs (consistente com a marca) */
+.app-shell input:focus,
+.app-shell select:focus,
+.app-shell textarea:focus {
+  border-color: var(--primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(212,175,55,0.25) !important;
 }
 
-/* Headings em cards → tipografia mais clean (sem mexer no que já é dark-native) */
-.app-shell h1, .app-shell h2, .app-shell h3 {
-  letter-spacing: -0.02em;
-}
+/* Tipografia clean — letter-spacing apertado em headings */
+.app-shell h1, .app-shell h2, .app-shell h3 { letter-spacing: -0.02em; }
 
-/* Force shadows mais suaves para se integrar ao dark */
+/* Sombras warm uniformes (Tailwind shadow-* fica creme em vez de preto puro) */
 .app-shell .shadow,
 .app-shell .shadow-sm,
 .app-shell .shadow-md,
 .app-shell .shadow-lg,
 .app-shell .shadow-xl {
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 4px 24px rgba(20,16,8,0.06), inset 0 1px 0 rgba(255,255,255,0.6) !important;
 }
 
-/* Border radius generoso em cards principais */
+/* Border radius generoso em cards principais (mantém identidade Liquid Glass) */
 .app-shell .rounded-lg { border-radius: 14px; }
 .app-shell .rounded-xl { border-radius: 18px; }
 .app-shell .rounded-2xl { border-radius: 22px; }
 
-/* ============================================================
-   DROPDOWNS / MENUS FLUTUANTES — fundo OPACO obrigatório
-   Apple HIG: overlays nunca podem ser translúcidos sobre conteúdo.
-   ============================================================ */
-.app-shell .absolute.bg-white,
-.app-shell .fixed.bg-white,
-.app-shell [role="menu"].bg-white,
-.app-shell [role="listbox"].bg-white,
-.app-shell [role="dialog"].bg-white {
-  background: rgba(22, 22, 30, 0.96) !important;
-  backdrop-filter: blur(40px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(200%) !important;
-  border: 0.5px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
-  color: var(--text-soft);
+/* Dropdowns/menus — elevação adicional sobre conteúdo
+   Tailwind bg-white já entrega branco sólido; aqui só reforça sombra e hairline */
+.app-shell [role="menu"],
+.app-shell [role="listbox"],
+.app-shell [role="dialog"] {
+  box-shadow: 0 24px 64px rgba(20,16,8,0.14), inset 0 1px 0 rgba(255,255,255,0.6);
+  border: 0.5px solid var(--hairline);
 }
-
-/* Texto dentro de dropdowns: claro */
-.app-shell .absolute.bg-white .text-slate-900,
-.app-shell .fixed.bg-white .text-slate-900,
-.app-shell .absolute.bg-white .text-slate-800,
-.app-shell .fixed.bg-white .text-slate-800 { color: var(--text) !important; }
-
-.app-shell .absolute.bg-white .text-slate-700,
-.app-shell .fixed.bg-white .text-slate-700,
-.app-shell .absolute.bg-white .text-slate-600,
-.app-shell .fixed.bg-white .text-slate-600 { color: var(--text-soft) !important; }
-
-.app-shell .absolute.bg-white .text-slate-500,
-.app-shell .fixed.bg-white .text-slate-500,
-.app-shell .absolute.bg-white .text-slate-400,
-.app-shell .fixed.bg-white .text-slate-400 { color: var(--text-mute) !important; }
-
-/* Sub-headers dentro de dropdown (bg-slate-50) ficam um pouco mais escuros pra dar separação */
-.app-shell .absolute.bg-white .bg-slate-50,
-.app-shell .fixed.bg-white .bg-slate-50,
-.app-shell .absolute.bg-white .bg-gray-50,
-.app-shell .fixed.bg-white .bg-gray-50 {
-  background: rgba(0, 0, 0, 0.25) !important;
-  backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-/* Borders dentro de dropdown */
-.app-shell .absolute.bg-white .border-slate-100,
-.app-shell .fixed.bg-white .border-slate-100,
-.app-shell .absolute.bg-white .border-slate-200,
-.app-shell .fixed.bg-white .border-slate-200 {
-  border-color: rgba(255, 255, 255, 0.08) !important;
-}
-
-/* Hover de items em dropdown */
-.app-shell .absolute.bg-white .hover\:bg-slate-50:hover,
-.app-shell .fixed.bg-white .hover\:bg-slate-50:hover,
-.app-shell .absolute.bg-white .hover\:bg-gray-50:hover,
-.app-shell .fixed.bg-white .hover\:bg-gray-50:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
-}
-
-/* Item ativo em dropdown — usa dourado da marca em vez de violet */
-.app-shell .absolute.bg-white .bg-violet-50,
-.app-shell .fixed.bg-white .bg-violet-50,
-.app-shell .absolute.bg-white .bg-purple-50,
-.app-shell .fixed.bg-white .bg-purple-50 {
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(212, 175, 55, 0.06)) !important;
-  border-left: 2px solid var(--primary) !important;
-}
-
-/* Cores de ícone violet (admin) — manter contexto mas saturadas em dark */
-.app-shell .absolute.bg-white .text-violet-600,
-.app-shell .fixed.bg-white .text-violet-600,
-.app-shell .absolute.bg-white .text-violet-700 { color: var(--primary-bright) !important; }
-
-/* Cards de cor light dentro de dropdown — tinted dark */
-.app-shell .absolute.bg-white .bg-blue-100,
-.app-shell .fixed.bg-white .bg-blue-100 { background: rgba(184, 197, 214, 0.18) !important; }
-.app-shell .absolute.bg-white .text-blue-700,
-.app-shell .fixed.bg-white .text-blue-700 { color: var(--sky-bright) !important; }
-.app-shell .absolute.bg-white .bg-emerald-100,
-.app-shell .fixed.bg-white .bg-emerald-100 { background: rgba(93, 216, 182, 0.18) !important; }
-.app-shell .absolute.bg-white .text-emerald-700,
-.app-shell .fixed.bg-white .text-emerald-700 { color: var(--mint) !important; }
-
-/* Borda dos sub-headers (top/bottom) */
-.app-shell .absolute.bg-white .border-t,
-.app-shell .fixed.bg-white .border-t { border-top-color: rgba(255, 255, 255, 0.08) !important; }
-.app-shell .absolute.bg-white .border-b,
-.app-shell .fixed.bg-white .border-b { border-bottom-color: rgba(255, 255, 255, 0.08) !important; }

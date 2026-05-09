@@ -301,7 +301,7 @@ function SecaoGlass({
           style={{
             background: "linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.06))",
             border: "0.5px solid rgba(212,175,55,0.4)",
-            color: "var(--primary-bright)",
+            color: "var(--primary-deep)",
             letterSpacing: "-0.04em",
           }}
         >
@@ -417,7 +417,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
         className="glass-tile mt-5 overflow-hidden rounded-[20px] px-7 py-6"
         style={{
           background:
-            "linear-gradient(135deg, rgba(197,180,255,0.18), rgba(184,197,214,0.06)), rgba(255,255,255,0.03)",
+            "linear-gradient(135deg, rgba(197,180,255,0.12), rgba(184,197,214,0.04)), var(--glass-2)",
         }}
       >
         <div className="relative z-[1] flex items-start gap-4">
@@ -750,11 +750,11 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
                   style={{
                     background: prazoNaoAplica
                       ? "rgba(212,175,55,0.18)"
-                      : "rgba(255,255,255,0.04)",
+                      : "rgba(15,14,12,0.04)",
                     border: prazoNaoAplica
-                      ? "0.5px solid rgba(212,175,55,0.4)"
+                      ? "0.5px solid rgba(168,137,71,0.5)"
                       : "0.5px solid var(--hairline)",
-                    color: prazoNaoAplica ? "var(--primary-bright)" : "var(--text-mute)",
+                    color: prazoNaoAplica ? "var(--primary-deep)" : "var(--text-mute)",
                     letterSpacing: "0.08em",
                   }}
                 >
@@ -835,8 +835,8 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
                 Esta Ata aceita adesão (carona) por outros órgãos.
                 <br />
                 <span className="text-xs" style={{ color: "var(--text-mute)" }}>
-                  Lei 14.133/2021 art. 86 — limite de <strong style={{ color: "var(--primary-bright)" }}>50% por órgão</strong> e{" "}
-                  <strong style={{ color: "var(--primary-bright)" }}>200% no total</strong>. Sistema monitora os limites automaticamente.
+                  Lei 14.133/2021 art. 86 — limite de <strong style={{ color: "var(--primary-deep)" }}>50% por órgão</strong> e{" "}
+                  <strong style={{ color: "var(--primary-deep)" }}>200% no total</strong>. Sistema monitora os limites automaticamente.
                 </span>
               </span>
             </label>
@@ -942,7 +942,7 @@ function EnderecosEntregaEditor() {
           key={idx}
           className="grid grid-cols-12 gap-2 rounded-2xl px-3 py-3"
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
@@ -990,7 +990,7 @@ function EnderecosEntregaEditor() {
         onClick={adicionar}
         className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
         style={{
-          background: "rgba(255,255,255,0.06)",
+          background: "rgba(255,255,255,0.8)",
           color: "var(--text-soft)",
           border: "0.5px solid var(--hairline)",
         }}
@@ -1033,7 +1033,7 @@ function PontosFocaisEditor() {
           key={idx}
           className="rounded-2xl px-4 py-4"
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
@@ -1106,7 +1106,7 @@ function PontosFocaisEditor() {
         onClick={adicionar}
         className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
         style={{
-          background: "rgba(255,255,255,0.06)",
+          background: "rgba(255,255,255,0.8)",
           color: "var(--text-soft)",
           border: "0.5px solid var(--hairline)",
         }}
@@ -1159,7 +1159,7 @@ function OrgaosParticipantesEditor() {
           key={idx}
           className="rounded-2xl px-4 py-4"
           style={{
-            background: "rgba(255,255,255,0.03)",
+            background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
@@ -1242,7 +1242,7 @@ function OrgaosParticipantesEditor() {
         className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
         style={{
           background: "rgba(212, 175, 55, 0.14)",
-          color: "var(--primary-bright)",
+          color: "var(--primary-deep)",
           border: "0.5px solid rgba(212, 175, 55, 0.3)",
         }}
       >

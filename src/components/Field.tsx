@@ -22,6 +22,9 @@ const inputStyle: React.CSSProperties = {
   fontWeight: 500,
 };
 
+const inputBaseClasses =
+  "w-full border bg-white text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-[color:var(--primary)] focus:ring-2 focus:ring-[color:var(--primary)]/25";
+
 export function Field({ label, erro, span = 2, className, helper, ...rest }: FieldProps) {
   const spanCls =
     span === 1 ? "col-span-1" : span === 2 ? "col-span-2" : span === 3 ? "col-span-3" : "col-span-4";
@@ -29,13 +32,13 @@ export function Field({ label, erro, span = 2, className, helper, ...rest }: Fie
     <label className={`flex flex-col gap-1.5 ${spanCls}`}>
       <span style={labelStyle}>
         {label}
-        {rest.required && <span style={{ color: "var(--primary)" }}> *</span>}
+        {rest.required && <span style={{ color: "var(--primary-deep)" }}> *</span>}
       </span>
       <input
         {...rest}
         style={inputStyle}
-        className={`outline-none transition ${
-          erro ? "ring-2 ring-rose-300/50" : ""
+        className={`${inputBaseClasses} ${
+          erro ? "border-red-400 focus:border-red-400" : "border-slate-300"
         } ${className ?? ""}`}
       />
       {helper && !erro && (
@@ -44,7 +47,7 @@ export function Field({ label, erro, span = 2, className, helper, ...rest }: Fie
         </span>
       )}
       {erro && (
-        <span className="text-[12px] font-semibold" style={{ color: "var(--coral)" }}>
+        <span className="text-[12px] font-semibold" style={{ color: "var(--coral-deep)" }}>
           {erro}
         </span>
       )}
@@ -69,14 +72,16 @@ export function Select({ label, erro, span = 2, options, className, defaultValue
     <label className={`flex flex-col gap-1.5 ${spanCls}`}>
       <span style={labelStyle}>
         {label}
-        {rest.required && <span style={{ color: "var(--primary)" }}> *</span>}
+        {rest.required && <span style={{ color: "var(--primary-deep)" }}> *</span>}
       </span>
       <select
         key={selectKey}
         {...rest}
         defaultValue={defaultValue}
         style={inputStyle}
-        className={`outline-none transition ${erro ? "ring-2 ring-rose-300/50" : ""} ${className ?? ""}`}
+        className={`${inputBaseClasses} ${
+          erro ? "border-red-400 focus:border-red-400" : "border-slate-300"
+        } ${className ?? ""}`}
       >
         <option value="">— Selecione —</option>
         {options.map((o) => (
@@ -86,7 +91,7 @@ export function Select({ label, erro, span = 2, options, className, defaultValue
         ))}
       </select>
       {erro && (
-        <span className="text-[12px] font-semibold" style={{ color: "var(--coral)" }}>
+        <span className="text-[12px] font-semibold" style={{ color: "var(--coral-deep)" }}>
           {erro}
         </span>
       )}

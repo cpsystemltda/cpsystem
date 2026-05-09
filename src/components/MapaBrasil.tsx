@@ -56,9 +56,9 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
   }, [dados]);
 
   const maxEmpresas = useMemo(() => Math.max(1, ...dados.map((d) => d.empresas)), [dados]);
-  // Gradient da cor base (lavender translúcido) até o dourado da marca — paleta Liquid Glass
+  // Gradient choropleth: do creme suave até o dourado deep — paleta Liquid Glass clean
   const colorScale = useMemo(
-    () => scaleSequential<string>(interpolateRgb("#5A4F6E", "#E8C875")).domain([0, maxEmpresas]),
+    () => scaleSequential<string>(interpolateRgb("#EDE5D0", "#A88947")).domain([0, maxEmpresas]),
     [maxEmpresas],
   );
 
@@ -76,7 +76,7 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
         className="grid h-[360px] place-items-center rounded-2xl text-sm"
         style={{
           color: "var(--text-mute)",
-          background: "rgba(255,255,255,0.04)",
+          background: "rgba(15,14,12,0.03)",
           border: "0.5px solid var(--hairline)",
         }}
       >
@@ -109,7 +109,7 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
           if (!uf) return null;
           const dado = dadosMap.get(uf);
           const valor = dado?.empresas ?? 0;
-          const fill = valor > 0 ? colorScale(valor) : "rgba(255, 255, 255, 0.06)";
+          const fill = valor > 0 ? colorScale(valor) : "rgba(15, 14, 12, 0.04)";
           const isHover = hover?.uf === uf;
           const d = pathFn(feature as unknown as GeoJSON.Feature) || "";
           const centroid = pathFn.centroid(feature as unknown as GeoJSON.Feature);
@@ -120,10 +120,10 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
               <path
                 d={d}
                 fill={fill}
-                stroke={isHover ? "#FFFFFF" : "rgba(255,255,255,0.18)"}
+                stroke={isHover ? "var(--primary-deep)" : "rgba(15,14,12,0.16)"}
                 strokeWidth={isHover ? 1.4 : 0.6}
                 className="transition-all duration-150 cursor-pointer"
-                style={isTop ? { filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.45))" } : undefined}
+                style={isTop ? { filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.30))" } : undefined}
                 onMouseEnter={(e) => {
                   const rect = wrapperRef.current?.getBoundingClientRect();
                   setHover({

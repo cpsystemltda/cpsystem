@@ -340,7 +340,7 @@ export default async function DashboardPage() {
           className="glass-tile t-primary mb-[18px] flex items-center gap-3 rounded-[18px] px-5 py-3.5 text-sm"
           style={{ color: "var(--text)" }}
         >
-          <AlertTriangle className="h-5 w-5" style={{ color: "var(--primary-bright)" }} />
+          <AlertTriangle className="h-5 w-5" style={{ color: "var(--primary-deep)" }} />
           <span>
             Trial gratuito · <strong>{diasTrial} dias restantes</strong>. Ative uma assinatura antes do
             término para não perder acesso.
@@ -583,7 +583,7 @@ export default async function DashboardPage() {
                 className="grid h-[320px] place-items-center rounded-2xl"
                 style={{
                   border: "0.5px dashed var(--hairline)",
-                  background: "rgba(255,255,255,0.02)",
+                  background: "rgba(15,14,12,0.02)",
                 }}
               >
                 <div className="text-center">
@@ -622,7 +622,7 @@ export default async function DashboardPage() {
                 {rankingOrgaos.map((o, i) => (
                   <div
                     key={o.nome}
-                    className="flex items-center gap-5 border-b border-white/5 py-3.5 last:border-b-0"
+                    className="flex items-center gap-5 border-b border-[color:var(--hairline)] py-3.5 last:border-b-0"
                   >
                     <div
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[13px] font-extrabold"
@@ -630,7 +630,7 @@ export default async function DashboardPage() {
                         background:
                           "linear-gradient(135deg, rgba(212,175,55,0.22), rgba(212,175,55,0.05))",
                         border: "0.5px solid rgba(212,175,55,0.35)",
-                        color: "var(--primary-bright)",
+                        color: "var(--primary-deep)",
                         letterSpacing: "-0.04em",
                         boxShadow: "0 0 14px rgba(212,175,55,0.18)",
                       }}
@@ -645,7 +645,7 @@ export default async function DashboardPage() {
                     </div>
                     <div
                       className="flex-1 overflow-hidden rounded-full"
-                      style={{ background: "rgba(255,255,255,0.05)", height: "8px" }}
+                      style={{ background: "rgba(15,14,12,0.06)", height: "8px" }}
                     >
                       <div
                         className="h-full rounded-full"
@@ -855,7 +855,7 @@ function DonutChart({
               <stop offset="100%" stopColor="var(--primary-deep)" />
             </linearGradient>
           </defs>
-          <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="20" />
+          <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(15,14,12,0.08)" strokeWidth="20" />
           <circle
             cx="110"
             cy="110"
@@ -936,7 +936,7 @@ function FaixasVencimentoChart({
             </div>
             <div
               className="relative flex-1 overflow-hidden rounded-full"
-              style={{ background: "rgba(255,255,255,0.04)", height: "20px" }}
+              style={{ background: "rgba(15,14,12,0.06)", height: "20px" }}
             >
               <div
                 className="absolute inset-y-0 left-0 flex items-center justify-end pr-2.5 rounded-full"
@@ -990,8 +990,8 @@ function MesesChart({ dados, max }: { dados: number[]; max: number }) {
                 style={{
                   height: `${(v / max) * 100}%`,
                   background: isHigh
-                    ? "linear-gradient(180deg, var(--primary-bright), var(--primary-deep))"
-                    : "linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.05))",
+                    ? "linear-gradient(180deg, var(--primary), var(--primary-deep))"
+                    : "linear-gradient(180deg, rgba(15,14,12,0.16), rgba(15,14,12,0.06))",
                   borderRadius: "8px 8px 2px 2px",
                   boxShadow: isHigh ? "0 0 28px var(--primary-glow)" : undefined,
                 }}
@@ -1049,7 +1049,7 @@ function TabelaLogistica({
   return (
     <div className="glass-tile relative overflow-hidden rounded-[20px]">
       <div
-        className="flex items-center justify-between border-b border-white/10 px-6 py-3.5 text-[12px] font-medium"
+        className="flex items-center justify-between border-b border-[color:var(--hairline)] px-6 py-3.5 text-[12px] font-medium"
         style={{ color: "var(--text-mute)", background: "rgba(0,0,0,0.18)" }}
       >
         <span>

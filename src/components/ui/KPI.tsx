@@ -12,21 +12,21 @@ const ICON_BG: Record<Tone, string> = {
 };
 
 const ICON_COLOR: Record<Tone, string> = {
-  primary:  "var(--primary-bright)",
-  mint:     "var(--mint)",
-  rose:     "var(--rose)",
-  lavender: "var(--lavender)",
-  sky:      "var(--sky)",
-  coral:    "var(--coral)",
+  primary:  "var(--primary-deep)",
+  mint:     "var(--mint-deep)",
+  rose:     "#C68E7B",
+  lavender: "#8E73E0",
+  sky:      "#6F8BAA",
+  coral:    "var(--coral-deep)",
 };
 
 const VALUE_GRADIENT: Record<Tone, string> = {
-  primary:  "linear-gradient(180deg, var(--text) 30%, var(--primary-bright) 110%)",
-  mint:     "linear-gradient(180deg, var(--text) 30%, var(--mint) 110%)",
-  rose:     "linear-gradient(180deg, var(--text) 30%, var(--rose) 110%)",
-  lavender: "linear-gradient(180deg, var(--text) 30%, var(--lavender) 110%)",
-  sky:      "linear-gradient(180deg, var(--text) 30%, var(--sky) 110%)",
-  coral:    "linear-gradient(180deg, var(--text) 30%, var(--coral) 110%)",
+  primary:  "linear-gradient(180deg, var(--text) 30%, var(--primary-deep) 110%)",
+  mint:     "linear-gradient(180deg, var(--text) 30%, var(--mint-deep) 110%)",
+  rose:     "linear-gradient(180deg, var(--text) 30%, #C68E7B 110%)",
+  lavender: "linear-gradient(180deg, var(--text) 30%, #8E73E0 110%)",
+  sky:      "linear-gradient(180deg, var(--text) 30%, #6F8BAA 110%)",
+  coral:    "linear-gradient(180deg, var(--text) 30%, var(--coral-deep) 110%)",
 };
 
 export function KPI({
@@ -47,13 +47,13 @@ export function KPI({
   const isHero = size === "hero";
   return (
     <div
-      className={`glass-tile relative overflow-hidden t-${tone} ${isHero ? "rounded-[24px] px-7 py-8" : "rounded-[20px] px-6 py-6"}`}
+      className={`glass-tile relative overflow-hidden t-${tone} ${isHero ? "rounded-[22px] px-6 py-6" : "rounded-[18px] px-5 py-5"}`}
     >
       <div className="kpi-aura" />
       <div className="relative z-[1]">
         {Icon && (
           <div
-            className="mb-3.5 inline-flex h-[38px] w-[38px] items-center justify-center rounded-xl"
+            className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl"
             style={{ background: ICON_BG[tone] }}
           >
             <Icon className="h-[18px] w-[18px]" style={{ color: ICON_COLOR[tone], strokeWidth: 2 }} />
@@ -66,7 +66,7 @@ export function KPI({
           {label}
         </div>
         <div
-          className={`tabular mt-2.5 ${isHero ? "text-[84px] leading-[0.9]" : "text-[36px] leading-none"} font-extrabold`}
+          className={`tabular mt-2.5 ${isHero ? "text-[64px] leading-[0.9]" : "text-[36px] leading-none"} font-extrabold`}
           style={{
             background: VALUE_GRADIENT[tone],
             WebkitBackgroundClip: "text",

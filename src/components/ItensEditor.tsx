@@ -151,7 +151,7 @@ export function ItensEditor({
           }}
         >
           <Layers className="h-4 w-4" style={{ color: "var(--primary)" }} />
-          <span style={{ color: "var(--primary-bright)", fontWeight: 700 }}>
+          <span style={{ color: "var(--primary-deep)", fontWeight: 700 }}>
             {lotesUnicos.length} lote{lotesUnicos.length > 1 ? "s" : ""}:
           </span>
           {lotesUnicos.map((lote) => {
@@ -161,7 +161,7 @@ export function ItensEditor({
               <span
                 key={lote}
                 className="rounded-full px-2.5 py-1"
-                style={{ background: "rgba(212, 175, 55, 0.14)", color: "var(--primary-bright)" }}
+                style={{ background: "rgba(212, 175, 55, 0.14)", color: "var(--primary-deep)" }}
               >
                 Lote {lote} · {itens.length} item{itens.length > 1 ? "ns" : ""} · {brl(valor)}
               </span>
@@ -233,7 +233,7 @@ export function ItensEditor({
             {linhas.map((l, idx) => (
               <tr
                 key={idx}
-                style={{ borderTop: "0.5px solid rgba(255,255,255,0.05)" }}
+                style={{ borderTop: "0.5px solid var(--hairline)" }}
               >
                 {permitirLotes && (
                   <td className="px-3 py-2">
@@ -244,9 +244,9 @@ export function ItensEditor({
                       placeholder="—"
                       className="w-16 rounded-md px-2 py-1.5 text-center text-xs font-bold"
                       style={{
-                        background: l.lote ? "rgba(212,175,55,0.14)" : "rgba(255,255,255,0.04)",
-                        color: l.lote ? "var(--primary-bright)" : "var(--text-mute)",
-                        border: "0.5px solid rgba(212,175,55,0.25)",
+                        background: l.lote ? "rgba(212,175,55,0.18)" : "rgba(15,14,12,0.04)",
+                        color: l.lote ? "var(--primary-deep)" : "var(--text-mute)",
+                        border: "0.5px solid rgba(168,137,71,0.35)",
                       }}
                     />
                   </td>
@@ -358,7 +358,7 @@ export function ItensEditor({
               </td>
               <td
                 className="px-3 py-3 text-right text-base font-extrabold tabular-nums"
-                style={{ color: "var(--primary-bright)", letterSpacing: "-0.02em" }}
+                style={{ color: "var(--primary-deep)", letterSpacing: "-0.02em" }}
               >
                 {brl(total)}
               </td>
@@ -374,7 +374,7 @@ export function ItensEditor({
           onClick={add}
           className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: "rgba(255,255,255,0.8)",
             color: "var(--text-soft)",
             border: "0.5px solid var(--hairline)",
           }}
@@ -388,7 +388,7 @@ export function ItensEditor({
             className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"
             style={{
               background: "rgba(212, 175, 55, 0.14)",
-              color: "var(--primary-bright)",
+              color: "var(--primary-deep)",
               border: "0.5px solid rgba(212, 175, 55, 0.3)",
             }}
           >

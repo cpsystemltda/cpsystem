@@ -128,7 +128,7 @@ export default function LoginPage() {
                   className="h-[18px] w-[18px] shrink-0"
                   style={{
                     color:
-                      tipoEscolhido === "EMPRESA" ? "var(--primary-bright)" : "var(--text-mute)",
+                      tipoEscolhido === "EMPRESA" ? "var(--primary-deep)" : "var(--text-mute)",
                     strokeWidth: 1.7,
                   }}
                 />
@@ -158,7 +158,7 @@ export default function LoginPage() {
                   className="h-[18px] w-[18px] shrink-0"
                   style={{
                     color:
-                      tipoEscolhido === "ANALISTA" ? "var(--primary-bright)" : "var(--text-mute)",
+                      tipoEscolhido === "ANALISTA" ? "var(--primary-deep)" : "var(--text-mute)",
                     strokeWidth: 1.7,
                   }}
                 />
@@ -189,9 +189,9 @@ export default function LoginPage() {
                 <div
                   className="rounded-2xl px-4 py-3 text-sm"
                   style={{
-                    background: "rgba(232,138,152,0.10)",
-                    border: "0.5px solid rgba(232,138,152,0.3)",
-                    color: "var(--coral)",
+                    background: "rgba(232,138,152,0.14)",
+                    border: "0.5px solid rgba(198,103,112,0.5)",
+                    color: "var(--coral-deep)",
                   }}
                 >
                   {state.erro}
@@ -211,7 +211,7 @@ export default function LoginPage() {
               <Link
                 href={`/signup?tipo=${tipoEscolhido}`}
                 className="font-bold transition"
-                style={{ color: "var(--primary-bright)" }}
+                style={{ color: "var(--primary-deep)" }}
               >
                 Criar conta {tipoEscolhido === "EMPRESA" ? "de empresa" : "de analista"}
               </Link>

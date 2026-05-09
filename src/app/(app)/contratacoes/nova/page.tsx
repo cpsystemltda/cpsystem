@@ -12,9 +12,9 @@ export default async function NovaContratacaoPage() {
       <div className="mx-auto max-w-3xl px-8 py-16 text-center">
         <div
           className="glass mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full"
-          style={{ background: "rgba(212, 175, 55, 0.15)" }}
+          style={{ background: "rgba(212, 175, 55, 0.18)" }}
         >
-          <Building2 className="h-8 w-8" style={{ color: "var(--primary-bright)" }} />
+          <Building2 className="h-8 w-8" style={{ color: "var(--primary-deep)" }} />
         </div>
         <h1
           className="mt-6 text-3xl font-extrabold"
@@ -36,25 +36,25 @@ export default async function NovaContratacaoPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1280px] px-8 py-8">
+    <div className="mx-auto max-w-[1280px] px-8 py-6">
       {/* Header */}
-      <header className="glass mb-8 rounded-[28px] px-10 py-9">
+      <header className="glass mb-6 rounded-[24px] px-8 py-6">
         <div className="relative z-[1]">
           <p
             className="text-[11px] font-bold uppercase"
-            style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
+            style={{ letterSpacing: "0.22em", color: "var(--primary-deep)" }}
           >
             Nova contratação
           </p>
           <h1
-            className="mt-2 text-[44px] font-extrabold leading-none"
-            style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
+            className="mt-2 text-[32px] font-extrabold leading-none"
+            style={{ color: "var(--text)", letterSpacing: "-0.04em" }}
           >
             Selecione o{" "}
             <em
               style={{
                 fontStyle: "normal",
-                background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -64,7 +64,7 @@ export default async function NovaContratacaoPage() {
             </em>
           </h1>
           <p
-            className="mt-3 max-w-[640px] text-[15px]"
+            className="mt-2 max-w-[640px] text-[14px]"
             style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
           >
             Escolha qual instrumento você quer cadastrar. Cada um tem regras específicas pela
@@ -73,7 +73,7 @@ export default async function NovaContratacaoPage() {
         </div>
       </header>
 
-      {/* 3 cards grandes */}
+      {/* 3 cards compactos 16:10 */}
       <div className="grid gap-5 md:grid-cols-3">
         <Card
           href="/contratacoes/nova/ata"
@@ -86,7 +86,7 @@ export default async function NovaContratacaoPage() {
         <Card
           href="/contratacoes/nova/contrato"
           icone={ClipboardList}
-          titulo="Contrato administrativo"
+          titulo="Contrato Administrativo"
           descricao="Derivado ou não de uma Ata de Registro de Preços"
           textoSecundario="Registra obrigações, prazos e itens. Pode ser independente ou abater saldo de Ata existente."
           tone="mint"
@@ -98,7 +98,7 @@ export default async function NovaContratacaoPage() {
             <>
               Nota de Empenho
               <span
-                className="block text-[15px] font-semibold"
+                className="block text-[13px] font-semibold"
                 style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
               >
                 Carta-Contrato · Autorização de Compra · Ordem de Serviço
@@ -106,14 +106,7 @@ export default async function NovaContratacaoPage() {
             </>
           }
           descricao="Derivado ou não de uma Ata de Registro de Preços"
-          textoSecundario={
-            <>
-              Reserva orçamentária. Pode ser autônoma, derivada de Ata (SRP) ou de Contrato existente.
-              <span className="mt-2 block text-[12px]" style={{ color: "var(--text-mute)" }}>
-                Lei 14.133/2021, art. 95 — substitui o Termo de Contrato em hipóteses específicas.
-              </span>
-            </>
-          }
+          textoSecundario="Reserva orçamentária. Pode ser autônoma, derivada de Ata (SRP) ou de Contrato existente. Lei 14.133/2021, art. 95."
           tone="lavender"
         />
       </div>
@@ -124,9 +117,9 @@ export default async function NovaContratacaoPage() {
 type Tone = "primary" | "mint" | "lavender";
 
 const ICON_TINT: Record<Tone, { bg: string; color: string }> = {
-  primary: { bg: "rgba(212, 175, 55, 0.18)", color: "var(--primary-bright)" },
-  mint: { bg: "rgba(93, 216, 182, 0.18)", color: "var(--mint)" },
-  lavender: { bg: "rgba(197, 180, 255, 0.18)", color: "var(--lavender)" },
+  primary: { bg: "rgba(212, 175, 55, 0.18)", color: "var(--primary-deep)" },
+  mint: { bg: "rgba(93, 216, 182, 0.18)", color: "var(--mint-deep)" },
+  lavender: { bg: "rgba(197, 180, 255, 0.18)", color: "#8E73E0" },
 };
 
 function Card({
@@ -148,25 +141,25 @@ function Card({
   return (
     <Link
       href={href}
-      className={`glass-tile t-${tone} group relative block overflow-hidden rounded-[24px] px-8 py-8 transition`}
-      style={{ minHeight: "320px" }}
+      className={`glass-tile t-${tone} group relative block overflow-hidden rounded-[20px] px-6 py-6 transition`}
+      style={{ minHeight: "220px" }}
     >
       <div className="kpi-aura" />
       <div className="relative z-[1] flex h-full flex-col">
-        {/* Ícone grande */}
+        {/* Ícone */}
         <div
-          className="inline-flex h-14 w-14 items-center justify-center rounded-[16px]"
+          className="inline-flex h-12 w-12 items-center justify-center rounded-[14px]"
           style={{ background: tint.bg }}
         >
           <Icone
-            className="h-7 w-7"
+            className="h-6 w-6"
             style={{ color: tint.color, strokeWidth: 1.6 }}
           />
         </div>
 
-        {/* Título grande */}
+        {/* Título grande (Igor pediu mais legível) */}
         <h2
-          className="mt-6 text-[24px] font-extrabold leading-tight"
+          className="mt-4 text-[26px] font-extrabold leading-tight"
           style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
         >
           {titulo}
@@ -174,7 +167,7 @@ function Card({
 
         {/* Descrição em destaque (eyebrow secundário) */}
         <p
-          className="mt-3 text-[13px] font-bold uppercase"
+          className="mt-2 text-[12px] font-bold uppercase"
           style={{
             letterSpacing: "0.16em",
             color: tint.color,
@@ -185,7 +178,7 @@ function Card({
 
         {/* Texto explicativo */}
         <div
-          className="mt-3 text-[14px] leading-relaxed"
+          className="mt-2 text-[13px] leading-relaxed line-clamp-3"
           style={{ color: "var(--text-soft)", letterSpacing: "-0.005em" }}
         >
           {textoSecundario}
@@ -193,7 +186,7 @@ function Card({
 
         {/* CTA */}
         <div
-          className="mt-auto flex items-center gap-2 pt-6 text-[14px] font-bold"
+          className="mt-auto flex items-center gap-2 pt-4 text-[13px] font-bold"
           style={{ color: tint.color, letterSpacing: "-0.005em" }}
         >
           Cadastrar

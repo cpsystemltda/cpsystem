@@ -14,17 +14,17 @@ export function SecaoGlass({
   children: ReactNode;
 }) {
   return (
-    <section className="glass overflow-hidden rounded-[24px]">
+    <section className="glass overflow-hidden rounded-[20px]">
       <header
-        className="relative z-[1] flex items-center gap-4 px-8 py-5"
+        className="relative z-[1] flex items-center gap-4 px-7 py-4"
         style={{ borderBottom: "0.5px solid var(--hairline)" }}
       >
         <div
           className="grid h-9 w-9 place-items-center rounded-full text-[13px] font-extrabold"
           style={{
-            background: "linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.06))",
-            border: "0.5px solid rgba(212,175,55,0.4)",
-            color: "var(--primary-bright)",
+            background: "linear-gradient(135deg, rgba(212,175,55,0.35), rgba(212,175,55,0.10))",
+            border: "0.5px solid rgba(168,137,71,0.5)",
+            color: "var(--primary-deep)",
             letterSpacing: "-0.04em",
           }}
         >
@@ -47,7 +47,7 @@ export function SecaoGlass({
           )}
         </div>
       </header>
-      <div className="relative z-[1] px-8 py-6">{children}</div>
+      <div className="relative z-[1] px-7 py-5">{children}</div>
     </section>
   );
 }
@@ -66,26 +66,26 @@ export function PageHeader({
   cta?: ReactNode;
 }) {
   return (
-    <header className="glass mb-6 flex items-end justify-between gap-6 rounded-[28px] px-9 py-7">
+    <header className="glass mb-5 flex items-end justify-between gap-6 rounded-[24px] px-7 py-5">
       <div className="relative z-[1]">
         {eyebrow && (
           <p
             className="text-[11px] font-bold uppercase"
-            style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
+            style={{ letterSpacing: "0.22em", color: "var(--primary-deep)" }}
           >
             {eyebrow}
           </p>
         )}
         <h1
-          className="mt-2 text-[40px] font-extrabold leading-none"
-          style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
+          className="mt-2 text-[32px] font-extrabold leading-none"
+          style={{ color: "var(--text)", letterSpacing: "-0.04em" }}
         >
           {titulo}{" "}
           {destaque && (
             <em
               style={{
                 fontStyle: "normal",
-                background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
                 WebkitTextFillColor: "transparent",

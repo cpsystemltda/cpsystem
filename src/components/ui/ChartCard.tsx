@@ -12,7 +12,7 @@ export function ChartCard({
   className?: string;
 }) {
   return (
-    <div className={`glass-tile relative overflow-hidden rounded-[22px] px-7 py-6 ${className}`}>
+    <div className={`glass-tile relative overflow-hidden rounded-[20px] px-6 py-5 ${className}`}>
       <div className="relative z-[1]">
         <h3
           className="text-[18px] font-bold leading-tight"
