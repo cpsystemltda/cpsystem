@@ -889,61 +889,92 @@ function BarsPosicao({
   aExecutar: number;
 }) {
   const max = Math.max(1, recebido, aReceber, aExecutar);
-  const barras: { val: number; cor: string; rotulo: string; glow: string }[] = [
-    { val: recebido, cor: "linear-gradient(180deg, var(--mint), #2EAB85)", rotulo: "Recebido", glow: "var(--mint-glow)" },
-    { val: aReceber, cor: "linear-gradient(180deg, var(--rose), #C18876)", rotulo: "A receber", glow: "var(--rose-glow)" },
-    { val: aExecutar, cor: "linear-gradient(180deg, var(--lavender), #8A7DAD)", rotulo: "A executar", glow: "var(--lavender-glow)" },
+  const barras: { val: number; cor: string; rotulo: string }[] = [
+    { val: recebido, cor: "linear-gradient(180deg, #5DD8B6, #2EAB85)", rotulo: "Recebidos" },
+    { val: aReceber, cor: "linear-gradient(180deg, #F0B8A8, #C66B4A)", rotulo: "A receber" },
+    { val: aExecutar, cor: "linear-gradient(180deg, #C5B4FF, #8E73E0)", rotulo: "Executados" },
   ];
-  return (
-    <div>
-      <div
-        className="flex items-end gap-8 px-4"
-        style={{ height: "200px", borderBottom: "0.5px solid var(--hairline)" }}
-      >
-        {barras.map((b) => {
-          const alturaPx = Math.max(2, Math.round((b.val / max) * 170));
-          return (
-            <div
-              key={b.rotulo}
-              className="flex flex-1 flex-col items-center justify-end gap-3"
-              style={{ height: "100%" }}
-            >
-              <span className="tabular text-[11px] font-semibold" style={{ color: "var(--text)" }}>
-                {brlCompacto(b.val)}
-              </span>
-              <div
-                className="relative w-full max-w-[64px]"
-                style={{
-                  height: `${alturaPx}px`,
-                  background: b.cor,
-                  borderRadius: "10px 10px 3px 3px",
-                  boxShadow: `0 0 28px ${b.glow}`,
-                }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      <div
-        className="mt-4 flex gap-6 px-4 text-[12px] font-medium"
-        style={{ color: "var(--text-soft)" }}
-      >
-        <Legenda cor="var(--mint)" rotulo="Recebido" />
-        <Legenda cor="var(--rose)" rotulo="A receber" />
-        <Legenda cor="var(--lavender)" rotulo="A executar" />
-      </div>
-    </div>
-  );
-}
+  // Eixo Y — calcula 4 ticks múltiplos de mil/milhão pra "respirar" o gráfico
+  const escala = (() => {
+    if (max >= 1_000_000) return Math.ceil(max / 100_000) * 100_000;
+    if (max >= 100_000) return Math.ceil(max / 50_000) * 50_000;
+    if (max >= 10_000) return Math.ceil(max / 25_000) * 25_000 || 25_000;
+    return Math.ceil(max / 1_000) * 1_000 || 1_000;
+  })();
+  const ticks = [0, escala / 4, escala / 2, (escala * 3) / 4, escala].reverse();
+  const alturaGrafico = 220;
 
-function Legenda({ cor, rotulo }: { cor: string; rotulo: string }) {
   return (
-    <div className="flex flex-1 items-center justify-center gap-2.5">
-      <span
-        className="h-2.5 w-2.5 rounded-[3px]"
-        style={{ background: cor, boxShadow: `0 0 10px ${cor}` }}
-      />
-      <span>{rotulo}</span>
+    <div className="flex gap-3">
+      {/* Eixo Y */}
+      <div
+        className="flex flex-col justify-between text-[11px] font-semibold"
+        style={{ color: "var(--text-mute)", height: `${alturaGrafico}px`, paddingBottom: "2px" }}
+      >
+        {ticks.map((t) => (
+          <span key={t} className="tabular leading-none">
+            {brlCompacto(t)}
+          </span>
+        ))}
+      </div>
+
+      {/* Área do gráfico com gridlines */}
+      <div className="flex-1">
+        <div
+          className="relative flex items-end gap-10 px-2"
+          style={{ height: `${alturaGrafico}px` }}
+        >
+          {/* Gridlines horizontais */}
+          {ticks.map((t, i) => (
+            <span
+              key={`grid-${t}`}
+              className="absolute left-0 right-0 h-px"
+              style={{
+                top: `${(i / (ticks.length - 1)) * 100}%`,
+                background: "rgba(15,14,12,0.06)",
+              }}
+            />
+          ))}
+          {barras.map((b) => {
+            const alturaPx = Math.max(2, Math.round((b.val / escala) * (alturaGrafico - 30)));
+            return (
+              <div
+                key={b.rotulo}
+                className="relative z-[1] flex flex-1 flex-col items-center justify-end gap-2"
+                style={{ height: "100%" }}
+              >
+                <span
+                  className="tabular text-[11px] font-extrabold"
+                  style={{ color: "var(--text)" }}
+                >
+                  {brlCompacto(b.val)}
+                </span>
+                <div
+                  className="w-full max-w-[72px]"
+                  style={{
+                    height: `${alturaPx}px`,
+                    background: b.cor,
+                    borderRadius: "12px 12px 4px 4px",
+                    boxShadow:
+                      "inset 0 1px 0 rgba(255,255,255,0.4), 0 8px 24px -6px rgba(20,16,8,0.16)",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+        {/* Rótulos abaixo das barras */}
+        <div
+          className="mt-3 flex gap-10 px-2 text-[12px] font-semibold"
+          style={{ color: "var(--text-soft)" }}
+        >
+          {barras.map((b) => (
+            <span key={b.rotulo} className="flex-1 text-center">
+              {b.rotulo}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -964,38 +995,53 @@ function DonutChart({
   executado: number;
   contratado: number;
 }) {
-  const radius = 86;
+  const radius = 92;
   const circ = 2 * Math.PI * radius;
   const dashoffset = circ - (circ * pct) / 100;
   return (
-    <div className="flex flex-col items-center justify-center py-4">
+    <div className="flex flex-col items-center justify-center py-3">
       <div className="relative">
-        <svg width="220" height="220" viewBox="0 0 220 220" style={{ filter: "drop-shadow(0 0 30px var(--primary-glow))" }}>
+        <svg
+          width="240"
+          height="240"
+          viewBox="0 0 240 240"
+          style={{ filter: "drop-shadow(0 8px 24px rgba(212,175,55,0.18))" }}
+        >
           <defs>
             <linearGradient id="donutGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="var(--primary-bright)" />
-              <stop offset="100%" stopColor="var(--primary-deep)" />
+              <stop offset="0%" stopColor="#E8C875" />
+              <stop offset="50%" stopColor="#D4AF37" />
+              <stop offset="100%" stopColor="#A88947" />
             </linearGradient>
           </defs>
-          <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(15,14,12,0.08)" strokeWidth="20" />
+          {/* Anel de fundo (parte vazia do donut) */}
           <circle
-            cx="110"
-            cy="110"
+            cx="120"
+            cy="120"
+            r={radius}
+            fill="none"
+            stroke="rgba(15,14,12,0.06)"
+            strokeWidth="22"
+          />
+          {/* Anel preenchido (executado) */}
+          <circle
+            cx="120"
+            cy="120"
             r={radius}
             fill="none"
             stroke="url(#donutGrad)"
-            strokeWidth="20"
+            strokeWidth="22"
             strokeLinecap="round"
             strokeDasharray={circ}
             strokeDashoffset={dashoffset}
-            transform="rotate(-90 110 110)"
+            transform="rotate(-90 120 120)"
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <div
-            className="text-[56px] font-extrabold leading-none"
+            className="tabular text-[72px] font-extrabold leading-none"
             style={{
-              background: "linear-gradient(180deg, var(--text), var(--primary-bright))",
+              background: "linear-gradient(180deg, var(--primary-deep), var(--primary))",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
               WebkitTextFillColor: "transparent",
@@ -1005,14 +1051,17 @@ function DonutChart({
             {pct}%
           </div>
           <div
-            className="mt-2 text-[9px] font-extrabold uppercase"
-            style={{ letterSpacing: "0.32em", color: "var(--text-mute)" }}
+            className="mt-2 text-[10px] font-extrabold uppercase"
+            style={{ letterSpacing: "0.32em", color: "var(--primary-deep)" }}
           >
             executado
           </div>
         </div>
       </div>
-      <div className="mt-3.5 text-center text-[12px] font-medium" style={{ color: "var(--text-mute)" }}>
+      <div
+        className="mt-4 text-center text-[12px] font-semibold"
+        style={{ color: "var(--text-soft)" }}
+      >
         {brlCompacto(executado)} executados de {brlCompacto(contratado)} contratados
       </div>
     </div>

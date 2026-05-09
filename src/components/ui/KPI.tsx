@@ -61,9 +61,16 @@ export function KPI({
       title={href ? `Abrir ${label.toLowerCase()}` : undefined}
     >
       <div className="kpi-aura" />
+      {/* Seta de navegação no canto superior direito (quando o KPI é clicável) */}
+      {href && (
+        <ArrowRight
+          className="absolute right-4 top-4 z-[2] h-5 w-5 transition-transform group-hover:translate-x-0.5"
+          style={{ color: ICON_COLOR[tone], strokeWidth: 2.2 }}
+        />
+      )}
       <div className="relative z-[1]">
         {/* Header: ícone + label na mesma linha */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" style={{ paddingRight: href ? "28px" : "0" }}>
           {Icon && (
             <div
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px]"
@@ -78,12 +85,6 @@ export function KPI({
           >
             {label}
           </h3>
-          {href && (
-            <ArrowRight
-              className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5"
-              style={{ color: ICON_COLOR[tone], strokeWidth: 2 }}
-            />
-          )}
         </div>
 
         {/* Valor */}
