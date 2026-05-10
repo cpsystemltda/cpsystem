@@ -205,6 +205,7 @@ function TabelaSaldoItens({
       descricao: string;
       unidade: string;
       lote: string | null;
+      numero: string | null;
       quantidadeTotal: number;
       quantidadeUsada: number;
       quantidadeDisponivel: number;
@@ -277,8 +278,9 @@ function TabelaSaldoItens({
                 </span>
               </div>
             </header>
-            <table className="table-glass" style={{ minWidth: "1100px", tableLayout: "fixed" }}>
+            <table className="table-glass" style={{ minWidth: "1160px", tableLayout: "fixed" }}>
               <colgroup>
+                <col style={{ width: "64px" }} />{/* Item */}
                 <col style={{ width: "auto", minWidth: "320px" }} />
                 <col style={{ width: "64px" }} />
                 <col style={{ width: "104px" }} />
@@ -289,6 +291,7 @@ function TabelaSaldoItens({
               </colgroup>
               <thead>
                 <tr>
+                  <th className="center">Item</th>
                   <th>Descrição</th>
                   <th>Un.</th>
                   <th className="num">Qtd. registrada</th>
@@ -301,6 +304,18 @@ function TabelaSaldoItens({
               <tbody>
                 {itens.map((it) => (
                   <tr key={it.ataItemId}>
+                    <td className="center" style={{ verticalAlign: "top" }}>
+                      <span
+                        className="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold tabular"
+                        style={{
+                          background: it.numero ? "rgba(15,14,12,0.06)" : "transparent",
+                          color: it.numero ? "var(--text)" : "var(--text-mute)",
+                          border: it.numero ? "0.5px solid var(--hairline)" : "none",
+                        }}
+                      >
+                        {it.numero ?? "—"}
+                      </span>
+                    </td>
                     <td
                       className="strong"
                       title={it.descricao}

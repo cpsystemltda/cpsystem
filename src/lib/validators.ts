@@ -211,6 +211,7 @@ const itemSchema = z.object({
   valorUnitario: z.coerce.number().positive("Valor unitário > 0"),
   ataItemId: z.string().optional(),
   lote: z.string().optional(), // briefing PDF 2.7 — agrupar em lotes
+  numero: z.string().optional(), // número do item dentro do lote
 });
 
 const contratacaoBase = z.object({

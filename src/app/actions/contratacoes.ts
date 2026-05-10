@@ -31,6 +31,7 @@ function parseItens(formData: FormData) {
     valorUnitario: number;
     ataItemId?: string;
     lote?: string;
+    numero?: string;
   }[] = [];
 
   // formato: itens[0][descricao], itens[0][unidade], etc.
@@ -44,10 +45,42 @@ function parseItens(formData: FormData) {
       valorUnitario: Number(formData.get(`itens[${i}][valorUnitario]`) || 0),
       ataItemId: String(formData.get(`itens[${i}][ataItemId]`) || "") || undefined,
       lote: String(formData.get(`itens[${i}][lote]`) || "") || undefined,
+      numero: String(formData.get(`itens[${i}][numero]`) || "") || undefined,
     });
     i++;
   }
   return out;
+}
+
+/**
+ * Valida que não há combinação Lote+numero duplicada nos itens da Ata.
+ * Retorna ActionResult com erro descritivo se houver — caso contrário null.
+ * Itens com numero vazio são ignorados (Lote pode ter itens não-numerados).
+ */
+function validarDuplicidadeLoteItem(
+  itens: { lote?: string; numero?: string }[],
+  dados: Record<string, unknown>,
+): ActionResult | null {
+  const seen = new Map<string, number>(); // chave normalizada → índice da primeira ocorrência
+  for (let i = 0; i < itens.length; i++) {
+    const it = itens[i];
+    const numero = (it.numero ?? "").trim();
+    if (!numero) continue;
+    const lote = (it.lote ?? "").trim();
+    const chave = `${lote.toLowerCase()}|${numero.toLowerCase()}`;
+    if (seen.has(chave)) {
+      const primeiro = seen.get(chave)! + 1;
+      const segundo = i + 1;
+      const ondeNoLote = lote ? `Lote ${lote}` : "Itens isolados";
+      return {
+        erro: `Itens duplicados em ${ondeNoLote}: número "${numero}" aparece nos itens #${primeiro} e #${segundo}. Cada item de um lote precisa ter número único.`,
+        campos: { [`itens.${i}.numero`]: "Número duplicado no mesmo lote." },
+        valores: dados,
+      };
+    }
+    seen.set(chave, i);
+  }
+  return null;
 }
 
 function parseOrgaosParticipantes(formData: FormData) {
@@ -233,6 +266,9 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
     };
   }
 
+  const erroDuplicata = validarDuplicidadeLoteItem(v.itens, dados);
+  if (erroDuplicata) return erroDuplicata;
+
   try {
     const ata = await prisma.ata.create({
       data: {
@@ -268,6 +304,7 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
             valorUnitario: i.valorUnitario,
             valorTotal: i.quantidade * i.valorUnitario,
             lote: i.lote || null,
+            numero: i.numero || null,
           })),
         },
         ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {

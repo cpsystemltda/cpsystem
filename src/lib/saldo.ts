@@ -6,6 +6,7 @@ export type SaldoItem = {
   unidade: string;
   marca: string | null;
   lote: string | null;
+  numero: string | null;
   quantidadeTotal: number;
   quantidadeUsada: number;
   quantidadeDisponivel: number;
@@ -51,6 +52,7 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
       unidade: it.unidade,
       marca: it.marca ?? null,
       lote: it.lote ?? null,
+      numero: it.numero ?? null,
       quantidadeTotal: it.quantidade,
       quantidadeUsada: usado,
       quantidadeDisponivel: disponivel,

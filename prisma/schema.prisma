@@ -408,6 +408,10 @@ model AtaItem {
   moeda         Moeda   @default(BRL)
   // Lote (briefing PDF — Cadastro Ata 2.7: itens agrupados em lotes)
   lote          String?
+  // Número do item dentro do lote (ou global se isolado). Texto livre pra
+  // permitir "01", "1.A", etc. Validação de unicidade Lote+numero é feita
+  // na action de criação (não constraint do banco).
+  numero        String?
 
   ataId String
   ata   Ata    @relation(fields: [ataId], references: [id], onDelete: Cascade)

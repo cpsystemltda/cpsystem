@@ -20,9 +20,10 @@ export type LinhaItem = {
   valorUnitario: string;
   ataItemId: string;
   lote: string;
+  numero: string;
 };
 
-const VAZIA = (lote = ""): LinhaItem => ({
+const VAZIA = (lote = "", numero = ""): LinhaItem => ({
   descricao: "",
   unidade: "",
   quantidade: "",
@@ -30,6 +31,7 @@ const VAZIA = (lote = ""): LinhaItem => ({
   valorUnitario: "",
   ataItemId: "",
   lote,
+  numero,
 });
 
 export type ItemInicial = {
@@ -39,7 +41,23 @@ export type ItemInicial = {
   marca: string | null;
   valorUnitario: number;
   lote?: string | null;
+  numero?: string | null;
 };
+
+/**
+ * Sugere próximo número de item dentro de um lote (ou item isolado quando
+ * lote vazio): pega o maior número numérico já usado no mesmo agrupamento + 1.
+ * Strings não-numéricas (ex: "1.A") são ignoradas no cálculo.
+ */
+function proximoNumeroItem(linhas: LinhaItem[], lote: string): string {
+  const noLote = linhas.filter((l) => (l.lote ?? "").trim() === lote.trim());
+  let maior = 0;
+  for (const l of noLote) {
+    const n = Number((l.numero ?? "").replace(/\D/g, ""));
+    if (Number.isFinite(n) && n > maior) maior = n;
+  }
+  return String(maior + 1);
+}
 
 /* === Máscara monetária BRL — entrada como dígitos, render formatado === */
 function formatarBrlInput(valor: string): string {
@@ -73,8 +91,9 @@ export function ItensEditor({
           valorUnitario: String(i.valorUnitario),
           ataItemId: "",
           lote: i.lote ?? "",
+          numero: i.numero ?? "",
         }))
-      : [VAZIA()];
+      : [VAZIA("", "1")];
   const [linhas, setLinhas] = useState<LinhaItem[]>(inicial);
 
   // Estado da máscara monetária (display formatado por linha)
@@ -85,14 +104,21 @@ export function ItensEditor({
   );
 
   function add() {
-    setLinhas((l) => [...l, VAZIA()]);
+    setLinhas((l) => {
+      // Continua o lote da última linha (mais natural pra inserção em sequência)
+      const ultimaLote = l[l.length - 1]?.lote ?? "";
+      const numeroSugerido = proximoNumeroItem(l, ultimaLote);
+      return [...l, VAZIA(ultimaLote, numeroSugerido)];
+    });
     setValoresFormatados((v) => [...v, ""]);
   }
   function addLote() {
-    // Cria nova linha já com sugestão de lote (próximo número)
-    const lotesExistentes = new Set(linhas.map((l) => l.lote).filter(Boolean));
-    const proximo = String(lotesExistentes.size + 1).padStart(2, "0");
-    setLinhas((l) => [...l, VAZIA(proximo)]);
+    setLinhas((l) => {
+      const lotesExistentes = new Set(l.map((x) => x.lote).filter(Boolean));
+      const proximoLote = String(lotesExistentes.size + 1);
+      // Item começa em 1 num lote novo
+      return [...l, VAZIA(proximoLote, "1")];
+    });
     setValoresFormatados((v) => [...v, ""]);
   }
 
@@ -139,6 +165,25 @@ export function ItensEditor({
   // Lotes únicos (pra mostrar resumo se tiver mais de 1)
   const lotesUnicos = Array.from(new Set(linhas.map((l) => l.lote).filter(Boolean)));
 
+  // Detecta duplicidades Lote+Item pra dar feedback visual (campo numero
+  // fica destacado em coral). Itens sem numero não geram duplicata.
+  const indicesDuplicados = (() => {
+    const dup = new Set<number>();
+    const visto = new Map<string, number>();
+    linhas.forEach((l, i) => {
+      const numero = l.numero.trim();
+      if (!numero) return;
+      const chave = `${l.lote.trim().toLowerCase()}|${numero.toLowerCase()}`;
+      if (visto.has(chave)) {
+        dup.add(visto.get(chave)!);
+        dup.add(i);
+      } else {
+        visto.set(chave, i);
+      }
+    });
+    return dup;
+  })();
+
   return (
     <div>
       {permitirLotes && (
@@ -178,11 +223,12 @@ export function ItensEditor({
       )}
 
       <div className="overflow-x-auto rounded-xl" style={{ border: "0.5px solid var(--hairline)" }}>
-        <table className="w-full text-sm" style={{ minWidth: "1080px" }}>
+        <table className="w-full text-sm" style={{ minWidth: "1140px" }}>
           {/* colgroup garante que Descrição domine o espaço — ela é o único campo
              texto longo da linha; demais colunas têm largura fixa enxuta */}
           <colgroup>
             {permitirLotes && <col style={{ width: "72px" }} />}
+            <col style={{ width: "72px" }} />{/* Item — número dentro do lote */}
             {ataItens && <col style={{ width: "180px" }} />}
             <col />{/* Descrição — pega o restante */}
             <col style={{ width: "72px" }} />{/* Un. */}
@@ -202,6 +248,12 @@ export function ItensEditor({
                   Lote
                 </th>
               )}
+              <th
+                className="px-3 py-3 text-left text-[10px] font-bold uppercase"
+                style={{ letterSpacing: "0.18em", color: "var(--text-mute)" }}
+              >
+                Item
+              </th>
               {ataItens && (
                 <th
                   className="px-3 py-3 text-left text-[10px] font-bold uppercase"
@@ -260,7 +312,18 @@ export function ItensEditor({
                     <input
                       name={`itens[${idx}][lote]`}
                       value={l.lote}
-                      onChange={(ev) => update(idx, { lote: ev.target.value })}
+                      onChange={(ev) => {
+                        const novoLote = ev.target.value;
+                        // Quando o lote muda, sugere automaticamente o próximo número
+                        // do novo lote (só se o usuário não tiver editado o item manualmente
+                        // — heurística: se o numero atual já é o que estaria no lote antigo,
+                        // aceita substituir).
+                        const sugerido = proximoNumeroItem(
+                          linhas.filter((_, i) => i !== idx),
+                          novoLote,
+                        );
+                        update(idx, { lote: novoLote, numero: l.numero.trim() ? l.numero : sugerido });
+                      }}
                       placeholder="—"
                       list="lotes-sugeridos"
                       className="w-16 rounded-md px-2 py-1.5 text-center text-xs font-bold"
@@ -273,6 +336,35 @@ export function ItensEditor({
                     />
                   </td>
                 )}
+                <td className="px-3 py-2">
+                  <input
+                    name={`itens[${idx}][numero]`}
+                    value={l.numero}
+                    onChange={(ev) => update(idx, { numero: ev.target.value })}
+                    placeholder={proximoNumeroItem(linhas.filter((_, i) => i !== idx), l.lote)}
+                    className="w-16 rounded-md px-2 py-1.5 text-center text-xs font-bold"
+                    style={{
+                      background: indicesDuplicados.has(idx)
+                        ? "rgba(232,138,152,0.22)"
+                        : l.numero
+                          ? "rgba(15,14,12,0.04)"
+                          : "rgba(15,14,12,0.02)",
+                      color: indicesDuplicados.has(idx)
+                        ? "var(--coral-deep)"
+                        : l.numero
+                          ? "var(--text)"
+                          : "var(--text-mute)",
+                      border: indicesDuplicados.has(idx)
+                        ? "0.5px solid rgba(198,103,112,0.6)"
+                        : "0.5px solid rgba(15,14,12,0.16)",
+                    }}
+                    title={
+                      indicesDuplicados.has(idx)
+                        ? "Número duplicado para este lote. Cada item precisa de número único dentro do mesmo lote."
+                        : "Número do item dentro do lote (ou número global se item isolado). Sugestão: próximo disponível."
+                    }
+                  />
+                </td>
                 {ataItens && (
                   <td className="px-3 py-2">
                     <select
@@ -375,7 +467,7 @@ export function ItensEditor({
           <tfoot style={{ background: "rgba(0,0,0,0.2)" }}>
             <tr>
               <td
-                colSpan={(permitirLotes ? 1 : 0) + (ataItens ? 1 : 0) + 5}
+                colSpan={(permitirLotes ? 1 : 0) + 1 /* Item */ + (ataItens ? 1 : 0) + 5}
                 className="px-3 py-3 text-right text-[10px] font-bold uppercase"
                 style={{ letterSpacing: "0.18em", color: "var(--text-mute)" }}
               >
