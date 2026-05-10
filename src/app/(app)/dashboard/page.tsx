@@ -68,7 +68,7 @@ export default async function DashboardPage() {
   const em30dias = new Date(hoje.getTime() + 30 * 86400000);
 
   const [
-    qtdEmpresas,
+    empresasDaConta,
     atasVigentes,
     contratosVigentes,
     atasVencidas,
@@ -81,7 +81,7 @@ export default async function DashboardPage() {
     procedimentos,
     reajustesPendentes,
   ] = await Promise.all([
-    prisma.empresa.count({ where: { contaId } }),
+    prisma.empresa.findMany({ where: { contaId }, select: { id: true, cnpj: true } }),
     prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
     prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
     prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { lt: hoje } } }),
@@ -287,13 +287,23 @@ export default async function DashboardPage() {
   }
   const totalContinuos = contratosContinuos.length;
 
-  // Órgãos atendidos (distintos) — empenhos + Atas (gerenciador + participantes)
-  const orgaosUnicos = new Set<string>(empenhosCompletos.map((e) => e.orgaoCnpj));
+  // Órgãos atendidos (distintos) — empenhos + Atas (gerenciador + participantes).
+  // CNPJs vazios e CNPJs das próprias empresas da conta são excluídos
+  // (defesa contra erro de digitação em que o usuário coloca o próprio CNPJ
+  // no campo do órgão público).
+  const cnpjsDasEmpresas = new Set(empresasDaConta.map((e) => e.cnpj.replace(/\D/g, "")));
+  const orgaosUnicos = new Set<string>();
+  function adicionarOrgao(cnpjBruto: string | null | undefined) {
+    if (!cnpjBruto) return;
+    const cnpj = cnpjBruto.replace(/\D/g, "");
+    if (!cnpj) return;
+    if (cnpjsDasEmpresas.has(cnpj)) return; // não conta empresa fornecedora
+    orgaosUnicos.add(cnpj);
+  }
+  for (const e of empenhosCompletos) adicionarOrgao(e.orgaoCnpj);
   for (const a of atasVigentesDetalhe) {
-    if (a.orgaoCnpj) orgaosUnicos.add(a.orgaoCnpj);
-    for (const op of a.orgaos) {
-      if (op.cnpj) orgaosUnicos.add(op.cnpj);
-    }
+    adicionarOrgao(a.orgaoCnpj);
+    for (const op of a.orgaos) adicionarOrgao(op.cnpj);
   }
   const qtdOrgaos = orgaosUnicos.size;
 

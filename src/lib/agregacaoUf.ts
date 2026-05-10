@@ -96,6 +96,15 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
   const empresaIds = empresas.map((e) => e.id);
   if (empresaIds.length === 0) return [];
 
+  // CNPJs das próprias empresas da conta — excluídos do count de órgãos
+  // (defesa contra empenho cadastrado com o CNPJ da fornecedora no campo
+  // do órgão público).
+  const cnpjsEmpresas = new Set(
+    (await prisma.empresa.findMany({ where: { id: { in: empresaIds } }, select: { cnpj: true } }))
+      .map((e) => e.cnpj.replace(/\D/g, ""))
+      .filter(Boolean),
+  );
+
   // Busca todos os instrumentos com órgão+endereço pra extrair UF do CLIENTE
   // (não só da sede da fornecedora). Atas e Contratos vigentes; Empenhos sem
   // filtro de vigência (histórico financeiro entra na ranqueamento por UF).
@@ -142,7 +151,10 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
   function marcarOrgao(uf: string, cnpj: string | null | undefined, nome: string) {
     const set = orgaosPorUf.get(uf);
     if (!set) return;
-    set.add((cnpj ?? "").trim() || nome.trim().toLowerCase());
+    const cnpjLimpo = (cnpj ?? "").replace(/\D/g, "");
+    // Ignora CNPJ da própria fornecedora (erro de cadastro defensivo).
+    if (cnpjLimpo && cnpjsEmpresas.has(cnpjLimpo)) return;
+    set.add(cnpjLimpo || nome.trim().toLowerCase());
   }
 
   // 1. Empresas (sede da fornecedora).

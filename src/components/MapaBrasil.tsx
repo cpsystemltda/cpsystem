@@ -115,7 +115,7 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="mx-auto block w-full"
-        style={{ maxHeight: "440px" }}
+        style={{ maxHeight: "320px" }}
         preserveAspectRatio="xMidYMid meet"
       >
         {geo.features.map((feature, i) => {
@@ -129,12 +129,11 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
             dado.empresas > 0 || dado.contratos > 0 || dado.empenhos > 0 || dado.orgaos > 0
           );
           const valor = dado?.empresas ?? 0;
-          // Cores DRAMATICAMENTE separadas: estados sem operação ficam cinza
-          // CLARO mas visível (não fantasma); com operação ficam dourado
-          // saturado. Bordas SEMPRE escuras pra desenhar o Brasil inteiro.
+          // Cor original (sutil, glass-friendly): estados sem operação em
+          // cinza translúcido; com operação em dourado via colorScale.
           const fill = temOperacao
             ? colorScale(Math.max(1, valor))
-            : "#E8E2D2"; // cinza-creme sólido, todos os 27 estados visíveis
+            : "rgba(15, 14, 12, 0.06)";
           const isHover = hover?.uf === uf;
           const d = pathFn(feature as unknown as GeoJSON.Feature) || "";
           const centroid = pathFn.centroid(feature as unknown as GeoJSON.Feature);
@@ -144,14 +143,8 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
               <path
                 d={d}
                 fill={fill}
-                stroke={
-                  isHover
-                    ? "var(--primary-deep)"
-                    : temOperacao
-                      ? "var(--primary-deep)"
-                      : "rgba(15,14,12,0.45)"
-                }
-                strokeWidth={isHover ? 2.2 : temOperacao ? 1.6 : 1.0}
+                stroke={isHover ? "var(--primary-deep)" : "rgba(15,14,12,0.16)"}
+                strokeWidth={isHover ? 1.4 : 0.6}
                 className="transition-all duration-150 cursor-pointer"
                 style={isTop ? { filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.30))" } : undefined}
                 onMouseEnter={(e) => {
