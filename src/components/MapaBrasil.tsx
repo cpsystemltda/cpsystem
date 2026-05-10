@@ -40,7 +40,18 @@ function brl(n: number): string {
 export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
   const [geo, setGeo] = useState<GeoCollection | null>(null);
   const [hover, setHover] = useState<{ uf: string; x: number; y: number } | null>(null);
+  const [wrapperWidth, setWrapperWidth] = useState<number>(WIDTH);
   const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    setWrapperWidth(el.clientWidth);
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setWrapperWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     fetch("/brasil-uf.geojson")
@@ -167,7 +178,7 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
         <div
           className="pointer-events-none absolute z-20 min-w-[230px] rounded-[14px] px-4 py-3 text-xs"
           style={{
-            left: Math.min(hover.x + 16, (wrapperRef.current?.clientWidth ?? WIDTH) - 250),
+            left: Math.min(hover.x + 16, wrapperWidth - 250),
             top: Math.max(hover.y - 60, 8),
             background: "rgba(255, 255, 255, 0.96)",
             backdropFilter: "blur(20px) saturate(160%)",
