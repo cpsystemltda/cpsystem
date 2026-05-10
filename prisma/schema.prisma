@@ -282,6 +282,9 @@ enum TipoObjeto {
   FORNECIMENTO_CONTINUO
   SERVICOS
   SERVICOS_CONTINUOS
+  SERVICOS_DEDICACAO_EXCLUSIVA
+  LOCACAO
+  OBRAS_ENGENHARIA
 }
 
 // Modalidade de entrega do contrato (Lei 14.133 — fluxograma do contrato não-continuado).

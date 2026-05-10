@@ -173,7 +173,15 @@ export const novaEmpresaSchema = z
     }
   });
 
-export const tiposObjeto = ["FORNECIMENTO", "FORNECIMENTO_CONTINUO", "SERVICOS", "SERVICOS_CONTINUOS"] as const;
+export const tiposObjeto = [
+  "FORNECIMENTO",
+  "FORNECIMENTO_CONTINUO",
+  "SERVICOS",
+  "SERVICOS_CONTINUOS",
+  "SERVICOS_DEDICACAO_EXCLUSIVA",
+  "LOCACAO",
+  "OBRAS_ENGENHARIA",
+] as const;
 
 // Tipos não-continuados (fluxograma do contrato independente: não permitem prorrogação).
 export const tiposNaoContinuados = ["FORNECIMENTO", "SERVICOS"] as const;
@@ -432,11 +440,16 @@ export const OPCOES_NATUREZA_JURIDICA = (
   Object.entries(ROTULO_NATUREZA_JURIDICA) as [string, string][]
 ).map(([value, label]) => ({ value, label }));
 
+// Ordem segue a Lei 14.133/2021 e a categorização operacional do CP System.
+// Mantida exatamente como o cliente pediu.
 export const ROTULO_TIPO: Record<(typeof tiposObjeto)[number], string> = {
-  FORNECIMENTO: "Fornecimento",
-  FORNECIMENTO_CONTINUO: "Fornecimento contínuo",
+  FORNECIMENTO: "Fornecimento de bens",
+  FORNECIMENTO_CONTINUO: "Fornecimento contínuo de bens",
   SERVICOS: "Serviços",
   SERVICOS_CONTINUOS: "Serviços contínuos",
+  SERVICOS_DEDICACAO_EXCLUSIVA: "Serviços contínuos com dedicação exclusiva de mão de obra",
+  LOCACAO: "Locação",
+  OBRAS_ENGENHARIA: "Obras e serviços de engenharia",
 };
 
 export const ROTULO_MODALIDADE_ENTREGA: Record<(typeof modalidadesEntrega)[number], string> = {
