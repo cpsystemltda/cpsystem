@@ -115,7 +115,7 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="mx-auto block w-full"
-        style={{ maxHeight: "320px" }}
+        style={{ maxHeight: "440px" }}
         preserveAspectRatio="xMidYMid meet"
       >
         {geo.features.map((feature, i) => {
@@ -129,13 +129,15 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
             dado.empresas > 0 || dado.contratos > 0 || dado.empenhos > 0 || dado.orgaos > 0
           );
           const valor = dado?.empresas ?? 0;
+          // Cores DRAMATICAMENTE separadas: estados sem operação ficam cinza
+          // CLARO mas visível (não fantasma); com operação ficam dourado
+          // saturado. Bordas SEMPRE escuras pra desenhar o Brasil inteiro.
           const fill = temOperacao
-            ? colorScale(Math.max(1, valor)) // garante cor visível mesmo com 0 empresas
-            : "rgba(15, 14, 12, 0.06)"; // base ligeiramente mais escura — todos os estados visíveis
+            ? colorScale(Math.max(1, valor))
+            : "#E8E2D2"; // cinza-creme sólido, todos os 27 estados visíveis
           const isHover = hover?.uf === uf;
           const d = pathFn(feature as unknown as GeoJSON.Feature) || "";
           const centroid = pathFn.centroid(feature as unknown as GeoJSON.Feature);
-          // UFs com operação recebem glow dourado pra destacar
           const isTop = temOperacao;
           return (
             <g key={`${uf}-${i}`}>
@@ -146,10 +148,10 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
                   isHover
                     ? "var(--primary-deep)"
                     : temOperacao
-                      ? "rgba(168,137,71,0.6)"
-                      : "rgba(15,14,12,0.28)"
+                      ? "var(--primary-deep)"
+                      : "rgba(15,14,12,0.45)"
                 }
-                strokeWidth={isHover ? 1.8 : temOperacao ? 1.0 : 0.7}
+                strokeWidth={isHover ? 2.2 : temOperacao ? 1.6 : 1.0}
                 className="transition-all duration-150 cursor-pointer"
                 style={isTop ? { filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.30))" } : undefined}
                 onMouseEnter={(e) => {
@@ -170,21 +172,29 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
                 }}
                 onMouseLeave={() => setHover(null)}
               />
-              {valor > 0 && (
-                <text
-                  x={centroid[0]}
-                  y={centroid[1]}
-                  textAnchor="middle"
-                  fontSize={valor > maxEmpresas * 0.4 ? 14 : 11}
-                  fontWeight={800}
-                  fill={valor > maxEmpresas * 0.5 ? "#0A0A0A" : "#FFFFFF"}
-                  pointerEvents="none"
-                  fontFamily="Inter, sans-serif"
-                  style={{ letterSpacing: "-0.02em" }}
-                >
-                  {uf}
-                </text>
-              )}
+              {/* Sigla aparece em TODOS os 27 estados — fundo cinza-creme
+                  pros sem operação (legibilidade clara), preto bold pros
+                  com operação. Mapa sempre conta a história "Brasil inteiro
+                  + onde estamos atuando" sem omitir estados. */}
+              <text
+                x={centroid[0]}
+                y={centroid[1]}
+                textAnchor="middle"
+                fontSize={temOperacao ? (valor > maxEmpresas * 0.4 ? 14 : 12) : 9}
+                fontWeight={temOperacao ? 800 : 600}
+                fill={
+                  temOperacao
+                    ? valor > maxEmpresas * 0.5
+                      ? "#0A0A0A"
+                      : "#FFFFFF"
+                    : "rgba(15,14,12,0.50)"
+                }
+                pointerEvents="none"
+                fontFamily="Inter, sans-serif"
+                style={{ letterSpacing: "-0.02em" }}
+              >
+                {uf}
+              </text>
             </g>
           );
         })}
