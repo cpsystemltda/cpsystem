@@ -83,7 +83,20 @@ export function CampoCnpj({
       const d = await r.json();
       // Preenche os demais campos
       if (d.razao_social) setarCampo("razaoSocial", d.razao_social);
-      if (d.nome_fantasia) setarCampo("nomeFantasia", d.nome_fantasia);
+      // MEI: a Receita devolve nome_fantasia = nome da pessoa física. Quando
+      // for igual a razao_social ou a um nome de responsável já no DOM, ignora
+      // pra não confundir o usuário (o select de empresas filtra pelo nome).
+      if (d.nome_fantasia && d.nome_fantasia.trim()) {
+        const fantasia = String(d.nome_fantasia).trim();
+        const razao = String(d.razao_social ?? "").trim();
+        const respDom = (
+          document.querySelector<HTMLInputElement>('[name="responsavel"]')?.value ?? ""
+        ).trim();
+        const ehDuplicata =
+          fantasia.toLowerCase() === razao.toLowerCase() ||
+          (respDom.length > 0 && fantasia.toLowerCase() === respDom.toLowerCase());
+        if (!ehDuplicata) setarCampo("nomeFantasia", fantasia);
+      }
       const porte = mapearPorte(d.porte);
       if (porte) setarCampo("porte", porte);
       if (d.cnae_fiscal_descricao) setarCampo("cnaePrincipal", `${d.cnae_fiscal} — ${d.cnae_fiscal_descricao}`);

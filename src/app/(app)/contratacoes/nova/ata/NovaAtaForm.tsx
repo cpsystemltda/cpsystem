@@ -374,7 +374,13 @@ function rotularErro(path: string): string {
   return ROTULO_CAMPO[path] ?? path;
 }
 
-export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
+export default function NovaAtaForm({
+  empresas,
+  empresaPreSelecionada,
+}: {
+  empresas: EmpresaOpt[];
+  empresaPreSelecionada?: string;
+}) {
   const [state, formAction] = useActionState(criarAtaAction, null);
   const e = state?.campos ?? {};
   const v = (state?.valores ?? {}) as Record<string, string>;
@@ -626,6 +632,7 @@ export default function NovaAtaForm({ empresas }: { empresas: EmpresaOpt[] }) {
               required
               erro={e.empresaId}
               span={2}
+              defaultValue={(v.empresaId as string) ?? empresaPreSelecionada}
             />
             <FieldGlass
               label="Número da Ata"

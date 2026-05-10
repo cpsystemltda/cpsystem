@@ -172,9 +172,29 @@ function extrairCampos(formData: FormData) {
 }
 
 async function pegarEmpresaDoUsuario(empresaId: string, contaId: string) {
+  // Caso 1: empresa é da própria conta logada (tipo EMPRESA).
   const empresa = await prisma.empresa.findFirst({ where: { id: empresaId, contaId } });
-  if (!empresa) throw new Error("Empresa inválida.");
-  return empresa;
+  if (empresa) return empresa;
+
+  // Caso 2: a conta logada é de um ANALISTA — empresa precisa pertencer a uma
+  // conta com VinculoAnalista ATIVO em que ele é responsável.
+  const analista = await prisma.analista.findUnique({
+    where: { contaId },
+    select: {
+      vinculos: { where: { status: "ATIVO" }, select: { contaId: true } },
+    },
+  });
+  if (analista) {
+    const contaIdsVinculadas = analista.vinculos.map((v) => v.contaId);
+    if (contaIdsVinculadas.length > 0) {
+      const empresaViaVinculo = await prisma.empresa.findFirst({
+        where: { id: empresaId, contaId: { in: contaIdsVinculadas } },
+      });
+      if (empresaViaVinculo) return empresaViaVinculo;
+    }
+  }
+
+  throw new Error("Empresa inválida ou sem vínculo com sua conta.");
 }
 
 // ============================================================
