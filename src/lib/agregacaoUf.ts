@@ -104,6 +104,8 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
     prisma.contrato.findMany({
       where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
       select: {
+        orgaoNome: true,
+        orgaoCnpj: true,
         orgaoEndereco: true,
         itens: { select: { valorTotal: true } },
       },
@@ -111,6 +113,8 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
     prisma.empenho.findMany({
       where: { empresaId: { in: empresaIds } },
       select: {
+        orgaoNome: true,
+        orgaoCnpj: true,
         orgaoEndereco: true,
         itens: { select: { valorTotal: true } },
       },
@@ -118,27 +122,36 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
     prisma.ata.findMany({
       where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
       select: {
+        orgaoNome: true,
+        orgaoCnpj: true,
         orgaoEndereco: true,
         itens: { select: { valorTotal: true } },
-        orgaos: { select: { endereco: true } }, // órgãos participantes
+        orgaos: { select: { nome: true, cnpj: true, endereco: true } },
       },
     }),
   ]);
 
   const acc: Record<string, DadosUf> = {};
+  // Set por UF de identificadores únicos de órgão (CNPJ; fallback nome).
+  const orgaosPorUf = new Map<string, Set<string>>();
   function ensure(uf: string): DadosUf {
-    if (!acc[uf]) acc[uf] = { uf, empresas: 0, contratos: 0, empenhos: 0, valor: 0 };
+    if (!acc[uf]) acc[uf] = { uf, empresas: 0, contratos: 0, empenhos: 0, orgaos: 0, valor: 0 };
+    if (!orgaosPorUf.has(uf)) orgaosPorUf.set(uf, new Set());
     return acc[uf];
   }
+  function marcarOrgao(uf: string, cnpj: string | null | undefined, nome: string) {
+    const set = orgaosPorUf.get(uf);
+    if (!set) return;
+    set.add((cnpj ?? "").trim() || nome.trim().toLowerCase());
+  }
 
-  // 1. Empresas (sede da fornecedora) — alimenta a coluna "Empresas atendidas"
-  //    quando o usuário tem várias filiais em UFs distintas.
+  // 1. Empresas (sede da fornecedora).
   for (const empresaId of empresaIds) {
     const uf = ufPorEmpresa.get(empresaId);
     if (uf) ensure(uf).empresas += 1;
   }
 
-  // 2. Contratos — agrega pela UF do ÓRGÃO contratante (não da fornecedora).
+  // 2. Contratos — agrega pela UF do ÓRGÃO contratante.
   for (const c of contratos) {
     const uf = extrairUf(c.orgaoEndereco);
     if (!uf) continue;
@@ -146,6 +159,7 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
     const d = ensure(uf);
     d.contratos += 1;
     d.valor += total;
+    marcarOrgao(uf, c.orgaoCnpj, c.orgaoNome);
   }
 
   // 3. Empenhos — idem.
@@ -156,24 +170,30 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
     const d = ensure(uf);
     d.empenhos += 1;
     d.valor += total;
+    marcarOrgao(uf, e.orgaoCnpj, e.orgaoNome);
   }
 
-  // 4. Atas — agrega valor pelo órgão gerenciador, e adiciona "marcação"
-  //    no estado de cada órgão participante (sem somar valor de novo).
+  // 4. Atas — gerenciador soma valor; participantes marcam presença + contam órgão.
   for (const a of atas) {
     const ufGer = extrairUf(a.orgaoEndereco);
     if (ufGer) {
       const total = a.itens.reduce((s, i) => s + i.valorTotal, 0);
       const d = ensure(ufGer);
-      d.contratos += 1; // ata conta como instrumento contratado
+      d.contratos += 1;
       d.valor += total;
+      marcarOrgao(ufGer, a.orgaoCnpj, a.orgaoNome);
     }
-    // Órgãos participantes só "marcam presença" no estado (sem dupla contagem
-    // do valor — o valor financeiro real depende das adesões, que são empenhos).
     for (const op of a.orgaos) {
       const ufP = extrairUf(op.endereco);
-      if (ufP && ufP !== ufGer) ensure(ufP);
+      if (!ufP) continue;
+      ensure(ufP); // garante o bucket
+      marcarOrgao(ufP, op.cnpj, op.nome);
     }
+  }
+
+  // Propaga contagem de órgãos únicos pra cada DadosUf.
+  for (const [uf, set] of orgaosPorUf) {
+    if (acc[uf]) acc[uf].orgaos = set.size;
   }
 
   return Object.values(acc).sort((a, b) => b.valor - a.valor);

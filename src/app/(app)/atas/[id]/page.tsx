@@ -236,6 +236,30 @@ function TabelaSaldoItens({
     });
   if (grupos.has(ITENS_ISOLADOS)) chavesOrdenadas.push(ITENS_ISOLADOS);
 
+  // Empty state — Atas legadas (cadastradas antes do fix do form) podem
+  // não ter itens registrados. Mostra mensagem explicativa em vez de bloco
+  // vazio confuso.
+  if (saldo.itens.length === 0) {
+    return (
+      <div
+        className="glass-tile rounded-[20px] p-12 text-center"
+        style={{ border: "0.5px dashed var(--hairline)" }}
+      >
+        <p className="text-sm font-extrabold" style={{ color: "var(--text)" }}>
+          Esta Ata não tem itens registrados.
+        </p>
+        <p className="mt-2 text-xs" style={{ color: "var(--text-soft)" }}>
+          Os itens são gravados na criação da Ata. Se a Ata foi cadastrada antes desse
+          campo ficar disponível, a forma mais rápida é{" "}
+          <Link href="/contratacoes/nova/ata" className="font-bold underline" style={{ color: "var(--primary-deep)" }}>
+            cadastrar uma nova Ata
+          </Link>{" "}
+          incluindo os itens registrados.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       {chavesOrdenadas.map((chave) => {

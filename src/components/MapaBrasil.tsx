@@ -20,6 +20,9 @@ export type DadosUf = {
   empresas: number;
   contratos: number;
   empenhos: number;
+  // Órgãos públicos distintos atendidos no estado (gerenciador + participantes
+  // de Atas, contratantes diretos de Contratos, contratantes de Empenhos).
+  orgaos: number;
   valor: number;
 };
 
@@ -119,20 +122,34 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
           const uf = feature.properties.UF;
           if (!uf) return null;
           const dado = dadosMap.get(uf);
+          // Estado tem operação se aparece em qualquer dimensão (empresas,
+          // contratos, empenhos OU órgãos atendidos). Antes só considerava
+          // empresas — DF com órgãos mas sem filial ficava cinza.
+          const temOperacao = !!dado && (
+            dado.empresas > 0 || dado.contratos > 0 || dado.empenhos > 0 || dado.orgaos > 0
+          );
           const valor = dado?.empresas ?? 0;
-          const fill = valor > 0 ? colorScale(valor) : "rgba(15, 14, 12, 0.04)";
+          const fill = temOperacao
+            ? colorScale(Math.max(1, valor)) // garante cor visível mesmo com 0 empresas
+            : "rgba(15, 14, 12, 0.06)"; // base ligeiramente mais escura — todos os estados visíveis
           const isHover = hover?.uf === uf;
           const d = pathFn(feature as unknown as GeoJSON.Feature) || "";
           const centroid = pathFn.centroid(feature as unknown as GeoJSON.Feature);
-          // UFs com mais valor recebem glow (drop-shadow) com a cor da marca
-          const isTop = valor >= maxEmpresas * 0.6;
+          // UFs com operação recebem glow dourado pra destacar
+          const isTop = temOperacao;
           return (
             <g key={`${uf}-${i}`}>
               <path
                 d={d}
                 fill={fill}
-                stroke={isHover ? "var(--primary-deep)" : "rgba(15,14,12,0.16)"}
-                strokeWidth={isHover ? 1.4 : 0.6}
+                stroke={
+                  isHover
+                    ? "var(--primary-deep)"
+                    : temOperacao
+                      ? "rgba(168,137,71,0.6)"
+                      : "rgba(15,14,12,0.28)"
+                }
+                strokeWidth={isHover ? 1.8 : temOperacao ? 1.0 : 0.7}
                 className="transition-all duration-150 cursor-pointer"
                 style={isTop ? { filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.30))" } : undefined}
                 onMouseEnter={(e) => {
@@ -196,8 +213,9 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
           </p>
           {dadoHover ? (
             <div className="mt-2 space-y-1">
-              <Linha label="Empresas atendidas" valor={dadoHover.empresas.toString()} />
-              <Linha label="Contratos" valor={dadoHover.contratos.toString()} />
+              <Linha label="Órgãos atendidos" valor={dadoHover.orgaos.toString()} />
+              <Linha label="Empresas (filiais)" valor={dadoHover.empresas.toString()} />
+              <Linha label="Contratos / Atas" valor={dadoHover.contratos.toString()} />
               <Linha label="Empenhos" valor={dadoHover.empenhos.toString()} />
               <Linha
                 label="Valor em carteira"
