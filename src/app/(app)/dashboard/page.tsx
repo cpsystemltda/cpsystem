@@ -209,9 +209,18 @@ export default async function DashboardPage() {
     ["NF_EMITIDA", "NF_ENCAMINHADA"].includes(e.status),
   ).length;
 
-  const totalContratado = valoresContratados + valoresRecebidos;
+  // Total contratado = carteira de Atas + Contratos vigentes (denominador).
+  // % executado = quanto dessa carteira já virou empenho com status >= ENTREGUE
+  // (valoresExecutados já agrega ENTREGUE/NF_EMITIDA/NF_ENCAMINHADA/PAGO; PAGO é
+  // subset, NÃO somar separadamente). Quando a carteira é zero mas há execução
+  // (caso raro: atas vencidas com empenhos recentes), evita Infinity.
+  const totalContratado = valoresContratados;
   const pctExecutado =
-    totalContratado > 0 ? Math.round((valoresExecutados / totalContratado) * 100) : 0;
+    totalContratado > 0
+      ? Math.min(100, Math.round((valoresExecutados / totalContratado) * 100))
+      : valoresExecutados > 0
+        ? 100
+        : 0;
 
   // Logística: empenhos em execução (status entre EMPENHADO..NF_ENCAMINHADA)
   const empenhosEmExecucao = empenhosCompletos.filter((e) =>

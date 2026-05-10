@@ -86,25 +86,42 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
     select: { id: true, endereco: true, cep: true },
   });
 
-  // Mapa empresaId → uf
+  // Mapa empresaId → uf (sede da empresa)
   const ufPorEmpresa = new Map<string, string>();
   for (const e of empresas) {
     const uf = extrairUf(e.endereco, e.cep);
     if (uf) ufPorEmpresa.set(e.id, uf);
   }
 
-  if (ufPorEmpresa.size === 0) return [];
+  const empresaIds = empresas.map((e) => e.id);
+  if (empresaIds.length === 0) return [];
 
-  const empresaIds = Array.from(ufPorEmpresa.keys());
-
-  const [contratos, empenhos] = await Promise.all([
+  // Busca todos os instrumentos com órgão+endereço pra extrair UF do CLIENTE
+  // (não só da sede da fornecedora). Atas e Contratos vigentes; Empenhos sem
+  // filtro de vigência (histórico financeiro entra na ranqueamento por UF).
+  const hoje = new Date();
+  const [contratos, empenhos, atas] = await Promise.all([
     prisma.contrato.findMany({
-      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: new Date() } },
-      select: { empresaId: true, itens: { select: { valorTotal: true } } },
+      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
+      select: {
+        orgaoEndereco: true,
+        itens: { select: { valorTotal: true } },
+      },
     }),
     prisma.empenho.findMany({
       where: { empresaId: { in: empresaIds } },
-      select: { empresaId: true, itens: { select: { valorTotal: true } } },
+      select: {
+        orgaoEndereco: true,
+        itens: { select: { valorTotal: true } },
+      },
+    }),
+    prisma.ata.findMany({
+      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
+      select: {
+        orgaoEndereco: true,
+        itens: { select: { valorTotal: true } },
+        orgaos: { select: { endereco: true } }, // órgãos participantes
+      },
     }),
   ]);
 
@@ -114,13 +131,16 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
     return acc[uf];
   }
 
+  // 1. Empresas (sede da fornecedora) — alimenta a coluna "Empresas atendidas"
+  //    quando o usuário tem várias filiais em UFs distintas.
   for (const empresaId of empresaIds) {
-    const uf = ufPorEmpresa.get(empresaId)!;
-    ensure(uf).empresas += 1;
+    const uf = ufPorEmpresa.get(empresaId);
+    if (uf) ensure(uf).empresas += 1;
   }
 
+  // 2. Contratos — agrega pela UF do ÓRGÃO contratante (não da fornecedora).
   for (const c of contratos) {
-    const uf = ufPorEmpresa.get(c.empresaId);
+    const uf = extrairUf(c.orgaoEndereco);
     if (!uf) continue;
     const total = c.itens.reduce((s, i) => s + i.valorTotal, 0);
     const d = ensure(uf);
@@ -128,13 +148,32 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
     d.valor += total;
   }
 
+  // 3. Empenhos — idem.
   for (const e of empenhos) {
-    const uf = ufPorEmpresa.get(e.empresaId);
+    const uf = extrairUf(e.orgaoEndereco);
     if (!uf) continue;
     const total = e.itens.reduce((s, i) => s + i.valorTotal, 0);
     const d = ensure(uf);
     d.empenhos += 1;
     d.valor += total;
+  }
+
+  // 4. Atas — agrega valor pelo órgão gerenciador, e adiciona "marcação"
+  //    no estado de cada órgão participante (sem somar valor de novo).
+  for (const a of atas) {
+    const ufGer = extrairUf(a.orgaoEndereco);
+    if (ufGer) {
+      const total = a.itens.reduce((s, i) => s + i.valorTotal, 0);
+      const d = ensure(ufGer);
+      d.contratos += 1; // ata conta como instrumento contratado
+      d.valor += total;
+    }
+    // Órgãos participantes só "marcam presença" no estado (sem dupla contagem
+    // do valor — o valor financeiro real depende das adesões, que são empenhos).
+    for (const op of a.orgaos) {
+      const ufP = extrairUf(op.endereco);
+      if (ufP && ufP !== ufGer) ensure(ufP);
+    }
   }
 
   return Object.values(acc).sort((a, b) => b.valor - a.valor);
