@@ -53,6 +53,76 @@ function formatarCepInput(valor: string): string {
 /* ============================================================
    Form Components
    ============================================================ */
+/**
+ * Textarea com auto-resize. Usada no campo "Objeto" (descrição longa).
+ * - min-height = 3 linhas
+ * - cresce conforme o conteúdo (sem scroll vertical)
+ * - largura cheia da seção (span=4 default)
+ */
+function TextareaGlass({
+  label,
+  name,
+  placeholder,
+  required,
+  erro,
+  defaultValue,
+  span = 4,
+  helper,
+  minRows = 3,
+}: {
+  label: string;
+  name: string;
+  placeholder?: string;
+  required?: boolean;
+  erro?: string;
+  defaultValue?: string;
+  span?: 1 | 2 | 3 | 4;
+  helper?: string;
+  minRows?: number;
+}) {
+  const colSpan = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" }[span];
+  const ref = useRef<HTMLTextAreaElement>(null);
+  function autoResize(el: HTMLTextAreaElement) {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+  useEffect(() => {
+    if (ref.current) autoResize(ref.current);
+  }, []);
+  return (
+    <label className={`${colSpan} block`}>
+      <span
+        className="mb-1.5 block text-[11px] font-bold uppercase"
+        style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+      >
+        {label}
+        {required && <span style={{ color: "var(--primary)" }}> *</span>}
+      </span>
+      <textarea
+        ref={ref}
+        name={name}
+        placeholder={placeholder}
+        required={required}
+        defaultValue={defaultValue}
+        rows={minRows}
+        onInput={(ev) => autoResize(ev.currentTarget)}
+        className="w-full rounded-xl px-4 py-3 text-sm font-medium leading-relaxed"
+        style={{ resize: "vertical", overflow: "hidden", minHeight: `${minRows * 24 + 24}px` }}
+      />
+      {helper && (
+        <span className="mt-1 block text-[11px]" style={{ color: "var(--text-mute)" }}>
+          {helper}
+        </span>
+      )}
+      {erro && (
+        <span className="mt-1 block text-[12px] font-semibold" style={{ color: "var(--coral)" }}>
+          {erro}
+        </span>
+      )}
+    </label>
+  );
+}
+
 function FieldGlass({
   label,
   name,
@@ -684,13 +754,15 @@ export default function NovaAtaForm({
               span={2}
               defaultValue={dados?.idAtaPncp ?? ""}
             />
-            <FieldGlass
+            <TextareaGlass
               label="Objeto (descrição geral)"
               name="objeto"
               required
               erro={e.objeto}
-              span={2}
+              span={4}
+              minRows={3}
               defaultValue={(v.objeto as string) ?? dados?.objeto}
+              placeholder="Descreva o objeto da contratação por completo — bens, serviços, especificações técnicas, condições."
             />
           </div>
         </SecaoGlass>

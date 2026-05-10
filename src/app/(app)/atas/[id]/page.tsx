@@ -54,31 +54,49 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
       </Link>
 
       <div className="mt-4 flex items-start gap-4">
-        <div className="grid h-12 w-12 place-items-center rounded-lg bg-blue-50">
-          <FileText className="h-6 w-6 text-blue-700" />
+        <div
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-[14px]"
+          style={{ background: "rgba(212,175,55,0.18)", color: "var(--primary-deep)" }}
+        >
+          <FileText className="h-6 w-6" />
         </div>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold text-slate-900">Ata {ata.numero}</h1>
-          <p className="mt-1 text-sm text-slate-600">{ata.objeto}</p>
-          <p className="mt-2 text-xs text-slate-500">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-[32px] font-extrabold leading-none" style={{ color: "var(--text)", letterSpacing: "-0.04em" }}>
+            Ata {ata.numero}
+          </h1>
+          <p className="mt-2 text-xs" style={{ color: "var(--text-soft)" }}>
             {ata.empresa.nomeFantasia || ata.empresa.razaoSocial} · {ata.orgaoNome}
           </p>
         </div>
         <div className="flex gap-2">
-          <Link
-            href="/contratacoes/nova/contrato"
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <Link href="/contratacoes/nova/contrato" className="btn-secondary" style={{ height: "36px", padding: "0 14px", fontSize: "12px" }}>
             + Contrato
           </Link>
-          <Link
-            href="/contratacoes/nova/empenho"
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
+          <Link href="/contratacoes/nova/empenho" className="btn-secondary" style={{ height: "36px", padding: "0 14px", fontSize: "12px" }}>
             + Empenho
           </Link>
         </div>
       </div>
+
+      {/* Objeto — largura cheia, quebra natural, sem corte */}
+      <section className="glass mt-4 rounded-[20px] px-6 py-5">
+        <h2
+          className="text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
+          Objeto
+        </h2>
+        <p
+          className="mt-2 text-sm leading-relaxed"
+          style={{
+            color: "var(--text-soft)",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {ata.objeto}
+        </p>
+      </section>
 
       {(venceEmDias < 60 || (reajusteEmDias !== null && reajusteEmDias < 60)) && (
         <div className="mt-6 space-y-2">
