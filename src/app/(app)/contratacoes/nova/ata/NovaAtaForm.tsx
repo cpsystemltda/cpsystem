@@ -92,11 +92,18 @@ function TextareaGlass({
   return (
     <label className={`${colSpan} block`}>
       <span
-        className="mb-1.5 block text-[11px] font-bold uppercase"
-        style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+        className="mb-1.5 flex items-end text-[11px] font-bold uppercase"
+        style={{
+          letterSpacing: "0.16em",
+          color: "var(--text-mute)",
+          minHeight: "30px",
+          lineHeight: "1.25",
+        }}
       >
-        {label}
-        {required && <span style={{ color: "var(--primary)" }}> *</span>}
+        <span>
+          {label}
+          {required && <span style={{ color: "var(--primary)" }}> *</span>}
+        </span>
       </span>
       <textarea
         ref={ref}
@@ -154,11 +161,18 @@ function FieldGlass({
   return (
     <label className={`${colSpan} block`}>
       <span
-        className="mb-1.5 block text-[11px] font-bold uppercase"
-        style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+        className="mb-1.5 flex items-end text-[11px] font-bold uppercase"
+        style={{
+          letterSpacing: "0.16em",
+          color: "var(--text-mute)",
+          minHeight: "30px",
+          lineHeight: "1.25",
+        }}
       >
-        {label}
-        {required && <span style={{ color: "var(--primary)" }}> *</span>}
+        <span>
+          {label}
+          {required && <span style={{ color: "var(--primary)" }}> *</span>}
+        </span>
       </span>
       <input
         type={type}
@@ -210,11 +224,18 @@ function SelectGlass({
   return (
     <label className={`${colSpan} block`}>
       <span
-        className="mb-1.5 block text-[11px] font-bold uppercase"
-        style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+        className="mb-1.5 flex items-end text-[11px] font-bold uppercase"
+        style={{
+          letterSpacing: "0.16em",
+          color: "var(--text-mute)",
+          minHeight: "30px",
+          lineHeight: "1.25",
+        }}
       >
-        {label}
-        {required && <span style={{ color: "var(--primary)" }}> *</span>}
+        <span>
+          {label}
+          {required && <span style={{ color: "var(--primary)" }}> *</span>}
+        </span>
       </span>
       <select
         name={name}
@@ -313,11 +334,18 @@ function CepInput({
   return (
     <label className={`col-span-${span} block`}>
       <span
-        className="mb-1.5 block text-[11px] font-bold uppercase"
-        style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+        className="mb-1.5 flex items-end text-[11px] font-bold uppercase"
+        style={{
+          letterSpacing: "0.16em",
+          color: "var(--text-mute)",
+          minHeight: "30px",
+          lineHeight: "1.25",
+        }}
       >
-        {label}
-        {required && <span style={{ color: "var(--primary)" }}> *</span>}
+        <span>
+          {label}
+          {required && <span style={{ color: "var(--primary)" }}> *</span>}
+        </span>
       </span>
       <div className="relative">
         <input

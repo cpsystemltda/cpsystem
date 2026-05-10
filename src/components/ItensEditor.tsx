@@ -222,21 +222,21 @@ export function ItensEditor({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-xl" style={{ border: "0.5px solid var(--hairline)" }}>
-        <table className="w-full text-sm" style={{ minWidth: "1140px" }}>
-          {/* colgroup garante que Descrição domine o espaço — ela é o único campo
-             texto longo da linha; demais colunas têm largura fixa enxuta */}
+      <div className="overflow-x-auto rounded-[16px]" style={{ border: "0.5px solid var(--hairline)" }}>
+        <table className="w-full text-sm" style={{ minWidth: "980px", tableLayout: "fixed" }}>
+          {/* colgroup: Descrição é a única coluna fluida; restante tem largura
+             fixa enxuta pra caber sem scroll horizontal em viewport 1366. */}
           <colgroup>
-            {permitirLotes && <col style={{ width: "72px" }} />}
-            <col style={{ width: "72px" }} />{/* Item — número dentro do lote */}
-            {ataItens && <col style={{ width: "180px" }} />}
+            {permitirLotes && <col style={{ width: "60px" }} />}
+            <col style={{ width: "60px" }} />{/* Item */}
+            {ataItens && <col style={{ width: "160px" }} />}
             <col />{/* Descrição — pega o restante */}
-            <col style={{ width: "72px" }} />{/* Un. */}
-            <col style={{ width: "92px" }} />{/* Qtd. */}
-            <col style={{ width: "112px" }} />{/* Marca */}
-            <col style={{ width: "128px" }} />{/* Valor unit. */}
-            <col style={{ width: "120px" }} />{/* Total */}
-            <col style={{ width: "44px" }} />{/* Excluir */}
+            <col style={{ width: "56px" }} />{/* Un. */}
+            <col style={{ width: "76px" }} />{/* Qtd. */}
+            <col style={{ width: "96px" }} />{/* Marca */}
+            <col style={{ width: "108px" }} />{/* Valor unit. */}
+            <col style={{ width: "108px" }} />{/* Total */}
+            <col style={{ width: "40px" }} />{/* Excluir */}
           </colgroup>
           <thead style={{ background: "rgba(15,14,12,0.04)" }}>
             <tr>
@@ -308,16 +308,12 @@ export function ItensEditor({
                 style={{ borderTop: "0.5px solid var(--hairline)" }}
               >
                 {permitirLotes && (
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-2 align-middle">
                     <input
                       name={`itens[${idx}][lote]`}
                       value={l.lote}
                       onChange={(ev) => {
                         const novoLote = ev.target.value;
-                        // Quando o lote muda, sugere automaticamente o próximo número
-                        // do novo lote (só se o usuário não tiver editado o item manualmente
-                        // — heurística: se o numero atual já é o que estaria no lote antigo,
-                        // aceita substituir).
                         const sugerido = proximoNumeroItem(
                           linhas.filter((_, i) => i !== idx),
                           novoLote,
@@ -326,7 +322,7 @@ export function ItensEditor({
                       }}
                       placeholder="—"
                       list="lotes-sugeridos"
-                      className="w-16 rounded-md px-2 py-1.5 text-center text-xs font-bold"
+                      className="w-full rounded-md px-1 py-1.5 text-center text-xs font-bold"
                       style={{
                         background: l.lote ? "rgba(212,175,55,0.18)" : "rgba(15,14,12,0.04)",
                         color: l.lote ? "var(--primary-deep)" : "var(--text-mute)",
@@ -336,13 +332,13 @@ export function ItensEditor({
                     />
                   </td>
                 )}
-                <td className="px-3 py-2">
+                <td className="px-2 py-2 align-middle">
                   <input
                     name={`itens[${idx}][numero]`}
                     value={l.numero}
                     onChange={(ev) => update(idx, { numero: ev.target.value })}
                     placeholder={proximoNumeroItem(linhas.filter((_, i) => i !== idx), l.lote)}
-                    className="w-16 rounded-md px-2 py-1.5 text-center text-xs font-bold"
+                    className="w-full rounded-md px-1 py-1.5 text-center text-xs font-bold"
                     style={{
                       background: indicesDuplicados.has(idx)
                         ? "rgba(232,138,152,0.22)"
@@ -366,12 +362,12 @@ export function ItensEditor({
                   />
                 </td>
                 {ataItens && (
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-2 align-middle">
                     <select
                       name={`itens[${idx}][ataItemId]`}
                       value={l.ataItemId}
                       onChange={(ev) => pickAtaItem(idx, ev.target.value)}
-                      className="w-44 rounded-md px-2 py-1.5 text-xs"
+                      className="w-full rounded-md px-2 py-1.5 text-xs"
                     >
                       <option value="">— Livre —</option>
                       {ataItens.map((a) => (
@@ -383,7 +379,7 @@ export function ItensEditor({
                     </select>
                   </td>
                 )}
-                <td className="px-3 py-2">
+                <td className="px-2 py-2 align-middle">
                   <textarea
                     name={`itens[${idx}][descricao]`}
                     value={l.descricao}
@@ -395,17 +391,17 @@ export function ItensEditor({
                     style={{ minHeight: "36px", lineHeight: "1.4" }}
                   />
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-2 py-2 align-middle">
                   <input
                     name={`itens[${idx}][unidade]`}
                     value={l.unidade}
                     onChange={(ev) => update(idx, { unidade: ev.target.value })}
                     required
                     placeholder="UN"
-                    className="w-16 rounded-md px-2 py-1.5 text-xs"
+                    className="w-full rounded-md px-1 py-1.5 text-center text-xs"
                   />
                 </td>
-                <td className="px-3 py-2 text-right">
+                <td className="px-2 py-2 align-middle">
                   <input
                     type="number"
                     step="0.01"
@@ -414,19 +410,18 @@ export function ItensEditor({
                     value={l.quantidade}
                     onChange={(ev) => update(idx, { quantidade: ev.target.value })}
                     required
-                    className="w-20 rounded-md px-2 py-1.5 text-right text-xs"
+                    className="w-full rounded-md px-2 py-1.5 text-right text-xs"
                   />
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-2 py-2 align-middle">
                   <input
                     name={`itens[${idx}][marca]`}
                     value={l.marca}
                     onChange={(ev) => update(idx, { marca: ev.target.value })}
-                    className="w-24 rounded-md px-2 py-1.5 text-xs"
+                    className="w-full rounded-md px-2 py-1.5 text-xs"
                   />
                 </td>
-                <td className="px-3 py-2 text-right">
-                  {/* Máscara monetária — campo display + hidden numérico */}
+                <td className="px-2 py-2 align-middle">
                   <input
                     type="text"
                     inputMode="numeric"
@@ -434,7 +429,7 @@ export function ItensEditor({
                     value={valoresFormatados[idx] ?? ""}
                     onChange={(ev) => updateValor(idx, ev.target.value)}
                     required
-                    className="w-28 rounded-md px-2 py-1.5 text-right text-xs"
+                    className="w-full rounded-md px-2 py-1.5 text-right text-xs"
                     style={{ fontVariantNumeric: "tabular-nums" }}
                   />
                   <input
@@ -464,12 +459,12 @@ export function ItensEditor({
               </tr>
             ))}
           </tbody>
-          <tfoot style={{ background: "rgba(0,0,0,0.2)" }}>
+          <tfoot style={{ background: "rgba(15,14,12,0.04)" }}>
             <tr>
               <td
                 colSpan={(permitirLotes ? 1 : 0) + 1 /* Item */ + (ataItens ? 1 : 0) + 5}
                 className="px-3 py-3 text-right text-[10px] font-bold uppercase"
-                style={{ letterSpacing: "0.18em", color: "var(--text-mute)" }}
+                style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
               >
                 Total geral
               </td>
