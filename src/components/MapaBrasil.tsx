@@ -98,20 +98,35 @@ export function MapaBrasil({
 
   const projection = useMemo(() => {
     if (!geo) return null;
-    // Zoom sempre que houver operação — fitExtent calcula bounds nas UFs
-    // com operação, sem threshold. Caso a empresa atue só em GO, o mapa
-    // foca em GO/região centro-oeste em vez de mostrar o Brasil inteiro
-    // (com DF/GO microscópicos). Brasil cheio só quando não há operação.
+    // Vizinhos próximos por região — quando a empresa atua em uma UF do
+    // centro-oeste, incluímos as do entorno (incluindo DF) pra o mapa
+    // mostrar contexto regional ao invés de só o estado em foco. Resolve o
+    // caso "GO sozinho ocupa a tela, DF some dentro dele".
+    const VIZINHOS: Record<string, string[]> = {
+      GO: ["DF", "MT", "MS", "MG", "BA", "TO"],
+      DF: ["GO"],
+      MG: ["SP", "RJ", "ES", "BA", "GO", "MS"],
+      SP: ["MG", "RJ", "PR", "MS"],
+      RJ: ["MG", "SP", "ES"],
+      ES: ["RJ", "MG", "BA"],
+      // demais regiões usam só o que a empresa tem — fitExtent já é
+      // adequado quando há vários estados na lista.
+    };
+    let ufsParaFit = new Set(ufsComOperacao);
+    if (ufsComOperacao.size === 1) {
+      const unica = Array.from(ufsComOperacao)[0];
+      const viz = VIZINHOS[unica];
+      if (viz) for (const v of viz) ufsParaFit.add(v);
+    }
+    if (ufsParaFit.size === 0) ufsParaFit = new Set();
     const featuresParaFit =
-      ufsComOperacao.size > 0
+      ufsParaFit.size > 0
         ? geo.features.filter(
-            (f) => f.properties.UF && ufsComOperacao.has(f.properties.UF),
+            (f) => f.properties.UF && ufsParaFit.has(f.properties.UF),
           )
         : geo.features;
     const collection = { type: "FeatureCollection", features: featuresParaFit };
-    // Margem maior (15%) quando há zoom regional — dá respiro pros pins
-    // não ficarem no canto e os estados vizinhos aparecerem como contexto.
-    const margem = ufsComOperacao.size > 0 ? 0.15 : 0.05;
+    const margem = ufsParaFit.size > 0 ? 0.08 : 0.05;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return geoMercator().fitExtent(
       [
@@ -251,12 +266,12 @@ export function MapaBrasil({
           );
         })}
 
-        {/* Camada superior: markers visuais + hit areas pros estados com
-           operação. Renderizada DEPOIS de todos os paths pra garantir que:
-           (a) o pin dourado fica visível em estados pequenos (DF, AL, SE,
-               RJ, ES) que o usuário não consegue distinguir no mapa cheio;
-           (b) o hit area do DF não é coberto pelo path do GO (problema
-               reportado: o mouse não acertava o DF). */}
+        {/* Camada superior: markers visuais + hit areas. Renderizada DEPOIS
+           de todos os paths pra garantir:
+           (a) Estados pequenos (DF, AL, SE, RJ, ES, PB, RN) ganham pin
+               visível sempre — mesmo sem operação, pra não sumirem dentro
+               do estado-pai (caso clássico: DF embutido no GO).
+           (b) Hit area no topo não é coberta pelo path do estado vizinho. */}
         {geo.features.map((feature, i) => {
           const uf = feature.properties.UF;
           if (!uf || !pathFn) return null;
@@ -264,31 +279,38 @@ export function MapaBrasil({
           const temOperacao = !!dado && (
             dado.empresas > 0 || dado.contratos > 0 || dado.empenhos > 0 || dado.orgaos > 0
           );
-          if (!temOperacao) return null;
-          const centroid = pathFn.centroid(feature as unknown as GeoJSON.Feature);
-          // Estados pequenos ganham um pin visual dourado pra serem
-          // distinguíveis mesmo no zoom Brasil inteiro.
           const pequeno = ["DF", "AL", "SE", "RJ", "ES", "PB", "RN"].includes(uf);
+          // Pequeno sempre ganha marker (operação ou não). Estado grande sem
+          // operação não recebe pin — fica só com seu path normal.
+          if (!temOperacao && !pequeno) return null;
+          const centroid = pathFn.centroid(feature as unknown as GeoJSON.Feature);
           const isHover = hover?.uf === uf;
           const isDestaqueRow = ufDestaque === uf;
+          // Visual diferenciado por estado:
+          //  - com operação: dourado vibrante
+          //  - sem operação (estado pequeno): cinza médio com borda branca,
+          //    serve só como "âncora visual" pra que o estado não desapareça
+          //    embutido em outro maior.
+          const corFundo = temOperacao
+            ? "var(--primary-deep)"
+            : "rgba(140,130,110,0.85)";
+          const corTexto = "white";
           return (
             <g key={`pin-${uf}-${i}`} style={{ pointerEvents: "auto" }}>
               {pequeno && (
                 <>
-                  {/* Pin grande e claro — estados pequenos viram marcadores
-                     visíveis independente da escala. DF, em particular, fica
-                     visível mesmo no zoom em torno do GO. */}
                   <circle
                     cx={centroid[0]}
                     cy={centroid[1]}
                     r={isHover || isDestaqueRow ? 18 : 14}
-                    fill="var(--primary-deep)"
+                    fill={corFundo}
                     stroke="white"
                     strokeWidth={3}
                     className="transition-all duration-150"
                     style={{
-                      filter:
-                        "drop-shadow(0 0 6px rgba(168,137,71,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.35))",
+                      filter: temOperacao
+                        ? "drop-shadow(0 0 6px rgba(168,137,71,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.35))"
+                        : "drop-shadow(0 1px 3px rgba(0,0,0,0.25))",
                     }}
                   />
                   <text
@@ -298,7 +320,7 @@ export function MapaBrasil({
                     dominantBaseline="central"
                     fontSize={isHover || isDestaqueRow ? 13 : 11}
                     fontWeight={900}
-                    fill="white"
+                    fill={corTexto}
                     pointerEvents="none"
                     fontFamily="Inter, sans-serif"
                     style={{ letterSpacing: "-0.02em" }}
@@ -307,34 +329,36 @@ export function MapaBrasil({
                   </text>
                 </>
               )}
-              {/* Hit area invisível (24px) — todos os estados com operação
-                 ganham, pra reforçar a clicabilidade. Especialmente
-                 importante pra DF e outros pequenos. */}
-              <circle
-                cx={centroid[0]}
-                cy={centroid[1]}
-                r={pequeno ? 22 : 16}
-                fill="transparent"
-                pointerEvents="all"
-                className="cursor-pointer"
-                onMouseEnter={(e) => {
-                  const rect = wrapperRef.current?.getBoundingClientRect();
-                  setHover({
-                    uf,
-                    x: e.clientX - (rect?.left ?? 0),
-                    y: e.clientY - (rect?.top ?? 0),
-                  });
-                }}
-                onMouseMove={(e) => {
-                  const rect = wrapperRef.current?.getBoundingClientRect();
-                  setHover({
-                    uf,
-                    x: e.clientX - (rect?.left ?? 0),
-                    y: e.clientY - (rect?.top ?? 0),
-                  });
-                }}
-                onMouseLeave={() => setHover(null)}
-              />
+              {/* Hit area apenas para estados COM operação (clique tem
+                 sentido só nesses). Pequenos sem operação ganham só o pin
+                 visual de orientação, sem ser clicáveis. */}
+              {temOperacao && (
+                <circle
+                  cx={centroid[0]}
+                  cy={centroid[1]}
+                  r={pequeno ? 22 : 16}
+                  fill="transparent"
+                  pointerEvents="all"
+                  className="cursor-pointer"
+                  onMouseEnter={(e) => {
+                    const rect = wrapperRef.current?.getBoundingClientRect();
+                    setHover({
+                      uf,
+                      x: e.clientX - (rect?.left ?? 0),
+                      y: e.clientY - (rect?.top ?? 0),
+                    });
+                  }}
+                  onMouseMove={(e) => {
+                    const rect = wrapperRef.current?.getBoundingClientRect();
+                    setHover({
+                      uf,
+                      x: e.clientX - (rect?.left ?? 0),
+                      y: e.clientY - (rect?.top ?? 0),
+                    });
+                  }}
+                  onMouseLeave={() => setHover(null)}
+                />
+              )}
             </g>
           );
         })}
