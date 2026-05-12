@@ -45,6 +45,9 @@ export async function listarComissoesDoAnalista(
           empresa: {
             select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
           },
+          // Documento de origem do empenho — Ata, Contrato ou Direto
+          ata: { select: { id: true, numero: true } },
+          contrato: { select: { id: true, numero: true } },
         },
       },
       vinculo: { select: { percentualComissao: true } },

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Clock, Upload, AlertCircle, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, Clock, Upload, AlertCircle, X, ChevronDown, ChevronUp, Bell } from "lucide-react";
 import { brl } from "@/lib/validators";
 import {
   marcarComissaoExecucaoAction,
@@ -30,6 +30,7 @@ type ComissaoLinha = {
   comprovanteUrl: string | null;
   observacao: string | null;
   criadoEm: Date;
+  atualizadoEm: Date;
   empenho: {
     id: string;
     numero: string;
@@ -42,6 +43,8 @@ type ComissaoLinha = {
       razaoSocial: string;
       nomeFantasia: string | null;
     };
+    ata: { id: string; numero: string } | null;
+    contrato: { id: string; numero: string } | null;
   };
 };
 
@@ -73,6 +76,26 @@ export function ComissoesVariaveisBloco({
   const [filtroEmpresa, setFiltroEmpresa] = useState("");
   const [filtroStatus, setFiltroStatus] = useState<StatusComissao | "">("");
   const [filtroMes, setFiltroMes] = useState(""); // YYYY-MM
+  // Origem: "" (todos), "direto", "ata:<id>", "contrato:<id>"
+  const [filtroOrigem, setFiltroOrigem] = useState("");
+
+  // Lista única de documentos de origem presentes nas comissões — popula o
+  // dropdown sem repetir Atas/Contratos quando vários empenhos derivam do mesmo.
+  const opcoesOrigem = useMemo(() => {
+    const atas = new Map<string, string>();
+    const contratos = new Map<string, string>();
+    let temDireto = false;
+    for (const c of comissoes) {
+      if (c.empenho.ata) atas.set(c.empenho.ata.id, c.empenho.ata.numero);
+      else if (c.empenho.contrato) contratos.set(c.empenho.contrato.id, c.empenho.contrato.numero);
+      else temDireto = true;
+    }
+    const out: { value: string; label: string }[] = [];
+    if (temDireto) out.push({ value: "direto", label: "Empenho direto (sem Ata/Contrato)" });
+    for (const [id, numero] of atas) out.push({ value: `ata:${id}`, label: `Ata ${numero}` });
+    for (const [id, numero] of contratos) out.push({ value: `contrato:${id}`, label: `Contrato ${numero}` });
+    return out;
+  }, [comissoes]);
 
   const filtradas = useMemo(() => {
     return comissoes.filter((c) => {
@@ -84,9 +107,34 @@ export function ComissoesVariaveisBloco({
       } else if (filtroMes && !c.dataPagamento) {
         return false;
       }
+      if (filtroOrigem) {
+        if (filtroOrigem === "direto") {
+          if (c.empenho.ata || c.empenho.contrato) return false;
+        } else if (filtroOrigem.startsWith("ata:")) {
+          const ataId = filtroOrigem.slice(4);
+          if (!c.empenho.ata || c.empenho.ata.id !== ataId) return false;
+        } else if (filtroOrigem.startsWith("contrato:")) {
+          const contratoId = filtroOrigem.slice(9);
+          if (!c.empenho.contrato || c.empenho.contrato.id !== contratoId) return false;
+        }
+      }
       return true;
     });
-  }, [comissoes, filtroEmpresa, filtroStatus, filtroMes]);
+  }, [comissoes, filtroEmpresa, filtroStatus, filtroMes, filtroOrigem]);
+
+  // Comissões liberadas nos últimos 7 dias e ainda não cobradas pelo analista —
+  // motor do banner destacado no topo. Aparece independente dos filtros, mas
+  // só conta linhas que respeitam o filtro de empresa (analista pode estar
+  // focando em uma empresa específica).
+  const recentes = useMemo(() => {
+    const seteDiasAtras = Date.now() - 7 * 86400000;
+    return comissoes.filter((c) => {
+      if (filtroEmpresa && c.empenho.empresa.id !== filtroEmpresa) return false;
+      if (c.status !== "A_RECEBER" && c.status !== "ATRASADO") return false;
+      return c.atualizadoEm.getTime() >= seteDiasAtras;
+    });
+  }, [comissoes, filtroEmpresa]);
+  const recentesValor = recentes.reduce((s, c) => s + c.valorCalculado, 0);
 
   // Cards agregados sobre o filtro corrente (sem o filtro de mês — esses
   // cards mostram o total atual)
@@ -136,6 +184,40 @@ export function ComissoesVariaveisBloco({
           </p>
         </div>
       </header>
+
+      {recentes.length > 0 && (
+        <div
+          className="mb-4 flex items-start gap-3 rounded-[14px] px-4 py-3"
+          style={{
+            background: "linear-gradient(135deg, rgba(212,175,55,0.20), rgba(212,175,55,0.08))",
+            border: "0.5px solid rgba(168,137,71,0.55)",
+            color: "var(--text-soft)",
+          }}
+        >
+          <Bell className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--primary-deep)" }} />
+          <div className="flex-1">
+            <p className="text-sm font-extrabold" style={{ color: "var(--primary-deep)" }}>
+              {recentes.length} execução{recentes.length !== 1 ? "ões" : ""} liberada{recentes.length !== 1 ? "s" : ""} nos últimos 7 dias
+              {" · "}
+              {brl(recentesValor)} pendente{recentes.length !== 1 ? "s" : ""}
+            </p>
+            <p className="mt-0.5 text-xs">
+              Cliente recebeu do órgão e sua comissão está disponível para cobrança. Marque cada uma como recebida quando a empresa repassar.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setFiltroStatus("A_RECEBER");
+              setFiltroMes("");
+              setFiltroOrigem("");
+            }}
+            className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-700"
+          >
+            Ver pendentes
+          </button>
+        </div>
+      )}
 
       <div className="mb-4 grid gap-3 md:grid-cols-3">
         <MiniCard
@@ -190,13 +272,29 @@ export function ComissoesVariaveisBloco({
           className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
           title="Filtrar por mês do pagamento da comissão"
         />
-        {(filtroEmpresa || filtroStatus || filtroMes) && (
+        {opcoesOrigem.length > 1 && (
+          <select
+            value={filtroOrigem}
+            onChange={(ev) => setFiltroOrigem(ev.target.value)}
+            className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+            title="Filtrar por documento de origem do empenho"
+          >
+            <option value="">Toda origem</option>
+            {opcoesOrigem.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
+        {(filtroEmpresa || filtroStatus || filtroMes || filtroOrigem) && (
           <button
             type="button"
             onClick={() => {
               setFiltroEmpresa("");
               setFiltroStatus("");
               setFiltroMes("");
+              setFiltroOrigem("");
             }}
             className="text-xs text-slate-600 underline hover:text-slate-900"
           >
@@ -300,6 +398,28 @@ function ItemComissao({ comissao: c }: { comissao: ComissaoLinha }) {
           </div>
           <p className="mt-0.5 truncate text-xs text-slate-600">
             {nomeEmpresa} · {c.empenho.orgaoNome}
+            {c.empenho.ata && (
+              <>
+                {" · "}
+                <Link
+                  href={`/atas/${c.empenho.ata.id}`}
+                  className="underline hover:text-slate-900"
+                >
+                  Ata {c.empenho.ata.numero}
+                </Link>
+              </>
+            )}
+            {c.empenho.contrato && (
+              <>
+                {" · "}
+                <Link
+                  href={`/contratos/${c.empenho.contrato.id}`}
+                  className="underline hover:text-slate-900"
+                >
+                  Contrato {c.empenho.contrato.numero}
+                </Link>
+              </>
+            )}
           </p>
 
           {/* Linha A — read-only */}
