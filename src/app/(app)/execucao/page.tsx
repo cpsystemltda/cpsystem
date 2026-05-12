@@ -28,13 +28,37 @@ const COR_STATUS: Record<string, string> = {
   PAGO: "bg-emerald-100 text-emerald-800",
 };
 
-export default async function ExecucaoPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; orgao?: string }> }) {
+export default async function ExecucaoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    orgao?: string;
+    de?: string; // data emissão >= (filtro por período)
+    ate?: string; // data emissão <= (filtro por período)
+    ataId?: string;
+    contratoId?: string;
+  }>;
+}) {
   const usuario = await exigirUsuario();
   const filtroEmpresa = await filtroEmpresaWhere(usuario.contaId);
   const sp = await searchParams;
   const q = (sp.q || "").trim();
   const statusFiltro = sp.status || "";
   const orgao = sp.orgao || "";
+  const de = sp.de || "";
+  const ate = sp.ate || "";
+  const ataId = sp.ataId || "";
+  const contratoId = sp.contratoId || "";
+
+  const dataEmissaoFiltro =
+    de || ate
+      ? {
+          ...(de && { gte: new Date(de) }),
+          ...(ate && { lte: new Date(`${ate}T23:59:59`) }),
+        }
+      : undefined;
 
   const empenhos = await prisma.empenho.findMany({
     where: {
@@ -47,8 +71,20 @@ export default async function ExecucaoPage({ searchParams }: { searchParams: Pro
           { orgaoNome: { contains: q } },
         ],
       }),
-      ...(statusFiltro && { status: statusFiltro as "EMPENHADO" | "PEDIDO_RECEBIDO" | "EM_TRANSITO" | "ENTREGUE" | "NF_EMITIDA" | "NF_ENCAMINHADA" | "PAGO" }),
+      ...(statusFiltro && {
+        status: statusFiltro as
+          | "EMPENHADO"
+          | "PEDIDO_RECEBIDO"
+          | "EM_TRANSITO"
+          | "ENTREGUE"
+          | "NF_EMITIDA"
+          | "NF_ENCAMINHADA"
+          | "PAGO",
+      }),
       ...(orgao && { orgaoNome: orgao }),
+      ...(dataEmissaoFiltro && { dataEmissao: dataEmissaoFiltro }),
+      ...(ataId && { ataId }),
+      ...(contratoId && { contratoId }),
     },
     orderBy: { criadoEm: "desc" },
     include: {
@@ -57,11 +93,23 @@ export default async function ExecucaoPage({ searchParams }: { searchParams: Pro
     },
   });
 
-  const orgaosDistintos = await prisma.empenho.groupBy({
-    by: ["orgaoNome"],
-    where: { empresa: filtroEmpresa },
-    orderBy: { orgaoNome: "asc" },
-  });
+  const [orgaosDistintos, atasOpcoes, contratosOpcoes] = await Promise.all([
+    prisma.empenho.groupBy({
+      by: ["orgaoNome"],
+      where: { empresa: filtroEmpresa },
+      orderBy: { orgaoNome: "asc" },
+    }),
+    prisma.ata.findMany({
+      where: { empresa: filtroEmpresa, empenhos: { some: {} } },
+      select: { id: true, numero: true },
+      orderBy: { numero: "asc" },
+    }),
+    prisma.contrato.findMany({
+      where: { empresa: filtroEmpresa, empenhos: { some: {} } },
+      select: { id: true, numero: true },
+      orderBy: { numero: "asc" },
+    }),
+  ]);
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
@@ -92,6 +140,29 @@ export default async function ExecucaoPage({ searchParams }: { searchParams: Pro
               label: "Todos os órgãos",
               opcoes: orgaosDistintos.map((o) => ({ value: o.orgaoNome, label: o.orgaoNome })),
             },
+            ...(atasOpcoes.length > 0
+              ? [
+                  {
+                    name: "ataId",
+                    label: "Todas as Atas",
+                    opcoes: atasOpcoes.map((a) => ({ value: a.id, label: `Ata ${a.numero}` })),
+                  },
+                ]
+              : []),
+            ...(contratosOpcoes.length > 0
+              ? [
+                  {
+                    name: "contratoId",
+                    label: "Todos os Contratos",
+                    opcoes: contratosOpcoes.map((c) => ({
+                      value: c.id,
+                      label: `Contrato ${c.numero}`,
+                    })),
+                  },
+                ]
+              : []),
+            { name: "de", label: "De:", tipo: "date" as const },
+            { name: "ate", label: "Até:", tipo: "date" as const },
           ]}
         />
       </div>

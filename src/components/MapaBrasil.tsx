@@ -40,7 +40,15 @@ function brl(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 }
 
-export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
+export function MapaBrasil({
+  dados,
+  ufDestaque,
+}: {
+  dados: DadosUf[];
+  // UF a destacar (vinda da lista de clientes — sync lista↔mapa).
+  // Quando presente, o estado correspondente recebe stroke mais grosso.
+  ufDestaque?: string | null;
+}) {
   const [geo, setGeo] = useState<GeoCollection | null>(null);
   const [hover, setHover] = useState<{ uf: string; x: number; y: number } | null>(null);
   const [wrapperWidth, setWrapperWidth] = useState<number>(WIDTH);
@@ -76,11 +84,38 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
     [maxEmpresas],
   );
 
+  // UFs com operação (qualquer dimensão > 0). Usado pro zoom inteligente
+  // e pro destaque visual.
+  const ufsComOperacao = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of dados) {
+      if (d.empresas > 0 || d.contratos > 0 || d.empenhos > 0 || d.orgaos > 0) {
+        set.add(d.uf);
+      }
+    }
+    return set;
+  }, [dados]);
+
   const projection = useMemo(() => {
     if (!geo) return null;
+    // Zoom inteligente: se a empresa atua em <= 3 estados, faz fitSize só
+    // nesses estados (mais legível, especialmente pro DF). Senão, mostra
+    // o Brasil inteiro como antes.
+    const featuresParaFit =
+      ufsComOperacao.size > 0 && ufsComOperacao.size <= 3
+        ? geo.features.filter((f) => f.properties.UF && ufsComOperacao.has(f.properties.UF))
+        : geo.features;
+    const collection = { type: "FeatureCollection", features: featuresParaFit };
+    // Margem de 10% pra não cortar bordas.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return geoMercator().fitSize([WIDTH, HEIGHT], geo as any);
-  }, [geo]);
+    return geoMercator().fitExtent(
+      [
+        [WIDTH * 0.05, HEIGHT * 0.05],
+        [WIDTH * 0.95, HEIGHT * 0.95],
+      ],
+      collection as any,
+    );
+  }, [geo, ufsComOperacao]);
 
   const pathFn = useMemo(() => (projection ? geoPath(projection) : null), [projection]);
 
@@ -135,6 +170,7 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
             ? colorScale(Math.max(1, valor))
             : "rgba(15, 14, 12, 0.06)";
           const isHover = hover?.uf === uf;
+          const isDestaque = ufDestaque === uf;
           const d = pathFn(feature as unknown as GeoJSON.Feature) || "";
           const centroid = pathFn.centroid(feature as unknown as GeoJSON.Feature);
           const isTop = temOperacao;
@@ -143,10 +179,16 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
               <path
                 d={d}
                 fill={fill}
-                stroke={isHover ? "var(--primary-deep)" : "rgba(15,14,12,0.16)"}
-                strokeWidth={isHover ? 1.4 : 0.6}
+                stroke={isHover || isDestaque ? "var(--primary-deep)" : "rgba(15,14,12,0.16)"}
+                strokeWidth={isHover || isDestaque ? 2 : 0.6}
                 className="transition-all duration-150 cursor-pointer"
-                style={isTop ? { filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.30))" } : undefined}
+                style={
+                  isDestaque
+                    ? { filter: "drop-shadow(0 0 14px rgba(168,137,71,0.55))" }
+                    : isTop
+                      ? { filter: "drop-shadow(0 0 12px rgba(212, 175, 55, 0.30))" }
+                      : undefined
+                }
                 onMouseEnter={(e) => {
                   const rect = wrapperRef.current?.getBoundingClientRect();
                   setHover({
@@ -188,6 +230,37 @@ export function MapaBrasil({ dados }: { dados: DadosUf[] }) {
               >
                 {uf}
               </text>
+              {/* Hit area invisível maior — útil pro DF (estado pequeno).
+                 Círculo de 18px de raio no centroide aumenta a área clicável
+                 sem alterar o visual. Aplicado só onde o estado é menor que
+                 6% da largura do mapa. */}
+              {temOperacao && (
+                <circle
+                  cx={centroid[0]}
+                  cy={centroid[1]}
+                  r={18}
+                  fill="transparent"
+                  pointerEvents="all"
+                  className="cursor-pointer"
+                  onMouseEnter={(e) => {
+                    const rect = wrapperRef.current?.getBoundingClientRect();
+                    setHover({
+                      uf,
+                      x: e.clientX - (rect?.left ?? 0),
+                      y: e.clientY - (rect?.top ?? 0),
+                    });
+                  }}
+                  onMouseMove={(e) => {
+                    const rect = wrapperRef.current?.getBoundingClientRect();
+                    setHover({
+                      uf,
+                      x: e.clientX - (rect?.left ?? 0),
+                      y: e.clientY - (rect?.top ?? 0),
+                    });
+                  }}
+                  onMouseLeave={() => setHover(null)}
+                />
+              )}
             </g>
           );
         })}

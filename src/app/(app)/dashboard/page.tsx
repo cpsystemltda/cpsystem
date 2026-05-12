@@ -21,8 +21,9 @@ import {
 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { dadosPorUf } from "@/lib/agregacaoUf";
+import { dadosPorUf, extrairUf } from "@/lib/agregacaoUf";
 import { MapaBrasil } from "@/components/MapaBrasil";
+import { ClientesMapaSync } from "@/components/ClientesMapaSync";
 import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { Block } from "@/components/ui/Block";
@@ -99,6 +100,7 @@ export default async function DashboardPage() {
         itens: { select: { valorTotal: true } },
         orgaoNome: true,
         orgaoCnpj: true,
+        orgaoEndereco: true,
       },
     }),
     prisma.contrato.findMany({
@@ -121,8 +123,9 @@ export default async function DashboardPage() {
         vigenciaFim: true,
         orgaoNome: true,
         orgaoCnpj: true,
+        orgaoEndereco: true,
         itens: { select: { valorTotal: true } },
-        orgaos: { select: { cnpj: true, nome: true } },
+        orgaos: { select: { cnpj: true, nome: true, endereco: true } },
       },
     }),
     prisma.empenho.findMany({
@@ -357,21 +360,36 @@ export default async function DashboardPage() {
   }
   const qtdOrgaos = orgaosUnicos.size;
 
-  // Ranking de órgãos por valor contratado — soma empenhos + atas vigentes
-  const orgaoMap = new Map<string, { nome: string; valor: number }>();
+  // Ranking de órgãos por valor contratado — soma empenhos + atas vigentes.
+  // Mantém também o endereço para extrair UF (sync lista↔mapa).
+  const orgaoMap = new Map<
+    string,
+    { nome: string; valor: number; endereco: string | null }
+  >();
   for (const e of empenhosCompletos) {
-    const cur = orgaoMap.get(e.orgaoCnpj) ?? { nome: e.orgaoNome, valor: 0 };
+    const cur = orgaoMap.get(e.orgaoCnpj) ?? {
+      nome: e.orgaoNome,
+      valor: 0,
+      endereco: e.orgaoEndereco ?? null,
+    };
     cur.valor += sumItens(e);
+    if (!cur.endereco && e.orgaoEndereco) cur.endereco = e.orgaoEndereco;
     orgaoMap.set(e.orgaoCnpj, cur);
   }
   for (const a of atasVigentesDetalhe) {
     if (!a.orgaoCnpj) continue;
     const valorAta = a.itens.reduce((s, it) => s + it.valorTotal, 0);
-    const cur = orgaoMap.get(a.orgaoCnpj) ?? { nome: a.orgaoNome, valor: 0 };
+    const cur = orgaoMap.get(a.orgaoCnpj) ?? {
+      nome: a.orgaoNome,
+      valor: 0,
+      endereco: a.orgaoEndereco ?? null,
+    };
     cur.valor += valorAta;
+    if (!cur.endereco && a.orgaoEndereco) cur.endereco = a.orgaoEndereco;
     orgaoMap.set(a.orgaoCnpj, cur);
   }
   const rankingOrgaos = Array.from(orgaoMap.values())
+    .map((r) => ({ ...r, uf: extrairUf(r.endereco) }))
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 5);
   const maiorRanking = rankingOrgaos[0]?.valor ?? 1;
@@ -728,77 +746,57 @@ export default async function DashboardPage() {
 
       {/* === Bloco V — Clientes === */}
       <Block numero="05" eyebrow="Carteira de órgãos" titulo="Clientes atendidos">
-        <div
-          className="grid gap-3.5"
-          style={{ gridTemplateColumns: "1fr 2fr" }}
-        >
-          <KPI
-            tone="rose"
-            size="hero"
-            icon={Building2}
-            label="Órgãos atendidos"
-            value={qtdOrgaos}
-            meta="Distintos · CNPJ único"
-          />
-          <div className="glass-tile relative overflow-hidden rounded-[20px]">
-            <table className="table-glass">
-              <thead>
-                <tr>
-                  <th>Órgão</th>
-                  <th className="num">Valor contratado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesTabela.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} style={{ textAlign: "center", color: "var(--text-mute)" }}>
-                      Sem dados ainda.
-                    </td>
-                  </tr>
-                ) : (
-                  clientesTabela.map((c) => (
-                    <tr key={c.nome}>
-                      <td className="strong">{c.nome}</td>
-                      <td className="num strong">{brl(c.valor)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="mt-3.5">
-          <ChartCard
-            title="Mapa de operações por estado"
-            subtitle="Distribuição geográfica — passe o mouse sobre o estado para detalhes"
+        {dadosUf.length === 0 ? (
+          <div
+            className="grid gap-3.5"
+            style={{ gridTemplateColumns: "1fr 2fr" }}
           >
-            {dadosUf.length === 0 ? (
-              <div
-                className="grid h-[320px] place-items-center rounded-2xl"
-                style={{
-                  border: "0.5px dashed var(--hairline)",
-                  background: "rgba(15,14,12,0.02)",
-                }}
-              >
-                <div className="text-center">
-                  <MapPin className="mx-auto h-10 w-10" style={{ color: "var(--text-faint)" }} />
-                  <p
-                    className="mt-3 text-sm font-semibold"
-                    style={{ color: "var(--text-soft)" }}
-                  >
-                    Sem dados geográficos ainda
-                  </p>
-                  <p className="mt-1 text-xs" style={{ color: "var(--text-mute)" }}>
-                    Cadastre suas empresas com endereço completo para visualizar o mapa.
-                  </p>
-                </div>
+            <KPI
+              tone="rose"
+              size="hero"
+              icon={Building2}
+              label="Órgãos atendidos"
+              value={qtdOrgaos}
+              meta="Distintos · CNPJ único"
+            />
+            <div
+              className="grid place-items-center rounded-2xl"
+              style={{
+                border: "0.5px dashed var(--hairline)",
+                background: "rgba(15,14,12,0.02)",
+                minHeight: "160px",
+              }}
+            >
+              <div className="text-center">
+                <MapPin className="mx-auto h-10 w-10" style={{ color: "var(--text-faint)" }} />
+                <p
+                  className="mt-3 text-sm font-semibold"
+                  style={{ color: "var(--text-soft)" }}
+                >
+                  Sem dados geográficos ainda
+                </p>
+                <p className="mt-1 text-xs" style={{ color: "var(--text-mute)" }}>
+                  Cadastre suas empresas com endereço completo para visualizar o mapa.
+                </p>
               </div>
-            ) : (
-              <MapaBrasil dados={dadosUf} />
-            )}
-          </ChartCard>
-        </div>
+            </div>
+          </div>
+        ) : (
+          <ClientesMapaSync
+            clientes={clientesTabela}
+            dadosUf={dadosUf}
+            kpiSlot={
+              <KPI
+                tone="rose"
+                size="hero"
+                icon={Building2}
+                label="Órgãos atendidos"
+                value={qtdOrgaos}
+                meta="Distintos · CNPJ único"
+              />
+            }
+          />
+        )}
 
         <div className="mt-3.5">
           <ChartCard

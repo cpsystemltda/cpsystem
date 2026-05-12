@@ -5,12 +5,16 @@ import { Search, X } from "lucide-react";
 
 type Opcao = { value: string; label: string };
 
+type Filtro =
+  | { name: string; label: string; opcoes: Opcao[]; tipo?: "select" }
+  | { name: string; label: string; tipo: "date" };
+
 export function FiltroLista({
   placeholderBusca,
   filtros = [],
 }: {
   placeholderBusca?: string;
-  filtros?: { name: string; label: string; opcoes: Opcao[] }[];
+  filtros?: Filtro[];
 }) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -37,21 +41,36 @@ export function FiltroLista({
         />
       </div>
 
-      {filtros.map((f) => (
-        <select
-          key={f.name}
-          value={sp.get(f.name) || ""}
-          onChange={(e) => setParam(f.name, e.target.value)}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500"
-        >
-          <option value="">{f.label}</option>
-          {f.opcoes.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      ))}
+      {filtros.map((f) => {
+        if (f.tipo === "date") {
+          return (
+            <label key={f.name} className="flex items-center gap-1 text-xs text-slate-600">
+              <span>{f.label}</span>
+              <input
+                type="date"
+                value={sp.get(f.name) || ""}
+                onChange={(e) => setParam(f.name, e.target.value)}
+                className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+              />
+            </label>
+          );
+        }
+        return (
+          <select
+            key={f.name}
+            value={sp.get(f.name) || ""}
+            onChange={(e) => setParam(f.name, e.target.value)}
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-blue-500"
+          >
+            <option value="">{f.label}</option>
+            {f.opcoes.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        );
+      })}
 
       {temFiltro && (
         <button
