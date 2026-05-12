@@ -28,6 +28,7 @@ import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { Block } from "@/components/ui/Block";
 import { KPI, CurrencyValue } from "@/components/ui/KPI";
 import { ChartCard } from "@/components/ui/ChartCard";
+import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -102,11 +103,20 @@ export default async function DashboardPage() {
     }),
     prisma.contrato.findMany({
       where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } },
-      select: { tipo: true, vigenciaFim: true, itens: { select: { valorTotal: true } } },
+      select: {
+        id: true,
+        numero: true,
+        orgaoNome: true,
+        tipo: true,
+        vigenciaFim: true,
+        itens: { select: { valorTotal: true } },
+      },
     }),
     prisma.ata.findMany({
       where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } },
       select: {
+        id: true,
+        numero: true,
         tipo: true,
         vigenciaFim: true,
         orgaoNome: true,
@@ -131,7 +141,8 @@ export default async function DashboardPage() {
         empresa: { select: { nomeFantasia: true, razaoSocial: true } },
       },
       orderBy: [{ dataPrevistaExecucao: "asc" }, { vigenciaFim: "asc" }],
-      take: 6,
+      // Take maior pra capturar agenda da semana corrente + lista geral
+      take: 50,
     }),
     dadosPorUf(contaId, empresaIdSelecionada ?? undefined),
     prisma.procedimentoApuratorio.findMany({
@@ -192,9 +203,11 @@ export default async function DashboardPage() {
     .filter((e) => ["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(e.status))
     .reduce((s, e) => s + sumItens(e), 0);
 
-  const valoresAExecutar = empenhosCompletos
-    .filter((e) => ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"].includes(e.status))
-    .reduce((s, e) => s + sumItens(e), 0);
+  // Fórmula determinística (briefing Igor): saldo disponível = carteira
+  // contratada (Atas+Contratos vigentes) menos o que já entrou em execução
+  // efetiva. Antes era um filtro por status dos empenhos, o que dava número
+  // diferente do "Contratados − Executados" esperado.
+  const valoresAExecutar = Math.max(0, valoresContratados - valoresExecutados);
 
   const valoresRecebidos = empenhosCompletos
     .filter((e) => e.status === "PAGO")
@@ -260,6 +273,43 @@ export default async function DashboardPage() {
     if (idx >= 0 && idx < 12) vencimentosPorMes[idx] += 1;
   }
   const maxVenc = Math.max(1, ...vencimentosPorMes);
+
+  // Agenda da semana corrente (segunda a domingo). Recorta proximasEntregas
+  // pelo intervalo. Usa dataPrevistaExecucao quando preenchida, senão
+  // vigenciaFim como proxy de "data limite".
+  const inicioSemana = (() => {
+    const d = new Date(hoje);
+    d.setHours(0, 0, 0, 0);
+    // getDay: 0=domingo, 1=segunda... — converte pra semana iniciando na seg
+    const diaSemana = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - diaSemana);
+    return d;
+  })();
+  const fimSemana = new Date(inicioSemana);
+  fimSemana.setDate(fimSemana.getDate() + 7);
+  const agendaSemana = proximasEntregas
+    .map((e) => ({ ...e, limite: e.dataPrevistaExecucao ?? e.vigenciaFim }))
+    .filter((e) => e.limite >= inicioSemana && e.limite < fimSemana)
+    .sort((a, b) => a.limite.getTime() - b.limite.getTime());
+
+  // Lista única pra TimelineVencimentos: Atas + Contratos com vigência em
+  // até 120 dias. Sort feito no componente client (pra reagir aos filtros).
+  const itensTimeline = [
+    ...atasVigentesDetalhe.map((a) => ({
+      id: a.id,
+      tipo: "ata" as const,
+      numero: a.numero,
+      orgaoNome: a.orgaoNome,
+      vigenciaFim: a.vigenciaFim,
+    })),
+    ...contratosVigentesDetalhe.map((c) => ({
+      id: c.id,
+      tipo: "contrato" as const,
+      numero: c.numero,
+      orgaoNome: c.orgaoNome,
+      vigenciaFim: c.vigenciaFim,
+    })),
+  ];
 
   // Contratos contínuos (briefing Igor): só tipos contínuos, agrupados em faixas
   // de vencimento (alertas de renovação). Sem "renovação automática" (não existe).
@@ -471,7 +521,7 @@ export default async function DashboardPage() {
             label="Valores recebidos"
             value={<CurrencyValue amount={valoresRecebidos} />}
             meta={`${empenhosPagos} empenhos pagos`}
-            href="/execucao"
+            href="/execucao?status=PAGO"
           />
           <KPI
             tone="rose"
@@ -479,7 +529,7 @@ export default async function DashboardPage() {
             label="Valores a receber"
             value={<CurrencyValue amount={valoresAReceber} />}
             meta={`${nfsPendentes} NFs pendentes`}
-            href="/execucao"
+            href="/execucao?status=NF_ENCAMINHADA"
           />
           <KPI
             tone="coral"
@@ -586,12 +636,7 @@ export default async function DashboardPage() {
         )}
 
         <div className="mt-3.5">
-          <ChartCard
-            title="Vencimentos nos próximos 12 meses"
-            subtitle="Janela rolling a partir de hoje — antecipe renovações e aditivos"
-          >
-            <MesesChart dados={vencimentosPorMes} max={maxVenc} rotulos={rotulosMeses} />
-          </ChartCard>
+          <TimelineVencimentos itens={itensTimeline} />
         </div>
       </Block>
 
@@ -668,7 +713,16 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mt-3.5">
-          <TabelaLogistica entregas={proximasEntregas} hoje={hoje} />
+          <AgendaSemana
+            entregas={agendaSemana}
+            inicio={inicioSemana}
+            fim={fimSemana}
+            hoje={hoje}
+          />
+        </div>
+
+        <div className="mt-3.5">
+          <TabelaLogistica entregas={proximasEntregas.slice(0, 6)} hoje={hoje} />
         </div>
       </Block>
 
@@ -1300,5 +1354,155 @@ function TabelaLogistica({
         </tbody>
       </table>
     </div>
+  );
+}
+
+// Agenda da semana corrente (segunda a domingo) — empenhos cujo prazo de
+// execução cai no intervalo. Renderiza em 7 colunas (dia da semana) com os
+// itens agrupados; se um dia está vazio mostra "—" pra dar previsibilidade
+// visual.
+function AgendaSemana({
+  entregas,
+  inicio,
+  fim,
+  hoje,
+}: {
+  entregas: {
+    id: string;
+    numero: string;
+    objeto: string;
+    orgaoNome: string;
+    status: string;
+    limite: Date;
+  }[];
+  inicio: Date;
+  fim: Date;
+  hoje: Date;
+}) {
+  const DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+  const hojeNorm = new Date(hoje);
+  hojeNorm.setHours(0, 0, 0, 0);
+
+  // Agrupa por offset 0..6 a partir do início da semana
+  const porDia: Map<number, typeof entregas> = new Map();
+  for (let i = 0; i < 7; i++) porDia.set(i, []);
+  for (const e of entregas) {
+    const ms = e.limite.getTime() - inicio.getTime();
+    const dia = Math.floor(ms / 86400000);
+    if (dia >= 0 && dia < 7) porDia.get(dia)!.push(e);
+  }
+
+  const total = entregas.length;
+  const fimMostrar = new Date(fim.getTime() - 86400000);
+
+  return (
+    <section
+      className="glass overflow-hidden rounded-[20px] px-5 py-5"
+      style={{ border: "0.5px solid var(--hairline)" }}
+    >
+      <header className="mb-4 flex items-end justify-between gap-3">
+        <div>
+          <h3
+            className="text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
+            Agenda da semana
+          </h3>
+          <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
+            {inicio.toLocaleDateString("pt-BR")} → {fimMostrar.toLocaleDateString("pt-BR")} · {total} execução(ões) com prazo nesta semana
+          </p>
+        </div>
+      </header>
+
+      {total === 0 ? (
+        <div
+          className="rounded-xl px-6 py-10 text-center"
+          style={{ border: "0.5px dashed var(--hairline)" }}
+        >
+          <p className="text-sm font-extrabold" style={{ color: "var(--text)" }}>
+            Sem entregas previstas para esta semana.
+          </p>
+          <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
+            Empenhos com prazo entre {inicio.toLocaleDateString("pt-BR")} e {fimMostrar.toLocaleDateString("pt-BR")}.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-2 md:grid-cols-7">
+          {DIAS.map((label, idx) => {
+            const dataDia = new Date(inicio);
+            dataDia.setDate(dataDia.getDate() + idx);
+            const ehHoje = dataDia.getTime() === hojeNorm.getTime();
+            const itens = porDia.get(idx) ?? [];
+            return (
+              <div
+                key={idx}
+                className="rounded-xl px-3 py-2"
+                style={{
+                  background: ehHoje ? "rgba(212,175,55,0.14)" : "rgba(15,14,12,0.03)",
+                  border: ehHoje
+                    ? "0.5px solid rgba(168,137,71,0.5)"
+                    : "0.5px solid var(--hairline)",
+                  minHeight: "92px",
+                }}
+              >
+                <div className="mb-1.5 flex items-center justify-between gap-1">
+                  <span
+                    className="text-[10px] font-bold uppercase"
+                    style={{
+                      letterSpacing: "0.12em",
+                      color: ehHoje ? "var(--primary-deep)" : "var(--text-mute)",
+                    }}
+                  >
+                    {label} {dataDia.getDate().toString().padStart(2, "0")}
+                  </span>
+                  {ehHoje && (
+                    <span
+                      className="rounded-full px-1.5 py-0.5 text-[9px] font-extrabold"
+                      style={{
+                        background: "var(--primary-deep)",
+                        color: "white",
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      HOJE
+                    </span>
+                  )}
+                </div>
+                {itens.length === 0 ? (
+                  <p className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+                    —
+                  </p>
+                ) : (
+                  <ul className="space-y-1">
+                    {itens.map((e) => {
+                      const atrasado = e.limite < hojeNorm;
+                      return (
+                        <li key={e.id}>
+                          <Link
+                            href={`/execucao/${e.id}`}
+                            className="block rounded px-1.5 py-1 text-[11px] hover:bg-white/70"
+                            style={{
+                              color: atrasado ? "var(--coral-deep)" : "var(--text)",
+                              background: "rgba(255,255,255,0.5)",
+                              border: "0.5px solid var(--hairline)",
+                            }}
+                            title={`Empenho ${e.numero} · ${e.orgaoNome} · ${e.objeto}`}
+                          >
+                            <p className="truncate font-bold">Empenho {e.numero}</p>
+                            <p className="truncate" style={{ color: "var(--text-soft)" }}>
+                              {e.orgaoNome}
+                            </p>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }

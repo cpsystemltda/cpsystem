@@ -481,6 +481,7 @@ export async function atualizarAtaItemAction(_p: Result | null, formData: FormDa
   });
 
   revalidatePath(`/atas/${itemAntes.ataId}`);
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -518,6 +519,7 @@ export async function removerAtaItemAction(formData: FormData) {
   });
 
   revalidatePath(`/atas/${item.ataId}`);
+  revalidatePath("/dashboard");
 }
 
 // ============================================================
@@ -572,6 +574,7 @@ export async function atualizarContratoItemAction(_p: Result | null, formData: F
   });
 
   revalidatePath(`/contratos/${itemAntes.contratoId}`);
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -614,6 +617,7 @@ export async function removerContratoItemAction(formData: FormData) {
   });
 
   revalidatePath(`/contratos/${item.contratoId}`);
+  revalidatePath("/dashboard");
 }
 
 // ============================================================
@@ -676,6 +680,7 @@ export async function atualizarEmpenhoItemAction(_p: Result | null, formData: Fo
   });
 
   revalidatePath(`/execucao/${itemAntes.empenhoId}`);
+  revalidatePath("/dashboard");
   return { ok: true };
 }
 
@@ -712,6 +717,7 @@ export async function removerEmpenhoItemAction(formData: FormData) {
   });
 
   revalidatePath(`/execucao/${item.empenhoId}`);
+  revalidatePath("/dashboard");
 }
 
 export async function adicionarPontoFocalAction(_p: Result | null, formData: FormData): Promise<Result> {
