@@ -2,12 +2,14 @@
 
 import { useState, type ReactNode } from "react";
 import { MapaBrasil, type DadosUf } from "@/components/MapaBrasil";
+import { MapaPinsBrasil, type PinMapa } from "@/components/MapaPinsBrasil";
 import { brl } from "@/lib/validators";
 
 type Cliente = {
   nome: string;
   valor: number;
   uf: string | null;
+  cnpj?: string;
 };
 
 /**
@@ -18,17 +20,23 @@ type Cliente = {
 export function ClientesMapaSync({
   clientes,
   dadosUf,
+  pins,
   kpiSlot,
   mapaTitle,
   mapaSubtitle,
 }: {
   clientes: Cliente[];
   dadosUf: DadosUf[];
+  // Quando há pins geocodificados, usamos MapaPinsBrasil (Leaflet) com
+  // marcadores reais por órgão. Sem pins, fallback no choropleth SVG.
+  pins?: PinMapa[];
   kpiSlot: ReactNode;
   mapaTitle?: string;
   mapaSubtitle?: string;
 }) {
   const [ufDestaque, setUfDestaque] = useState<string | null>(null);
+  const [cnpjDestaque, setCnpjDestaque] = useState<string | null>(null);
+  const usarPins = (pins?.length ?? 0) > 0;
 
   return (
     <>
@@ -56,20 +64,29 @@ export function ClientesMapaSync({
                 clientes.map((c) => (
                   <tr
                     key={c.nome}
-                    onMouseEnter={() => setUfDestaque(c.uf)}
-                    onMouseLeave={() => setUfDestaque(null)}
+                    onMouseEnter={() => {
+                      setUfDestaque(c.uf);
+                      if (c.cnpj) setCnpjDestaque(c.cnpj);
+                    }}
+                    onMouseLeave={() => {
+                      setUfDestaque(null);
+                      setCnpjDestaque(null);
+                    }}
                     style={{
-                      cursor: c.uf ? "pointer" : "default",
+                      cursor: c.uf || c.cnpj ? "pointer" : "default",
                       background:
-                        c.uf && ufDestaque === c.uf
+                        (c.uf && ufDestaque === c.uf) ||
+                        (c.cnpj && cnpjDestaque === c.cnpj)
                           ? "rgba(212,175,55,0.10)"
                           : undefined,
                       transition: "background 120ms",
                     }}
                     title={
-                      c.uf
-                        ? `Passe o mouse para destacar ${c.uf} no mapa`
-                        : "UF não identificada"
+                      c.cnpj
+                        ? "Passe o mouse para destacar o pin no mapa"
+                        : c.uf
+                          ? `Passe o mouse para destacar ${c.uf} no mapa`
+                          : "Sem geocode"
                     }
                   >
                     <td className="strong">
@@ -106,14 +123,20 @@ export function ClientesMapaSync({
               className="text-[12px] font-bold uppercase"
               style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
             >
-              {mapaTitle ?? "Mapa de operações por estado"}
+              {mapaTitle ?? (usarPins ? "Órgãos atendidos no mapa" : "Mapa de operações por estado")}
             </h3>
             <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
               {mapaSubtitle ??
-                "Passe o mouse sobre uma linha da lista para destacar o estado no mapa."}
+                (usarPins
+                  ? "Cada pin é um órgão. Passe o mouse sobre uma linha da lista para destacar o pin correspondente; clique nos clusters para expandir."
+                  : "Passe o mouse sobre uma linha da lista para destacar o estado no mapa.")}
             </p>
           </header>
-          <MapaBrasil dados={dadosUf} ufDestaque={ufDestaque} />
+          {usarPins ? (
+            <MapaPinsBrasil pins={pins ?? []} cnpjDestaque={cnpjDestaque} />
+          ) : (
+            <MapaBrasil dados={dadosUf} ufDestaque={ufDestaque} />
+          )}
         </section>
       </div>
     </>

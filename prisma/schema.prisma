@@ -1142,6 +1142,19 @@ enum AcaoAuditoria {
   DOWNLOAD
 }
 
+// Cache de geocodificação por CNPJ. Evita bater no Nominatim toda vez que
+// o dashboard carrega. Atualizado on-demand quando um órgão novo aparece
+// ou quando o endereço cadastrado muda.
+model OrgaoGeocode {
+  cnpj         String   @id // CNPJ normalizado (só dígitos)
+  endereco     String   // endereço usado pra geocodificar (audita re-trigger)
+  latitude     Float
+  longitude    Float
+  precisao     String?  // "exact" / "city" / "state" — qualidade do resultado
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
 model LogAuditoria {
   id          String        @id @default(cuid())
   contaId     String

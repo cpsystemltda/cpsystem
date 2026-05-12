@@ -22,6 +22,7 @@ import {
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { dadosPorUf, extrairUf } from "@/lib/agregacaoUf";
+import { coletarPinsOrgaos } from "@/lib/pinsOrgaos";
 import { MapaBrasil } from "@/components/MapaBrasil";
 import { ClientesMapaSync } from "@/components/ClientesMapaSync";
 import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
@@ -176,6 +177,14 @@ export default async function DashboardPage() {
       },
     }).catch(() => 0),
   ]);
+
+  // Pins geocodificados — fora do Promise.all principal porque a primeira
+  // chamada pode bater no Nominatim (até 5-6 segundos). Cache em
+  // OrgaoGeocode garante que carregas subsequentes sejam instantâneas.
+  // Falha silenciosa: pins vazio = fallback no choropleth.
+  const pinsOrgaos = await coletarPinsOrgaos(contaId, empresaIdSelecionada ?? undefined).catch(
+    () => [],
+  );
 
   // === Cálculos financeiros (semântica do briefing) ===
   const sumItens = (e: { itens: { valorTotal: number }[] }) =>
@@ -361,32 +370,39 @@ export default async function DashboardPage() {
   const qtdOrgaos = orgaosUnicos.size;
 
   // Ranking de órgãos por valor contratado — soma empenhos + atas vigentes.
-  // Mantém também o endereço para extrair UF (sync lista↔mapa).
+  // Mantém também o endereço e CNPJ pra sync lista↔mapa (por UF no
+  // choropleth, por pin individual no Leaflet).
   const orgaoMap = new Map<
     string,
-    { nome: string; valor: number; endereco: string | null }
+    { cnpj: string; nome: string; valor: number; endereco: string | null }
   >();
   for (const e of empenhosCompletos) {
-    const cur = orgaoMap.get(e.orgaoCnpj) ?? {
+    const cnpjLimpo = (e.orgaoCnpj ?? "").replace(/\D/g, "");
+    if (!cnpjLimpo) continue;
+    const cur = orgaoMap.get(cnpjLimpo) ?? {
+      cnpj: cnpjLimpo,
       nome: e.orgaoNome,
       valor: 0,
       endereco: e.orgaoEndereco ?? null,
     };
     cur.valor += sumItens(e);
     if (!cur.endereco && e.orgaoEndereco) cur.endereco = e.orgaoEndereco;
-    orgaoMap.set(e.orgaoCnpj, cur);
+    orgaoMap.set(cnpjLimpo, cur);
   }
   for (const a of atasVigentesDetalhe) {
     if (!a.orgaoCnpj) continue;
+    const cnpjLimpo = a.orgaoCnpj.replace(/\D/g, "");
+    if (!cnpjLimpo) continue;
     const valorAta = a.itens.reduce((s, it) => s + it.valorTotal, 0);
-    const cur = orgaoMap.get(a.orgaoCnpj) ?? {
+    const cur = orgaoMap.get(cnpjLimpo) ?? {
+      cnpj: cnpjLimpo,
       nome: a.orgaoNome,
       valor: 0,
       endereco: a.orgaoEndereco ?? null,
     };
     cur.valor += valorAta;
     if (!cur.endereco && a.orgaoEndereco) cur.endereco = a.orgaoEndereco;
-    orgaoMap.set(a.orgaoCnpj, cur);
+    orgaoMap.set(cnpjLimpo, cur);
   }
   const rankingOrgaos = Array.from(orgaoMap.values())
     .map((r) => ({ ...r, uf: extrairUf(r.endereco) }))
@@ -785,6 +801,7 @@ export default async function DashboardPage() {
           <ClientesMapaSync
             clientes={clientesTabela}
             dadosUf={dadosUf}
+            pins={pinsOrgaos}
             kpiSlot={
               <KPI
                 tone="rose"
