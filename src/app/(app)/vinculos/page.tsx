@@ -3,7 +3,13 @@ import { UserCheck, Briefcase } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
-import { NovoVinculoForm, EditarFixoForm, EncerrarVinculoButton, MarcarFixoPagoForm } from "./VinculoForms";
+import {
+  NovoVinculoForm,
+  EditarFixoForm,
+  EditarPercentualForm,
+  EncerrarVinculoButton,
+  MarcarFixoPagoForm,
+} from "./VinculoForms";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 
 function formatarCpf(cpf: string): string {
@@ -126,7 +132,7 @@ export default async function VinculosPage() {
                         <div>
                           <p className="text-[10px] uppercase tracking-wide text-slate-500">Comissão</p>
                           <p className="font-bold">{v.percentualComissao}%</p>
-                          <p className="text-[10px] text-slate-500">(o analista pode ajustar)</p>
+                          <p className="text-[10px] text-slate-500">vale para execuções futuras</p>
                         </div>
                         <div>
                           <p className="text-[10px] uppercase tracking-wide text-slate-500">Fixo mensal</p>
@@ -150,6 +156,7 @@ export default async function VinculosPage() {
 
                     {v.status === "ATIVO" && (
                       <div className="flex flex-col items-end gap-2">
+                        <EditarPercentualForm vinculoId={v.id} percentualAtual={v.percentualComissao} />
                         <EditarFixoForm vinculoId={v.id} fixoAtual={v.fixoMensal} diaAtual={v.diaVencimentoFixo} />
                         <EncerrarVinculoButton vinculoId={v.id} nomeAnalista={v.analista.nomeCompleto} />
                       </div>

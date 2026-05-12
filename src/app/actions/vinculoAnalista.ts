@@ -116,21 +116,50 @@ export async function atualizarFixoAction(_p: Result | null, formData: FormData)
 }
 
 // ANALISTA → atualiza só o próprio percentual de comissão
+/**
+ * Atualiza o percentual da comissão variável de um vínculo.
+ *
+ * Quem pode editar (regra da spec original do painel do analista):
+ *   - Conta ANALISTA: o próprio analista (só os vínculos dele).
+ *   - Conta EMPRESA com perfil ADMIN: o admin da empresa fornecedora
+ *     (só os vínculos da própria conta).
+ *
+ * Mudança vale só pra execuções futuras — comissões já criadas em
+ * ComissaoExecucao têm o percentual snapshotado e não são reescritas
+ * retroativamente (essa é a regra de override). Para alterar uma comissão
+ * já existente, use overridePercentualComissaoAction com justificativa.
+ */
 export async function atualizarPercentualAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
-  if (usuario.conta.tipo !== "ANALISTA") return { erro: "Apenas contas de analista." };
-
-  const analista = await prisma.analista.findUnique({ where: { contaId: usuario.contaId } });
-  if (!analista) return { erro: "Conta de analista sem perfil cadastrado." };
-
   const vinculoId = String(formData.get("vinculoId") || "");
-  const v = await prisma.vinculoAnalista.findFirst({
-    where: { id: vinculoId, analistaId: analista.id },
-  });
-  if (!v) return { erro: "Vínculo não encontrado." };
-
   const percentual = Number(formData.get("percentualComissao") || 0);
   if (percentual < 0 || percentual > 100) return { erro: "Percentual fora do intervalo." };
+
+  let v: { id: string; percentualComissao: number } | null = null;
+  let resumoQuem = "";
+
+  if (usuario.conta.tipo === "ANALISTA") {
+    const analista = await prisma.analista.findUnique({ where: { contaId: usuario.contaId } });
+    if (!analista) return { erro: "Conta de analista sem perfil cadastrado." };
+    v = await prisma.vinculoAnalista.findFirst({
+      where: { id: vinculoId, analistaId: analista.id },
+      select: { id: true, percentualComissao: true },
+    });
+    resumoQuem = "Analista";
+  } else if (usuario.conta.tipo === "EMPRESA") {
+    if (usuario.perfil !== "ADMIN") {
+      return { erro: "Apenas o ADMIN da empresa pode alterar o percentual de comissão." };
+    }
+    v = await prisma.vinculoAnalista.findFirst({
+      where: { id: vinculoId, contaId: usuario.contaId },
+      select: { id: true, percentualComissao: true },
+    });
+    resumoQuem = "Admin da empresa";
+  } else {
+    return { erro: "Apenas analista ou ADMIN da empresa pode alterar o percentual." };
+  }
+
+  if (!v) return { erro: "Vínculo não encontrado ou sem permissão." };
 
   await prisma.vinculoAnalista.update({ where: { id: vinculoId }, data: { percentualComissao: percentual } });
 
@@ -140,7 +169,7 @@ export async function atualizarPercentualAction(_p: Result | null, formData: For
     acao: "ATUALIZAR",
     recurso: "VinculoAnalista",
     recursoId: vinculoId,
-    resumo: `Analista atualizou comissão para ${percentual}%`,
+    resumo: `${resumoQuem} atualizou comissão de ${v.percentualComissao}% para ${percentual}%`,
   });
 
   revalidatePath("/painel-analista");

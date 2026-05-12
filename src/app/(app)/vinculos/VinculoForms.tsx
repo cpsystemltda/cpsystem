@@ -6,6 +6,7 @@ import { useFormStatus } from "react-dom";
 import {
   criarVinculoAnalistaAction,
   atualizarFixoAction,
+  atualizarPercentualAction,
   encerrarVinculoAction,
   marcarFixoPagoAction,
 } from "@/app/actions/vinculoAnalista";
@@ -108,6 +109,69 @@ export function EditarFixoForm({
         <X className="h-3 w-3" />
       </button>
       {state?.erro && <span className="text-[10px] text-red-700">{state.erro}</span>}
+    </form>
+  );
+}
+
+export function EditarPercentualForm({
+  vinculoId,
+  percentualAtual,
+}: {
+  vinculoId: string;
+  percentualAtual: number;
+}) {
+  const [state, formAction] = useActionState(atualizarPercentualAction, null);
+  const [editando, setEditando] = useState(false);
+
+  if (!editando) {
+    return (
+      <button
+        onClick={() => setEditando(true)}
+        className="text-xs text-blue-600 hover:underline"
+        title="Editar percentual da comissão variável (vale só para execuções futuras)"
+      >
+        Editar comissão: {percentualAtual}%
+      </button>
+    );
+  }
+
+  return (
+    <form
+      action={formAction}
+      className="flex items-center gap-2"
+      onSubmit={(ev) => {
+        if (
+          !window.confirm(
+            "Alterar o percentual vale só para execuções futuras. Comissões já criadas mantêm o percentual original. Confirma?",
+          )
+        ) {
+          ev.preventDefault();
+        }
+      }}
+    >
+      <input type="hidden" name="vinculoId" value={vinculoId} />
+      <input
+        type="number"
+        step="0.1"
+        min="0"
+        max="100"
+        name="percentualComissao"
+        defaultValue={percentualAtual}
+        className="w-16 rounded border border-slate-300 px-2 py-1 text-right text-xs"
+      />
+      <span className="text-xs text-slate-500">%</span>
+      <button type="submit" className="rounded bg-blue-600 px-2 py-1 text-xs text-white">
+        <Check className="h-3 w-3" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setEditando(false)}
+        className="rounded border border-slate-300 px-2 py-1 text-xs"
+      >
+        <X className="h-3 w-3" />
+      </button>
+      {state?.erro && <span className="text-[10px] text-red-700">{state.erro}</span>}
+      {state?.ok && <span className="text-[10px] text-emerald-700">salvo</span>}
     </form>
   );
 }
