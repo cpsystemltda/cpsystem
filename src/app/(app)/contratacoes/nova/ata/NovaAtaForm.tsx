@@ -20,7 +20,8 @@ import {
 } from "lucide-react";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor } from "@/components/ItensEditor";
-import { criarAtaAction } from "@/app/actions/contratacoes";
+import type { ItemInicial } from "@/components/ItensEditor";
+import { criarAtaAction, editarAtaAction } from "@/app/actions/contratacoes";
 import { extrairAtaPdfAction } from "@/app/actions/iaExtracao";
 import {
   OPCOES_PROCEDIMENTO,
@@ -31,6 +32,51 @@ import {
 import type { AtaExtraida } from "@/lib/extrairAta";
 
 type EmpresaOpt = { value: string; label: string };
+
+export type AtaValoresIniciais = {
+  empresaId: string;
+  numero: string;
+  processoAdministrativo: string;
+  tipo: string;
+  procedimentoSelecao: string;
+  numeroLicitacao: string | null;
+  idAtaPncp: string | null;
+  objeto: string;
+  orgaoNome: string;
+  orgaoCnpj: string;
+  orgaoEndereco: string;
+  orgaoEmail: string | null;
+  orgaoTelefone: string | null;
+  dataAssinatura: string; // YYYY-MM-DD
+  dataPublicacao: string | null;
+  vigenciaInicio: string;
+  vigenciaFim: string;
+  prazoEntregaDias: number | null;
+  prazoEntregaNaoAplica: boolean;
+  prazoPagamentoDias: number | null;
+  marcoReajusteOrigem: string | null;
+  marcoOrcamentoEstimado: string | null;
+  aceitaCarona: boolean;
+  itens: ItemInicial[];
+  enderecosEntrega: { id: string; rotulo: string | null; endereco: string }[];
+  pontosFocais: {
+    id: string;
+    nome: string;
+    email: string | null;
+    telefone: string | null;
+    funcao: string;
+    funcaoDescricao: string | null;
+  }[];
+  orgaosParticipantes: {
+    id: string;
+    tipo: string;
+    nome: string;
+    cnpj: string;
+    endereco: string;
+    email: string | null;
+    telefone: string | null;
+  }[];
+};
 
 /* ============================================================
    Helpers de máscara
@@ -475,11 +521,18 @@ function rotularErro(path: string): string {
 export default function NovaAtaForm({
   empresas,
   empresaPreSelecionada,
+  modo = "criar",
+  ataId,
+  valoresIniciais,
 }: {
   empresas: EmpresaOpt[];
   empresaPreSelecionada?: string;
+  modo?: "criar" | "editar";
+  ataId?: string;
+  valoresIniciais?: AtaValoresIniciais;
 }) {
-  const [state, formAction] = useActionState(criarAtaAction, null);
+  const action = modo === "editar" ? editarAtaAction : criarAtaAction;
+  const [state, formAction] = useActionState(action, null);
   const e = state?.campos ?? {};
   const v = (state?.valores ?? {}) as Record<string, string>;
   const errosResumo = Object.entries(e);
@@ -489,6 +542,11 @@ export default function NovaAtaForm({
   const [extracaoErro, setExtracaoErro] = useState<string | null>(null);
   const [dados, setDados] = useState<AtaExtraida | null>(null);
   const [pdfNome, setPdfNome] = useState<string | null>(null);
+
+  // Em modo edição, valoresIniciais é o fallback final pra cada campo.
+  // Helper pra ler string-like sem espalhar `?? valoresIniciais?.foo` em
+  // cada defaultValue (escala mal e é fácil de errar).
+  const vi = valoresIniciais;
 
   // Após erro de validação: rola até o resumo de erros e foca o primeiro
   // campo problemático
@@ -503,18 +561,20 @@ export default function NovaAtaForm({
     }
   }, [state]);
 
-  // Estados controlados (PDF apontamentos)
-  const [prazoNaoAplica, setPrazoNaoAplica] = useState(false);
-  const [marcoOrigem, setMarcoOrigem] = useState<string>("");
-  const [temParticipantes, setTemParticipantes] = useState(false);
+  // Estados controlados (PDF apontamentos / pré-preenchidos em modo edição)
+  const [prazoNaoAplica, setPrazoNaoAplica] = useState(vi?.prazoEntregaNaoAplica ?? false);
+  const [marcoOrigem, setMarcoOrigem] = useState<string>(vi?.marcoReajusteOrigem ?? "");
+  const [temParticipantes, setTemParticipantes] = useState(
+    (vi?.orgaosParticipantes?.length ?? 0) > 0,
+  );
 
   // Endereço auto-preenchido pelo CEP do órgão gerenciador
-  const [orgaoEndereco, setOrgaoEndereco] = useState("");
+  const [orgaoEndereco, setOrgaoEndereco] = useState(vi?.orgaoEndereco ?? "");
 
   // Vigência fim controlada — pra warnar quando o usuário escolhe data no passado
   // (caso reportado pela Regina: cadastrou Ata e ela não apareceu como vigente
   // porque a vigenciaFim já tinha passado).
-  const [vigenciaFim, setVigenciaFim] = useState<string>("");
+  const [vigenciaFim, setVigenciaFim] = useState<string>(vi?.vigenciaFim ?? "");
   const vigenciaFimNoPassado = vigenciaFim
     ? new Date(vigenciaFim + "T23:59:59") < new Date()
     : false;
@@ -553,13 +613,13 @@ export default function NovaAtaForm({
             className="text-[11px] font-bold uppercase"
             style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
           >
-            Nova contratação · Ata de Registro de Preços
+            {modo === "editar" ? "Editar registro · Ata de Registro de Preços" : "Nova contratação · Ata de Registro de Preços"}
           </p>
           <h1
             className="mt-2 text-[40px] font-extrabold leading-none"
             style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
           >
-            Cadastre sua{" "}
+            {modo === "editar" ? "Corrigir " : "Cadastre sua "}
             <em
               style={{
                 fontStyle: "normal",
@@ -569,20 +629,22 @@ export default function NovaAtaForm({
                 WebkitTextFillColor: "transparent",
               }}
             >
-              Ata
+              {modo === "editar" ? `Ata ${vi?.numero ?? ""}` : "Ata"}
             </em>
           </h1>
           <p
             className="mt-3 max-w-[640px] text-[14px]"
             style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
           >
-            Os itens registram preço e quantidade. O saldo é abatido automaticamente conforme você
-            gera Contratos e Empenhos.
+            {modo === "editar"
+              ? "Ajuste qualquer campo. Alterações em valores monetários, vigências e CNPJs pedem confirmação. Tudo fica registrado no histórico."
+              : "Os itens registram preço e quantidade. O saldo é abatido automaticamente conforme você gera Contratos e Empenhos."}
           </p>
         </div>
       </header>
 
-      {/* Upload PDF — IA extrai automático */}
+      {/* Upload PDF — IA extrai automático (escondido em modo edição) */}
+      {modo !== "editar" && (
       <section
         className="glass-tile mt-5 overflow-hidden rounded-[20px] px-7 py-6"
         style={{
@@ -673,8 +735,27 @@ export default function NovaAtaForm({
           </div>
         </div>
       </section>
+      )}
 
-      <form key={formKey} action={formAction} className="mt-6 space-y-5">
+      <form
+        key={formKey}
+        action={formAction}
+        className="mt-6 space-y-5"
+        onSubmit={(ev) => {
+          if (modo === "editar") {
+            const ok = window.confirm(
+              "Tem certeza? As alterações em valores monetários, datas de vigência e CNPJs serão registradas no histórico.",
+            );
+            if (!ok) {
+              ev.preventDefault();
+              ev.stopPropagation();
+            }
+          }
+        }}
+      >
+        {modo === "editar" && ataId && (
+          <input type="hidden" name="ataId" value={ataId} />
+        )}
         {/* Resumo de erros — clicável, scroll-into-view + focus */}
         {(state?.erro || errosResumo.length > 0) && (
           <div
@@ -730,7 +811,7 @@ export default function NovaAtaForm({
               required
               erro={e.empresaId}
               span={2}
-              defaultValue={(v.empresaId as string) ?? empresaPreSelecionada}
+              defaultValue={(v.empresaId as string) ?? vi?.empresaId ?? empresaPreSelecionada}
             />
             <FieldGlass
               label="Número da Ata"
@@ -739,7 +820,7 @@ export default function NovaAtaForm({
               required
               erro={e.numero}
               span={1}
-              defaultValue={(v.numero as string) ?? dados?.numero}
+              defaultValue={(v.numero as string) ?? dados?.numero ?? vi?.numero}
             />
             <FieldGlass
               label="Processo administrativo"
@@ -747,7 +828,7 @@ export default function NovaAtaForm({
               required
               erro={e.processoAdministrativo}
               span={1}
-              defaultValue={(v.processoAdministrativo as string) ?? dados?.processoAdministrativo}
+              defaultValue={(v.processoAdministrativo as string) ?? dados?.processoAdministrativo ?? vi?.processoAdministrativo}
             />
             <SelectGlass
               label="Tipo de objeto"
@@ -756,6 +837,7 @@ export default function NovaAtaForm({
               required
               erro={e.tipo}
               span={2}
+              defaultValue={(v.tipo as string) ?? vi?.tipo}
             />
             <SelectGlass
               label="Procedimento de seleção"
@@ -764,7 +846,7 @@ export default function NovaAtaForm({
               required
               erro={e.procedimentoSelecao}
               span={1}
-              defaultValue={dados?.procedimentoSelecao}
+              defaultValue={dados?.procedimentoSelecao ?? vi?.procedimentoSelecao}
             />
             <FieldGlass
               label="Nº do Pregão Eletrônico"
@@ -772,7 +854,7 @@ export default function NovaAtaForm({
               placeholder="123/2025"
               erro={e.numeroLicitacao}
               span={1}
-              defaultValue={dados?.numeroLicitacao ?? ""}
+              defaultValue={dados?.numeroLicitacao ?? vi?.numeroLicitacao ?? ""}
             />
             <FieldGlass
               label="ID Ata no PNCP"
@@ -780,7 +862,7 @@ export default function NovaAtaForm({
               helper="Opcional — preencha se já estiver publicado no PNCP"
               erro={e.idAtaPncp}
               span={2}
-              defaultValue={dados?.idAtaPncp ?? ""}
+              defaultValue={dados?.idAtaPncp ?? vi?.idAtaPncp ?? ""}
             />
             <TextareaGlass
               label="Objeto (descrição geral)"
@@ -789,7 +871,7 @@ export default function NovaAtaForm({
               erro={e.objeto}
               span={4}
               minRows={3}
-              defaultValue={(v.objeto as string) ?? dados?.objeto}
+              defaultValue={(v.objeto as string) ?? dados?.objeto ?? vi?.objeto}
               placeholder="Descreva o objeto da contratação por completo — bens, serviços, especificações técnicas, condições."
             />
           </div>
@@ -809,7 +891,7 @@ export default function NovaAtaForm({
               required
               erro={e.orgaoNome}
               span={2}
-              defaultValue={dados?.orgaoNome}
+              defaultValue={dados?.orgaoNome ?? vi?.orgaoNome}
             />
             <CnpjInput
               label="CNPJ do órgão"
@@ -817,7 +899,7 @@ export default function NovaAtaForm({
               required
               erro={e.orgaoCnpj}
               span={2}
-              defaultValue={dados?.orgaoCnpj}
+              defaultValue={dados?.orgaoCnpj ?? vi?.orgaoCnpj}
             />
             <CepInput
               label="CEP do órgão"
@@ -836,7 +918,7 @@ export default function NovaAtaForm({
               span={3}
               value={orgaoEndereco}
               onChange={setOrgaoEndereco}
-              defaultValue={dados?.orgaoEndereco}
+              defaultValue={dados?.orgaoEndereco ?? vi?.orgaoEndereco}
             />
             <FieldGlass
               label="E-mail"
@@ -844,14 +926,14 @@ export default function NovaAtaForm({
               type="email"
               erro={e.orgaoEmail}
               span={2}
-              defaultValue={dados?.orgaoEmail ?? ""}
+              defaultValue={dados?.orgaoEmail ?? vi?.orgaoEmail ?? ""}
             />
             <FieldGlass
               label="Telefone"
               name="orgaoTelefone"
               erro={e.orgaoTelefone}
               span={2}
-              defaultValue={dados?.orgaoTelefone ?? ""}
+              defaultValue={dados?.orgaoTelefone ?? vi?.orgaoTelefone ?? ""}
             />
           </div>
         </SecaoGlass>
@@ -892,7 +974,7 @@ export default function NovaAtaForm({
             </div>
           </fieldset>
 
-          {temParticipantes && <OrgaosParticipantesEditor />}
+          {temParticipantes && <OrgaosParticipantesEditor iniciais={vi?.orgaosParticipantes} />}
         </SecaoGlass>
 
         {/* === 2.4 DATAS E PRAZOS === */}
@@ -910,7 +992,7 @@ export default function NovaAtaForm({
               required
               erro={e.dataAssinatura}
               span={1}
-              defaultValue={dados?.dataAssinatura}
+              defaultValue={dados?.dataAssinatura ?? vi?.dataAssinatura}
             />
             <FieldGlass
               label="Data de publicação"
@@ -918,7 +1000,7 @@ export default function NovaAtaForm({
               type="date"
               erro={e.dataPublicacao}
               span={1}
-              defaultValue={dados?.dataPublicacao ?? ""}
+              defaultValue={dados?.dataPublicacao ?? vi?.dataPublicacao ?? ""}
             />
             <FieldGlass
               label="Vigência — início"
@@ -927,7 +1009,7 @@ export default function NovaAtaForm({
               required
               erro={e.vigenciaInicio}
               span={1}
-              defaultValue={dados?.vigenciaInicio}
+              defaultValue={dados?.vigenciaInicio ?? vi?.vigenciaInicio}
             />
             <FieldGlass
               label="Vigência — fim"
@@ -936,7 +1018,7 @@ export default function NovaAtaForm({
               required
               erro={e.vigenciaFim}
               span={1}
-              value={vigenciaFim || (v.vigenciaFim as string) || dados?.vigenciaFim || ""}
+              value={vigenciaFim || (v.vigenciaFim as string) || dados?.vigenciaFim || vi?.vigenciaFim || ""}
               onChange={setVigenciaFim}
             />
             {vigenciaFimNoPassado && (
@@ -975,7 +1057,7 @@ export default function NovaAtaForm({
                   min="0"
                   placeholder="Dias"
                   disabled={prazoNaoAplica}
-                  defaultValue={dados?.prazoEntregaDias?.toString() ?? ""}
+                  defaultValue={dados?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""}
                   className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
                   style={{ opacity: prazoNaoAplica ? 0.5 : 1 }}
                 />
@@ -997,6 +1079,7 @@ export default function NovaAtaForm({
                     name="prazoEntregaNaoAplica"
                     checked={prazoNaoAplica}
                     onChange={(ev) => setPrazoNaoAplica(ev.target.checked)}
+                    value="on"
                     className="h-3.5 w-3.5"
                   />
                   Não se aplica
@@ -1011,7 +1094,7 @@ export default function NovaAtaForm({
               label="Prazo de pagamento (dias)"
               name="prazoPagamentoDias"
               type="number"
-              defaultValue={dados?.prazoPagamentoDias?.toString() ?? ""}
+              defaultValue={dados?.prazoPagamentoDias?.toString() ?? vi?.prazoPagamentoDias?.toString() ?? ""}
               span={2}
             />
 
@@ -1043,6 +1126,7 @@ export default function NovaAtaForm({
                 <input
                   type="date"
                   name="marcoOrcamentoEstimado"
+                  defaultValue={vi?.marcoOrcamentoEstimado ?? ""}
                   disabled={marcoOrigem === "OMISSA" || marcoOrigem === ""}
                   className="rounded-xl px-4 py-3 text-sm font-medium"
                   style={{ opacity: marcoOrigem === "OMISSA" || marcoOrigem === "" ? 0.5 : 1 }}
@@ -1063,7 +1147,7 @@ export default function NovaAtaForm({
                 type="checkbox"
                 name="aceitaCarona"
                 className="mt-0.5"
-                defaultChecked={dados?.aceitaCarona}
+                defaultChecked={dados?.aceitaCarona ?? vi?.aceitaCarona ?? false}
               />
               <span style={{ color: "var(--text-soft)" }}>
                 Esta Ata aceita adesão (carona) por outros órgãos.
@@ -1084,7 +1168,7 @@ export default function NovaAtaForm({
           subtitulo="Onde o órgão pode pedir entrega. CEP busca automaticamente."
           icone={MapPin}
         >
-          <EnderecosEntregaEditor />
+          <EnderecosEntregaEditor iniciais={vi?.enderecosEntrega} />
         </SecaoGlass>
 
         {/* === 2.6 PONTOS FOCAIS === */}
@@ -1094,7 +1178,7 @@ export default function NovaAtaForm({
           subtitulo="Pessoas-chave para gestão e fiscalização (Lei 14.133, art. 117)."
           icone={Users}
         >
-          <PontosFocaisEditor />
+          <PontosFocaisEditor iniciais={vi?.pontosFocais} />
         </SecaoGlass>
 
         {/* === 2.7 ITENS REGISTRADOS === */}
@@ -1104,7 +1188,7 @@ export default function NovaAtaForm({
           subtitulo="Agrupe os itens por lote. Valor unitário com máscara automática."
           icone={Package}
         >
-          <ItensEditor itensIniciais={dados?.itens} />
+          <ItensEditor itensIniciais={vi?.itens ?? dados?.itens} />
         </SecaoGlass>
 
         {state?.erro && (
@@ -1121,9 +1205,9 @@ export default function NovaAtaForm({
         )}
 
         <div className="flex gap-3 pt-2">
-          <SubmitButton>Cadastrar Ata</SubmitButton>
+          <SubmitButton>{modo === "editar" ? "Salvar alterações" : "Cadastrar Ata"}</SubmitButton>
           <Link
-            href="/contratacoes/nova"
+            href={modo === "editar" && ataId ? `/atas/${ataId}` : "/contratacoes/nova"}
             className="btn-secondary inline-flex"
           >
             Cancelar
@@ -1137,16 +1221,24 @@ export default function NovaAtaForm({
 /* ============================================================
    Sub-editor: Endereços de entrega (com busca CEP)
    ============================================================ */
-function EnderecosEntregaEditor() {
-  const [enderecos, setEnderecos] = useState<{ rotulo: string; endereco: string; cep: string }[]>([
-    { rotulo: "", endereco: "", cep: "" },
-  ]);
+function EnderecosEntregaEditor({
+  iniciais,
+}: {
+  iniciais?: { id: string; rotulo: string | null; endereco: string }[];
+}) {
+  const [enderecos, setEnderecos] = useState<
+    { id: string; rotulo: string; endereco: string; cep: string }[]
+  >(
+    iniciais && iniciais.length > 0
+      ? iniciais.map((e) => ({ id: e.id, rotulo: e.rotulo ?? "", endereco: e.endereco, cep: "" }))
+      : [{ id: "", rotulo: "", endereco: "", cep: "" }],
+  );
 
   const atualizar = (idx: number, patch: Partial<{ rotulo: string; endereco: string; cep: string }>) => {
     setEnderecos((prev) => prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)));
   };
   const adicionar = () =>
-    setEnderecos((prev) => [...prev, { rotulo: "", endereco: "", cep: "" }]);
+    setEnderecos((prev) => [...prev, { id: "", rotulo: "", endereco: "", cep: "" }]);
   const remover = (idx: number) =>
     setEnderecos((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
 
@@ -1173,13 +1265,16 @@ function EnderecosEntregaEditor() {
     <div className="space-y-3">
       {enderecos.map((e, idx) => (
         <div
-          key={idx}
+          key={e.id || `novo-${idx}`}
           className="grid grid-cols-12 gap-2 rounded-2xl px-3 py-3"
           style={{
             background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
+          {e.id && (
+            <input type="hidden" name={`enderecosEntrega[${idx}][id]`} value={e.id} />
+          )}
           <input
             type="text"
             placeholder="Rótulo (ex: Almoxarifado central)"
@@ -1238,16 +1333,39 @@ function EnderecosEntregaEditor() {
 /* ============================================================
    Sub-editor: Pontos Focais (sem pré-designações fixas)
    ============================================================ */
-function PontosFocaisEditor() {
+function PontosFocaisEditor({
+  iniciais,
+}: {
+  iniciais?: {
+    id: string;
+    nome: string;
+    email: string | null;
+    telefone: string | null;
+    funcao: string;
+    funcaoDescricao: string | null;
+  }[];
+}) {
   const [pessoas, setPessoas] = useState<
     {
+      id: string;
       nome: string;
       email: string;
       telefone: string;
       funcao: string;
       funcaoDescricao: string;
     }[]
-  >([{ nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" }]);
+  >(
+    iniciais && iniciais.length > 0
+      ? iniciais.map((p) => ({
+          id: p.id,
+          nome: p.nome,
+          email: p.email ?? "",
+          telefone: p.telefone ?? "",
+          funcao: p.funcao,
+          funcaoDescricao: p.funcaoDescricao ?? "",
+        }))
+      : [{ id: "", nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" }],
+  );
 
   const atualizar = (idx: number, patch: Partial<(typeof pessoas)[0]>) => {
     setPessoas((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
@@ -1255,7 +1373,7 @@ function PontosFocaisEditor() {
   const adicionar = () =>
     setPessoas((prev) => [
       ...prev,
-      { nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" },
+      { id: "", nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" },
     ]);
   const remover = (idx: number) =>
     setPessoas((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
@@ -1264,13 +1382,16 @@ function PontosFocaisEditor() {
     <div className="space-y-3">
       {pessoas.map((p, idx) => (
         <div
-          key={idx}
+          key={p.id || `nova-${idx}`}
           className="rounded-2xl px-4 py-4"
           style={{
             background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
+          {p.id && (
+            <input type="hidden" name={`pontosFocais[${idx}][id]`} value={p.id} />
+          )}
           <div className="grid grid-cols-12 gap-3">
             <input
               type="text"
@@ -1354,10 +1475,35 @@ function PontosFocaisEditor() {
 /* ============================================================
    Sub-editor: Órgãos Participantes (briefing 2.3)
    ============================================================ */
-function OrgaosParticipantesEditor() {
+function OrgaosParticipantesEditor({
+  iniciais,
+}: {
+  iniciais?: {
+    id: string;
+    tipo: string;
+    nome: string;
+    cnpj: string;
+    endereco: string;
+    email: string | null;
+    telefone: string | null;
+  }[];
+}) {
   const [orgaos, setOrgaos] = useState<
-    { tipo: string; nome: string; cnpj: string; endereco: string; cep: string; email: string; telefone: string }[]
-  >([{ tipo: "PARTICIPANTE", nome: "", cnpj: "", endereco: "", cep: "", email: "", telefone: "" }]);
+    { id: string; tipo: string; nome: string; cnpj: string; endereco: string; cep: string; email: string; telefone: string }[]
+  >(
+    iniciais && iniciais.length > 0
+      ? iniciais.map((o) => ({
+          id: o.id,
+          tipo: o.tipo,
+          nome: o.nome,
+          cnpj: formatarCnpjInput(o.cnpj),
+          endereco: o.endereco,
+          cep: "",
+          email: o.email ?? "",
+          telefone: o.telefone ?? "",
+        }))
+      : [{ id: "", tipo: "PARTICIPANTE", nome: "", cnpj: "", endereco: "", cep: "", email: "", telefone: "" }],
+  );
 
   const atualizar = (idx: number, patch: Partial<(typeof orgaos)[0]>) => {
     setOrgaos((prev) => prev.map((o, i) => (i === idx ? { ...o, ...patch } : o)));
@@ -1365,7 +1511,7 @@ function OrgaosParticipantesEditor() {
   const adicionar = () =>
     setOrgaos((prev) => [
       ...prev,
-      { tipo: "PARTICIPANTE", nome: "", cnpj: "", endereco: "", cep: "", email: "", telefone: "" },
+      { id: "", tipo: "PARTICIPANTE", nome: "", cnpj: "", endereco: "", cep: "", email: "", telefone: "" },
     ]);
   const remover = (idx: number) =>
     setOrgaos((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
@@ -1390,7 +1536,7 @@ function OrgaosParticipantesEditor() {
     <div className="space-y-3">
       {orgaos.map((o, idx) => (
         <div
-          key={idx}
+          key={o.id || `novo-${idx}`}
           className="rounded-2xl px-4 py-4"
           style={{
             background: "var(--glass-2)",
@@ -1414,6 +1560,9 @@ function OrgaosParticipantesEditor() {
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           </div>
+          {o.id && (
+            <input type="hidden" name={`orgaosParticipantes[${idx}][id]`} value={o.id} />
+          )}
           <input type="hidden" name={`orgaosParticipantes[${idx}][tipo]`} value={o.tipo} />
           <div className="grid grid-cols-12 gap-3">
             <input

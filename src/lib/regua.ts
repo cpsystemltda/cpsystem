@@ -19,6 +19,9 @@ export type ResumoRegua = {
   marcadasAtrasadas: number;
   contasBloqueadas: number;
   cartaoRetentar: number;
+  comissoesAtrasadas: number;
+  fixosGerados: number;
+  fixosAtrasados: number;
 };
 
 export async function executarRegua(): Promise<ResumoRegua> {
@@ -94,10 +97,26 @@ export async function executarRegua(): Promise<ResumoRegua> {
     });
   }
 
+  // 5. Marca comissões variáveis A_RECEBER como ATRASADO após 30 dias da
+  // liberação. Janela padrão; analista pode reverter manualmente.
+  const { marcarComissoesAtrasadas } = await import("@/lib/comissaoExecucao");
+  const comissoesAtrasadas = await marcarComissoesAtrasadas(30);
+
+  // 6. Gera as linhas de comissão fixa mensal do mês corrente para os vínculos
+  // ativos (idempotente). E marca as A_RECEBER vencidas como ATRASADO.
+  const { gerarLinhasComissaoFixaDoMes, marcarFixosAtrasados } = await import(
+    "@/lib/comissaoFixa"
+  );
+  const fixosGerados = await gerarLinhasComissaoFixaDoMes();
+  const fixosAtrasados = await marcarFixosAtrasados();
+
   return {
     avisosVencimento: aVencer.length,
     marcadasAtrasadas: vencidas.length,
     contasBloqueadas: aBloquear.length,
     cartaoRetentar: cartaoRetry.length,
+    comissoesAtrasadas,
+    fixosGerados,
+    fixosAtrasados,
   };
 }

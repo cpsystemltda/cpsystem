@@ -3,6 +3,10 @@ import { Wallet, TrendingUp, Briefcase, AlertCircle, Receipt, Coins } from "luci
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularComissaoAnalista, listarExecucoesDoVinculo } from "@/lib/comissaoB2G";
+import { listarComissoesDoAnalista } from "@/lib/comissaoExecucao";
+import { listarComissoesFixasDoAnalista } from "@/lib/comissaoFixa";
+import { ComissoesVariaveisBloco } from "@/components/ComissoesVariaveisBloco";
+import { ComissoesFixasBloco } from "@/components/ComissoesFixasBloco";
 import { brl, formatarCnpj } from "@/lib/validators";
 import { PercentualForm } from "./PercentualForm";
 import { PageHeader } from "@/components/ui/SecaoGlass";
@@ -104,10 +108,19 @@ export default async function PainelAnalistaPage({
 
         const empresaIds = v.conta.empresas.map((e) => e.id);
         if (empresaIds.length === 0) continue;
-        const [empenhos, atas, contratos] = await Promise.all([
-          prisma.empenho.findMany({
-            where: { empresaId: { in: empresaIds }, criadoEm: { gte: v.dataInicio } },
-            select: { status: true, itens: { select: { valorTotal: true } } },
+        // Consulta a Linha B canônica (ComissaoExecucao) em vez de tentar
+        // inferir do empenho.status — esse era o bug que somava órgão pagar
+        // empresa com empresa pagar comissão.
+        const [comissoes, atas, contratos] = await Promise.all([
+          prisma.comissaoExecucao.findMany({
+            where: { vinculoId: v.id },
+            select: {
+              status: true,
+              valorCalculado: true,
+              valorRecebido: true,
+              valorBaseEmpenho: true,
+              percentual: true,
+            },
           }),
           v.status === "ATIVO"
             ? prisma.ata.findMany({
@@ -122,11 +135,19 @@ export default async function PainelAnalistaPage({
               })
             : Promise.resolve([]),
         ]);
-        for (const e of empenhos) {
-          const valor = e.itens.reduce((s, i) => s + i.valorTotal, 0);
-          const com = (valor * v.percentualComissao) / 100;
-          if (e.status === "PAGO") totalComissaoPaga += com;
-          else if (v.status === "ATIVO") totalComissaoAPagar += com;
+        for (const c of comissoes) {
+          if (c.status === "PAGO") {
+            totalComissaoPaga += c.valorRecebido || c.valorCalculado;
+          } else if (c.status === "PAGO_PARCIAL") {
+            totalComissaoPaga += c.valorRecebido;
+            if (v.status === "ATIVO") {
+              totalComissaoAPagar += Math.max(0, c.valorCalculado - c.valorRecebido);
+            }
+          } else if (c.status === "A_RECEBER" || c.status === "ATRASADO") {
+            if (v.status === "ATIVO") totalComissaoAPagar += c.valorCalculado;
+          }
+          // AGUARDANDO_ORGAO: não conta como "a pagar" — empresa só deve
+          // a comissão depois que o órgão pagar a ela.
         }
         if (v.status === "ATIVO") {
           totalCarteira +=
@@ -232,6 +253,30 @@ export default async function PainelAnalistaPage({
   }
 
   const consolidado = await calcularComissaoAnalista(analista.id);
+  const comissoesExecucao = await listarComissoesDoAnalista(analista.id);
+  const comissoesFixas = await listarComissoesFixasDoAnalista(analista.id);
+  const empresasOpcoes = Array.from(
+    new Map(
+      comissoesExecucao.map((c) => [
+        c.empenho.empresa.id,
+        {
+          id: c.empenho.empresa.id,
+          label:
+            c.empenho.empresa.nomeFantasia || c.empenho.empresa.razaoSocial,
+        },
+      ]),
+    ).values(),
+  );
+  // Opções de empresa pra filtro do bloco fixo (pode ter empresas sem
+  // execução ainda, então precisa unir com as empresas dos vínculos)
+  const empresasFixoOpcoes = Array.from(
+    new Map(
+      comissoesFixas
+        .map((l) => l.vinculo.conta.empresas[0])
+        .filter((e): e is { id: string; razaoSocial: string; nomeFantasia: string | null } => !!e)
+        .map((e) => [e.id, { id: e.id, label: e.nomeFantasia || e.razaoSocial }]),
+    ).values(),
+  );
   const ehPreviewAdmin = usuario.superAdmin && usuario.conta.tipo !== "ANALISTA";
   const vinculoSelecionado = sp.vinculo
     ? consolidado.empresas.find((e) => e.vinculoId === sp.vinculo)
@@ -291,12 +336,52 @@ export default async function PainelAnalistaPage({
         subtitulo={`${consolidado.totalEmpresas} empresa(s) vinculada(s) — comissões, carteira e atividade consolidada.`}
       />
 
-      <div className="mt-6 grid gap-4 md:grid-cols-4">
-        <KPI tone="mint" icon={Wallet} label="Comissão recebida" value={brlCompacto(consolidado.totalComissaoRecebida)} meta="execuções pagas após o vínculo" />
-        <KPI tone="primary" icon={Coins} label="Comissão a receber" value={brlCompacto(consolidado.totalComissaoAReceber)} meta="execuções pendentes" />
-        <KPI tone="lavender" icon={Briefcase} label="Carteira contratada" value={brlCompacto(consolidado.totalCarteiraContratada)} meta="atas + contratos vigentes" />
-        <KPI tone="sky" icon={Receipt} label="Fixo mensal ativo" value={brlCompacto(consolidado.totalFixoMensalAtivo)} meta={`${consolidado.empresas.filter((e) => e.status === "ATIVO").length} vínculos ativos`} />
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        <KPI
+          tone="mint"
+          icon={Wallet}
+          label="Recebido (comissão variável)"
+          value={brlCompacto(consolidado.totalComissaoRecebida)}
+          meta="empresa já repassou a comissão"
+        />
+        <KPI
+          tone="primary"
+          icon={Coins}
+          label="A receber"
+          value={brlCompacto(consolidado.totalComissaoAReceber)}
+          meta="órgão pagou a empresa; comissão pendente"
+        />
+        <KPI
+          tone="sky"
+          icon={Receipt}
+          label="Aguardando órgão"
+          value={brlCompacto(consolidado.totalComissaoAguardandoOrgao)}
+          meta="empenhos ainda não pagos pelo órgão (potencial)"
+        />
       </div>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <KPI
+          tone="lavender"
+          icon={Briefcase}
+          label="Carteira contratada"
+          value={brlCompacto(consolidado.totalCarteiraContratada)}
+          meta="atas + contratos vigentes"
+        />
+        <KPI
+          tone="sky"
+          icon={Receipt}
+          label="Fixo mensal ativo"
+          value={brlCompacto(consolidado.totalFixoMensalAtivo)}
+          meta={`${consolidado.empresas.filter((e) => e.status === "ATIVO").length} vínculos ativos`}
+        />
+      </div>
+
+      <ComissoesFixasBloco linhas={comissoesFixas} empresas={empresasFixoOpcoes} />
+
+      <ComissoesVariaveisBloco
+        comissoes={comissoesExecucao}
+        empresas={empresasOpcoes}
+      />
 
       <section className="mt-8">
         <h2
@@ -348,7 +433,7 @@ export default async function PainelAnalistaPage({
                         </span>
                       </div>
                       <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-                        Vínculo desde {e.dataInicio.toLocaleDateString("pt-BR")} · {e.totalExecucoes} execuções ({e.totalExecucoesPagas} pagas)
+                        Vínculo desde {e.dataInicio.toLocaleDateString("pt-BR")} · {e.totalExecucoes} execuções ({e.totalExecucoesPagasPeloOrgao} pagas pelo órgão)
                       </p>
                       <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
                         <div>

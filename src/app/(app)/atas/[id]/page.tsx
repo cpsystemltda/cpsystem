@@ -1,15 +1,18 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, FileText, ClipboardList, Receipt, AlertTriangle } from "lucide-react";
+import { ChevronLeft, FileText, ClipboardList, Receipt, AlertTriangle, Pencil } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularSaldoAta } from "@/lib/saldo";
+import { podeEditarDocumento } from "@/lib/permissoes";
 import { brl, formatarCnpj, ROTULO_PROCEDIMENTO, ROTULO_TIPO } from "@/lib/validators";
 import { Tabs } from "@/components/Tabs";
 import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { OrgaosTab, EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
+import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
+import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { LerMais } from "@/components/LerMais";
 
 export default async function AtaDetalhePage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +23,7 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
     where: { id, empresa: { contaId: usuario.contaId } },
     include: {
       empresa: true,
+      criadoPor: { select: { nome: true, email: true } },
       contratos: { orderBy: { criadoEm: "desc" } },
       empenhos: { orderBy: { criadoEm: "desc" }, where: { contratoId: null } },
       orgaos: { orderBy: { tipo: "asc" } },
@@ -40,7 +44,45 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
 
   if (!ata) notFound();
 
+  const podeEditar = podeEditarDocumento(usuario, ata);
   const saldo = await calcularSaldoAta(ata.id);
+
+  // Histórico de edições — entradas de auditoria diretamente na Ata + nos
+  // filhos cuja recursoId está entre os IDs deste registro (itens, órgãos
+  // participantes, endereços e pontos focais ligados a esta Ata).
+  const recursoIdsFilhos = [
+    ...ata.orgaos.map((o) => o.id),
+    ...ata.enderecosEntrega.map((e) => e.id),
+    ...ata.pontosFocais.map((p) => p.id),
+  ];
+  const itensIds = (
+    await prisma.ataItem.findMany({ where: { ataId: ata.id }, select: { id: true } })
+  ).map((i) => i.id);
+
+  const historico = await prisma.logAuditoria.findMany({
+    where: {
+      contaId: usuario.contaId,
+      OR: [
+        { recurso: "Ata", recursoId: ata.id },
+        { recurso: "AtaItem", recursoId: { in: itensIds.length > 0 ? itensIds : ["__none__"] } },
+        {
+          recurso: "OrgaoNaAta",
+          recursoId: { in: recursoIdsFilhos.length > 0 ? recursoIdsFilhos : ["__none__"] },
+        },
+        {
+          recurso: "EnderecoEntrega",
+          recursoId: { in: recursoIdsFilhos.length > 0 ? recursoIdsFilhos : ["__none__"] },
+        },
+        {
+          recurso: "PontoFocal",
+          recursoId: { in: recursoIdsFilhos.length > 0 ? recursoIdsFilhos : ["__none__"] },
+        },
+      ],
+    },
+    orderBy: { criadoEm: "desc" },
+    take: 200,
+    include: { usuario: { select: { nome: true, email: true } } },
+  });
 
   const venceEmDias = Math.ceil((ata.vigenciaFim.getTime() - Date.now()) / 86400000);
   const reajusteEmDias = ata.marcoOrcamentoEstimado
@@ -66,9 +108,22 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
           </h1>
           <p className="mt-2 text-xs" style={{ color: "var(--text-soft)" }}>
             {ata.empresa.nomeFantasia || ata.empresa.razaoSocial} · {ata.orgaoNome}
+            {ata.criadoPor && (
+              <> · criada por <strong>{ata.criadoPor.nome}</strong></>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
+          {podeEditar && (
+            <Link
+              href={`/atas/${ata.id}/editar`}
+              className="btn-secondary inline-flex items-center gap-1.5"
+              style={{ height: "36px", padding: "0 14px", fontSize: "12px" }}
+              title="Editar dados da Ata"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Editar
+            </Link>
+          )}
           <Link href="/contratacoes/nova/contrato" className="btn-secondary" style={{ height: "36px", padding: "0 14px", fontSize: "12px" }}>
             + Contrato
           </Link>
@@ -127,7 +182,7 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
             {
               key: "saldo",
               label: "Saldo de itens",
-              content: <TabelaSaldoItens saldo={saldo} />,
+              content: <ItensAtaTab saldo={saldo} />,
             },
             {
               key: "orgaos",
@@ -188,6 +243,12 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
               key: "dados",
               label: "Dados",
               content: <DadosAta ata={ata} />,
+            },
+            {
+              key: "historico",
+              label: "Histórico",
+              badge: historico.length,
+              content: <HistoricoLista entradas={historico} />,
             },
           ]}
         />

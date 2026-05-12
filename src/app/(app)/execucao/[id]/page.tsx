@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Receipt, AlertTriangle } from "lucide-react";
+import { ChevronLeft, Receipt, AlertTriangle, Pencil } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, formatarCnpj, ROTULO_PROCEDIMENTO, ROTULO_TIPO } from "@/lib/validators";
+import { podeEditarDocumento } from "@/lib/permissoes";
 import { AvancarStatus } from "@/components/AvancarStatus";
 import { Tabs } from "@/components/Tabs";
 import { TimelineExecucao } from "@/components/TimelineExecucao";
@@ -17,6 +18,9 @@ import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
+import { HistoricoLista } from "@/components/abas/HistoricoLista";
+import { ItensEmpenhoTab } from "@/components/abas/ItensEmpenhoTab";
+import { ComissoesNoEmpenhoTab } from "@/components/abas/ComissoesNoEmpenhoTab";
 
 const PASSOS = [
   { marco: "PEDIDO_RECEBIDO", label: "Pedido recebido", campo: "dataPedidoRecebido" },
@@ -35,6 +39,13 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
     where: { id, empresa: { contaId: usuario.contaId } },
     include: {
       empresa: true,
+      criadoPor: { select: { nome: true, email: true } },
+      comissoes: {
+        include: {
+          analista: { select: { nomeCompleto: true, email: true } },
+        },
+        orderBy: { criadoEm: "asc" },
+      },
       ata: true,
       contrato: true,
       itens: true,
@@ -58,6 +69,25 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
   });
 
   if (!e) notFound();
+
+  const podeEditar = podeEditarDocumento(usuario, e);
+  const itemIds = e.itens.map((i) => i.id);
+  const enderecoIds = e.enderecosEntrega.map((x) => x.id);
+  const pontoFocalIds = e.pontosFocais.map((p) => p.id);
+  const historico = await prisma.logAuditoria.findMany({
+    where: {
+      contaId: usuario.contaId,
+      OR: [
+        { recurso: "Empenho", recursoId: e.id },
+        { recurso: "EmpenhoItem", recursoId: { in: itemIds.length > 0 ? itemIds : ["__none__"] } },
+        { recurso: "EnderecoEntrega", recursoId: { in: enderecoIds.length > 0 ? enderecoIds : ["__none__"] } },
+        { recurso: "PontoFocal", recursoId: { in: pontoFocalIds.length > 0 ? pontoFocalIds : ["__none__"] } },
+      ],
+    },
+    orderBy: { criadoEm: "desc" },
+    take: 200,
+    include: { usuario: { select: { nome: true, email: true } } },
+  });
 
   // Empenho não tem marcoOrcamentoEstimado próprio — herda do Contrato (ou Ata) pai
   const marcoReajusteHerdado = e.contrato?.marcoOrcamentoEstimado ?? e.ata?.marcoOrcamentoEstimado ?? null;
@@ -93,8 +123,20 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
             {e.ata && !e.contrato && (
               <> · derivado da <Link href={`/atas/${e.ata.id}`} className="text-blue-700 hover:underline">Ata {e.ata.numero}</Link></>
             )}
+            {e.criadoPor && (
+              <> · criado por <strong>{e.criadoPor.nome}</strong></>
+            )}
           </p>
         </div>
+        {e.status !== "PAGO" && podeEditar && (
+          <Link
+            href={`/execucao/${e.id}/editar`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            title="Editar dados do Empenho"
+          >
+            <Pencil className="h-3.5 w-3.5" /> Editar
+          </Link>
+        )}
       </div>
 
       <div className="mt-6 space-y-2">
@@ -185,7 +227,13 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
             {
               key: "itens",
               label: "Itens",
-              content: <TabelaItens itens={e.itens} />,
+              content: <ItensEmpenhoTab itens={e.itens} empenhoEditavel={e.status !== "PAGO"} />,
+            },
+            {
+              key: "comissoes",
+              label: "Comissões dos analistas",
+              badge: e.comissoes.length,
+              content: <ComissoesNoEmpenhoTab comissoes={e.comissoes} />,
             },
             {
               key: "aditivos",
@@ -251,6 +299,12 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
               key: "dados",
               label: "Dados",
               content: <DadosEmpenho e={e} />,
+            },
+            {
+              key: "historico",
+              label: "Histórico",
+              badge: historico.length,
+              content: <HistoricoLista entradas={historico} />,
             },
             {
               key: "relatorio",

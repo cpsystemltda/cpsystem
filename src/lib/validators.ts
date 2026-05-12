@@ -204,6 +204,7 @@ export const procedimentosSelecao = [
 ] as const;
 
 const itemSchema = z.object({
+  id: z.string().optional(), // id do AtaItem existente (apenas no modo edição)
   descricao: z.string().min(2, "Descrição obrigatória"),
   unidade: z.string().min(1, "Unidade obrigatória"),
   quantidade: z.coerce.number().positive("Quantidade > 0"),
@@ -235,6 +236,7 @@ const contratacaoBase = z.object({
 });
 
 const enderecoEntregaSchema = z.object({
+  id: z.string().optional(),
   rotulo: z.string().optional(),
   endereco: z.string().min(5, "Endereço muito curto"),
 });
@@ -266,6 +268,7 @@ export const OPCOES_FUNCAO_PONTO_FOCAL = (
 ).map(([value, label]) => ({ value, label }));
 
 const pontoFocalSchema = z.object({
+  id: z.string().optional(),
   funcao: z.enum(funcoesPontoFocal),
   funcaoDescricao: z.string().optional(), // quando funcao = OUTRO
   nome: z.string().min(2, "Informe o nome"),
@@ -287,6 +290,7 @@ export const OPCOES_MARCO_REAJUSTE = (
 // Órgão participante / carona (briefing PDF 2.3)
 export const tiposOrgaoNaAta = ["PARTICIPANTE", "CARONA"] as const;
 const orgaoNaAtaSchema = z.object({
+  id: z.string().optional(),
   tipo: z.enum(tiposOrgaoNaAta).default("PARTICIPANTE"),
   nome: z.string().min(2, "Nome do órgão obrigatório"),
   cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
@@ -313,6 +317,7 @@ export const novaAtaSchema = contratacaoBase.extend({
 });
 
 const parcelaSchema = z.object({
+  id: z.string().optional(),
   numero: z.coerce.number().int().positive(),
   prazoDias: z.coerce.number().int().nonnegative(),
   descricao: z.string().optional(),

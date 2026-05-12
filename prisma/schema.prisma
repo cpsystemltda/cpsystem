@@ -89,6 +89,10 @@ model Usuario {
   sessoes              Sessao[]
   logsAuditoria        LogAuditoria[]
   notificacoesSistema  NotificacaoSistema[]
+  // Quem criou cada documento — base da regra "só edita criador + admin"
+  atasCriadas      Ata[]      @relation("AtasCriadas")
+  contratosCriados Contrato[] @relation("ContratosCriados")
+  empenhosCriados  Empenho[]  @relation("EmpenhosCriados")
 
   @@index([contaId])
 }
@@ -193,6 +197,7 @@ model Analista {
   contasIndicadas Conta[]           @relation("ContasIndicadas")
   comissoes       Comissao[]
   vinculos        VinculoAnalista[]
+  comissoesExecucao ComissaoExecucao[]
 }
 
 // ============================================================
@@ -228,7 +233,8 @@ model VinculoAnalista {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  fixosPagos PagamentoFixoMensal[]
+  fixosPagos        PagamentoFixoMensal[]
+  comissoesExecucao ComissaoExecucao[]
 
   @@unique([contaId, analistaId, dataInicio])
   @@index([contaId])
@@ -236,20 +242,40 @@ model VinculoAnalista {
   @@index([status])
 }
 
-// Histórico de pagamentos do fixo mensal (por competência)
+// Status da comissão fixa mensal. Mesmo conceito da Linha B variável, mas
+// sem o estado AGUARDANDO_ORGAO (o fixo independe do pagamento do órgão).
+enum StatusComissaoFixa {
+  A_RECEBER
+  ATRASADO
+  PAGO
+  PAGO_PARCIAL
+}
+
+// Histórico de pagamentos do fixo mensal (por competência).
+// Uma linha por VinculoAnalista × competência (YYYY-MM). Geradas automaticamente
+// pelo cron diário na primeira passagem após a virada do mês.
 model PagamentoFixoMensal {
   id          String          @id @default(cuid())
   vinculoId   String
   vinculo     VinculoAnalista @relation(fields: [vinculoId], references: [id], onDelete: Cascade)
   competencia String          // YYYY-MM
   valor       Float
+  // Vencimento por linha (editável) — snapshot de diaVencimentoFixo no momento
+  // da criação. Mudanças posteriores no vínculo não afetam linhas já geradas.
+  vencimento  DateTime?
+  status         StatusComissaoFixa @default(A_RECEBER)
+  valorRecebido  Float              @default(0)
+  comprovanteUrl String?
+  // Campos legados — mantidos pra compatibilidade. `paga` espelha status === PAGO.
   paga        Boolean         @default(false)
   pagaEm      DateTime?
   observacoes String?
   criadoEm    DateTime        @default(now())
+  atualizadoEm DateTime       @updatedAt @default(now())
 
   @@unique([vinculoId, competencia])
   @@index([vinculoId])
+  @@index([status])
 }
 
 model Comissao {
@@ -383,6 +409,12 @@ model Ata {
   empresaId String
   empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
+  // Quem criou — null em registros legados (preexistentes à feature).
+  // Regra de edição: criador OU usuário ADMIN/superAdmin da conta. Registros
+  // legados ficam restritos a ADMIN/superAdmin.
+  criadoPorId String?
+  criadoPor   Usuario? @relation("AtasCriadas", fields: [criadoPorId], references: [id])
+
   itens                AtaItem[]
   contratos             Contrato[]
   empenhos              Empenho[]
@@ -395,6 +427,7 @@ model Ata {
   anotacoes             Anotacao[]
 
   @@index([empresaId])
+  @@index([criadoPorId])
 }
 
 model AtaItem {
@@ -529,6 +562,9 @@ model Contrato {
   ataId String?
   ata   Ata?    @relation(fields: [ataId], references: [id])
 
+  criadoPorId String?
+  criadoPor   Usuario? @relation("ContratosCriados", fields: [criadoPorId], references: [id])
+
   itens             ContratoItem[]
   parcelas          ParcelaContrato[]
   empenhos          Empenho[]
@@ -545,6 +581,7 @@ model Contrato {
 
   @@index([empresaId])
   @@index([ataId])
+  @@index([criadoPorId])
 }
 
 // Cronograma de entrega quando modalidadeEntrega = PARCELADA.
@@ -592,6 +629,63 @@ enum StatusExecucao {
   NF_EMITIDA
   NF_ENCAMINHADA
   PAGO
+}
+
+// ============================================================
+// COMISSÃO POR EXECUÇÃO (Linha B — empresa paga analista)
+// ============================================================
+// Distinção crítica versus Empenho.status === "PAGO":
+//   - Empenho.status PAGO = órgão pagou a empresa (Linha A, sem efeito caixa
+//     pro analista)
+//   - ComissaoExecucao.status PAGO = empresa pagou a comissão ao analista
+//     (Linha B, é o que entra no painel "Recebido no mês")
+//
+// Bug histórico: o sistema considerava Linha A como Linha B, marcando comissão
+// como recebida automaticamente. Hoje os dois fluxos são independentes.
+enum StatusComissaoExecucao {
+  AGUARDANDO_ORGAO  // Empenho ainda não foi pago pelo órgão à empresa
+  A_RECEBER         // Órgão pagou; comissão liberada para cobrança pelo analista
+  ATRASADO          // A_RECEBER e passou da data combinada (controle do analista)
+  PAGO              // Empresa pagou a comissão ao analista
+  PAGO_PARCIAL      // Empresa pagou parcialmente a comissão
+}
+
+model ComissaoExecucao {
+  id        String  @id @default(cuid())
+  empenhoId String
+  empenho   Empenho @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  vinculoId String
+  vinculo   VinculoAnalista @relation(fields: [vinculoId], references: [id], onDelete: Cascade)
+
+  analistaId String
+  analista   Analista @relation(fields: [analistaId], references: [id], onDelete: Cascade)
+
+  // Snapshot do percentual no momento da criação — protege contra alterações
+  // retroativas no vínculo. Quando o admin muda o % no cadastro, vale só pra
+  // execuções futuras.
+  percentual         Float
+  percentualOverride Boolean @default(false) // se foi editado por execução
+  observacaoOverride String?
+
+  // Valores monetários
+  valorBaseEmpenho Float           // snapshot do total empenhado (sem alterações)
+  valorBasePago    Float  @default(0) // quanto o órgão efetivamente pagou (Linha A)
+  valorCalculado   Float           // percentual × valorBasePago (a comissão devida)
+  valorRecebido    Float  @default(0) // quanto o analista já recebeu da empresa
+
+  status         StatusComissaoExecucao @default(AGUARDANDO_ORGAO)
+  dataPagamento  DateTime?
+  comprovanteUrl String?
+  observacao     String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([empenhoId, vinculoId])
+  @@index([analistaId, status])
+  @@index([vinculoId])
+  @@index([empenhoId])
 }
 
 model Empenho {
@@ -651,6 +745,9 @@ model Empenho {
   contratoId String?
   contrato   Contrato? @relation(fields: [contratoId], references: [id])
 
+  criadoPorId String?
+  criadoPor   Usuario? @relation("EmpenhosCriados", fields: [criadoPorId], references: [id])
+
   itens             EmpenhoItem[]
   enderecosEntrega  EnderecoEntrega[]
   pontosFocais      PontoFocal[]
@@ -662,10 +759,12 @@ model Empenho {
   garantias         Garantia[]
   anexos            Anexo[]
   anotacoes         Anotacao[]
+  comissoes         ComissaoExecucao[]
 
   @@index([empresaId])
   @@index([ataId])
   @@index([contratoId])
+  @@index([criadoPorId])
 }
 
 model EmpenhoItem {

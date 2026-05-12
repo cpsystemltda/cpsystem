@@ -7,12 +7,24 @@ import { exigirUsuario } from "@/lib/auth";
 import { calcularSaldoAta, calcularSaldoContrato } from "@/lib/saldo";
 import { notificarAnalistasDaEmpresa } from "@/lib/notificacoes";
 import {
+  criarComissoesParaEmpenho,
+  sincronizarComissoesComEmpenhoPago,
+} from "@/lib/comissaoExecucao";
+import {
   novaAtaSchema,
   novoContratoSchema,
   novoEmpenhoSchema,
   normalizarCnpj,
 } from "@/lib/validators";
 import { salvarArquivo } from "@/lib/uploads";
+import { registrarAuditoria } from "@/lib/auditoria";
+import {
+  calcularDiff,
+  CAMPOS_ATA,
+  CAMPOS_CONTRATO,
+  CAMPOS_EMPENHO,
+} from "@/lib/diff";
+import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
 
 type ActionResult = {
   erro?: string;
@@ -24,6 +36,7 @@ type ActionResult = {
 
 function parseItens(formData: FormData) {
   const out: {
+    id?: string;
     descricao: string;
     unidade: string;
     quantidade: number;
@@ -38,6 +51,7 @@ function parseItens(formData: FormData) {
   let i = 0;
   while (formData.has(`itens[${i}][descricao]`)) {
     out.push({
+      id: String(formData.get(`itens[${i}][id]`) || "") || undefined,
       descricao: String(formData.get(`itens[${i}][descricao]`) || ""),
       unidade: String(formData.get(`itens[${i}][unidade]`) || ""),
       quantidade: Number(formData.get(`itens[${i}][quantidade]`) || 0),
@@ -85,6 +99,7 @@ function validarDuplicidadeLoteItem(
 
 function parseOrgaosParticipantes(formData: FormData) {
   const out: {
+    id?: string;
     tipo: "PARTICIPANTE" | "CARONA";
     nome: string;
     cnpj: string;
@@ -97,6 +112,7 @@ function parseOrgaosParticipantes(formData: FormData) {
     const nome = String(formData.get(`orgaosParticipantes[${i}][nome]`) || "").trim();
     if (nome) {
       out.push({
+        id: String(formData.get(`orgaosParticipantes[${i}][id]`) || "") || undefined,
         tipo: (String(formData.get(`orgaosParticipantes[${i}][tipo]`) || "PARTICIPANTE")) as
           | "PARTICIPANTE"
           | "CARONA",
@@ -113,10 +129,11 @@ function parseOrgaosParticipantes(formData: FormData) {
 }
 
 function parseEnderecosEntrega(formData: FormData) {
-  const out: { rotulo?: string; endereco: string }[] = [];
+  const out: { id?: string; rotulo?: string; endereco: string }[] = [];
   let i = 0;
   while (formData.has(`enderecosEntrega[${i}][endereco]`)) {
     out.push({
+      id: String(formData.get(`enderecosEntrega[${i}][id]`) || "") || undefined,
       rotulo: String(formData.get(`enderecosEntrega[${i}][rotulo]`) || "") || undefined,
       endereco: String(formData.get(`enderecosEntrega[${i}][endereco]`) || ""),
     });
@@ -137,6 +154,7 @@ type FuncaoFocal =
 
 function parsePontosFocais(formData: FormData) {
   const out: {
+    id?: string;
     funcao: FuncaoFocal;
     funcaoDescricao?: string;
     nome: string;
@@ -148,6 +166,7 @@ function parsePontosFocais(formData: FormData) {
     const nome = String(formData.get(`pontosFocais[${i}][nome]`) || "").trim();
     if (nome) {
       out.push({
+        id: String(formData.get(`pontosFocais[${i}][id]`) || "") || undefined,
         funcao: String(formData.get(`pontosFocais[${i}][funcao]`) || "CONTATO_GERAL") as FuncaoFocal,
         funcaoDescricao:
           String(formData.get(`pontosFocais[${i}][funcaoDescricao]`) || "") || undefined,
@@ -162,11 +181,12 @@ function parsePontosFocais(formData: FormData) {
 }
 
 function parseParcelas(formData: FormData) {
-  const out: { numero: number; prazoDias: number; descricao?: string; valorEstimado?: number }[] = [];
+  const out: { id?: string; numero: number; prazoDias: number; descricao?: string; valorEstimado?: number }[] = [];
   let i = 0;
   while (formData.has(`parcelas[${i}][prazoDias]`)) {
     const valor = formData.get(`parcelas[${i}][valorEstimado]`);
     out.push({
+      id: String(formData.get(`parcelas[${i}][id]`) || "") || undefined,
       numero: Number(formData.get(`parcelas[${i}][numero]`) || i + 1),
       prazoDias: Number(formData.get(`parcelas[${i}][prazoDias]`) || 0),
       descricao: String(formData.get(`parcelas[${i}][descricao]`) || "") || undefined,
@@ -273,6 +293,7 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
     const ata = await prisma.ata.create({
       data: {
         empresaId: v.empresaId,
+        criadoPorId: usuario.id,
         tipo: v.tipo,
         numero: v.numero,
         processoAdministrativo: v.processoAdministrativo,
@@ -362,6 +383,241 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
 }
 
 // ============================================================
+// EDITAR ATA
+// ============================================================
+// Reabre o mesmo formulário usado no cadastro, com dados pré-preenchidos.
+// Estratégia de sync dos blocos repetíveis:
+//   - Itens: smart-sync por id. Itens removidos no form que estão usados em
+//     Contrato/Empenho são bloqueados (saldo quebraria); demais são deletados.
+//   - Órgãos / Endereços / Pontos focais: replace wholesale (sem FK externas).
+export async function editarAtaAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  const usuario = await exigirUsuario();
+  const ataId = String(formData.get("ataId") || "");
+  const dados = extrairCampos(formData);
+  const parsed = novaAtaSchema.safeParse(dados);
+
+  if (!parsed.success) {
+    const campos: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const k = issue.path.join(".");
+      if (!campos[k]) campos[k] = issue.message;
+    }
+    return { erro: "Verifique os campos destacados.", campos, valores: dados };
+  }
+
+  const v = parsed.data;
+
+  const ataExistente = await prisma.ata.findFirst({
+    where: { id: ataId, empresa: { contaId: usuario.contaId } },
+    include: {
+      itens: {
+        include: {
+          contratoItens: { select: { id: true } },
+          empenhoItens: { select: { id: true } },
+        },
+      },
+    },
+  });
+  if (!ataExistente) return { erro: "Ata não encontrada ou sem permissão." };
+
+  if (!podeEditarDocumento(usuario, ataExistente)) {
+    return { erro: mensagemSemPermissao(ataExistente), valores: dados };
+  }
+
+  try {
+    await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
+  } catch (err) {
+    return {
+      erro: err instanceof Error ? err.message : "Empresa inválida.",
+      campos: { empresaId: "Selecione uma empresa válida." },
+      valores: dados,
+    };
+  }
+
+  if (v.vigenciaFim < v.vigenciaInicio) {
+    return {
+      erro: "A vigência final precisa ser posterior à inicial.",
+      campos: { vigenciaFim: "Deve ser posterior à vigência inicial." },
+      valores: dados,
+    };
+  }
+
+  const erroDuplicata = validarDuplicidadeLoteItem(v.itens, dados);
+  if (erroDuplicata) return erroDuplicata;
+
+  const idsNovos = new Set(
+    v.itens.map((i) => i.id).filter((id): id is string => Boolean(id)),
+  );
+  const itensUsados = new Set(
+    ataExistente.itens
+      .filter((i) => i.contratoItens.length > 0 || i.empenhoItens.length > 0)
+      .map((i) => i.id),
+  );
+  const itensParaRemover = ataExistente.itens.filter((i) => !idsNovos.has(i.id));
+  for (const it of itensParaRemover) {
+    if (itensUsados.has(it.id)) {
+      return {
+        erro: `O item "${it.descricao}" não pode ser removido — está vinculado a um Contrato ou Empenho. Remova-o do documento dependente antes.`,
+        valores: dados,
+      };
+    }
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.ata.update({
+        where: { id: ataId },
+        data: {
+          empresaId: v.empresaId,
+          tipo: v.tipo,
+          numero: v.numero,
+          processoAdministrativo: v.processoAdministrativo,
+          procedimentoSelecao: v.procedimentoSelecao,
+          numeroLicitacao: v.numeroLicitacao || null,
+          orgaoNome: v.orgaoNome,
+          orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+          orgaoEndereco: v.orgaoEndereco,
+          orgaoEmail: v.orgaoEmail || null,
+          orgaoTelefone: v.orgaoTelefone || null,
+          objeto: v.objeto,
+          dataAssinatura: v.dataAssinatura,
+          dataPublicacao: v.dataPublicacao || null,
+          vigenciaInicio: v.vigenciaInicio,
+          vigenciaFim: v.vigenciaFim,
+          prazoEntregaDias: v.prazoEntregaNaoAplica ? null : (v.prazoEntregaDias || null),
+          prazoEntregaNaoAplica: !!v.prazoEntregaNaoAplica,
+          prazoPagamentoDias: v.prazoPagamentoDias || null,
+          marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
+          marcoReajusteOrigem: v.marcoReajusteOrigem || null,
+          aceitaCarona: !!v.aceitaCarona,
+          idAtaPncp: v.idAtaPncp || null,
+        },
+      });
+
+      // Itens — smart sync
+      if (itensParaRemover.length > 0) {
+        await tx.ataItem.deleteMany({
+          where: { id: { in: itensParaRemover.map((i) => i.id) } },
+        });
+      }
+      for (const it of v.itens) {
+        const valorTotal = it.quantidade * it.valorUnitario;
+        if (it.id) {
+          await tx.ataItem.update({
+            where: { id: it.id },
+            data: {
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: it.quantidade,
+              marca: it.marca || null,
+              valorUnitario: it.valorUnitario,
+              valorTotal,
+              lote: it.lote || null,
+              numero: it.numero || null,
+            },
+          });
+        } else {
+          await tx.ataItem.create({
+            data: {
+              ataId,
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: it.quantidade,
+              marca: it.marca || null,
+              valorUnitario: it.valorUnitario,
+              valorTotal,
+              lote: it.lote || null,
+              numero: it.numero || null,
+            },
+          });
+        }
+      }
+
+      // Órgãos participantes — replace
+      await tx.orgaoNaAta.deleteMany({ where: { ataId } });
+      if (v.orgaosParticipantes && v.orgaosParticipantes.length > 0) {
+        for (const o of v.orgaosParticipantes) {
+          await tx.orgaoNaAta.create({
+            data: {
+              ataId,
+              tipo: o.tipo,
+              nome: o.nome,
+              cnpj: normalizarCnpj(o.cnpj),
+              endereco: o.endereco,
+              email: o.email || null,
+              telefone: o.telefone || null,
+            },
+          });
+        }
+      }
+
+      // Endereços de entrega (apenas os do nível da Ata — não os dos órgãos)
+      await tx.enderecoEntrega.deleteMany({ where: { ataId, orgaoNaAtaId: null } });
+      if (v.enderecosEntrega && v.enderecosEntrega.length > 0) {
+        for (const e of v.enderecosEntrega) {
+          await tx.enderecoEntrega.create({
+            data: { ataId, rotulo: e.rotulo || null, endereco: e.endereco },
+          });
+        }
+      }
+
+      // Pontos focais (apenas os do nível da Ata)
+      await tx.pontoFocal.deleteMany({ where: { ataId, orgaoNaAtaId: null } });
+      if (v.pontosFocais && v.pontosFocais.length > 0) {
+        for (const p of v.pontosFocais) {
+          await tx.pontoFocal.create({
+            data: {
+              ataId,
+              funcao: p.funcao,
+              funcaoDescricao: p.funcao === "OUTRO" ? (p.funcaoDescricao || null) : null,
+              nome: p.nome,
+              email: p.email || null,
+              telefone: p.telefone || null,
+            },
+          });
+        }
+      }
+    });
+
+    const mudancas = calcularDiff(
+      ataExistente as unknown as Record<string, unknown>,
+      {
+        ...v,
+        orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+        prazoEntregaDias: v.prazoEntregaNaoAplica ? null : (v.prazoEntregaDias ?? null),
+        prazoEntregaNaoAplica: !!v.prazoEntregaNaoAplica,
+        marcoReajusteOrigem: v.marcoReajusteOrigem ?? null,
+        marcoOrcamentoEstimado: v.marcoOrcamentoEstimado ?? null,
+        aceitaCarona: !!v.aceitaCarona,
+      },
+      CAMPOS_ATA,
+    );
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "ATUALIZAR",
+      recurso: "Ata",
+      recursoId: ataId,
+      titulo: `Ata ${v.numero}`,
+      mudancas,
+    });
+
+    revalidatePath("/atas");
+    revalidatePath(`/atas/${ataId}`);
+    revalidatePath("/dashboard");
+    redirect(`/atas/${ataId}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      const msg = err.message;
+      if (msg.includes("NEXT_REDIRECT")) throw err;
+      console.error("[editarAtaAction] erro ao salvar Ata:", msg);
+      return { erro: `Não foi possível salvar a Ata: ${msg.slice(0, 240)}`, valores: dados };
+    }
+    throw err;
+  }
+}
+
+// ============================================================
 // CONTRATO
 // ============================================================
 export async function criarContratoAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
@@ -417,6 +673,7 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
     const contrato = await prisma.contrato.create({
       data: {
         empresaId: v.empresaId,
+        criadoPorId: usuario.id,
         ataId: v.ataId || null,
         tipo: v.tipo,
         numero: v.numero,
@@ -486,6 +743,232 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
       if (msg.includes("NEXT_REDIRECT")) throw err;
       console.error("[criarContratoAction] erro ao salvar Contrato:", msg);
       return { erro: `Não foi possível salvar o Contrato: ${msg.slice(0, 240)}` };
+    }
+    throw err;
+  }
+}
+
+// ============================================================
+// EDITAR CONTRATO
+// ============================================================
+// Estratégia: igual à editarAtaAction.
+//   - Atualiza campos escalares do Contrato.
+//   - Itens: smart-sync por id; itens removidos que estão referenciados por
+//     EmpenhoItem são bloqueados.
+//   - Parcelas (modalidade PARCELADA): replace wholesale (sem FK externas).
+//   - Endereços e Pontos focais do nível do contrato: replace wholesale.
+export async function editarContratoAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  const usuario = await exigirUsuario();
+  const contratoId = String(formData.get("contratoId") || "");
+  const dados = extrairCampos(formData);
+  const parsed = novoContratoSchema.safeParse(dados);
+
+  if (!parsed.success) {
+    const campos: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const k = issue.path.join(".");
+      if (!campos[k]) campos[k] = issue.message;
+    }
+    return { erro: "Verifique os campos destacados.", campos, valores: dados };
+  }
+
+  const v = parsed.data;
+
+  const contratoExistente = await prisma.contrato.findFirst({
+    where: { id: contratoId, empresa: { contaId: usuario.contaId } },
+    include: {
+      itens: { select: { id: true, descricao: true } },
+      empenhos: { select: { id: true } },
+    },
+  });
+  if (!contratoExistente) return { erro: "Contrato não encontrado ou sem permissão." };
+
+  if (!podeEditarDocumento(usuario, contratoExistente)) {
+    return { erro: mensagemSemPermissao(contratoExistente), valores: dados };
+  }
+
+  try {
+    await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
+  } catch (err) {
+    return {
+      erro: err instanceof Error ? err.message : "Empresa inválida.",
+      campos: { empresaId: "Selecione uma empresa válida." },
+      valores: dados,
+    };
+  }
+
+  // Se for derivado de Ata, validar saldo dos itens (igual ao criar)
+  if (v.ataId) {
+    const ata = await prisma.ata.findFirst({
+      where: { id: v.ataId, empresa: { contaId: usuario.contaId } },
+    });
+    if (!ata) return { erro: "Ata vinculada inválida.", valores: dados };
+  }
+
+  // Se há empenhos vinculados, avisar antes de remover itens — o saldo pode ficar
+  // inconsistente. (ContratoItem não tem FK reversa de EmpenhoItem, mas a regra
+  // de saldo casa por descrição; remover um item enquanto há Empenho ativo pode
+  // gerar surpresas.)
+  const idsNovos = new Set(
+    v.itens.map((i) => i.id).filter((id): id is string => Boolean(id)),
+  );
+  const itensParaRemover = contratoExistente.itens.filter((i) => !idsNovos.has(i.id));
+  if (itensParaRemover.length > 0 && contratoExistente.empenhos.length > 0) {
+    return {
+      erro: `Este contrato tem ${contratoExistente.empenhos.length} empenho(s) vinculados. Para remover itens, exclua os empenhos primeiro ou edite-os para não referenciarem este item.`,
+      valores: dados,
+    };
+  }
+
+  const parcelasParaCriar =
+    v.modalidadeEntrega === "PARCELADA" && v.parcelas
+      ? v.parcelas.map((p) => ({
+          numero: p.numero,
+          prazoDias: p.prazoDias,
+          descricao: p.descricao || null,
+          valorEstimado: p.valorEstimado ?? null,
+        }))
+      : [];
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.contrato.update({
+        where: { id: contratoId },
+        data: {
+          empresaId: v.empresaId,
+          ataId: v.ataId || null,
+          tipo: v.tipo,
+          numero: v.numero,
+          numeroNotaEmpenho: v.numeroNotaEmpenho || null,
+          numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
+          processoAdministrativo: v.processoAdministrativo,
+          procedimentoSelecao: v.procedimentoSelecao,
+          numeroLicitacao: v.numeroLicitacao || null,
+          orgaoNome: v.orgaoNome,
+          orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+          orgaoEndereco: v.orgaoEndereco,
+          orgaoEmail: v.orgaoEmail || null,
+          orgaoTelefone: v.orgaoTelefone || null,
+          objeto: v.objeto,
+          dataAssinatura: v.dataAssinatura,
+          dataPublicacao: v.dataPublicacao || null,
+          vigenciaInicio: v.vigenciaInicio,
+          vigenciaFim: v.vigenciaFim,
+          prazoEntregaDias: v.prazoEntregaDias || null,
+          prazoPagamentoDias: v.prazoPagamentoDias || null,
+          marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
+          modalidadeEntrega: v.modalidadeEntrega,
+          marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
+          marcoInicialDescricao:
+            v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
+        },
+      });
+
+      // Itens — smart sync
+      if (itensParaRemover.length > 0) {
+        await tx.contratoItem.deleteMany({
+          where: { id: { in: itensParaRemover.map((i) => i.id) } },
+        });
+      }
+      for (const it of v.itens) {
+        const valorTotal = it.quantidade * it.valorUnitario;
+        if (it.id) {
+          await tx.contratoItem.update({
+            where: { id: it.id },
+            data: {
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: it.quantidade,
+              marca: it.marca || null,
+              valorUnitario: it.valorUnitario,
+              valorTotal,
+              ataItemId: it.ataItemId || null,
+            },
+          });
+        } else {
+          await tx.contratoItem.create({
+            data: {
+              contratoId,
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: it.quantidade,
+              marca: it.marca || null,
+              valorUnitario: it.valorUnitario,
+              valorTotal,
+              ataItemId: it.ataItemId || null,
+            },
+          });
+        }
+      }
+
+      // Parcelas — replace
+      await tx.parcelaContrato.deleteMany({ where: { contratoId } });
+      if (parcelasParaCriar.length > 0) {
+        await tx.parcelaContrato.createMany({
+          data: parcelasParaCriar.map((p) => ({ ...p, contratoId })),
+        });
+      }
+
+      // Endereços e pontos focais do nível do contrato
+      await tx.enderecoEntrega.deleteMany({ where: { contratoId } });
+      if (v.enderecosEntrega && v.enderecosEntrega.length > 0) {
+        for (const e of v.enderecosEntrega) {
+          await tx.enderecoEntrega.create({
+            data: { contratoId, rotulo: e.rotulo || null, endereco: e.endereco },
+          });
+        }
+      }
+
+      await tx.pontoFocal.deleteMany({ where: { contratoId } });
+      if (v.pontosFocais && v.pontosFocais.length > 0) {
+        for (const p of v.pontosFocais) {
+          await tx.pontoFocal.create({
+            data: {
+              contratoId,
+              funcao: p.funcao,
+              funcaoDescricao: p.funcao === "OUTRO" ? (p.funcaoDescricao || null) : null,
+              nome: p.nome,
+              email: p.email || null,
+              telefone: p.telefone || null,
+            },
+          });
+        }
+      }
+    });
+
+    const mudancas = calcularDiff(
+      contratoExistente as unknown as Record<string, unknown>,
+      {
+        ...v,
+        orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+        marcoOrcamentoEstimado: v.marcoOrcamentoEstimado ?? null,
+        marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : (v.marcoInicialPrazo ?? null),
+        marcoInicialDescricao:
+          v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
+        ataId: v.ataId || null,
+      },
+      CAMPOS_CONTRATO,
+    );
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "ATUALIZAR",
+      recurso: "Contrato",
+      recursoId: contratoId,
+      titulo: `Contrato ${v.numero}`,
+      mudancas,
+    });
+
+    revalidatePath("/contratos");
+    revalidatePath(`/contratos/${contratoId}`);
+    revalidatePath("/dashboard");
+    redirect(`/contratos/${contratoId}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      const msg = err.message;
+      if (msg.includes("NEXT_REDIRECT")) throw err;
+      console.error("[editarContratoAction] erro ao salvar Contrato:", msg);
+      return { erro: `Não foi possível salvar o Contrato: ${msg.slice(0, 240)}`, valores: dados };
     }
     throw err;
   }
@@ -595,6 +1078,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     const empenho = await prisma.empenho.create({
       data: {
         empresaId: v.empresaId,
+        criadoPorId: usuario.id,
         ataId: v.ataId || null,
         contratoId: v.contratoId || null,
         tipo: v.tipo,
@@ -649,6 +1133,15 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     });
 
     const valorTotalEmpenho = v.itens.reduce((s, i) => s + i.quantidade * i.valorUnitario, 0);
+
+    // Cria Linha B (comissão da empresa→analista) para cada vínculo ativo.
+    // Começa em AGUARDANDO_ORGAO — só libera quando empenho for pago.
+    await criarComissoesParaEmpenho({
+      empenhoId: empenho.id,
+      empresaId: v.empresaId,
+      valorTotalEmpenho,
+    });
+
     await notificarAnalistasDaEmpresa({
       empresaId: v.empresaId,
       tipo: "NOVA_EXECUCAO",
@@ -671,6 +1164,190 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
       if (msg.includes("NEXT_REDIRECT")) throw err;
       console.error("[criarEmpenhoAction] erro ao salvar Empenho:", msg);
       return { erro: `Não foi possível salvar o Empenho: ${msg.slice(0, 240)}` };
+    }
+    throw err;
+  }
+}
+
+// ============================================================
+// EDITAR EMPENHO / Carta-Contrato / Autorização / OS
+// ============================================================
+// Mesma estratégia das outras editar*Action.
+// EmpenhoItem não é referenciado por nenhum outro model, então itens podem ser
+// removidos livremente (diferente de AtaItem e ContratoItem).
+export async function editarEmpenhoAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  const usuario = await exigirUsuario();
+  const empenhoId = String(formData.get("empenhoId") || "");
+  const dados = extrairCampos(formData);
+  const parsed = novoEmpenhoSchema.safeParse(dados);
+
+  if (!parsed.success) {
+    const campos: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const k = issue.path.join(".");
+      if (!campos[k]) campos[k] = issue.message;
+    }
+    return { erro: "Verifique os campos destacados.", campos, valores: dados };
+  }
+
+  const v = parsed.data;
+
+  const empenhoExistente = await prisma.empenho.findFirst({
+    where: { id: empenhoId, empresa: { contaId: usuario.contaId } },
+  });
+  if (!empenhoExistente) return { erro: "Empenho não encontrado ou sem permissão." };
+
+  if (!podeEditarDocumento(usuario, empenhoExistente)) {
+    return { erro: mensagemSemPermissao(empenhoExistente), valores: dados };
+  }
+
+  if (empenhoExistente.status === "PAGO") {
+    return {
+      erro: "Empenho já pago não pode ser editado. Para correções use o histórico ou abra uma notificação.",
+      valores: dados,
+    };
+  }
+
+  try {
+    await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
+  } catch (err) {
+    return {
+      erro: err instanceof Error ? err.message : "Empresa inválida.",
+      campos: { empresaId: "Selecione uma empresa válida." },
+      valores: dados,
+    };
+  }
+
+  const idsNovos = new Set(
+    v.itens.map((i) => i.id).filter((id): id is string => Boolean(id)),
+  );
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.empenho.update({
+        where: { id: empenhoId },
+        data: {
+          empresaId: v.empresaId,
+          ataId: v.ataId || null,
+          contratoId: v.contratoId || null,
+          tipo: v.tipo,
+          numero: v.numero,
+          processoAdministrativo: v.processoAdministrativo,
+          procedimentoSelecao: v.procedimentoSelecao,
+          numeroLicitacao: v.numeroLicitacao || null,
+          orgaoNome: v.orgaoNome,
+          orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+          orgaoEndereco: v.orgaoEndereco,
+          orgaoEmail: v.orgaoEmail || null,
+          orgaoTelefone: v.orgaoTelefone || null,
+          objeto: v.objeto,
+          dataEmissao: v.dataEmissao,
+          vigenciaInicio: v.vigenciaInicio,
+          vigenciaFim: v.vigenciaFim,
+          prazoEntregaDias: v.prazoEntregaDias || null,
+          prazoPagamentoDias: v.prazoPagamentoDias || null,
+          numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
+        },
+      });
+
+      // Itens — smart sync (sem FK externas: livre pra remover)
+      const itensAtuais = await tx.empenhoItem.findMany({
+        where: { empenhoId },
+        select: { id: true },
+      });
+      const itensParaRemover = itensAtuais.filter((i) => !idsNovos.has(i.id));
+      if (itensParaRemover.length > 0) {
+        await tx.empenhoItem.deleteMany({
+          where: { id: { in: itensParaRemover.map((i) => i.id) } },
+        });
+      }
+      for (const it of v.itens) {
+        const valorTotal = it.quantidade * it.valorUnitario;
+        if (it.id) {
+          await tx.empenhoItem.update({
+            where: { id: it.id },
+            data: {
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: it.quantidade,
+              marca: it.marca || null,
+              valorUnitario: it.valorUnitario,
+              valorTotal,
+              ataItemId: it.ataItemId || null,
+            },
+          });
+        } else {
+          await tx.empenhoItem.create({
+            data: {
+              empenhoId,
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: it.quantidade,
+              marca: it.marca || null,
+              valorUnitario: it.valorUnitario,
+              valorTotal,
+              ataItemId: it.ataItemId || null,
+            },
+          });
+        }
+      }
+
+      // Endereços e pontos focais — replace
+      await tx.enderecoEntrega.deleteMany({ where: { empenhoId } });
+      if (v.enderecosEntrega && v.enderecosEntrega.length > 0) {
+        for (const e of v.enderecosEntrega) {
+          await tx.enderecoEntrega.create({
+            data: { empenhoId, rotulo: e.rotulo || null, endereco: e.endereco },
+          });
+        }
+      }
+      await tx.pontoFocal.deleteMany({ where: { empenhoId } });
+      if (v.pontosFocais && v.pontosFocais.length > 0) {
+        for (const p of v.pontosFocais) {
+          await tx.pontoFocal.create({
+            data: {
+              empenhoId,
+              funcao: p.funcao,
+              funcaoDescricao: p.funcao === "OUTRO" ? (p.funcaoDescricao || null) : null,
+              nome: p.nome,
+              email: p.email || null,
+              telefone: p.telefone || null,
+            },
+          });
+        }
+      }
+    });
+
+    const mudancas = calcularDiff(
+      empenhoExistente as unknown as Record<string, unknown>,
+      {
+        ...v,
+        orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+        ataId: v.ataId || null,
+        contratoId: v.contratoId || null,
+      },
+      CAMPOS_EMPENHO,
+    );
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "ATUALIZAR",
+      recurso: "Empenho",
+      recursoId: empenhoId,
+      titulo: `Empenho ${v.numero}`,
+      mudancas,
+    });
+
+    revalidatePath("/execucao");
+    revalidatePath(`/execucao/${empenhoId}`);
+    revalidatePath("/dashboard");
+    redirect(`/execucao/${empenhoId}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      const msg = err.message;
+      if (msg.includes("NEXT_REDIRECT")) throw err;
+      console.error("[editarEmpenhoAction] erro ao salvar Empenho:", msg);
+      return { erro: `Não foi possível salvar o Empenho: ${msg.slice(0, 240)}`, valores: dados };
     }
     throw err;
   }
@@ -735,11 +1412,18 @@ export async function registrarMarcoAction(
     });
     if (empenhoCompleto) {
       const valorTotal = empenhoCompleto.itens.reduce((s, i) => s + i.valorTotal, 0);
+      // Linha A foi paga: libera Linha B (AGUARDANDO_ORGAO → A_RECEBER).
+      // NÃO marca como PAGO — quem marca isso é o analista, manualmente,
+      // quando a empresa repassar a comissão.
+      await sincronizarComissoesComEmpenhoPago({
+        empenhoId,
+        valorBasePago: valorTotal,
+      });
       await notificarAnalistasDaEmpresa({
         empresaId: empenho.empresaId,
         tipo: "STATUS_PAGO",
-        titulo: `Empenho ${empenho.numero} pago`,
-        descricao: `${empenho.orgaoNome} · R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · sua comissão está liberada`,
+        titulo: `Empenho ${empenho.numero} pago pelo órgão`,
+        descricao: `${empenho.orgaoNome} · R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · sua comissão está disponível para cobrança`,
         link: `/painel-analista`,
         recursoTipo: "Empenho",
         recursoId: empenhoId,
@@ -809,11 +1493,15 @@ export async function avancarStatusAction(empenhoId: string, marco: string, data
     });
     if (empenhoCompleto) {
       const valorTotal = empenhoCompleto.itens.reduce((s, i) => s + i.valorTotal, 0);
+      await sincronizarComissoesComEmpenhoPago({
+        empenhoId,
+        valorBasePago: valorTotal,
+      });
       await notificarAnalistasDaEmpresa({
         empresaId: empenho.empresaId,
         tipo: "STATUS_PAGO",
-        titulo: `Empenho ${empenho.numero} pago`,
-        descricao: `${empenho.orgaoNome} · R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · sua comissão está liberada`,
+        titulo: `Empenho ${empenho.numero} pago pelo órgão`,
+        descricao: `${empenho.orgaoNome} · R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · sua comissão está disponível para cobrança`,
         link: `/painel-analista`,
         recursoTipo: "Empenho",
         recursoId: empenhoId,

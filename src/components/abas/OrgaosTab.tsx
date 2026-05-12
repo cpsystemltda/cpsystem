@@ -1,11 +1,18 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { Pencil, Trash2, X } from "lucide-react";
 import { brl, formatarCnpj, LIMITE_CARONA_POR_ORGAO_PCT, LIMITE_CARONA_TOTAL_PCT } from "@/lib/validators";
 import {
   adicionarOrgaoNaAtaAction,
   adicionarEnderecoEntregaAction,
   adicionarPontoFocalAction,
+  atualizarOrgaoNaAtaAction,
+  removerOrgaoNaAtaAction,
+  atualizarEnderecoEntregaAction,
+  removerEnderecoEntregaAction,
+  atualizarPontoFocalAction,
+  removerPontoFocalAction,
 } from "@/app/actions/orgaos";
 
 type OrgaoNaAta = {
@@ -43,30 +50,7 @@ export function OrgaosTab({ ataId, orgaos, valorTotalAta, aceitaCarona }: { ataI
       {orgaos.length > 0 && (
         <ul className="space-y-2">
           {orgaos.map((o) => (
-            <li key={o.id} className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-semibold text-slate-900">{o.nome}</h4>
-                    <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${COR_TIPO[o.tipo]}`}>
-                      {ROTULO_TIPO[o.tipo]}
-                    </span>
-                  </div>
-                  <div className="mt-1 grid gap-x-4 text-xs text-slate-600 md:grid-cols-2">
-                    <span>CNPJ: {formatarCnpj(o.cnpj)}</span>
-                    <span>{o.endereco}</span>
-                    {o.email && <span>{o.email}</span>}
-                    {o.telefone && <span>{o.telefone}</span>}
-                  </div>
-                </div>
-                {o.tipo === "CARONA" && o.limitePct !== null && (
-                  <div className="text-right text-xs">
-                    <div className="text-slate-500">Limite</div>
-                    <div className="font-medium text-slate-900">{o.limitePct}% · {brl(o.limiteValor || 0)}</div>
-                  </div>
-                )}
-              </div>
-            </li>
+            <OrgaoItem key={o.id} orgao={o} valorTotalAta={valorTotalAta} />
           ))}
         </ul>
       )}
@@ -93,6 +77,156 @@ export function OrgaosTab({ ataId, orgaos, valorTotalAta, aceitaCarona }: { ataI
 
       <FormOrgao ataId={ataId} aceitaCarona={aceitaCarona} state={state} formAction={formAction} valorTotalAta={valorTotalAta} />
     </div>
+  );
+}
+
+function OrgaoItem({ orgao: o, valorTotalAta }: { orgao: OrgaoNaAta; valorTotalAta: number }) {
+  const [editando, setEditando] = useState(false);
+  const [state, formAction] = useActionState(atualizarOrgaoNaAtaAction, null);
+  const [pct, setPct] = useState(o.limitePct ?? LIMITE_CARONA_POR_ORGAO_PCT);
+  const valorEstimado = (valorTotalAta * pct) / 100;
+
+  // Quando salva com sucesso, fecha o modo edição
+  useEffect(() => {
+    if (state?.ok) setEditando(false);
+  }, [state]);
+
+  if (editando) {
+    return (
+      <li className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+        <form action={formAction} className="grid grid-cols-2 gap-3 text-sm">
+          <input type="hidden" name="id" value={o.id} />
+          <div className="col-span-2 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wide text-amber-900">
+              Editando órgão {ROTULO_TIPO[o.tipo].toLowerCase()}
+            </span>
+            <button
+              type="button"
+              onClick={() => setEditando(false)}
+              className="rounded p-1 text-amber-900 hover:bg-amber-100"
+              title="Cancelar"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <Campo label="Nome" name="nome" defaultValue={o.nome} required />
+          <Campo
+            label="CNPJ"
+            name="cnpj"
+            defaultValue={formatarCnpj(o.cnpj)}
+            required
+          />
+          <Campo label="Endereço" name="endereco" defaultValue={o.endereco} required colSpan={2} />
+          <Campo label="E-mail" name="email" type="email" defaultValue={o.email ?? ""} />
+          <Campo label="Telefone" name="telefone" defaultValue={o.telefone ?? ""} />
+          {o.tipo === "CARONA" && (
+            <>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-600">Limite (% do total da Ata)</span>
+                <input
+                  type="number"
+                  name="limitePct"
+                  value={pct}
+                  onChange={(e) => setPct(Number(e.target.value))}
+                  max={LIMITE_CARONA_POR_ORGAO_PCT}
+                  min={1}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs"
+                />
+              </label>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-600">Valor calculado</span>
+                <span className="rounded border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-medium">
+                  {brl(valorEstimado)}
+                </span>
+              </div>
+            </>
+          )}
+          {state?.erro && <div className="col-span-2 text-xs text-red-700">{state.erro}</div>}
+          <div className="col-span-2 flex gap-2">
+            <button
+              type="submit"
+              className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+              onClick={(ev) => {
+                if (!window.confirm("Tem certeza? Esta ação será registrada no histórico.")) {
+                  ev.preventDefault();
+                }
+              }}
+            >
+              Salvar alterações
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditando(false)}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </li>
+    );
+  }
+
+  const podeEditar = o.tipo !== "GERENCIADOR";
+
+  return (
+    <li className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h4 className="font-semibold text-slate-900">{o.nome}</h4>
+            <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${COR_TIPO[o.tipo]}`}>
+              {ROTULO_TIPO[o.tipo]}
+            </span>
+          </div>
+          <div className="mt-1 grid gap-x-4 text-xs text-slate-600 md:grid-cols-2">
+            <span>CNPJ: {formatarCnpj(o.cnpj)}</span>
+            <span>{o.endereco}</span>
+            {o.email && <span>{o.email}</span>}
+            {o.telefone && <span>{o.telefone}</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {o.tipo === "CARONA" && o.limitePct !== null && (
+            <div className="text-right text-xs">
+              <div className="text-slate-500">Limite</div>
+              <div className="font-medium text-slate-900">{o.limitePct}% · {brl(o.limiteValor || 0)}</div>
+            </div>
+          )}
+          {podeEditar && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setEditando(true)}
+                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                title="Editar órgão"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <form action={removerOrgaoNaAtaAction}>
+                <input type="hidden" name="id" value={o.id} />
+                <button
+                  type="submit"
+                  className="rounded-md p-1.5 text-red-500 hover:bg-red-50 hover:text-red-700"
+                  title="Remover órgão"
+                  onClick={(ev) => {
+                    if (
+                      !window.confirm(
+                        `Remover o órgão "${o.nome}"? Esta ação será registrada no histórico.`,
+                      )
+                    ) {
+                      ev.preventDefault();
+                    }
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -201,9 +335,7 @@ export function EnderecosPontosFocaisTab({
         {enderecos.length > 0 ? (
           <ul className="mb-3 space-y-1 text-xs text-slate-600">
             {enderecos.map((e) => (
-              <li key={e.id} className="rounded border border-slate-200 bg-white p-2">
-                <strong>{e.rotulo || "Endereço"}</strong> — {e.endereco}
-              </li>
+              <EnderecoEditavel key={e.id} endereco={e} />
             ))}
           </ul>
         ) : (
@@ -227,11 +359,7 @@ export function EnderecosPontosFocaisTab({
         {pontosFocais.length > 0 ? (
           <ul className="mb-3 space-y-1 text-xs text-slate-600">
             {pontosFocais.map((p) => (
-              <li key={p.id} className="rounded border border-slate-200 bg-white p-2">
-                <strong>{p.funcao.replace(/_/g, " ")}</strong>: {p.nome}
-                {p.email && <> · {p.email}</>}
-                {p.telefone && <> · {p.telefone}</>}
-              </li>
+              <PontoFocalEditavel key={p.id} pontoFocal={p} />
             ))}
           </ul>
         ) : (
@@ -258,5 +386,201 @@ export function EnderecosPontosFocaisTab({
         </form>
       </section>
     </div>
+  );
+}
+
+function EnderecoEditavel({
+  endereco: e,
+}: {
+  endereco: { id: string; rotulo: string | null; endereco: string };
+}) {
+  const [editando, setEditando] = useState(false);
+  const [state, formAction] = useActionState(atualizarEnderecoEntregaAction, null);
+  useEffect(() => {
+    if (state?.ok) setEditando(false);
+  }, [state]);
+
+  if (editando) {
+    return (
+      <li className="rounded border border-amber-300 bg-amber-50 p-2">
+        <form action={formAction} className="flex flex-col gap-2">
+          <input type="hidden" name="id" value={e.id} />
+          <input
+            name="rotulo"
+            defaultValue={e.rotulo ?? ""}
+            placeholder="Rótulo"
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+          />
+          <input
+            name="endereco"
+            defaultValue={e.endereco}
+            required
+            placeholder="Endereço completo"
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+          />
+          {state?.erro && <span className="text-xs text-red-700">{state.erro}</span>}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              className="rounded bg-amber-600 px-2 py-1 text-xs font-medium text-white"
+            >
+              Salvar
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditando(false)}
+              className="rounded border border-slate-300 px-2 py-1 text-xs"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white p-2">
+      <span className="flex-1">
+        <strong>{e.rotulo || "Endereço"}</strong> — {e.endereco}
+      </span>
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setEditando(true)}
+          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          title="Editar"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+        <form action={removerEnderecoEntregaAction}>
+          <input type="hidden" name="id" value={e.id} />
+          <button
+            type="submit"
+            className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700"
+            title="Remover"
+            onClick={(ev) => {
+              if (!window.confirm("Remover este endereço? A ação será registrada no histórico.")) {
+                ev.preventDefault();
+              }
+            }}
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </form>
+      </div>
+    </li>
+  );
+}
+
+function PontoFocalEditavel({
+  pontoFocal: p,
+}: {
+  pontoFocal: { id: string; funcao: string; nome: string; email: string | null; telefone: string | null };
+}) {
+  const [editando, setEditando] = useState(false);
+  const [state, formAction] = useActionState(atualizarPontoFocalAction, null);
+  useEffect(() => {
+    if (state?.ok) setEditando(false);
+  }, [state]);
+
+  if (editando) {
+    return (
+      <li className="rounded border border-amber-300 bg-amber-50 p-2">
+        <form action={formAction} className="grid grid-cols-2 gap-2">
+          <input type="hidden" name="id" value={p.id} />
+          <select
+            name="funcao"
+            defaultValue={p.funcao}
+            required
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+          >
+            <option value="GESTOR">Gestor</option>
+            <option value="FISCAL">Fiscal</option>
+            <option value="FISCAL_TECNICO">Fiscal técnico</option>
+            <option value="FISCAL_ADMINISTRATIVO">Fiscal administrativo</option>
+            <option value="RESPONSAVEL_SETOR">Responsável setor</option>
+            <option value="CONTATO_GERAL">Contato geral</option>
+            <option value="AUTORIDADE_COMPETENTE">Autoridade competente</option>
+            <option value="OUTRO">Outro</option>
+          </select>
+          <input
+            name="nome"
+            defaultValue={p.nome}
+            required
+            placeholder="Nome"
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+          />
+          <input
+            name="email"
+            defaultValue={p.email ?? ""}
+            placeholder="E-mail"
+            type="email"
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+          />
+          <input
+            name="telefone"
+            defaultValue={p.telefone ?? ""}
+            placeholder="Telefone"
+            className="rounded border border-slate-300 px-2 py-1 text-xs"
+          />
+          {state?.erro && (
+            <span className="col-span-2 text-xs text-red-700">{state.erro}</span>
+          )}
+          <div className="col-span-2 flex gap-2">
+            <button
+              type="submit"
+              className="rounded bg-amber-600 px-2 py-1 text-xs font-medium text-white"
+            >
+              Salvar
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditando(false)}
+              className="rounded border border-slate-300 px-2 py-1 text-xs"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white p-2">
+      <span className="flex-1">
+        <strong>{p.funcao.replace(/_/g, " ")}</strong>: {p.nome}
+        {p.email && <> · {p.email}</>}
+        {p.telefone && <> · {p.telefone}</>}
+      </span>
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setEditando(true)}
+          className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          title="Editar"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+        <form action={removerPontoFocalAction}>
+          <input type="hidden" name="id" value={p.id} />
+          <button
+            type="submit"
+            className="rounded p-1 text-red-500 hover:bg-red-50 hover:text-red-700"
+            title="Remover"
+            onClick={(ev) => {
+              if (
+                !window.confirm("Remover este ponto focal? A ação será registrada no histórico.")
+              ) {
+                ev.preventDefault();
+              }
+            }}
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </form>
+      </div>
+    </li>
   );
 }

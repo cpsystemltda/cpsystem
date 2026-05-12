@@ -13,6 +13,7 @@ export type AtaItemRef = {
 };
 
 export type LinhaItem = {
+  id: string; // id do AtaItem existente (vazio quando linha nova)
   descricao: string;
   unidade: string;
   quantidade: string;
@@ -24,6 +25,7 @@ export type LinhaItem = {
 };
 
 const VAZIA = (lote = "", numero = ""): LinhaItem => ({
+  id: "",
   descricao: "",
   unidade: "",
   quantidade: "",
@@ -35,6 +37,7 @@ const VAZIA = (lote = "", numero = ""): LinhaItem => ({
 });
 
 export type ItemInicial = {
+  id?: string; // presente em modo edição
   descricao: string;
   unidade: string;
   quantidade: number;
@@ -84,6 +87,7 @@ export function ItensEditor({
   const inicial: LinhaItem[] =
     itensIniciais && itensIniciais.length > 0
       ? itensIniciais.map((i) => ({
+          id: i.id ?? "",
           descricao: i.descricao,
           unidade: i.unidade,
           quantidade: String(i.quantidade),
@@ -304,7 +308,7 @@ export function ItensEditor({
           <tbody>
             {linhas.map((l, idx) => (
               <tr
-                key={idx}
+                key={l.id || `nova-${idx}`}
                 style={{ borderTop: "0.5px solid var(--hairline)" }}
               >
                 {permitirLotes && (
@@ -333,6 +337,9 @@ export function ItensEditor({
                   </td>
                 )}
                 <td className="px-2 py-2 align-middle">
+                  {l.id && (
+                    <input type="hidden" name={`itens[${idx}][id]`} value={l.id} />
+                  )}
                   <input
                     name={`itens[${idx}][numero]`}
                     value={l.numero}

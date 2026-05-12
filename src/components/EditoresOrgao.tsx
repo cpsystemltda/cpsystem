@@ -15,10 +15,24 @@ function formatarCepInput(valor: string): string {
  * Inclui busca automática por CEP via ViaCEP.
  * Serializa como `enderecosEntrega[i][rotulo]` e `enderecosEntrega[i][endereco]`.
  */
-export function EnderecosEntregaEditor() {
+export function EnderecosEntregaEditor({
+  iniciais,
+}: {
+  iniciais?: { id: string; rotulo: string | null; endereco: string }[];
+}) {
   const [enderecos, setEnderecos] = useState<
-    { rotulo: string; endereco: string; cep: string; carregando: boolean }[]
-  >([{ rotulo: "", endereco: "", cep: "", carregando: false }]);
+    { id: string; rotulo: string; endereco: string; cep: string; carregando: boolean }[]
+  >(
+    iniciais && iniciais.length > 0
+      ? iniciais.map((e) => ({
+          id: e.id,
+          rotulo: e.rotulo ?? "",
+          endereco: e.endereco,
+          cep: "",
+          carregando: false,
+        }))
+      : [{ id: "", rotulo: "", endereco: "", cep: "", carregando: false }],
+  );
 
   const atualizar = (
     idx: number,
@@ -29,7 +43,7 @@ export function EnderecosEntregaEditor() {
   const adicionar = () =>
     setEnderecos((prev) => [
       ...prev,
-      { rotulo: "", endereco: "", cep: "", carregando: false },
+      { id: "", rotulo: "", endereco: "", cep: "", carregando: false },
     ]);
   const remover = (idx: number) =>
     setEnderecos((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
@@ -56,13 +70,16 @@ export function EnderecosEntregaEditor() {
     <div className="space-y-3">
       {enderecos.map((e, idx) => (
         <div
-          key={idx}
+          key={e.id || `novo-${idx}`}
           className="grid grid-cols-12 gap-2 rounded-2xl px-3 py-3"
           style={{
             background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
+          {e.id && (
+            <input type="hidden" name={`enderecosEntrega[${idx}][id]`} value={e.id} />
+          )}
           <input
             type="text"
             placeholder="Rótulo (ex: Almoxarifado central)"
@@ -131,16 +148,39 @@ export function EnderecosEntregaEditor() {
  * Sem pré-designações fixas. Usuário escolhe a função; quando "Outro"
  * aparece campo livre de descrição.
  */
-export function PontosFocaisEditor() {
+export function PontosFocaisEditor({
+  iniciais,
+}: {
+  iniciais?: {
+    id: string;
+    nome: string;
+    email: string | null;
+    telefone: string | null;
+    funcao: string;
+    funcaoDescricao: string | null;
+  }[];
+}) {
   const [pessoas, setPessoas] = useState<
     {
+      id: string;
       nome: string;
       email: string;
       telefone: string;
       funcao: string;
       funcaoDescricao: string;
     }[]
-  >([{ nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" }]);
+  >(
+    iniciais && iniciais.length > 0
+      ? iniciais.map((p) => ({
+          id: p.id,
+          nome: p.nome,
+          email: p.email ?? "",
+          telefone: p.telefone ?? "",
+          funcao: p.funcao,
+          funcaoDescricao: p.funcaoDescricao ?? "",
+        }))
+      : [{ id: "", nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" }],
+  );
 
   const atualizar = (idx: number, patch: Partial<(typeof pessoas)[0]>) => {
     setPessoas((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
@@ -148,7 +188,7 @@ export function PontosFocaisEditor() {
   const adicionar = () =>
     setPessoas((prev) => [
       ...prev,
-      { nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" },
+      { id: "", nome: "", email: "", telefone: "", funcao: "", funcaoDescricao: "" },
     ]);
   const remover = (idx: number) =>
     setPessoas((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
@@ -157,13 +197,16 @@ export function PontosFocaisEditor() {
     <div className="space-y-3">
       {pessoas.map((p, idx) => (
         <div
-          key={idx}
+          key={p.id || `nova-${idx}`}
           className="rounded-2xl px-4 py-4"
           style={{
             background: "var(--glass-2)",
             border: "0.5px solid var(--hairline)",
           }}
         >
+          {p.id && (
+            <input type="hidden" name={`pontosFocais[${idx}][id]`} value={p.id} />
+          )}
           <div className="grid grid-cols-12 gap-3">
             <input
               type="text"

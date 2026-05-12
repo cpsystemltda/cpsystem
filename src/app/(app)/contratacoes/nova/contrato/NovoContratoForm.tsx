@@ -8,7 +8,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor, type AtaItemRef } from "@/components/ItensEditor";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
 import { EnderecosEntregaEditor, PontosFocaisEditor } from "@/components/EditoresOrgao";
-import { criarContratoAction } from "@/app/actions/contratacoes";
+import type { ItemInicial } from "@/components/ItensEditor";
+import { criarContratoAction, editarContratoAction } from "@/app/actions/contratacoes";
 import { extrairContratoPdfAction } from "@/app/actions/iaExtracao";
 import {
   OPCOES_PROCEDIMENTO,
@@ -22,14 +23,75 @@ import type { ContratoExtraido } from "@/lib/extrairAta";
 type EmpresaOpt = { value: string; label: string };
 type AtaOpt = { value: string; label: string; itens: AtaItemRef[] };
 
-export default function NovoContratoForm({ empresas, atas }: { empresas: EmpresaOpt[]; atas: AtaOpt[] }) {
-  const [state, formAction] = useActionState(criarContratoAction, null);
+export type ContratoValoresIniciais = {
+  empresaId: string;
+  ataId: string | null;
+  tipo: string;
+  numero: string;
+  numeroNotaEmpenho: string | null;
+  numeroOrdemFornecimento: string | null;
+  processoAdministrativo: string;
+  procedimentoSelecao: string;
+  numeroLicitacao: string | null;
+  objeto: string;
+  orgaoNome: string;
+  orgaoCnpj: string;
+  orgaoEndereco: string;
+  orgaoEmail: string | null;
+  orgaoTelefone: string | null;
+  dataAssinatura: string;
+  dataPublicacao: string | null;
+  vigenciaInicio: string;
+  vigenciaFim: string;
+  prazoEntregaDias: number | null;
+  prazoPagamentoDias: number | null;
+  marcoOrcamentoEstimado: string | null;
+  modalidadeEntrega: "INTEGRAL" | "PARCELADA" | "SOB_DEMANDA";
+  marcoInicialPrazo: string | null;
+  marcoInicialDescricao: string | null;
+  itens: ItemInicial[];
+  parcelas: {
+    id: string;
+    numero: number;
+    prazoDias: number;
+    descricao: string | null;
+    valorEstimado: number | null;
+  }[];
+  enderecosEntrega: { id: string; rotulo: string | null; endereco: string }[];
+  pontosFocais: {
+    id: string;
+    nome: string;
+    email: string | null;
+    telefone: string | null;
+    funcao: string;
+    funcaoDescricao: string | null;
+  }[];
+};
+
+export default function NovoContratoForm({
+  empresas,
+  atas,
+  modo = "criar",
+  contratoId,
+  valoresIniciais,
+}: {
+  empresas: EmpresaOpt[];
+  atas: AtaOpt[];
+  modo?: "criar" | "editar";
+  contratoId?: string;
+  valoresIniciais?: ContratoValoresIniciais;
+}) {
+  const action = modo === "editar" ? editarContratoAction : criarContratoAction;
+  const [state, formAction] = useActionState(action, null);
   const e = state?.campos ?? {};
-  const [ataId, setAtaId] = useState("");
-  const [vinculadoArp, setVinculadoArp] = useState<"SIM" | "NAO">(atas.length > 0 ? "NAO" : "NAO");
+  const vi = valoresIniciais;
+  const [ataId, setAtaId] = useState(vi?.ataId ?? "");
+  const [vinculadoArp, setVinculadoArp] = useState<"SIM" | "NAO">(vi?.ataId ? "SIM" : "NAO");
   const [dados, setDados] = useState<ContratoExtraido | null>(null);
-  const [modalidadeEntrega, setModalidadeEntrega] = useState<"INTEGRAL" | "PARCELADA" | "SOB_DEMANDA">("INTEGRAL");
-  const [marcoInicialPrazo, setMarcoInicialPrazo] = useState<string>("");
+  const [modalidadeEntrega, setModalidadeEntrega] = useState<"INTEGRAL" | "PARCELADA" | "SOB_DEMANDA">(
+    vi?.modalidadeEntrega ?? "INTEGRAL",
+  );
+  const [marcoInicialPrazo, setMarcoInicialPrazo] = useState<string>(vi?.marcoInicialPrazo ?? "");
 
   const ataSelecionada = atas.find((a) => a.value === ataId);
   const formKey = dados ? `auto-${dados.numero}` : "manual";
@@ -50,13 +112,13 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
             className="text-[11px] font-bold uppercase"
             style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
           >
-            Nova contratação · Contrato administrativo
+            {modo === "editar" ? "Editar registro · Contrato administrativo" : "Nova contratação · Contrato administrativo"}
           </p>
           <h1
             className="mt-2 text-[40px] font-extrabold leading-none"
             style={{ color: "var(--text)", letterSpacing: "-0.045em" }}
           >
-            Novo{" "}
+            {modo === "editar" ? "Corrigir " : "Novo "}
             <em
               style={{
                 fontStyle: "normal",
@@ -66,34 +128,55 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
                 WebkitTextFillColor: "transparent",
               }}
             >
-              Contrato
+              {modo === "editar" ? `Contrato ${vi?.numero ?? ""}` : "Contrato"}
             </em>
           </h1>
           <p
             className="mt-3 max-w-[640px] text-[14px]"
             style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
           >
-            Direto ou derivado de uma Ata. Quando vinculado a Ata, o sistema valida o saldo dos
-            itens automaticamente.
+            {modo === "editar"
+              ? "Ajuste qualquer campo. Alterações em valores monetários, vigências e CNPJs pedem confirmação. Tudo fica registrado no histórico."
+              : "Direto ou derivado de uma Ata. Quando vinculado a Ata, o sistema valida o saldo dos itens automaticamente."}
           </p>
         </div>
       </header>
 
-      <div className="mt-6">
-        <UploadPdfPanel
-          titulo="Preencher automaticamente a partir do PDF do Contrato"
-          descricao="Anexe o PDF do contrato administrativo. A IA extrai número, processo, órgão, vigência, prazos e a lista completa de itens. Você confere e edita antes de salvar."
-          action={extrairContratoPdfAction}
-          onSuccess={setDados}
-          badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchido(s)`}
-        />
-      </div>
+      {modo !== "editar" && (
+        <div className="mt-6">
+          <UploadPdfPanel
+            titulo="Preencher automaticamente a partir do PDF do Contrato"
+            descricao="Anexe o PDF do contrato administrativo. A IA extrai número, processo, órgão, vigência, prazos e a lista completa de itens. Você confere e edita antes de salvar."
+            action={extrairContratoPdfAction}
+            onSuccess={setDados}
+            badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchido(s)`}
+          />
+        </div>
+      )}
 
-      <form key={formKey} action={formAction} className="mt-8 space-y-8">
+      <form
+        key={formKey}
+        action={formAction}
+        className="mt-8 space-y-8"
+        onSubmit={(ev) => {
+          if (modo === "editar") {
+            const ok = window.confirm(
+              "Tem certeza? As alterações em valores monetários, datas de vigência e CNPJs serão registradas no histórico.",
+            );
+            if (!ok) {
+              ev.preventDefault();
+              ev.stopPropagation();
+            }
+          }
+        }}
+      >
+        {modo === "editar" && contratoId && (
+          <input type="hidden" name="contratoId" value={contratoId} />
+        )}
         <Secao titulo="Identificação">
           <div className="grid grid-cols-4 gap-4">
-            <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} />
-            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} />
+            <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} defaultValue={vi?.empresaId} />
+            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={vi?.tipo} />
 
             {/* Toggle Vinculado a ARP */}
             <div className="col-span-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -148,14 +231,14 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.numero}
               span={1}
-              defaultValue={dados?.numero}
+              defaultValue={dados?.numero ?? vi?.numero}
             />
             <Field
               label="Nº da Nota de Empenho (suporte)"
               name="numeroNotaEmpenho"
               erro={e.numeroNotaEmpenho}
               span={1}
-              defaultValue={dados?.numeroNotaEmpenho ?? ""}
+              defaultValue={dados?.numeroNotaEmpenho ?? vi?.numeroNotaEmpenho ?? ""}
             />
             <Field
               label="Nº da Ordem de Fornecimento (se houver)"
@@ -163,6 +246,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               placeholder="OF nº/ano"
               erro={e.numeroOrdemFornecimento}
               span={2}
+              defaultValue={vi?.numeroOrdemFornecimento ?? ""}
             />
             <Field
               label="Processo administrativo"
@@ -170,7 +254,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.processoAdministrativo}
               span={2}
-              defaultValue={dados?.processoAdministrativo}
+              defaultValue={dados?.processoAdministrativo ?? vi?.processoAdministrativo}
             />
             <Select
               label="Procedimento de seleção"
@@ -179,14 +263,14 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.procedimentoSelecao}
               span={1}
-              defaultValue={dados?.procedimentoSelecao}
+              defaultValue={dados?.procedimentoSelecao ?? vi?.procedimentoSelecao}
             />
             <Field
               label="Nº da Licitação (opcional)"
               name="numeroLicitacao"
               erro={e.numeroLicitacao}
               span={1}
-              defaultValue={dados?.numeroLicitacao ?? ""}
+              defaultValue={dados?.numeroLicitacao ?? vi?.numeroLicitacao ?? ""}
             />
             <Field
               label="Objeto"
@@ -194,7 +278,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.objeto}
               span={4}
-              defaultValue={dados?.objeto}
+              defaultValue={dados?.objeto ?? vi?.objeto}
             />
           </div>
         </Secao>
@@ -207,7 +291,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.orgaoNome}
               span={2}
-              defaultValue={dados?.orgaoNome}
+              defaultValue={dados?.orgaoNome ?? vi?.orgaoNome}
             />
             <Field
               label="CNPJ do órgão"
@@ -216,7 +300,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.orgaoCnpj}
               span={2}
-              defaultValue={dados?.orgaoCnpj}
+              defaultValue={dados?.orgaoCnpj ?? vi?.orgaoCnpj}
             />
             <Field
               label="Endereço"
@@ -224,7 +308,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.orgaoEndereco}
               span={4}
-              defaultValue={dados?.orgaoEndereco}
+              defaultValue={dados?.orgaoEndereco ?? vi?.orgaoEndereco}
             />
             <Field
               label="E-mail"
@@ -232,14 +316,14 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               type="email"
               erro={e.orgaoEmail}
               span={2}
-              defaultValue={dados?.orgaoEmail ?? ""}
+              defaultValue={dados?.orgaoEmail ?? vi?.orgaoEmail ?? ""}
             />
             <Field
               label="Telefone"
               name="orgaoTelefone"
               erro={e.orgaoTelefone}
               span={2}
-              defaultValue={dados?.orgaoTelefone ?? ""}
+              defaultValue={dados?.orgaoTelefone ?? vi?.orgaoTelefone ?? ""}
             />
           </div>
         </Secao>
@@ -253,7 +337,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.dataAssinatura}
               span={1}
-              defaultValue={dados?.dataAssinatura}
+              defaultValue={dados?.dataAssinatura ?? vi?.dataAssinatura}
             />
             <Field
               label="Data de publicação"
@@ -261,7 +345,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               type="date"
               erro={e.dataPublicacao}
               span={1}
-              defaultValue={dados?.dataPublicacao ?? ""}
+              defaultValue={dados?.dataPublicacao ?? vi?.dataPublicacao ?? ""}
             />
             <Field
               label="Vigência — início"
@@ -270,7 +354,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.vigenciaInicio}
               span={1}
-              defaultValue={dados?.vigenciaInicio}
+              defaultValue={dados?.vigenciaInicio ?? vi?.vigenciaInicio}
             />
             <Field
               label="Vigência — fim"
@@ -279,7 +363,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               required
               erro={e.vigenciaFim}
               span={1}
-              defaultValue={dados?.vigenciaFim}
+              defaultValue={dados?.vigenciaFim ?? vi?.vigenciaFim}
             />
             <Field
               label="Prazo de entrega (dias)"
@@ -288,7 +372,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               min="0"
               erro={e.prazoEntregaDias}
               span={1}
-              defaultValue={dados?.prazoEntregaDias?.toString() ?? ""}
+              defaultValue={dados?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""}
             />
             <Field
               label="Prazo de pagamento (dias)"
@@ -297,7 +381,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               min="0"
               erro={e.prazoPagamentoDias}
               span={1}
-              defaultValue={dados?.prazoPagamentoDias?.toString() ?? ""}
+              defaultValue={dados?.prazoPagamentoDias?.toString() ?? vi?.prazoPagamentoDias?.toString() ?? ""}
             />
             <Field
               label="Marco do orçamento estimado (alerta de reajuste em +1 ano)"
@@ -305,6 +389,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               type="date"
               erro={e.marcoOrcamentoEstimado}
               span={2}
+              defaultValue={vi?.marcoOrcamentoEstimado ?? ""}
             />
           </div>
         </Secao>
@@ -349,6 +434,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
                 required
                 erro={e.marcoInicialDescricao}
                 span={4}
+                defaultValue={vi?.marcoInicialDescricao ?? ""}
               />
             )}
           </div>
@@ -360,7 +446,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
                 Cada parcela é entregue em prazo distinto (contado a partir do marco inicial). A
                 cada parcela cumprida, emite-se nota fiscal e o órgão paga.
               </p>
-              <ParcelasEditor erro={e.parcelas} />
+              <ParcelasEditor erro={e.parcelas} iniciais={vi?.parcelas} />
             </div>
           )}
 
@@ -377,7 +463,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
             Locais onde o contrato será cumprido. Os empenhos derivados podem referenciar
             qualquer um deles.
           </p>
-          <EnderecosEntregaEditor />
+          <EnderecosEntregaEditor iniciais={vi?.enderecosEntrega} />
         </Secao>
 
         <Secao titulo="Pontos focais do órgão (Lei 14.133 art. 117)">
@@ -385,7 +471,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
             Pessoas-chave para gestão e fiscalização. Adicione pelo menos o Gestor — Fiscais
             Técnico e Administrativo são recomendados.
           </p>
-          <PontosFocaisEditor />
+          <PontosFocaisEditor iniciais={vi?.pontosFocais} />
         </Secao>
 
         <Secao titulo="Itens contratados">
@@ -394,7 +480,7 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
               Vinculando à Ata <strong>{ataSelecionada.label}</strong>. Selecione cada item da Ata na primeira coluna — o saldo será validado automaticamente.
             </p>
           )}
-          <ItensEditor ataItens={ataSelecionada?.itens} itensIniciais={dados?.itens} />
+          <ItensEditor ataItens={ataSelecionada?.itens} itensIniciais={vi?.itens ?? dados?.itens} permitirLotes={false} />
         </Secao>
 
         {state?.erro && (
@@ -411,8 +497,11 @@ export default function NovoContratoForm({ empresas, atas }: { empresas: Empresa
         )}
 
         <div className="flex gap-3">
-          <SubmitButton>Cadastrar Contrato</SubmitButton>
-          <Link href="/contratacoes/nova" className="btn-secondary inline-flex">
+          <SubmitButton>{modo === "editar" ? "Salvar alterações" : "Cadastrar Contrato"}</SubmitButton>
+          <Link
+            href={modo === "editar" && contratoId ? `/contratos/${contratoId}` : "/contratacoes/nova"}
+            className="btn-secondary inline-flex"
+          >
             Cancelar
           </Link>
         </div>
@@ -446,13 +535,35 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
   );
 }
 
-type ParcelaState = { numero: number; prazoDias: string; descricao: string; valorEstimado: string };
+type ParcelaState = { id: string; numero: number; prazoDias: string; descricao: string; valorEstimado: string };
 
-function ParcelasEditor({ erro }: { erro?: string }) {
-  const [parcelas, setParcelas] = useState<ParcelaState[]>([
-    { numero: 1, prazoDias: "30", descricao: "", valorEstimado: "" },
-    { numero: 2, prazoDias: "60", descricao: "", valorEstimado: "" },
-  ]);
+function ParcelasEditor({
+  erro,
+  iniciais,
+}: {
+  erro?: string;
+  iniciais?: {
+    id: string;
+    numero: number;
+    prazoDias: number;
+    descricao: string | null;
+    valorEstimado: number | null;
+  }[];
+}) {
+  const [parcelas, setParcelas] = useState<ParcelaState[]>(
+    iniciais && iniciais.length > 0
+      ? iniciais.map((p) => ({
+          id: p.id,
+          numero: p.numero,
+          prazoDias: String(p.prazoDias),
+          descricao: p.descricao ?? "",
+          valorEstimado: p.valorEstimado != null ? String(p.valorEstimado) : "",
+        }))
+      : [
+          { id: "", numero: 1, prazoDias: "30", descricao: "", valorEstimado: "" },
+          { id: "", numero: 2, prazoDias: "60", descricao: "", valorEstimado: "" },
+        ],
+  );
 
   const atualizar = (idx: number, campo: keyof ParcelaState, valor: string) => {
     setParcelas((prev) =>
@@ -463,7 +574,7 @@ function ParcelasEditor({ erro }: { erro?: string }) {
   const adicionar = () => {
     setParcelas((prev) => [
       ...prev,
-      { numero: prev.length + 1, prazoDias: "", descricao: "", valorEstimado: "" },
+      { id: "", numero: prev.length + 1, prazoDias: "", descricao: "", valorEstimado: "" },
     ]);
   };
 
@@ -491,8 +602,11 @@ function ParcelasEditor({ erro }: { erro?: string }) {
         </thead>
         <tbody>
           {parcelas.map((p, idx) => (
-            <tr key={idx} className="border-b border-slate-100">
+            <tr key={p.id || `nova-${idx}`} className="border-b border-slate-100">
               <td className="py-2 pr-2">
+                {p.id && (
+                  <input type="hidden" name={`parcelas[${idx}][id]`} value={p.id} />
+                )}
                 <input
                   type="hidden"
                   name={`parcelas[${idx}][numero]`}

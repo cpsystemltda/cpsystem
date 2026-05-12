@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ClipboardList, Receipt } from "lucide-react";
+import { ChevronLeft, ClipboardList, Receipt, Pencil } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularSaldoContrato } from "@/lib/saldo";
+import { podeEditarDocumento } from "@/lib/permissoes";
 import {
   brl,
   formatarCnpj,
@@ -26,6 +27,8 @@ import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
+import { HistoricoLista } from "@/components/abas/HistoricoLista";
+import { ItensContratoTab } from "@/components/abas/ItensContratoTab";
 
 export default async function ContratoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,6 +38,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
     where: { id, empresa: { contaId: usuario.contaId } },
     include: {
       empresa: true,
+      criadoPor: { select: { nome: true, email: true } },
       itens: { select: { quantidade: true, valorTotal: true } },
       ata: true,
       empenhos: { orderBy: { criadoEm: "desc" } },
@@ -60,7 +64,31 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
 
   if (!contrato) notFound();
 
+  const podeEditar = podeEditarDocumento(usuario, contrato);
   const saldo = await calcularSaldoContrato(contrato.id);
+
+  const itemIds = (
+    await prisma.contratoItem.findMany({ where: { contratoId: contrato.id }, select: { id: true } })
+  ).map((i) => i.id);
+  const parcelaIds = contrato.parcelas.map((p) => p.id);
+  const enderecoIds = contrato.enderecosEntrega.map((e) => e.id);
+  const pontoFocalIds = contrato.pontosFocais.map((p) => p.id);
+
+  const historico = await prisma.logAuditoria.findMany({
+    where: {
+      contaId: usuario.contaId,
+      OR: [
+        { recurso: "Contrato", recursoId: contrato.id },
+        { recurso: "ContratoItem", recursoId: { in: itemIds.length > 0 ? itemIds : ["__none__"] } },
+        { recurso: "ParcelaContrato", recursoId: { in: parcelaIds.length > 0 ? parcelaIds : ["__none__"] } },
+        { recurso: "EnderecoEntrega", recursoId: { in: enderecoIds.length > 0 ? enderecoIds : ["__none__"] } },
+        { recurso: "PontoFocal", recursoId: { in: pontoFocalIds.length > 0 ? pontoFocalIds : ["__none__"] } },
+      ],
+    },
+    orderBy: { criadoEm: "desc" },
+    take: 200,
+    include: { usuario: { select: { nome: true, email: true } } },
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
@@ -80,10 +108,22 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
             {contrato.ata && (
               <> · derivado da <Link href={`/atas/${contrato.ata.id}`} className="text-blue-700 hover:underline">Ata {contrato.ata.numero}</Link></>
             )}
+            {contrato.criadoPor && (
+              <> · criado por <strong>{contrato.criadoPor.nome}</strong></>
+            )}
           </p>
         </div>
         <div className="flex items-start gap-2">
           <AnaliseJuridicaIA contratoId={contrato.id} />
+          {podeEditar && (
+            <Link
+              href={`/contratos/${contrato.id}/editar`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              title="Editar dados do Contrato"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Editar
+            </Link>
+          )}
           <Link
             href="/contratacoes/nova/empenho"
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -107,7 +147,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
             {
               key: "saldo",
               label: "Saldo de itens",
-              content: <TabelaSaldoContrato saldo={saldo} />,
+              content: <ItensContratoTab saldo={saldo} />,
             },
             {
               key: "aditivos",
@@ -185,6 +225,12 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               key: "dados",
               label: "Dados",
               content: <DadosContrato c={contrato} />,
+            },
+            {
+              key: "historico",
+              label: "Histórico",
+              badge: historico.length,
+              content: <HistoricoLista entradas={historico} />,
             },
             {
               key: "relatorio",

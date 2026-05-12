@@ -11,17 +11,19 @@ export type ResumoComissaoEmpresa = {
   status: "ATIVO" | "ENCERRADO";
   dataInicio: Date;
 
-  // Valores monetários (B2G — execuções de contratos com governo)
-  comissaoRecebida: number;          // execuções PAGAS após dataInicio
-  comissaoAReceber: number;          // execuções PENDENTES após dataInicio
+  // Linha B (comissão empresa→analista) — fonte: ComissaoExecucao
+  comissaoRecebida: number;          // status PAGO + valorRecebido de PAGO_PARCIAL
+  comissaoAReceber: number;          // A_RECEBER + ATRASADO + saldo de PAGO_PARCIAL
+  comissaoAguardandoOrgao: number;   // AGUARDANDO_ORGAO (Linha A ainda pendente)
   carteiraContratada: number;        // soma de TODOS os contratos+atas+empenhos vigentes
   totalExecucoes: number;
-  totalExecucoesPagas: number;
+  totalExecucoesPagasPeloOrgao: number; // Linha A paga
 };
 
 export type ResumoComissaoConsolidado = {
   totalComissaoRecebida: number;
   totalComissaoAReceber: number;
+  totalComissaoAguardandoOrgao: number;
   totalCarteiraContratada: number;
   totalFixoMensalAtivo: number;
   totalEmpresas: number;
@@ -48,29 +50,52 @@ export async function calcularComissaoAnalista(analistaId: string): Promise<Resu
   for (const v of vinculos) {
     const empresaIds = v.conta.empresas.map((e) => e.id);
 
-    // Comissão sobre execuções (Empenhos) criados após dataInicio
-    const empenhos = await prisma.empenho.findMany({
-      where: {
-        empresaId: { in: empresaIds },
-        criadoEm: { gte: v.dataInicio },
+    // Comissões da Linha B (empresa→analista) — fonte canônica é ComissaoExecucao.
+    // Cada empenho do vínculo tem 1 linha aqui. Status diferencia:
+    //   AGUARDANDO_ORGAO  → órgão ainda não pagou
+    //   A_RECEBER/ATRASADO → órgão pagou, comissão pendente de cobrança
+    //   PAGO              → analista recebeu integral
+    //   PAGO_PARCIAL      → analista recebeu parte
+    const comissoes = await prisma.comissaoExecucao.findMany({
+      where: { vinculoId: v.id },
+      select: {
+        status: true,
+        valorCalculado: true,
+        valorRecebido: true,
+        valorBaseEmpenho: true,
       },
-      include: { itens: { select: { valorTotal: true } } },
     });
 
     let comissaoRecebida = 0;
     let comissaoAReceber = 0;
-    let totalPagas = 0;
+    let comissaoAguardandoOrgao = 0;
+    let totalExecucoesPagasPeloOrgao = 0;
 
-    for (const e of empenhos) {
-      const valor = e.itens.reduce((s, i) => s + i.valorTotal, 0);
-      const comissao = valor * (v.percentualComissao / 100);
-      if (e.status === "PAGO") {
-        comissaoRecebida += comissao;
-        totalPagas++;
-      } else {
-        comissaoAReceber += comissao;
+    for (const c of comissoes) {
+      switch (c.status) {
+        case "AGUARDANDO_ORGAO":
+          // Potencial: usa o valor total empenhado × % (Linha A ainda não ocorreu)
+          comissaoAguardandoOrgao +=
+            c.valorBaseEmpenho * (v.percentualComissao / 100);
+          break;
+        case "A_RECEBER":
+        case "ATRASADO":
+          comissaoAReceber += c.valorCalculado;
+          totalExecucoesPagasPeloOrgao++;
+          break;
+        case "PAGO":
+          comissaoRecebida += c.valorRecebido || c.valorCalculado;
+          totalExecucoesPagasPeloOrgao++;
+          break;
+        case "PAGO_PARCIAL":
+          comissaoRecebida += c.valorRecebido;
+          comissaoAReceber += Math.max(0, c.valorCalculado - c.valorRecebido);
+          totalExecucoesPagasPeloOrgao++;
+          break;
       }
     }
+
+    const totalExecucoes = comissoes.length;
 
     // Carteira contratada: TODOS os contratos+atas vigentes (independente de quando criados)
     const hoje = new Date();
@@ -102,15 +127,17 @@ export async function calcularComissaoAnalista(analistaId: string): Promise<Resu
       dataInicio: v.dataInicio,
       comissaoRecebida,
       comissaoAReceber,
+      comissaoAguardandoOrgao,
       carteiraContratada: carteira,
-      totalExecucoes: empenhos.length,
-      totalExecucoesPagas: totalPagas,
+      totalExecucoes,
+      totalExecucoesPagasPeloOrgao,
     });
   }
 
   return {
     totalComissaoRecebida: empresas.reduce((s, e) => s + e.comissaoRecebida, 0),
     totalComissaoAReceber: empresas.reduce((s, e) => s + e.comissaoAReceber, 0),
+    totalComissaoAguardandoOrgao: empresas.reduce((s, e) => s + e.comissaoAguardandoOrgao, 0),
     totalCarteiraContratada: empresas.reduce((s, e) => s + e.carteiraContratada, 0),
     totalFixoMensalAtivo: empresas.filter((e) => e.status === "ATIVO").reduce((s, e) => s + e.fixoMensal, 0),
     totalEmpresas: empresas.length,
