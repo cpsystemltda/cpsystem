@@ -18,6 +18,19 @@ const NOMES_ESTADOS: Record<string, string> = {
   TOCANTINS: "TO",
 };
 
+// Cidades-âncora que mapeiam direto pra uma UF. Cobre o caso comum de
+// endereço "SHIS QL 12, Brasília" — sem "DF" explícito — voltar null.
+// Mantém só capitais e cidades de alta confiança (sem ambiguidade).
+const CIDADES_PARA_UF: Record<string, string> = {
+  "BRASILIA": "DF",
+  "MACEIO": "AL",
+  "ARACAJU": "SE",
+  "RIO DE JANEIRO": "RJ", // também já cai em NOMES_ESTADOS mas reforça
+  "VITORIA": "ES",
+  "JOAO PESSOA": "PB",
+  "NATAL": "RN",
+};
+
 const FAIXAS_CEP: Array<[number, number, string]> = [
   [1000000, 19999999, "SP"],
   [20000000, 28999999, "RJ"],
@@ -64,6 +77,14 @@ export function extrairUf(endereco: string | null | undefined, cep?: string | nu
     // Nome do estado
     for (const [nome, uf] of Object.entries(NOMES_ESTADOS)) {
       if (upper.includes(nome)) return uf;
+    }
+
+    // Cidade-âncora (sem UF explícita no endereço). Ex: "Brasília" → DF.
+    // Usa boundary word pra evitar falso-positivo: "Marília" não vira DF
+    // só porque contém "Brasília" como substring.
+    for (const [cidade, uf] of Object.entries(CIDADES_PARA_UF)) {
+      const regex = new RegExp(`(^|[\\s,/-])${cidade}([\\s,/.-]|$)`);
+      if (regex.test(upper)) return uf;
     }
   }
 

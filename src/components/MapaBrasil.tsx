@@ -98,28 +98,25 @@ export function MapaBrasil({
 
   const projection = useMemo(() => {
     if (!geo) return null;
-    // Zoom inteligente: se a empresa atua em até 5 estados E pelo menos um
-    // deles é pequeno (DF, AL, SE, RJ, ES, PB, RN), faz fitSize só nesses
-    // estados — caso clássico da Regina com cliente concentrado no DF que
-    // ficava perdido no Brasil inteiro. Para muitas UFs ou cobertura
-    // dispersa, mostra Brasil inteiro como antes.
-    const ESTADOS_PEQUENOS = new Set(["DF", "AL", "SE", "RJ", "ES", "PB", "RN"]);
-    const temPequeno = Array.from(ufsComOperacao).some((u) =>
-      ESTADOS_PEQUENOS.has(u),
-    );
-    const aplicarZoom =
-      ufsComOperacao.size > 0 &&
-      (ufsComOperacao.size <= 3 || (temPequeno && ufsComOperacao.size <= 5));
-    const featuresParaFit = aplicarZoom
-      ? geo.features.filter((f) => f.properties.UF && ufsComOperacao.has(f.properties.UF))
-      : geo.features;
+    // Zoom sempre que houver operação — fitExtent calcula bounds nas UFs
+    // com operação, sem threshold. Caso a empresa atue só em GO, o mapa
+    // foca em GO/região centro-oeste em vez de mostrar o Brasil inteiro
+    // (com DF/GO microscópicos). Brasil cheio só quando não há operação.
+    const featuresParaFit =
+      ufsComOperacao.size > 0
+        ? geo.features.filter(
+            (f) => f.properties.UF && ufsComOperacao.has(f.properties.UF),
+          )
+        : geo.features;
     const collection = { type: "FeatureCollection", features: featuresParaFit };
-    // Margem de 10% pra não cortar bordas.
+    // Margem maior (15%) quando há zoom regional — dá respiro pros pins
+    // não ficarem no canto e os estados vizinhos aparecerem como contexto.
+    const margem = ufsComOperacao.size > 0 ? 0.15 : 0.05;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return geoMercator().fitExtent(
       [
-        [WIDTH * 0.05, HEIGHT * 0.05],
-        [WIDTH * 0.95, HEIGHT * 0.95],
+        [WIDTH * margem, HEIGHT * margem],
+        [WIDTH * (1 - margem), HEIGHT * (1 - margem)],
       ],
       collection as any,
     );
@@ -278,17 +275,20 @@ export function MapaBrasil({
             <g key={`pin-${uf}-${i}`} style={{ pointerEvents: "auto" }}>
               {pequeno && (
                 <>
+                  {/* Pin grande e claro — estados pequenos viram marcadores
+                     visíveis independente da escala. DF, em particular, fica
+                     visível mesmo no zoom em torno do GO. */}
                   <circle
                     cx={centroid[0]}
                     cy={centroid[1]}
-                    r={isHover || isDestaqueRow ? 10 : 7}
+                    r={isHover || isDestaqueRow ? 18 : 14}
                     fill="var(--primary-deep)"
                     stroke="white"
-                    strokeWidth={2}
+                    strokeWidth={3}
                     className="transition-all duration-150"
                     style={{
                       filter:
-                        "drop-shadow(0 0 4px rgba(168,137,71,0.5)) drop-shadow(0 1px 2px rgba(0,0,0,0.25))",
+                        "drop-shadow(0 0 6px rgba(168,137,71,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.35))",
                     }}
                   />
                   <text
@@ -296,11 +296,12 @@ export function MapaBrasil({
                     y={centroid[1] + 1}
                     textAnchor="middle"
                     dominantBaseline="central"
-                    fontSize={isHover || isDestaqueRow ? 9 : 7}
-                    fontWeight={800}
+                    fontSize={isHover || isDestaqueRow ? 13 : 11}
+                    fontWeight={900}
                     fill="white"
                     pointerEvents="none"
                     fontFamily="Inter, sans-serif"
+                    style={{ letterSpacing: "-0.02em" }}
                   >
                     {uf}
                   </text>
