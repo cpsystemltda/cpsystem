@@ -298,17 +298,19 @@ export function MapaBrasil({
           return (
             <g key={`pin-${uf}-${i}`} style={{ pointerEvents: "auto" }}>
               {pequeno && (() => {
-                // Pin quadrado para estados pequenos. DF é o caso crítico
-                // — embutido em GO, precisa de tamanho generoso pra leitura
-                // e hover. Demais (AL, SE, RJ, ES, PB, RN) ficam um pouco
-                // menores porque têm costa visível ao redor.
+                // Pin quadrado para estados pequenos. ATENÇÃO: viewBox do
+                // SVG é 600×480 mas renderiza com altura máxima 320px →
+                // cada unidade de viewBox equivale a ~0.67px reais na tela.
+                // Tentativas anteriores usaram lado=38 (≈25px reais — quase
+                // invisível dentro do GO). Agora DF usa 90 unidades = ~60px
+                // reais, bem visível.
                 const isDF = uf === "DF";
                 const lado = isDF
-                  ? (isHover || isDestaqueRow ? 44 : 38)
-                  : (isHover || isDestaqueRow ? 32 : 26);
+                  ? (isHover || isDestaqueRow ? 108 : 90)
+                  : (isHover || isDestaqueRow ? 60 : 50);
                 const fontSize = isDF
-                  ? (isHover || isDestaqueRow ? 16 : 14)
-                  : (isHover || isDestaqueRow ? 13 : 11);
+                  ? (isHover || isDestaqueRow ? 44 : 36)
+                  : (isHover || isDestaqueRow ? 26 : 22);
                 return (
                   <>
                     <rect
@@ -350,10 +352,12 @@ export function MapaBrasil({
                  visual de orientação, sem ser clicáveis. */}
               {temOperacao && (
                 <rect
-                  x={centroid[0] - (pequeno ? (uf === "DF" ? 26 : 20) : 16)}
-                  y={centroid[1] - (pequeno ? (uf === "DF" ? 26 : 20) : 16)}
-                  width={pequeno ? (uf === "DF" ? 52 : 40) : 32}
-                  height={pequeno ? (uf === "DF" ? 52 : 40) : 32}
+                  // Hit area um pouco maior que o pin visual pra hover folgado.
+                  // DF: ~63px reais. Outros pequenos: ~40px reais. Não-pequenos: ~21px reais.
+                  x={centroid[0] - (pequeno ? (uf === "DF" ? 60 : 35) : 16)}
+                  y={centroid[1] - (pequeno ? (uf === "DF" ? 60 : 35) : 16)}
+                  width={pequeno ? (uf === "DF" ? 120 : 70) : 32}
+                  height={pequeno ? (uf === "DF" ? 120 : 70) : 32}
                   fill="transparent"
                   pointerEvents="all"
                   className="cursor-pointer"
