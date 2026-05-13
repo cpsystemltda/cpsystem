@@ -297,46 +297,63 @@ export function MapaBrasil({
           const corTexto = "white";
           return (
             <g key={`pin-${uf}-${i}`} style={{ pointerEvents: "auto" }}>
-              {pequeno && (
-                <>
-                  <circle
-                    cx={centroid[0]}
-                    cy={centroid[1]}
-                    r={isHover || isDestaqueRow ? 18 : 14}
-                    fill={corFundo}
-                    stroke="white"
-                    strokeWidth={3}
-                    className="transition-all duration-150"
-                    style={{
-                      filter: temOperacao
-                        ? "drop-shadow(0 0 6px rgba(168,137,71,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.35))"
-                        : "drop-shadow(0 1px 3px rgba(0,0,0,0.25))",
-                    }}
-                  />
-                  <text
-                    x={centroid[0]}
-                    y={centroid[1] + 1}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={isHover || isDestaqueRow ? 13 : 11}
-                    fontWeight={900}
-                    fill={corTexto}
-                    pointerEvents="none"
-                    fontFamily="Inter, sans-serif"
-                    style={{ letterSpacing: "-0.02em" }}
-                  >
-                    {uf}
-                  </text>
-                </>
-              )}
+              {pequeno && (() => {
+                // Pin quadrado para estados pequenos. DF é o caso crítico
+                // — embutido em GO, precisa de tamanho generoso pra leitura
+                // e hover. Demais (AL, SE, RJ, ES, PB, RN) ficam um pouco
+                // menores porque têm costa visível ao redor.
+                const isDF = uf === "DF";
+                const lado = isDF
+                  ? (isHover || isDestaqueRow ? 44 : 38)
+                  : (isHover || isDestaqueRow ? 32 : 26);
+                const fontSize = isDF
+                  ? (isHover || isDestaqueRow ? 16 : 14)
+                  : (isHover || isDestaqueRow ? 13 : 11);
+                return (
+                  <>
+                    <rect
+                      x={centroid[0] - lado / 2}
+                      y={centroid[1] - lado / 2}
+                      width={lado}
+                      height={lado}
+                      rx={5}
+                      ry={5}
+                      fill={corFundo}
+                      stroke="white"
+                      strokeWidth={3}
+                      className="transition-all duration-150"
+                      style={{
+                        filter: temOperacao
+                          ? "drop-shadow(0 0 6px rgba(168,137,71,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.35))"
+                          : "drop-shadow(0 1px 3px rgba(0,0,0,0.25))",
+                      }}
+                    />
+                    <text
+                      x={centroid[0]}
+                      y={centroid[1] + 1}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={fontSize}
+                      fontWeight={900}
+                      fill={corTexto}
+                      pointerEvents="none"
+                      fontFamily="Inter, sans-serif"
+                      style={{ letterSpacing: "-0.02em" }}
+                    >
+                      {uf}
+                    </text>
+                  </>
+                );
+              })()}
               {/* Hit area apenas para estados COM operação (clique tem
                  sentido só nesses). Pequenos sem operação ganham só o pin
                  visual de orientação, sem ser clicáveis. */}
               {temOperacao && (
-                <circle
-                  cx={centroid[0]}
-                  cy={centroid[1]}
-                  r={pequeno ? 22 : 16}
+                <rect
+                  x={centroid[0] - (pequeno ? (uf === "DF" ? 26 : 20) : 16)}
+                  y={centroid[1] - (pequeno ? (uf === "DF" ? 26 : 20) : 16)}
+                  width={pequeno ? (uf === "DF" ? 52 : 40) : 32}
+                  height={pequeno ? (uf === "DF" ? 52 : 40) : 32}
                   fill="transparent"
                   pointerEvents="all"
                   className="cursor-pointer"
