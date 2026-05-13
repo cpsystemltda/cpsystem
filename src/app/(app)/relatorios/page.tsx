@@ -109,10 +109,17 @@ export default async function RelatoriosPage() {
       </div>
 
       <div className="mt-8 grid gap-6 md:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Empenhos por status</h2>
+        <section className="glass rounded-[20px] px-6 py-5">
+          <h2
+            className="text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
+            Empenhos por status
+          </h2>
           {Object.keys(porStatus).length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">Sem dados ainda.</p>
+            <p className="mt-4 text-sm" style={{ color: "var(--text-mute)" }}>
+              Sem dados ainda.
+            </p>
           ) : (
             <div className="mt-4 space-y-3">
               {Object.entries(porStatus).map(([status, dados]) => {
@@ -120,13 +127,19 @@ export default async function RelatoriosPage() {
                 return (
                   <div key={status}>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-slate-700">{ROTULO_STATUS[status]}</span>
-                      <span className="text-slate-600">
+                      <span className="font-bold" style={{ color: "var(--text)" }}>{ROTULO_STATUS[status]}</span>
+                      <span style={{ color: "var(--text-soft)" }}>
                         {dados.qtd} · {brl(dados.valor)}
                       </span>
                     </div>
-                    <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div className="h-full bg-blue-500" style={{ width: `${pct}%` }} />
+                    <div
+                      className="mt-1 h-2 w-full overflow-hidden rounded-full"
+                      style={{ background: "rgba(15,14,12,0.06)" }}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${pct}%`, background: "var(--primary-deep)" }}
+                      />
                     </div>
                   </div>
                 );
@@ -135,40 +148,77 @@ export default async function RelatoriosPage() {
           )}
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Atas — saldo disponível</h2>
-          <p className="mt-4 text-3xl font-bold text-slate-900">{brl(valorDisponivelAtas)}</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <section className="glass rounded-[20px] px-6 py-5">
+          <h2
+            className="text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
+            Atas — saldo disponível
+          </h2>
+          <p
+            className="mt-3 text-[28px] font-extrabold leading-none tabular"
+            style={{ color: "var(--mint-deep)", letterSpacing: "-0.025em" }}
+          >
+            {brl(valorDisponivelAtas)}
+          </p>
+          <p className="mt-2 text-xs" style={{ color: "var(--text-soft)" }}>
             de {brl(valorTotalAtas)} registrado em {atas.length} atas vigentes ou em vigor.
           </p>
-          <div className="mt-4 h-3 w-full overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="mt-4 h-3 w-full overflow-hidden rounded-full"
+            style={{ background: "rgba(15,14,12,0.06)" }}
+          >
             <div
-              className="h-full bg-emerald-500"
-              style={{ width: `${valorTotalAtas ? (valorDisponivelAtas / valorTotalAtas) * 100 : 0}%` }}
+              className="h-full rounded-full"
+              style={{
+                width: `${valorTotalAtas ? (valorDisponivelAtas / valorTotalAtas) * 100 : 0}%`,
+                background: "var(--mint-deep)",
+              }}
             />
           </div>
         </section>
       </div>
 
       {(atasVencendo.length > 0 || reajustes.length > 0) && (
-        <section className="mt-8 rounded-xl border border-amber-200 bg-amber-50/50 p-5">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+        <section
+          className="glass mt-8 rounded-[20px] px-6 py-5"
+          style={{
+            background: "rgba(212,175,55,0.08)",
+            border: "0.5px solid rgba(168,137,71,0.30)",
+          }}
+        >
+          <h2
+            className="flex items-center gap-2 text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
             <AlertTriangle className="h-4 w-4" /> Alertas críticos ({atasVencendo.length + reajustes.length})
           </h2>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
             {atasVencendo.map((a) => (
-              <div key={a.id} className="rounded-md border border-amber-200 bg-white p-3 text-sm">
-                <p className="font-medium">Ata {a.numero} vence em {Math.ceil((a.vigenciaFim.getTime() - hoje) / 86400000)} dias</p>
-                <p className="text-xs text-slate-500">{a.orgaoNome}</p>
+              <div
+                key={a.id}
+                className="glass-tile rounded-[14px] px-4 py-3 text-sm"
+              >
+                <p className="font-bold" style={{ color: "var(--text)" }}>
+                  Ata {a.numero} vence em {Math.ceil((a.vigenciaFim.getTime() - hoje) / 86400000)} dias
+                </p>
+                <p className="text-xs" style={{ color: "var(--text-soft)" }}>{a.orgaoNome}</p>
               </div>
             ))}
             {reajustes.map((a) => {
               const janela = a.marcoOrcamentoEstimado!.getTime() + 365 * 86400000;
               const dias = Math.ceil((janela - hoje) / 86400000);
               return (
-                <div key={`r-${a.id}`} className="rounded-md border border-amber-200 bg-white p-3 text-sm">
-                  <p className="font-medium">Reajuste de preços disponível em {dias}d (Ata {a.numero})</p>
-                  <p className="text-xs text-slate-500">Marco orçamento: {a.marcoOrcamentoEstimado!.toLocaleDateString("pt-BR")}</p>
+                <div
+                  key={`r-${a.id}`}
+                  className="glass-tile rounded-[14px] px-4 py-3 text-sm"
+                >
+                  <p className="font-bold" style={{ color: "var(--text)" }}>
+                    Reajuste de preços disponível em {dias}d (Ata {a.numero})
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-soft)" }}>
+                    Marco orçamento: {a.marcoOrcamentoEstimado!.toLocaleDateString("pt-BR")}
+                  </p>
                 </div>
               );
             })}
@@ -176,27 +226,37 @@ export default async function RelatoriosPage() {
         </section>
       )}
 
-      <section className="mt-8 rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Por empresa do grupo</h2>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
+      <section className="glass mt-8 overflow-hidden rounded-[20px]">
+        <header
+          className="px-6 py-4"
+          style={{ borderBottom: "0.5px solid var(--hairline)" }}
+        >
+          <h2
+            className="text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
+            Por empresa do grupo
+          </h2>
+        </header>
+        <div className="overflow-x-auto">
+          <table className="table-glass">
+            <thead>
               <tr>
-                <th className="px-3 py-2 text-left">Empresa</th>
-                <th className="px-3 py-2 text-left">CNPJ</th>
-                <th className="px-3 py-2 text-right">Atas</th>
-                <th className="px-3 py-2 text-right">Contratos</th>
-                <th className="px-3 py-2 text-right">Empenhos</th>
+                <th>Empresa</th>
+                <th>CNPJ</th>
+                <th className="num">Atas</th>
+                <th className="num">Contratos</th>
+                <th className="num">Empenhos</th>
               </tr>
             </thead>
             <tbody>
               {empresas.map((e) => (
-                <tr key={e.id} className="border-t border-slate-100">
-                  <td className="px-3 py-2 font-medium">{e.nomeFantasia || e.razaoSocial}</td>
-                  <td className="px-3 py-2 text-slate-600 font-mono text-xs">{e.cnpj}</td>
-                  <td className="px-3 py-2 text-right">{e._count.atas}</td>
-                  <td className="px-3 py-2 text-right">{e._count.contratos}</td>
-                  <td className="px-3 py-2 text-right">{e._count.empenhos}</td>
+                <tr key={e.id}>
+                  <td className="strong">{e.nomeFantasia || e.razaoSocial}</td>
+                  <td style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, color: "var(--text-soft)" }}>{e.cnpj}</td>
+                  <td className="num">{e._count.atas}</td>
+                  <td className="num">{e._count.contratos}</td>
+                  <td className="num">{e._count.empenhos}</td>
                 </tr>
               ))}
             </tbody>
@@ -214,29 +274,52 @@ function Card({
   valor,
   sub,
 }: {
-  icone: React.ComponentType<{ className?: string }>;
+  icone: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   cor: "blue" | "emerald" | "amber" | "violet";
   titulo: string;
   valor: string;
   sub: string;
 }) {
-  const cores = {
-    blue: "bg-blue-50 text-blue-700",
-    emerald: "bg-emerald-50 text-emerald-700",
-    amber: "bg-amber-50 text-amber-700",
-    violet: "bg-violet-50 text-violet-700",
-  }[cor];
+  // Mapeia para tonalidades do design system (Liquid Glass)
+  const tone =
+    cor === "blue" ? "t-sky" :
+    cor === "emerald" ? "t-mint" :
+    cor === "amber" ? "t-primary" :
+    "t-lavender";
+  const tint =
+    cor === "blue" ? { bg: "rgba(184,197,214,0.20)", color: "#365175" } :
+    cor === "emerald" ? { bg: "rgba(93,216,182,0.20)", color: "var(--mint-deep)" } :
+    cor === "amber" ? { bg: "rgba(212,175,55,0.20)", color: "var(--primary-deep)" } :
+    { bg: "rgba(197,180,255,0.22)", color: "#8E73E0" };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
-        <div className={`grid h-7 w-7 place-items-center rounded ${cores}`}>
-          <Icone className="h-3.5 w-3.5" />
+    <div className={`glass-tile ${tone} relative overflow-hidden rounded-[20px] px-6 py-5`}>
+      <div className="kpi-aura" />
+      <div className="relative z-[1]">
+        <div className="flex items-center justify-between">
+          <p
+            className="text-[11px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
+            {titulo}
+          </p>
+          <div
+            className="grid h-8 w-8 place-items-center rounded-[10px]"
+            style={{ background: tint.bg }}
+          >
+            <Icone className="h-4 w-4" style={{ color: tint.color }} />
+          </div>
         </div>
+        <p
+          className="mt-3 text-[24px] font-extrabold leading-none tabular"
+          style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+        >
+          {valor}
+        </p>
+        <p className="mt-1.5 text-xs" style={{ color: "var(--text-soft)" }}>
+          {sub}
+        </p>
       </div>
-      <p className="mt-3 text-2xl font-bold text-slate-900">{valor}</p>
-      <p className="mt-1 text-xs text-slate-500">{sub}</p>
     </div>
   );
 }
