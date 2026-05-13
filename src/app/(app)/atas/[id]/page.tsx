@@ -365,6 +365,11 @@ function TabelaSaldoItens({
                 </span>
               </div>
             </header>
+            {/* Scroller horizontal: tabela tem minWidth grande pra caber
+                todas as colunas. Sem este wrapper, o overflow-hidden da
+                section corta "Qtd. disponível" / "Valor disponível" sem
+                permitir scroll. */}
+            <div style={{ overflowX: "auto" }}>
             <table className="table-glass" style={{ minWidth: "1160px", tableLayout: "fixed" }}>
               <colgroup>
                 <col style={{ width: "64px" }} />{/* Item */}
@@ -372,7 +377,7 @@ function TabelaSaldoItens({
                 <col style={{ width: "64px" }} />
                 <col style={{ width: "104px" }} />
                 <col style={{ width: "104px" }} />
-                <col style={{ width: "112px" }} />
+                <col style={{ width: "120px" }} />
                 <col style={{ width: "108px" }} />
                 <col style={{ width: "128px" }} />
               </colgroup>
@@ -432,6 +437,7 @@ function TabelaSaldoItens({
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         );
       })}
@@ -522,12 +528,32 @@ function DadosAta({
 }
 
 function Stat({ titulo, valor, sub, cor }: { titulo: string; valor: string; sub?: string; cor?: "emerald" }) {
-  const corCls = cor === "emerald" ? "text-emerald-700" : "text-slate-900";
+  const corValor = cor === "emerald" ? "var(--mint-deep)" : "var(--text)";
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
-      <p className={`mt-2 text-2xl font-bold ${corCls}`}>{valor}</p>
-      {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
+    <div
+      className="glass-tile relative overflow-hidden rounded-[20px] px-6 py-5"
+      style={{ minHeight: "120px" }}
+    >
+      <div className="kpi-aura" />
+      <div className="relative z-[1]">
+        <p
+          className="text-[11px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
+          {titulo}
+        </p>
+        <p
+          className="mt-2 text-[28px] font-extrabold leading-none tabular"
+          style={{ color: corValor, letterSpacing: "-0.025em" }}
+        >
+          {valor}
+        </p>
+        {sub && (
+          <p className="mt-1.5 text-xs" style={{ color: "var(--text-soft)" }}>
+            {sub}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -542,14 +568,21 @@ function Info({ label, valor }: { label: string; valor: string }) {
 }
 
 function Alerta({ cor, children }: { cor: "amber" | "red"; children: React.ReactNode }) {
-  const cls =
+  const tom =
     cor === "red"
-      ? "border-red-200 bg-red-50 text-red-900"
-      : "border-amber-200 bg-amber-50 text-amber-900";
+      ? { bg: "rgba(232,138,152,0.10)", border: "rgba(232,138,152,0.30)", fg: "var(--coral-deep)" }
+      : { bg: "rgba(212,175,55,0.10)", border: "rgba(168,137,71,0.30)", fg: "var(--primary-deep)" };
   return (
-    <div className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm ${cls}`}>
-      <AlertTriangle className="h-4 w-4" />
-      {children}
+    <div
+      className="glass flex items-center gap-2 rounded-[14px] px-5 py-3 text-sm"
+      style={{
+        background: tom.bg,
+        border: `0.5px solid ${tom.border}`,
+        color: tom.fg,
+      }}
+    >
+      <AlertTriangle className="h-4 w-4 shrink-0" />
+      <span style={{ fontWeight: 600 }}>{children}</span>
     </div>
   );
 }

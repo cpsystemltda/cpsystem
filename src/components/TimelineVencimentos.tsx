@@ -12,17 +12,8 @@ type Item = {
   vigenciaFim: Date;
 };
 
-type Filtro = "TODOS" | "ATA" | "CONTRATO" | "30" | "60" | "90" | "120";
-
-const FILTROS: { value: Filtro; label: string }[] = [
-  { value: "TODOS", label: "Todos" },
-  { value: "ATA", label: "Atas" },
-  { value: "CONTRATO", label: "Contratos" },
-  { value: "30", label: "≤ 30 dias" },
-  { value: "60", label: "≤ 60 dias" },
-  { value: "90", label: "≤ 90 dias" },
-  { value: "120", label: "≤ 120 dias" },
-];
+type FiltroTipo = "TODOS" | "ATA" | "CONTRATO";
+type FiltroJanela = 30 | 60 | 90 | 120;
 
 const FAIXA_COR: { ate: number; bg: string; fg: string; label: string }[] = [
   { ate: 30,  bg: "rgba(232,138,152,0.20)", fg: "var(--coral-deep)",   label: "Crítico (≤ 30d)" },
@@ -37,22 +28,25 @@ function corDeDias(dias: number) {
 }
 
 /**
- * Timeline horizontal unificada de vencimentos de Atas e Contratos.
- * Inspiração: dashboard CBMDF – SICON. Marcadores em 30/60/90/120 dias;
- * cada Ata/Contrato é plotado proporcionalmente entre hoje (esquerda) e
- * 120 dias (direita). Cores indicam proximidade.
+ * Timeline horizontal de vencimentos — modo gráfico.
+ *
+ * Cada Ata/Contrato vira um pino plotado horizontalmente em posição
+ * proporcional aos dias até vencer (0 = hoje à esquerda, 120 = direita).
+ * Pinos com hover/tooltip e click pra abrir detalhe. Para evitar
+ * sobreposição quando há muitos no mesmo dia, distribuímos em "lanes"
+ * verticais (até 4 lanes). Filtros discretos no topo.
  */
 export function TimelineVencimentos({ itens }: { itens: Item[] }) {
-  const [filtro, setFiltro] = useState<Filtro>("TODOS");
+  const [tipo, setTipo] = useState<FiltroTipo>("TODOS");
+  const [janela, setJanela] = useState<FiltroJanela>(120);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
-  // hoje virgem (sem horas) — evita off-by-one quando vigência cai em dia atual
   const hoje = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
 
-  // Dias restantes (≥ 0 entre hoje e 120 dias). Vencidos não entram.
   const itensComDias = useMemo(() => {
     return itens
       .map((i) => {
@@ -65,38 +59,42 @@ export function TimelineVencimentos({ itens }: { itens: Item[] }) {
 
   const filtrados = useMemo(() => {
     return itensComDias.filter((i) => {
-      if (filtro === "ATA") return i.tipo === "ata";
-      if (filtro === "CONTRATO") return i.tipo === "contrato";
-      if (filtro === "30") return i.dias <= 30;
-      if (filtro === "60") return i.dias <= 60;
-      if (filtro === "90") return i.dias <= 90;
-      if (filtro === "120") return i.dias <= 120;
+      if (tipo === "ATA" && i.tipo !== "ata") return false;
+      if (tipo === "CONTRATO" && i.tipo !== "contrato") return false;
+      if (i.dias > janela) return false;
       return true;
     });
-  }, [itensComDias, filtro]);
+  }, [itensComDias, tipo, janela]);
 
-  // Contagens por faixa (mostradas em chips de filtro)
-  const contagens = useMemo(() => {
-    return {
+  // Lanes: distribui pinos verticalmente quando próximos no eixo X (≤ 4%
+  // de distância). Até 4 lanes; itens seguintes empilham na lane 0 de novo.
+  const itensPlotados = useMemo(() => {
+    const lanes: { pct: number; idx: number }[][] = [[], [], [], []];
+    return filtrados.map((item, idx) => {
+      const pct = (item.dias / 120) * 100;
+      let lane = 0;
+      for (let l = 0; l < lanes.length; l++) {
+        const last = lanes[l][lanes[l].length - 1];
+        if (!last || pct - last.pct > 4) {
+          lane = l;
+          break;
+        }
+        lane = (l + 1) % lanes.length;
+      }
+      lanes[lane].push({ pct, idx });
+      return { ...item, pct, lane };
+    });
+  }, [filtrados]);
+
+  const contagens = useMemo(
+    () => ({
       todos: itensComDias.length,
       ata: itensComDias.filter((i) => i.tipo === "ata").length,
       contrato: itensComDias.filter((i) => i.tipo === "contrato").length,
       d30: itensComDias.filter((i) => i.dias <= 30).length,
-      d60: itensComDias.filter((i) => i.dias <= 60).length,
-      d90: itensComDias.filter((i) => i.dias <= 90).length,
-      d120: itensComDias.length, // mesmo que todos por definição da janela
-    };
-  }, [itensComDias]);
-
-  function contagemDoFiltro(f: Filtro): number {
-    if (f === "TODOS") return contagens.todos;
-    if (f === "ATA") return contagens.ata;
-    if (f === "CONTRATO") return contagens.contrato;
-    if (f === "30") return contagens.d30;
-    if (f === "60") return contagens.d60;
-    if (f === "90") return contagens.d90;
-    return contagens.d120;
-  }
+    }),
+    [itensComDias],
+  );
 
   return (
     <section className="glass overflow-hidden rounded-[20px] px-5 py-5">
@@ -109,37 +107,62 @@ export function TimelineVencimentos({ itens }: { itens: Item[] }) {
             Vencimentos próximos
           </h3>
           <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
-            Atas e Contratos em janela de 120 dias. Clique em um marcador para abrir o detalhe.
+            Atas e Contratos em janela de até {janela} dias. Passe o mouse sobre um marcador.
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {FILTROS.map((f) => {
-            const ativo = filtro === f.value;
-            const contagem = contagemDoFiltro(f.value);
-            return (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => setFiltro(f.value)}
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition"
-                style={{
-                  background: ativo ? "var(--primary-deep)" : "rgba(15,14,12,0.04)",
-                  color: ativo ? "white" : "var(--text-soft)",
-                  border: ativo ? "none" : "0.5px solid var(--hairline)",
-                }}
-              >
-                {f.label}
-                <span
-                  className="rounded-full px-1.5 py-0.5 text-[10px]"
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Segmented control: Todos / Atas / Contratos */}
+          <div
+            className="inline-flex rounded-full p-0.5 text-[11px] font-bold"
+            style={{ background: "rgba(15,14,12,0.05)", border: "0.5px solid var(--hairline)" }}
+          >
+            {([
+              { v: "TODOS" as const, label: "Todos", count: contagens.todos },
+              { v: "ATA" as const, label: "Atas", count: contagens.ata },
+              { v: "CONTRATO" as const, label: "Contratos", count: contagens.contrato },
+            ]).map((opt) => {
+              const ativo = tipo === opt.v;
+              return (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => setTipo(opt.v)}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition"
                   style={{
-                    background: ativo ? "rgba(255,255,255,0.25)" : "rgba(15,14,12,0.06)",
+                    background: ativo ? "var(--primary-deep)" : "transparent",
+                    color: ativo ? "white" : "var(--text-soft)",
                   }}
                 >
-                  {contagem}
-                </span>
-              </button>
-            );
-          })}
+                  {opt.label}
+                  <span
+                    className="rounded-full px-1.5 text-[10px]"
+                    style={{
+                      background: ativo ? "rgba(255,255,255,0.25)" : "rgba(15,14,12,0.08)",
+                      color: ativo ? "white" : "var(--text-mute)",
+                    }}
+                  >
+                    {opt.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {/* Dropdown da janela: pequeno, à direita */}
+          <select
+            value={janela}
+            onChange={(ev) => setJanela(Number(ev.currentTarget.value) as FiltroJanela)}
+            className="rounded-full px-3 py-1.5 text-[11px] font-bold"
+            style={{
+              background: "rgba(15,14,12,0.05)",
+              border: "0.5px solid var(--hairline)",
+              color: "var(--text-soft)",
+            }}
+          >
+            <option value={30}>Janela: ≤ 30 dias</option>
+            <option value={60}>Janela: ≤ 60 dias</option>
+            <option value={90}>Janela: ≤ 90 dias</option>
+            <option value={120}>Janela: ≤ 120 dias</option>
+          </select>
         </div>
       </header>
 
@@ -148,14 +171,8 @@ export function TimelineVencimentos({ itens }: { itens: Item[] }) {
           className="rounded-xl px-6 py-12 text-center"
           style={{ border: "0.5px dashed var(--hairline)" }}
         >
-          <CalendarClock
-            className="mx-auto h-8 w-8"
-            style={{ color: "var(--text-mute)" }}
-          />
-          <p
-            className="mt-3 text-sm font-extrabold"
-            style={{ color: "var(--text)" }}
-          >
+          <CalendarClock className="mx-auto h-8 w-8" style={{ color: "var(--text-mute)" }} />
+          <p className="mt-3 text-sm font-extrabold" style={{ color: "var(--text)" }}>
             Nenhum vencimento nos próximos 120 dias.
           </p>
           <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
@@ -164,132 +181,110 @@ export function TimelineVencimentos({ itens }: { itens: Item[] }) {
         </div>
       ) : (
         <>
-          {/* Eixo horizontal com marcas em 30/60/90/120 */}
-          <div className="relative mb-6 h-6 w-full">
-            <div
-              className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2"
-              style={{ background: "var(--hairline)" }}
-            />
-            {[0, 30, 60, 90, 120].map((d) => {
-              const pct = (d / 120) * 100;
-              return (
-                <div
-                  key={d}
-                  className="absolute top-0 flex h-full flex-col items-center"
-                  style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
-                >
+          {/* Faixas coloridas de fundo (Crítico/Próximo/Atenção/Horizonte) */}
+          <div className="relative" style={{ height: "200px" }}>
+            <div className="absolute inset-x-0 top-6 bottom-10 flex overflow-hidden rounded-lg">
+              {FAIXA_COR.map((faixa, i) => {
+                const prev = i === 0 ? 0 : FAIXA_COR[i - 1].ate;
+                const largura = ((faixa.ate - prev) / 120) * 100;
+                return (
                   <div
-                    className="h-2 w-px"
-                    style={{ background: "var(--text-mute)" }}
+                    key={faixa.label}
+                    style={{
+                      width: `${largura}%`,
+                      background: faixa.bg,
+                      borderRight: i < FAIXA_COR.length - 1 ? "0.5px solid rgba(255,255,255,0.4)" : "none",
+                    }}
                   />
-                  <span
-                    className="mt-0.5 text-[10px] tabular"
-                    style={{ color: "var(--text-mute)" }}
+                );
+              })}
+            </div>
+
+            {/* Eixo: marcas em 0/30/60/90/120 */}
+            <div className="absolute inset-x-0 top-0 h-6">
+              {[0, 30, 60, 90, 120].map((d) => {
+                const pct = (d / 120) * 100;
+                return (
+                  <div
+                    key={d}
+                    className="absolute top-0 flex flex-col items-center"
+                    style={{ left: `${pct}%`, transform: "translateX(-50%)" }}
                   >
-                    {d === 0 ? "hoje" : `${d}d`}
-                  </span>
-                </div>
-              );
-            })}
+                    <span
+                      className="text-[10px] font-bold tabular uppercase"
+                      style={{ color: "var(--text-mute)", letterSpacing: "0.06em" }}
+                    >
+                      {d === 0 ? "hoje" : `${d}d`}
+                    </span>
+                    <div className="mt-0.5 h-2 w-px" style={{ background: "var(--text-mute)" }} />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pinos plotados em lanes (cada lane = 1/4 da altura útil) */}
+            <div className="absolute inset-x-0 top-8 bottom-10">
+              {itensPlotados.map((i, idx) => {
+                const cor = corDeDias(i.dias);
+                const href = i.tipo === "ata" ? `/atas/${i.id}` : `/contratos/${i.id}`;
+                const top = i.lane * 28; // 28px entre lanes
+                return (
+                  <Link
+                    key={`${i.tipo}-${i.id}`}
+                    href={href}
+                    className="absolute inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold transition hover:scale-110"
+                    style={{
+                      left: `${i.pct}%`,
+                      top: `${top}px`,
+                      transform: "translateX(-50%)",
+                      background: cor.fg,
+                      color: "white",
+                      boxShadow: hoverIdx === idx
+                        ? `0 6px 14px ${cor.fg}55, 0 0 0 3px white`
+                        : `0 2px 6px ${cor.fg}55`,
+                      zIndex: hoverIdx === idx ? 10 : 1,
+                      whiteSpace: "nowrap",
+                    }}
+                    title={`${i.tipo === "ata" ? "Ata" : "Contrato"} ${i.numero} · ${i.orgaoNome} · ${i.vigenciaFim.toLocaleDateString("pt-BR")}`}
+                    onMouseEnter={() => setHoverIdx(idx)}
+                    onMouseLeave={() => setHoverIdx(null)}
+                  >
+                    {i.tipo === "ata" ? (
+                      <FileText className="h-3 w-3" />
+                    ) : (
+                      <ClipboardList className="h-3 w-3" />
+                    )}
+                    {i.numero}
+                    <span style={{ opacity: 0.8 }}>· {i.dias}d</span>
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Legenda das faixas, embaixo */}
+            <div className="absolute inset-x-0 bottom-0 flex justify-between text-[9px] font-bold uppercase tabular"
+              style={{ letterSpacing: "0.08em", color: "var(--text-mute)" }}
+            >
+              {FAIXA_COR.map((f) => (
+                <span key={f.label} style={{ color: f.fg }}>
+                  {f.label}
+                </span>
+              ))}
+            </div>
           </div>
 
-          {filtrados.length === 0 ? (
+          {filtrados.length === 0 && (
             <p
-              className="rounded-xl px-4 py-6 text-center text-sm"
-              style={{
-                color: "var(--text-mute)",
-                border: "0.5px dashed var(--hairline)",
-              }}
+              className="mt-4 rounded-xl px-4 py-6 text-center text-sm"
+              style={{ color: "var(--text-mute)", border: "0.5px dashed var(--hairline)" }}
             >
               Nenhum vencimento neste filtro.
             </p>
-          ) : (
-            <ul className="space-y-1.5">
-              {filtrados.map((i) => {
-                const cor = corDeDias(i.dias);
-                const pct = Math.min(100, Math.max(0, (i.dias / 120) * 100));
-                const href = i.tipo === "ata" ? `/atas/${i.id}` : `/contratos/${i.id}`;
-                return (
-                  <li key={`${i.tipo}-${i.id}`}>
-                    <Link
-                      href={href}
-                      className="group relative block rounded-lg px-3 py-2 transition hover:-translate-y-px"
-                      style={{
-                        background: cor.bg,
-                        border: `0.5px solid ${cor.fg}55`,
-                      }}
-                      title={`${i.tipo === "ata" ? "Ata" : "Contrato"} ${i.numero} · ${i.orgaoNome}`}
-                    >
-                      <div className="flex items-center gap-3 text-xs">
-                        {i.tipo === "ata" ? (
-                          <FileText
-                            className="h-3.5 w-3.5 shrink-0"
-                            style={{ color: cor.fg }}
-                          />
-                        ) : (
-                          <ClipboardList
-                            className="h-3.5 w-3.5 shrink-0"
-                            style={{ color: cor.fg }}
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p
-                            className="truncate font-bold"
-                            style={{ color: cor.fg }}
-                          >
-                            {i.tipo === "ata" ? "Ata" : "Contrato"} {i.numero}
-                            <span
-                              className="ml-1 font-normal"
-                              style={{ opacity: 0.75 }}
-                            >
-                              · {i.orgaoNome}
-                            </span>
-                          </p>
-                        </div>
-                        <span
-                          className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase"
-                          style={{
-                            background: cor.fg,
-                            color: "white",
-                            letterSpacing: "0.06em",
-                          }}
-                        >
-                          {i.dias === 0
-                            ? "vence hoje"
-                            : i.dias === 1
-                              ? "1 dia"
-                              : `${i.dias} dias`}
-                        </span>
-                        <span
-                          className="shrink-0 text-[10px] tabular"
-                          style={{ color: cor.fg, opacity: 0.7 }}
-                        >
-                          {i.vigenciaFim.toLocaleDateString("pt-BR")}
-                        </span>
-                      </div>
-                      {/* mini-barra mostrando posição na timeline */}
-                      <div
-                        className="mt-1.5 h-1 w-full rounded-full"
-                        style={{ background: "rgba(255,255,255,0.4)" }}
-                      >
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${100 - pct}%`,
-                            background: cor.fg,
-                          }}
-                        />
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
           )}
 
           {contagens.d30 > 0 && (
             <div
-              className="mt-3 flex items-start gap-2 rounded-md px-3 py-2 text-xs"
+              className="mt-4 flex items-start gap-2 rounded-md px-3 py-2 text-xs"
               style={{
                 background: "rgba(232,138,152,0.10)",
                 border: "0.5px solid rgba(232,138,152,0.3)",

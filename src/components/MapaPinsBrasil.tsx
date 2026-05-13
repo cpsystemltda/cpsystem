@@ -203,10 +203,20 @@ export function MapaPinsBrasil({
       <MapContainer
         bounds={bounds.bounds}
         boundsOptions={{ padding: [40, 40], maxZoom: 12 }}
+        // Trava a navegação ao retângulo do Brasil — usuário não pode dar
+        // zoom out até ver o globo nem arrastar pra África. minZoom=4 mantém
+        // o país inteiro como menor enquadramento possível.
+        maxBounds={[
+          [-34.0, -74.0], // sudoeste (RS / fronteira oeste)
+          [ 6.0,  -33.0], // nordeste (Roraima / RN)
+        ]}
+        maxBoundsViscosity={1.0}
+        minZoom={4}
+        maxZoom={16}
         scrollWheelZoom
         style={{ height: 420, width: "100%" }}
       >
-        <TileLayer url={tile.url} attribution={tile.attribution} />
+        <TileLayer url={tile.url} attribution={tile.attribution} noWrap />
         <MarkerClusterGroup chunkedLoading>
           {pins.map((p) => {
             const isDestaque = cnpjDestaque === p.cnpj;
