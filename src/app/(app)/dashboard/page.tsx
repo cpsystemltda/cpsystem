@@ -23,6 +23,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { dadosPorUf, extrairUf } from "@/lib/agregacaoUf";
 import { coletarPinsOrgaos } from "@/lib/pinsOrgaos";
+import { coletarPinsEntregas } from "@/lib/pinsEntregas";
 import { MapaBrasil } from "@/components/MapaBrasil";
 import { ClientesMapaSync } from "@/components/ClientesMapaSync";
 import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
@@ -186,6 +187,11 @@ export default async function DashboardPage() {
   // OrgaoGeocode garante que carregas subsequentes sejam instantâneas.
   // Falha silenciosa: pins vazio = fallback no choropleth.
   const pinsOrgaos = await coletarPinsOrgaos(contaId, empresaIdSelecionada ?? undefined).catch(
+    () => [],
+  );
+  // Pins de endereços de entrega cadastrados (toggle "Entregas" no mapa).
+  // Falha silenciosa pelo mesmo motivo do pinsOrgaos.
+  const pinsEntregas = await coletarPinsEntregas(contaId, empresaIdSelecionada ?? undefined).catch(
     () => [],
   );
 
@@ -805,6 +811,7 @@ export default async function DashboardPage() {
             clientes={clientesTabela}
             dadosUf={dadosUf}
             pins={pinsOrgaos}
+            pinsEntregas={pinsEntregas}
             kpiSlot={
               <KPI
                 tone="rose"

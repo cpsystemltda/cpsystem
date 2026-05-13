@@ -174,3 +174,59 @@ export async function geocodificarOrgaosEmBatch(
 
   return out;
 }
+
+/**
+ * Geocodifica endereços de entrega (sem CNPJ associado). Cache por
+ * endereço normalizado (trim + lowercase) — mesmo endereço em várias
+ * Atas/Contratos é geocodificado uma vez só. Reutiliza o mesmo rate
+ * limit do Nominatim e o mesmo limite de 5 chamadas por renderização.
+ */
+function normalizarEnderecoChave(e: string): string {
+  return e.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export async function geocodificarEnderecosEmBatch(
+  enderecos: string[],
+): Promise<Map<string, Geocode>> {
+  const out = new Map<string, Geocode>(); // chave = endereço normalizado
+  if (enderecos.length === 0) return out;
+
+  const unicos = new Map<string, string>(); // chave normalizada → endereço original (pra Nominatim)
+  for (const raw of enderecos) {
+    if (!raw?.trim()) continue;
+    const chave = normalizarEnderecoChave(raw);
+    if (!unicos.has(chave)) unicos.set(chave, raw);
+  }
+  if (unicos.size === 0) return out;
+
+  const chaves = Array.from(unicos.keys());
+  const cached = await prisma.enderecoGeocode.findMany({
+    where: { endereco: { in: chaves } },
+  });
+  const cacheByChave = new Map(cached.map((c) => [c.endereco, c]));
+
+  const pendentes: { chave: string; endereco: string }[] = [];
+  for (const [chave, original] of unicos) {
+    const c = cacheByChave.get(chave);
+    if (c) {
+      out.set(chave, { latitude: c.latitude, longitude: c.longitude, precisao: c.precisao });
+    } else {
+      pendentes.push({ chave, endereco: original });
+    }
+  }
+
+  for (const p of pendentes.slice(0, 5)) {
+    const geo = await chamarNominatim(p.endereco);
+    if (!geo) continue;
+    await prisma.enderecoGeocode.upsert({
+      where: { endereco: p.chave },
+      create: { endereco: p.chave, latitude: geo.latitude, longitude: geo.longitude, precisao: geo.precisao },
+      update: { latitude: geo.latitude, longitude: geo.longitude, precisao: geo.precisao },
+    });
+    out.set(p.chave, geo);
+  }
+
+  return out;
+}
+
+export { normalizarEnderecoChave };

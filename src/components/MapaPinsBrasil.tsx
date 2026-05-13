@@ -18,6 +18,19 @@ export type PinMapa = {
   valor: number;
 };
 
+export type PinEntregaMapa = {
+  id: string;
+  endereco: string;
+  rotulo: string | null;
+  latitude: number;
+  longitude: number;
+  precisao: string | null;
+  atas: number;
+  contratos: number;
+  empenhos: number;
+  orgaos: string[];
+};
+
 // Leaflet quebra em SSR (acessa window). Importa só no client.
 const MapContainer = dynamic(() => import("react-leaflet").then((m) => m.MapContainer), {
   ssr: false,
@@ -72,16 +85,21 @@ const TILES = {
  */
 export function MapaPinsBrasil({
   pins,
+  pinsEntregas,
   cnpjDestaque,
 }: {
   pins: PinMapa[];
+  // Quando fornecido, habilita o toggle Sedes/Entregas no canto do mapa.
+  pinsEntregas?: PinEntregaMapa[];
   cnpjDestaque?: string | null;
 }) {
   const [tileSet, setTileSet] = useState<"mapa" | "satelite">("mapa");
+  const [vista, setVista] = useState<"SEDES" | "ENTREGAS">("SEDES");
   const [LeafletIcon, setLeafletIcon] = useState<{
     icon: unknown;
     iconHover: unknown;
     iconDestaque: unknown;
+    iconEntrega: unknown;
   } | null>(null);
 
   // Configura ícones Leaflet só no client (acessa window/document).
@@ -106,18 +124,22 @@ export function MapaPinsBrasil({
         icon: fazerIcone("#7a5c1a", 11),
         iconHover: fazerIcone("#A88947", 13),
         iconDestaque: fazerIcone("#A88947", 15),
+        // Verde-menta pra distinguir entregas das sedes
+        iconEntrega: fazerIcone("#1f6f55", 11),
       });
     });
   }, []);
 
-  // Bounds iniciais: centra nos pins. Se só 1, usa zoom alto.
+  // Bounds iniciais: depende da vista atual. Cada conjunto de pins tem seu
+  // próprio enquadramento — útil quando entregas estão em DF e sedes em GO.
+  const pinsAtivos = vista === "ENTREGAS" ? (pinsEntregas ?? []) : pins;
   const bounds = useMemo(() => {
-    if (pins.length === 0) return null;
-    let minLat = pins[0].latitude;
-    let maxLat = pins[0].latitude;
-    let minLng = pins[0].longitude;
-    let maxLng = pins[0].longitude;
-    for (const p of pins) {
+    if (pinsAtivos.length === 0) return null;
+    let minLat = pinsAtivos[0].latitude;
+    let maxLat = pinsAtivos[0].latitude;
+    let minLng = pinsAtivos[0].longitude;
+    let maxLng = pinsAtivos[0].longitude;
+    for (const p of pinsAtivos) {
       if (p.latitude < minLat) minLat = p.latitude;
       if (p.latitude > maxLat) maxLat = p.latitude;
       if (p.longitude < minLng) minLng = p.longitude;
@@ -130,9 +152,9 @@ export function MapaPinsBrasil({
       ] as [[number, number], [number, number]],
       center: [(minLat + maxLat) / 2, (minLng + maxLng) / 2] as [number, number],
     };
-  }, [pins]);
+  }, [pinsAtivos]);
 
-  if (pins.length === 0 || !bounds) {
+  if (pins.length === 0 && (pinsEntregas?.length ?? 0) === 0) {
     return (
       <div
         className="grid h-[360px] place-items-center rounded-2xl text-sm"
@@ -142,7 +164,7 @@ export function MapaPinsBrasil({
           border: "0.5px solid var(--hairline)",
         }}
       >
-        Carregando geolocalizações dos órgãos…
+        Carregando geolocalizações…
       </div>
     );
   }
@@ -169,7 +191,40 @@ export function MapaPinsBrasil({
       className="relative rounded-2xl overflow-hidden"
       style={{ border: "0.5px solid var(--hairline)" }}
     >
-      {/* Controle de tile (Mapa / Satélite) — flutuante no topo direito */}
+      {/* Controles flutuantes — Sedes/Entregas à esquerda, Mapa/Satélite à direita */}
+      {pinsEntregas && pinsEntregas.length > 0 && (
+        <div
+          className="absolute left-3 top-3 z-[500] flex rounded-md text-xs font-bold shadow-md"
+          style={{ background: "white", border: "0.5px solid var(--hairline)" }}
+        >
+          <button
+            type="button"
+            onClick={() => setVista("SEDES")}
+            className="px-3 py-1.5 transition"
+            style={{
+              background: vista === "SEDES" ? "var(--primary-deep)" : "transparent",
+              color: vista === "SEDES" ? "white" : "var(--text)",
+              borderRadius: "6px 0 0 6px",
+            }}
+            title="Sedes dos órgãos atendidos"
+          >
+            Sedes ({pins.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setVista("ENTREGAS")}
+            className="px-3 py-1.5 transition"
+            style={{
+              background: vista === "ENTREGAS" ? "var(--mint-deep)" : "transparent",
+              color: vista === "ENTREGAS" ? "white" : "var(--text)",
+              borderRadius: "0 6px 6px 0",
+            }}
+            title="Locais de entrega cadastrados"
+          >
+            Entregas ({pinsEntregas.length})
+          </button>
+        </div>
+      )}
       <div
         className="absolute right-3 top-3 z-[500] flex rounded-md text-xs font-bold shadow-md"
         style={{ background: "white", border: "0.5px solid var(--hairline)" }}
@@ -201,7 +256,8 @@ export function MapaPinsBrasil({
       </div>
 
       <MapContainer
-        bounds={bounds.bounds}
+        key={vista /* força re-fit quando troca de vista */}
+        bounds={bounds?.bounds ?? [[-34, -74], [6, -33]]}
         boundsOptions={{ padding: [40, 40], maxZoom: 12 }}
         // Trava a navegação ao retângulo do Brasil — usuário não pode dar
         // zoom out até ver o globo nem arrastar pra África. minZoom=4 mantém
@@ -218,7 +274,7 @@ export function MapaPinsBrasil({
       >
         <TileLayer url={tile.url} attribution={tile.attribution} noWrap />
         <MarkerClusterGroup chunkedLoading>
-          {pins.map((p) => {
+          {vista === "SEDES" && pins.map((p) => {
             const isDestaque = cnpjDestaque === p.cnpj;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const icone = (isDestaque ? LeafletIcon.iconDestaque : LeafletIcon.icon) as any;
@@ -266,6 +322,65 @@ export function MapaPinsBrasil({
                       {p.valor > 0 && (
                         <div style={{ marginTop: 6, fontSize: 14, fontWeight: 800 }}>
                           {brl(p.valor)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+          {vista === "ENTREGAS" && pinsEntregas?.map((p) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const icone = LeafletIcon.iconEntrega as any;
+            return (
+              <Marker key={p.id} position={[p.latitude, p.longitude]} icon={icone}>
+                <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                  <div style={{ minWidth: 220 }}>
+                    <p style={{ fontWeight: 800, marginBottom: 4 }}>
+                      {p.rotulo || "Local de entrega"}
+                    </p>
+                    <p style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>
+                      {p.endereco}
+                    </p>
+                    <p style={{ fontSize: 11, color: "#1f6f55", fontWeight: 700 }}>
+                      {p.atas + p.contratos + p.empenhos} entrega
+                      {p.atas + p.contratos + p.empenhos !== 1 ? "s" : ""} aqui
+                    </p>
+                    {p.precisao && p.precisao !== "exact" && (
+                      <p style={{ fontSize: 10, color: "#999", marginTop: 4 }}>
+                        Localização aproximada ({p.precisao})
+                      </p>
+                    )}
+                  </div>
+                </Tooltip>
+                <Popup>
+                  <div style={{ minWidth: 240 }}>
+                    <p style={{ fontWeight: 800, marginBottom: 4 }}>
+                      {p.rotulo || "Local de entrega"}
+                    </p>
+                    <p style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>
+                      {p.endereco}
+                    </p>
+                    <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                      {p.atas > 0 && (
+                        <div>
+                          <strong>{p.atas}</strong> ata{p.atas !== 1 ? "s" : ""}
+                        </div>
+                      )}
+                      {p.contratos > 0 && (
+                        <div>
+                          <strong>{p.contratos}</strong> contrato{p.contratos !== 1 ? "s" : ""}
+                        </div>
+                      )}
+                      {p.empenhos > 0 && (
+                        <div>
+                          <strong>{p.empenhos}</strong> empenho{p.empenhos !== 1 ? "s" : ""}
+                        </div>
+                      )}
+                      {p.orgaos.length > 0 && (
+                        <div style={{ marginTop: 6, fontSize: 11, color: "#666" }}>
+                          {p.orgaos.join(" · ")}
                         </div>
                       )}
                     </div>

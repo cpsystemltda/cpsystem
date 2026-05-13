@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { MapaBrasil, type DadosUf } from "@/components/MapaBrasil";
-import { MapaPinsBrasil, type PinMapa } from "@/components/MapaPinsBrasil";
+import { MapaPinsBrasil, type PinMapa, type PinEntregaMapa } from "@/components/MapaPinsBrasil";
 import { brl } from "@/lib/validators";
 
 type Cliente = {
@@ -21,6 +21,7 @@ export function ClientesMapaSync({
   clientes,
   dadosUf,
   pins,
+  pinsEntregas,
   kpiSlot,
   mapaTitle,
   mapaSubtitle,
@@ -30,6 +31,9 @@ export function ClientesMapaSync({
   // Quando há pins geocodificados, usamos MapaPinsBrasil (Leaflet) com
   // marcadores reais por órgão. Sem pins, fallback no choropleth SVG.
   pins?: PinMapa[];
+  // Pins adicionais de locais de entrega — habilita toggle "Sedes/Entregas"
+  // no canto do mapa quando fornecidos.
+  pinsEntregas?: PinEntregaMapa[];
   kpiSlot: ReactNode;
   mapaTitle?: string;
   mapaSubtitle?: string;
@@ -133,7 +137,11 @@ export function ClientesMapaSync({
             </p>
           </header>
           {usarPins ? (
-            <MapaPinsBrasil pins={pins ?? []} cnpjDestaque={cnpjDestaque} />
+            <MapaPinsBrasil
+              pins={pins ?? []}
+              pinsEntregas={pinsEntregas}
+              cnpjDestaque={cnpjDestaque}
+            />
           ) : (
             <MapaBrasil dados={dadosUf} ufDestaque={ufDestaque} />
           )}

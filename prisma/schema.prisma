@@ -1181,6 +1181,18 @@ model OrgaoGeocode {
   atualizadoEm DateTime @updatedAt
 }
 
+// Cache de geocodificação para endereços de entrega (sem CNPJ associado).
+// Usa o próprio endereço normalizado como chave para evitar geocodificar
+// duas vezes o mesmo local. Reutiliza o mesmo pool de rate-limit do Nominatim.
+model EnderecoGeocode {
+  endereco     String   @id // endereço normalizado (trim, lowercase) — chave única
+  latitude     Float
+  longitude    Float
+  precisao     String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+}
+
 model LogAuditoria {
   id          String        @id @default(cuid())
   contaId     String
