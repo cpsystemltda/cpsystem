@@ -25,6 +25,7 @@ import {
   CAMPOS_EMPENHO,
 } from "@/lib/diff";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
+import { labelInstrumento } from "@/lib/instrumentoLabel";
 
 type ActionResult = {
   erro?: string;
@@ -1081,6 +1082,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
         criadoPorId: usuario.id,
         ataId: v.ataId || null,
         contratoId: v.contratoId || null,
+        instrumento: v.instrumento,
         tipo: v.tipo,
         numero: v.numero,
         processoAdministrativo: v.processoAdministrativo,
@@ -1098,6 +1100,13 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
         prazoEntregaDias: v.prazoEntregaDias || null,
         prazoPagamentoDias: v.prazoPagamentoDias || null,
         numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
+        classificacaoOrcamentaria: v.classificacaoOrcamentaria || null,
+        signatario: v.signatario || null,
+        dataAssinatura: v.dataAssinatura || null,
+        departamentoEmissor: v.departamentoEmissor || null,
+        pontoColeta: v.pontoColeta || null,
+        contatoRecebedor: v.contatoRecebedor || null,
+        fiscalResponsavel: v.fiscalResponsavel || null,
         status: "EMPENHADO",
         itens: {
           create: v.itens.map((i) => ({
@@ -1145,7 +1154,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     await notificarAnalistasDaEmpresa({
       empresaId: v.empresaId,
       tipo: "NOVA_EXECUCAO",
-      titulo: `Nova execução: empenho ${v.numero}`,
+      titulo: `Nova execução: ${labelInstrumento(v.instrumento).toLowerCase()} ${v.numero}`,
       descricao: `${v.orgaoNome} · ${v.objeto.slice(0, 80)} · R$ ${valorTotalEmpenho.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
       link: `/painel-analista`,
       recursoTipo: "Empenho",
@@ -1230,6 +1239,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
           empresaId: v.empresaId,
           ataId: v.ataId || null,
           contratoId: v.contratoId || null,
+          instrumento: v.instrumento,
           tipo: v.tipo,
           numero: v.numero,
           processoAdministrativo: v.processoAdministrativo,
@@ -1247,6 +1257,13 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
           prazoEntregaDias: v.prazoEntregaDias || null,
           prazoPagamentoDias: v.prazoPagamentoDias || null,
           numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
+          classificacaoOrcamentaria: v.classificacaoOrcamentaria || null,
+          signatario: v.signatario || null,
+          dataAssinatura: v.dataAssinatura || null,
+          departamentoEmissor: v.departamentoEmissor || null,
+          pontoColeta: v.pontoColeta || null,
+          contatoRecebedor: v.contatoRecebedor || null,
+          fiscalResponsavel: v.fiscalResponsavel || null,
         },
       });
 
@@ -1334,7 +1351,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
       acao: "ATUALIZAR",
       recurso: "Empenho",
       recursoId: empenhoId,
-      titulo: `Empenho ${v.numero}`,
+      titulo: `${labelInstrumento(v.instrumento)} ${v.numero}`,
       mudancas,
     });
 

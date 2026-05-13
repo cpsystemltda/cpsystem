@@ -142,6 +142,7 @@ export const CAMPOS_CONTRATO = [
 ];
 
 export const CAMPOS_EMPENHO = [
+  { chave: "instrumento", rotulo: "Instrumento contratual" },
   { chave: "numero", rotulo: "Número" },
   { chave: "numeroOrdemFornecimento", rotulo: "Ordem de Fornecimento" },
   { chave: "processoAdministrativo", rotulo: "Processo administrativo" },
@@ -161,6 +162,13 @@ export const CAMPOS_EMPENHO = [
   { chave: "prazoPagamentoDias", rotulo: "Prazo de pagamento" },
   { chave: "ataId", rotulo: "Ata vinculada" },
   { chave: "contratoId", rotulo: "Contrato vinculado" },
+  { chave: "classificacaoOrcamentaria", rotulo: "Classificação orçamentária" },
+  { chave: "signatario", rotulo: "Signatário" },
+  { chave: "dataAssinatura", rotulo: "Data de assinatura" },
+  { chave: "departamentoEmissor", rotulo: "Departamento emissor" },
+  { chave: "pontoColeta", rotulo: "Ponto de coleta/entrega" },
+  { chave: "contatoRecebedor", rotulo: "Contato do recebedor" },
+  { chave: "fiscalResponsavel", rotulo: "Fiscal responsável" },
 ];
 
 export const CAMPOS_ATA_ITEM = [

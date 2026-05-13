@@ -13,6 +13,8 @@ import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { OrgaosTab, EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
+import { labelInstrumento } from "@/lib/instrumentoLabel";
+import type { InstrumentoContratual } from "@/generated/prisma/client";
 import { LerMais } from "@/components/LerMais";
 
 export default async function AtaDetalhePage({ params }: { params: Promise<{ id: string }> }) {
@@ -127,8 +129,8 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
           <Link href="/contratacoes/nova/contrato" className="btn-secondary" style={{ height: "36px", padding: "0 14px", fontSize: "12px" }}>
             + Contrato
           </Link>
-          <Link href="/contratacoes/nova/empenho" className="btn-secondary" style={{ height: "36px", padding: "0 14px", fontSize: "12px" }}>
-            + Empenho
+          <Link href="/contratacoes/nova/fornecimento" className="btn-secondary" style={{ height: "36px", padding: "0 14px", fontSize: "12px" }}>
+            + Execução
           </Link>
         </div>
       </div>
@@ -442,7 +444,7 @@ function DerivadosLista({
   empenhos,
 }: {
   contratos: { id: string; numero: string; objeto: string }[];
-  empenhos: { id: string; numero: string; status: string }[];
+  empenhos: { id: string; numero: string; status: string; instrumento: InstrumentoContratual }[];
 }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -467,9 +469,9 @@ function DerivadosLista({
         )}
       </section>
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-slate-700">Empenhos diretos ({empenhos.length})</h3>
+        <h3 className="mb-2 text-sm font-semibold text-slate-700">Execuções diretas ({empenhos.length})</h3>
         {empenhos.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">Nenhum empenho direto.</p>
+          <p className="rounded-lg border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500">Nenhuma execução direta.</p>
         ) : (
           <ul className="space-y-2">
             {empenhos.map((e) => (
@@ -477,7 +479,7 @@ function DerivadosLista({
                 <Link href={`/execucao/${e.id}`} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 hover:border-blue-300">
                   <Receipt className="h-4 w-4 text-amber-600" />
                   <div>
-                    <div className="text-sm font-medium">Empenho {e.numero}</div>
+                    <div className="text-sm font-medium">{labelInstrumento(e.instrumento)} {e.numero}</div>
                     <div className="text-xs text-slate-500">Status: {e.status}</div>
                   </div>
                 </Link>

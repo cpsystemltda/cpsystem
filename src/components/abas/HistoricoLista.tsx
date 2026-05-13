@@ -88,6 +88,13 @@ const ENUM_LABEL: Record<string, Record<string, string>> = {
     ASSINATURA: "Assinatura",
     OMISSA: "Omissa",
   },
+  instrumento: {
+    NOTA_EMPENHO: "Nota de Empenho",
+    CARTA_CONTRATO: "Carta-Contrato",
+    AUTORIZACAO_COMPRA: "Autorização de Compra",
+    AUTORIZACAO_ENTREGA: "Autorização de Entrega",
+    ORDEM_SERVICO: "Ordem de Execução de Serviço",
+  },
   funcao: {
     AUTORIDADE_COMPETENTE: "Autoridade competente",
     GESTOR: "Gestor",

@@ -91,7 +91,7 @@ export default async function AdminPage() {
           <Mini label="Empresas (CNPJs)" valor={String(empresas)} />
           <Mini label="Atas" valor={String(totalAtas)} />
           <Mini label="Contratos" valor={String(totalContratos)} />
-          <Mini label="Empenhos" valor={String(totalEmpenhos)} />
+          <Mini label="Execuções" valor={String(totalEmpenhos)} />
         </div>
       </section>
 

@@ -92,21 +92,21 @@ export default async function NovaContratacaoPage() {
           tone="mint"
         />
         <Card
-          href="/contratacoes/nova/empenho"
+          href="/contratacoes/nova/fornecimento"
           icone={Receipt}
           titulo={
             <>
-              Nota de Empenho
+              Fornecimento / Execução
               <span
                 className="block text-[13px] font-semibold"
                 style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
               >
-                Carta-Contrato · Autorização de Compra · Ordem de Serviço
+                Carta-Contrato · Nota de Empenho · Autorização de Compra · Autorização de Entrega · Ordem de Execução de Serviço
               </span>
             </>
           }
           descricao="Derivado ou não de uma Ata de Registro de Preços"
-          textoSecundario="Reserva orçamentária. Pode ser autônoma, derivada de Ata (SRP) ou de Contrato existente. Lei 14.133/2021, art. 95."
+          textoSecundario="Instrumentos contratuais substitutivos do Termo de Contrato (art. 95, Lei 14.133/2021)."
           tone="lavender"
         />
       </div>

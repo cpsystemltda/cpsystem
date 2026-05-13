@@ -17,6 +17,7 @@ import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { prisma } from "@/lib/prisma";
 import { TimelineExecucao } from "@/components/TimelineExecucao";
+import { labelInstrumento } from "@/lib/instrumentoLabel";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -197,7 +198,7 @@ export default async function OperacaoPage({
                         <div className="flex items-start justify-between gap-4">
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold text-slate-900">
-                              Empenho {e.numero} · {e.objeto.slice(0, 60)}
+                              {labelInstrumento(e.instrumento)} {e.numero} · {e.objeto.slice(0, 60)}
                               {e.objeto.length > 60 ? "…" : ""}
                             </p>
                             <p className="mt-0.5 text-xs text-slate-500">

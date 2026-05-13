@@ -21,6 +21,7 @@ import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { ItensEmpenhoTab } from "@/components/abas/ItensEmpenhoTab";
 import { ComissoesNoEmpenhoTab } from "@/components/abas/ComissoesNoEmpenhoTab";
+import { labelInstrumento } from "@/lib/instrumentoLabel";
 
 const PASSOS = [
   { marco: "PEDIDO_RECEBIDO", label: "Pedido recebido", campo: "dataPedidoRecebido" },
@@ -113,7 +114,7 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
           <Receipt className="h-6 w-6 text-amber-700" />
         </div>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold text-slate-900">Empenho {e.numero}</h1>
+          <h1 className="text-3xl font-bold text-slate-900">{labelInstrumento(e.instrumento)} {e.numero}</h1>
           <p className="mt-1 text-sm text-slate-600">{e.objeto}</p>
           <p className="mt-2 text-xs text-slate-500">
             {e.empresa.nomeFantasia || e.empresa.razaoSocial} · {e.orgaoNome}
@@ -132,7 +133,7 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
           <Link
             href={`/execucao/${e.id}/editar`}
             className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            title="Editar dados do Empenho"
+            title={`Editar dados da ${labelInstrumento(e.instrumento).toLowerCase()}`}
           >
             <Pencil className="h-3.5 w-3.5" /> Editar
           </Link>
@@ -578,14 +579,23 @@ function DadosEmpenho({
   e,
 }: {
   e: {
+    instrumento: string;
     tipo: string; procedimentoSelecao: string; processoAdministrativo: string;
     numeroLicitacao: string | null; orgaoNome: string; orgaoCnpj: string;
     dataEmissao: Date; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null; prazoPagamentoDias: number | null;
+    classificacaoOrcamentaria: string | null;
+    signatario: string | null;
+    dataAssinatura: Date | null;
+    departamentoEmissor: string | null;
+    pontoColeta: string | null;
+    contatoRecebedor: string | null;
+    fiscalResponsavel: string | null;
   };
 }) {
   return (
     <div className="grid gap-x-8 gap-y-3 text-sm md:grid-cols-2">
+      <Info label="Instrumento" valor={labelInstrumento(e.instrumento as never)} />
       <Info label="Tipo" valor={ROTULO_TIPO[e.tipo as keyof typeof ROTULO_TIPO]} />
       <Info label="Procedimento" valor={ROTULO_PROCEDIMENTO[e.procedimentoSelecao as keyof typeof ROTULO_PROCEDIMENTO]} />
       <Info label="Processo administrativo" valor={e.processoAdministrativo} />
@@ -595,6 +605,19 @@ function DadosEmpenho({
       <Info label="Vigência" valor={`${e.vigenciaInicio.toLocaleDateString("pt-BR")} → ${e.vigenciaFim.toLocaleDateString("pt-BR")}`} />
       <Info label="Prazo de entrega" valor={e.prazoEntregaDias ? `${e.prazoEntregaDias} dias` : "—"} />
       <Info label="Prazo de pagamento" valor={e.prazoPagamentoDias ? `${e.prazoPagamentoDias} dias` : "—"} />
+      {e.classificacaoOrcamentaria && (
+        <Info label="Classificação orçamentária" valor={e.classificacaoOrcamentaria} />
+      )}
+      {e.signatario && <Info label="Signatário" valor={e.signatario} />}
+      {e.dataAssinatura && (
+        <Info label="Data de assinatura" valor={e.dataAssinatura.toLocaleDateString("pt-BR")} />
+      )}
+      {e.departamentoEmissor && (
+        <Info label="Departamento emissor" valor={e.departamentoEmissor} />
+      )}
+      {e.pontoColeta && <Info label="Ponto de coleta/entrega" valor={e.pontoColeta} />}
+      {e.contatoRecebedor && <Info label="Contato do recebedor" valor={e.contatoRecebedor} />}
+      {e.fiscalResponsavel && <Info label="Fiscal responsável" valor={e.fiscalResponsavel} />}
     </div>
   );
 }

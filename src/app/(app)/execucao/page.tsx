@@ -7,6 +7,7 @@ import { FiltroLista } from "@/components/FiltroLista";
 import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { PageHeader } from "@/components/ui/SecaoGlass";
+import { labelInstrumento } from "@/lib/instrumentoLabel";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -116,12 +117,12 @@ export default async function ExecucaoPage({
       <BannerEmpresaEmFoco contaId={usuario.contaId} />
       <PageHeader
         eyebrow="Operação · Logística"
-        titulo="Empenhos &"
+        titulo="Fornecimento &"
         destaque="Execução"
-        subtitulo={`${empenhos.length} empenho(s) — entregas, NFs e pagamentos.`}
+        subtitulo={`${empenhos.length} execução(ões) — empenhos, AE, OS, AC, Cartas-Contrato.`}
         cta={
-          <Link href="/contratacoes/nova/empenho" className="btn-primary">
-            <Plus className="h-4 w-4" /> Novo Empenho
+          <Link href="/contratacoes/nova/fornecimento" className="btn-primary">
+            <Plus className="h-4 w-4" /> Nova execução
           </Link>
         }
       />
@@ -170,9 +171,9 @@ export default async function ExecucaoPage({
       {empenhos.length === 0 ? (
         <div className="mt-12 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
           <Truck className="mx-auto h-10 w-10 text-slate-400" />
-          <h3 className="mt-4 text-lg font-semibold text-slate-900">Nenhum empenho encontrado</h3>
-          <Link href="/contratacoes/nova/empenho" className="mt-4 inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
-            Cadastrar primeiro Empenho
+          <h3 className="mt-4 text-lg font-semibold text-slate-900">Nenhuma execução encontrada</h3>
+          <Link href="/contratacoes/nova/fornecimento" className="mt-4 inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
+            Cadastrar primeira execução
           </Link>
         </div>
       ) : (
@@ -196,7 +197,7 @@ export default async function ExecucaoPage({
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-slate-900 truncate">
-                        Empenho {e.numero}
+                        {labelInstrumento(e.instrumento)} {e.numero}
                         <span className={`ml-2 rounded px-2 py-0.5 text-xs font-medium ${COR_STATUS[e.status]}`}>{ROTULO_STATUS[e.status]}</span>
                       </h3>
                       <p className="mt-1 text-sm text-slate-600 truncate">{e.objeto}</p>

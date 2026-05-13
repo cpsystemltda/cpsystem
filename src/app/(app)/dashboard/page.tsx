@@ -31,6 +31,8 @@ import { Block } from "@/components/ui/Block";
 import { KPI, CurrencyValue } from "@/components/ui/KPI";
 import { ChartCard } from "@/components/ui/ChartCard";
 import { TimelineVencimentos } from "@/components/TimelineVencimentos";
+import { labelCurtoInstrumento, labelInstrumento } from "@/lib/instrumentoLabel";
+import type { InstrumentoContratual } from "@/generated/prisma/client";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -140,6 +142,7 @@ export default async function DashboardPage() {
         objeto: true,
         orgaoNome: true,
         status: true,
+        instrumento: true,
         vigenciaFim: true,
         dataPrevistaExecucao: true,
         empresa: { select: { nomeFantasia: true, razaoSocial: true } },
@@ -739,9 +742,9 @@ export default async function DashboardPage() {
             tone="primary"
             size="hero"
             icon={Truck}
-            label="Empenhos em execução"
+            label="Execuções em andamento"
             value={empenhosEmExecucao}
-            meta="Não pagos / não finalizados"
+            meta="Empenhos, AE, OS, AC e Cartas-Contrato em curso"
             href="/execucao"
           />
         </div>
@@ -1289,6 +1292,7 @@ function TabelaLogistica({
     objeto: string;
     orgaoNome: string;
     status: string;
+    instrumento: InstrumentoContratual;
     vigenciaFim: Date;
     dataPrevistaExecucao: Date | null;
     empresa: { nomeFantasia: string | null; razaoSocial: string };
@@ -1331,7 +1335,7 @@ function TabelaLogistica({
         <thead>
           <tr>
             <th>Órgão</th>
-            <th>Empenho</th>
+            <th>Registro</th>
             <th>Data limite</th>
             <th>Status</th>
             <th>Atraso</th>
@@ -1345,7 +1349,7 @@ function TabelaLogistica({
             return (
               <tr key={e.id} className={atrasado ? "row-alert" : undefined}>
                 <td className="strong">{e.orgaoNome}</td>
-                <td className="num">EMP {e.numero}</td>
+                <td className="num">{labelCurtoInstrumento(e.instrumento)} {e.numero}</td>
                 <td className="num">{formatDate(limite)}</td>
                 <td>
                   <span className={`badge ${CLASSE_STATUS[e.status] ?? "b-empenhado"}`}>
@@ -1388,6 +1392,7 @@ function AgendaSemana({
     objeto: string;
     orgaoNome: string;
     status: string;
+    instrumento: InstrumentoContratual;
     limite: Date;
   }[];
   inicio: Date;
@@ -1501,9 +1506,9 @@ function AgendaSemana({
                               background: "rgba(255,255,255,0.5)",
                               border: "0.5px solid var(--hairline)",
                             }}
-                            title={`Empenho ${e.numero} · ${e.orgaoNome} · ${e.objeto}`}
+                            title={`${labelInstrumento(e.instrumento)} ${e.numero} · ${e.orgaoNome} · ${e.objeto}`}
                           >
-                            <p className="truncate font-bold">Empenho {e.numero}</p>
+                            <p className="truncate font-bold">{labelCurtoInstrumento(e.instrumento)} {e.numero}</p>
                             <p className="truncate" style={{ color: "var(--text-soft)" }}>
                               {e.orgaoNome}
                             </p>

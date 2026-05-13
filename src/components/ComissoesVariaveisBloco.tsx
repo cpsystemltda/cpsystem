@@ -4,6 +4,8 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Check, Clock, Upload, AlertCircle, X, ChevronDown, ChevronUp, Bell } from "lucide-react";
 import { brl } from "@/lib/validators";
+import { labelInstrumento } from "@/lib/instrumentoLabel";
+import type { InstrumentoContratual } from "@/generated/prisma/client";
 import {
   marcarComissaoExecucaoAction,
   overridePercentualComissaoAction,
@@ -37,6 +39,7 @@ type ComissaoLinha = {
     objeto: string;
     orgaoNome: string;
     status: string;
+    instrumento: InstrumentoContratual;
     dataPagamento: Date | null;
     empresa: {
       id: string;
@@ -383,7 +386,7 @@ function ItemComissao({ comissao: c }: { comissao: ComissaoLinha }) {
               href={`/execucao/${c.empenho.id}`}
               className="text-sm font-extrabold text-slate-900 hover:underline"
             >
-              Empenho {c.empenho.numero}
+              {labelInstrumento(c.empenho.instrumento)} {c.empenho.numero}
             </Link>
             <span
               className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase"

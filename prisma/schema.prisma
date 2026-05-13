@@ -631,6 +631,18 @@ enum StatusExecucao {
   PAGO
 }
 
+// Instrumentos contratuais substitutivos do Termo de Contrato (art. 95,
+// Lei 14.133/2021). Todos compartilham o mesmo model Empenho — o campo
+// `instrumento` diferencia a natureza jurídica e dispara labels/campos
+// específicos no formulário.
+enum InstrumentoContratual {
+  NOTA_EMPENHO
+  CARTA_CONTRATO
+  AUTORIZACAO_COMPRA
+  AUTORIZACAO_ENTREGA
+  ORDEM_SERVICO
+}
+
 // ============================================================
 // COMISSÃO POR EXECUÇÃO (Linha B — empresa paga analista)
 // ============================================================
@@ -691,11 +703,25 @@ model ComissaoExecucao {
 model Empenho {
   id                     String              @id @default(cuid())
   tipo                   TipoObjeto
+  // Natureza jurídica do registro (art. 95, Lei 14.133/2021). Default cobre
+  // legado: empenhos cadastrados antes da feature continuam aparecendo como
+  // "Nota de Empenho" sem regressão.
+  instrumento            InstrumentoContratual @default(NOTA_EMPENHO)
   numero                 String
   identificador          String?             // ex: "1ª parcela", "Solicitação 042/2026"
   processoAdministrativo String
   procedimentoSelecao    ProcedimentoSelecao
   numeroLicitacao        String?
+
+  // Campos específicos por instrumento (todos opcionais — só preenchidos
+  // quando o instrumento correspondente exige).
+  classificacaoOrcamentaria String?        // Nota de Empenho
+  signatario                String?        // Carta-Contrato
+  dataAssinatura            DateTime?      // Carta-Contrato
+  departamentoEmissor       String?        // Autorização de Compra
+  pontoColeta               String?        // Autorização de Entrega (origem)
+  contatoRecebedor          String?        // Autorização de Entrega (nome/contato)
+  fiscalResponsavel         String?        // Ordem de Execução de Serviço
 
   orgaoNome      String
   orgaoCnpj      String

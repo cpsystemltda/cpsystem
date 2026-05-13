@@ -29,6 +29,8 @@ import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { ItensContratoTab } from "@/components/abas/ItensContratoTab";
+import { labelInstrumento } from "@/lib/instrumentoLabel";
+import type { InstrumentoContratual } from "@/generated/prisma/client";
 
 export default async function ContratoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -125,10 +127,10 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
             </Link>
           )}
           <Link
-            href="/contratacoes/nova/empenho"
+            href="/contratacoes/nova/fornecimento"
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
-            + Empenho
+            + Execução
           </Link>
         </div>
       </div>
@@ -193,7 +195,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
             },
             {
               key: "empenhos",
-              label: "Empenhos",
+              label: "Execuções",
               badge: contrato.empenhos.length,
               content: <EmpenhosVinculados empenhos={contrato.empenhos} />,
             },
@@ -329,6 +331,7 @@ type EmpenhoVinculado = {
   id: string;
   numero: string;
   status: string;
+  instrumento: InstrumentoContratual;
   objeto: string;
   dataEmissao: Date;
   dataPedidoRecebido: Date | null;
@@ -354,7 +357,7 @@ function EmpenhosVinculados({ empenhos }: { empenhos: EmpenhoVinculado[] }) {
             <Receipt className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-slate-900">Empenho {e.numero}</p>
+                <p className="text-sm font-semibold text-slate-900">{labelInstrumento(e.instrumento)} {e.numero}</p>
                 <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-800">
                   {e.status.replace(/_/g, " ")}
                 </span>

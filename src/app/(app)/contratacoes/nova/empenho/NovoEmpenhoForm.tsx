@@ -13,6 +13,11 @@ import { criarEmpenhoAction, editarEmpenhoAction } from "@/app/actions/contratac
 import { extrairEmpenhoPdfAction } from "@/app/actions/iaExtracao";
 import { OPCOES_PROCEDIMENTO, OPCOES_TIPO } from "@/lib/validators";
 import type { EmpenhoExtraido } from "@/lib/extrairAta";
+import {
+  labelInstrumento,
+  labelNumeroInstrumento,
+} from "@/lib/instrumentoLabel";
+import type { InstrumentoContratual } from "@/generated/prisma/client";
 
 type EmpresaOpt = { value: string; label: string };
 type AtaOpt = { value: string; label: string; itens: AtaItemRef[] };
@@ -22,6 +27,7 @@ export type EmpenhoValoresIniciais = {
   empresaId: string;
   ataId: string | null;
   contratoId: string | null;
+  instrumento?: InstrumentoContratual;
   tipo: string;
   numero: string;
   numeroOrdemFornecimento: string | null;
@@ -39,6 +45,15 @@ export type EmpenhoValoresIniciais = {
   vigenciaFim: string;
   prazoEntregaDias: number | null;
   prazoPagamentoDias: number | null;
+  // Campos específicos por instrumento (todos opcionais; só aparecem no
+  // form quando o instrumento correspondente está selecionado).
+  classificacaoOrcamentaria?: string | null;
+  signatario?: string | null;
+  dataAssinatura?: string | null;
+  departamentoEmissor?: string | null;
+  pontoColeta?: string | null;
+  contatoRecebedor?: string | null;
+  fiscalResponsavel?: string | null;
   itens: ItemInicial[];
   enderecosEntrega: { id: string; rotulo: string | null; endereco: string }[];
   pontosFocais: {
@@ -58,6 +73,7 @@ export default function NovoEmpenhoForm({
   modo = "criar",
   empenhoId,
   valoresIniciais,
+  instrumento: instrumentoProp,
 }: {
   empresas: EmpresaOpt[];
   atas: AtaOpt[];
@@ -65,7 +81,15 @@ export default function NovoEmpenhoForm({
   modo?: "criar" | "editar";
   empenhoId?: string;
   valoresIniciais?: EmpenhoValoresIniciais;
+  // Instrumento selecionado no seletor secundário. Em modo editar vem do
+  // próprio registro (valoresIniciais.instrumento). Default NOTA_EMPENHO
+  // mantém retrocompat com chamadores antigos.
+  instrumento?: InstrumentoContratual;
 }) {
+  const instrumento: InstrumentoContratual =
+    instrumentoProp ?? valoresIniciais?.instrumento ?? "NOTA_EMPENHO";
+  const nomeInstr = labelInstrumento(instrumento);
+  const labelNumero = labelNumeroInstrumento(instrumento);
   const action = modo === "editar" ? editarEmpenhoAction : criarEmpenhoAction;
   const [state, formAction] = useActionState(action, null);
   const e = state?.campos ?? {};
@@ -86,7 +110,7 @@ export default function NovoEmpenhoForm({
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
       <Link
-        href="/contratacoes/nova"
+        href={modo === "editar" ? "/contratacoes/nova" : "/contratacoes/nova/fornecimento"}
         className="inline-flex items-center gap-1 text-sm transition"
         style={{ color: "var(--text-mute)" }}
       >
@@ -99,7 +123,7 @@ export default function NovoEmpenhoForm({
             className="text-[11px] font-bold uppercase"
             style={{ letterSpacing: "0.22em", color: "var(--primary)" }}
           >
-            {modo === "editar" ? "Editar registro · Nota de Empenho" : "Nova contratação · Nota de Empenho"}
+            {modo === "editar" ? `Editar registro · ${nomeInstr}` : `Nova contratação · ${nomeInstr}`}
           </p>
           <h1
             className="mt-2 text-[40px] font-extrabold leading-none"
@@ -115,7 +139,7 @@ export default function NovoEmpenhoForm({
                 WebkitTextFillColor: "transparent",
               }}
             >
-              {modo === "editar" ? `Empenho ${vi?.numero ?? ""}` : "Nota de Empenho"}
+              {modo === "editar" ? `${nomeInstr} ${vi?.numero ?? ""}` : nomeInstr}
             </em>
           </h1>
           <p
@@ -123,13 +147,15 @@ export default function NovoEmpenhoForm({
             style={{ color: "var(--text-mute)", letterSpacing: "-0.005em" }}
           >
             {modo === "editar"
-              ? "Ajuste qualquer campo. Alterações em valores monetários, vigências e CNPJs pedem confirmação. Tudo fica registrado no histórico. Não é possível editar empenhos já pagos."
-              : "Reserva orçamentária. Pode ser autônoma, derivada de Ata (SRP) ou de Contrato existente. Lei 14.133/2021 art. 95 — substitui o Termo de Contrato em hipóteses específicas."}
+              ? `Ajuste qualquer campo. Alterações em valores monetários, vigências e CNPJs pedem confirmação. Tudo fica registrado no histórico. Não é possível editar ${nomeInstr.toLowerCase()} já pago.`
+              : "Instrumento contratual substitutivo do Termo de Contrato (art. 95, Lei 14.133/2021). Pode ser autônomo, derivado de Ata (SRP) ou de Contrato existente."}
           </p>
         </div>
       </header>
 
-      {modo !== "editar" && (
+      {/* IA de extração só é treinada para PDF de Nota de Empenho. Pra
+          outros instrumentos o usuário preenche manualmente. */}
+      {modo !== "editar" && instrumento === "NOTA_EMPENHO" && (
         <div className="mt-6">
           <UploadPdfPanel
             titulo="Preencher automaticamente a partir do PDF da Nota de Empenho"
@@ -154,9 +180,20 @@ export default function NovoEmpenhoForm({
               ev.preventDefault();
               ev.stopPropagation();
             }
+          } else {
+            // No criar: pede confirmação dizendo qual instrumento será salvo
+            // (evita usuário cadastrar AE achando que era empenho, etc.).
+            const ok = window.confirm(
+              `Confirmar cadastro como ${nomeInstr}?`,
+            );
+            if (!ok) {
+              ev.preventDefault();
+              ev.stopPropagation();
+            }
           }
         }}
       >
+        <input type="hidden" name="instrumento" value={instrumento} />
         {modo === "editar" && empenhoId && (
           <input type="hidden" name="empenhoId" value={empenhoId} />
         )}
@@ -212,7 +249,7 @@ export default function NovoEmpenhoForm({
             <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} defaultValue={vi?.empresaId} />
             <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={vi?.tipo} />
             <Field
-              label="Número do Empenho (nº/ano)"
+              label={`${labelNumero} (nº/ano)`}
               name="numero"
               required
               erro={e.numero}
@@ -302,7 +339,7 @@ export default function NovoEmpenhoForm({
         <Secao titulo="Datas e prazos">
           <div className="grid grid-cols-4 gap-4">
             <Field
-              label="Data de emissão da NE"
+              label={`Data de emissão ${instrumento === "NOTA_EMPENHO" ? "da NE" : "do documento"}`}
               name="dataEmissao"
               type="date"
               required
@@ -356,9 +393,87 @@ export default function NovoEmpenhoForm({
           </div>
         </Secao>
 
+        {instrumento !== "NOTA_EMPENHO" || vi?.classificacaoOrcamentaria ? (
+          <Secao titulo={`Detalhes — ${nomeInstr}`}>
+            <div className="grid grid-cols-4 gap-4">
+              {instrumento === "NOTA_EMPENHO" && (
+                <Field
+                  label="Classificação orçamentária (opcional)"
+                  name="classificacaoOrcamentaria"
+                  placeholder="Programa/ação/elemento"
+                  span={4}
+                  defaultValue={vi?.classificacaoOrcamentaria ?? ""}
+                />
+              )}
+              {instrumento === "CARTA_CONTRATO" && (
+                <>
+                  <Field
+                    label="Signatário"
+                    name="signatario"
+                    required
+                    erro={e.signatario}
+                    span={2}
+                    defaultValue={vi?.signatario ?? ""}
+                  />
+                  <Field
+                    label="Data de assinatura"
+                    name="dataAssinatura"
+                    type="date"
+                    required
+                    erro={e.dataAssinatura}
+                    span={1}
+                    defaultValue={vi?.dataAssinatura ?? ""}
+                  />
+                </>
+              )}
+              {instrumento === "AUTORIZACAO_COMPRA" && (
+                <Field
+                  label="Departamento emissor"
+                  name="departamentoEmissor"
+                  required
+                  erro={e.departamentoEmissor}
+                  span={2}
+                  defaultValue={vi?.departamentoEmissor ?? ""}
+                />
+              )}
+              {instrumento === "AUTORIZACAO_ENTREGA" && (
+                <>
+                  <Field
+                    label="Ponto de coleta/entrega"
+                    name="pontoColeta"
+                    required
+                    erro={e.pontoColeta}
+                    span={2}
+                    defaultValue={vi?.pontoColeta ?? ""}
+                  />
+                  <Field
+                    label="Contato do recebedor"
+                    name="contatoRecebedor"
+                    placeholder="Nome · telefone/e-mail"
+                    required
+                    erro={e.contatoRecebedor}
+                    span={2}
+                    defaultValue={vi?.contatoRecebedor ?? ""}
+                  />
+                </>
+              )}
+              {instrumento === "ORDEM_SERVICO" && (
+                <Field
+                  label="Fiscal responsável"
+                  name="fiscalResponsavel"
+                  required
+                  erro={e.fiscalResponsavel}
+                  span={2}
+                  defaultValue={vi?.fiscalResponsavel ?? ""}
+                />
+              )}
+            </div>
+          </Secao>
+        ) : null}
+
         <Secao titulo="Endereços de entrega/execução">
           <p className="mb-3 text-xs text-slate-600">
-            Locais onde este empenho será cumprido.
+            Locais onde este {nomeInstr.toLowerCase()} será cumprido.
           </p>
           <EnderecosEntregaEditor iniciais={vi?.enderecosEntrega} />
         </Secao>
@@ -370,7 +485,7 @@ export default function NovoEmpenhoForm({
           <PontosFocaisEditor iniciais={vi?.pontosFocais} />
         </Secao>
 
-        <Secao titulo="Itens empenhados">
+        <Secao titulo="Itens">
           {ataSelecionada && (
             <p className="mb-3 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
               Selecione cada item da Ata na primeira coluna — o saldo será validado.
@@ -388,12 +503,12 @@ export default function NovoEmpenhoForm({
               color: "var(--coral)",
             }}
           >
-            <strong>Erro ao cadastrar Empenho:</strong> {state.erro}
+            <strong>Erro ao cadastrar {nomeInstr}:</strong> {state.erro}
           </div>
         )}
 
         <div className="flex gap-3">
-          <SubmitButton>{modo === "editar" ? "Salvar alterações" : "Cadastrar Empenho"}</SubmitButton>
+          <SubmitButton>{modo === "editar" ? "Salvar alterações" : `Cadastrar ${nomeInstr}`}</SubmitButton>
           <Link
             href={modo === "editar" && empenhoId ? `/execucao/${empenhoId}` : "/contratacoes/nova"}
             className="btn-secondary inline-flex"

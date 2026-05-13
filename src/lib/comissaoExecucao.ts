@@ -39,6 +39,7 @@ export async function listarComissoesDoAnalista(
           numero: true,
           objeto: true,
           orgaoNome: true,
+          instrumento: true,
           dataEmissao: true,
           status: true,
           dataPagamento: true,
