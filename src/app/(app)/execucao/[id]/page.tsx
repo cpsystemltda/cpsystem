@@ -580,11 +580,13 @@ function DadosEmpenho({
 }: {
   e: {
     instrumento: string;
-    tipo: string; procedimentoSelecao: string; processoAdministrativo: string;
+    tipo: string; procedimentoSelecao: string | null; processoAdministrativo: string;
     numeroLicitacao: string | null; orgaoNome: string; orgaoCnpj: string;
     dataEmissao: Date; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null;
     prazoEntregaUnidade: "DIAS" | "MESES";
+    prazoEntregaModo: "RELATIVO" | "DATA_CERTA";
+    dataEntregaCerta: Date | null;
     prazoPagamentoDias: number | null;
     classificacaoOrcamentaria: string | null;
     signatario: string | null;
@@ -599,18 +601,28 @@ function DadosEmpenho({
     <div className="grid gap-x-8 gap-y-3 text-sm md:grid-cols-2">
       <Info label="Instrumento" valor={labelInstrumento(e.instrumento as never)} />
       <Info label="Tipo" valor={ROTULO_TIPO[e.tipo as keyof typeof ROTULO_TIPO]} />
-      <Info label="Procedimento" valor={ROTULO_PROCEDIMENTO[e.procedimentoSelecao as keyof typeof ROTULO_PROCEDIMENTO]} />
+      {/* M3.3 ajuste 2 — Procedimento de seleção só aparece se houver
+          (legacy). Novos cadastros não preenchem mais esse campo. */}
+      {e.procedimentoSelecao && (
+        <Info label="Procedimento" valor={ROTULO_PROCEDIMENTO[e.procedimentoSelecao as keyof typeof ROTULO_PROCEDIMENTO]} />
+      )}
       <Info label="Processo administrativo" valor={e.processoAdministrativo} />
       <Info label="Nº Licitação" valor={e.numeroLicitacao || "—"} />
       <Info label="Órgão" valor={`${e.orgaoNome} (${formatarCnpj(e.orgaoCnpj)})`} />
-      <Info label="Data de emissão" valor={e.dataEmissao.toLocaleDateString("pt-BR")} />
+      {/* M3.3 ajuste 3 — "Data de recebimento do documento" (era "Data
+          de emissão"). Campo no banco continua `dataEmissao`. */}
+      <Info label="Data de recebimento do documento" valor={e.dataEmissao.toLocaleDateString("pt-BR")} />
       <Info label="Vigência" valor={`${e.vigenciaInicio.toLocaleDateString("pt-BR")} → ${e.vigenciaFim.toLocaleDateString("pt-BR")}`} />
       <Info
         label="Prazo de entrega"
         valor={
-          e.prazoEntregaDias
-            ? `${e.prazoEntregaDias} ${e.prazoEntregaUnidade === "MESES" ? (e.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
-            : "—"
+          e.prazoEntregaModo === "DATA_CERTA"
+            ? e.dataEntregaCerta
+              ? `Data certa: ${e.dataEntregaCerta.toLocaleDateString("pt-BR")}`
+              : "Data certa não informada"
+            : e.prazoEntregaDias
+              ? `${e.prazoEntregaDias} ${e.prazoEntregaUnidade === "MESES" ? (e.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
+              : "—"
         }
       />
       <Info label="Prazo de pagamento" valor={e.prazoPagamentoDias ? `${e.prazoPagamentoDias} dias` : "—"} />

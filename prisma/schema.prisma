@@ -733,7 +733,9 @@ model Empenho {
   numero                 String
   identificador          String?             // ex: "1ª parcela", "Solicitação 042/2026"
   processoAdministrativo String
-  procedimentoSelecao    ProcedimentoSelecao
+  // Opcional pro Empenho (M3.3, decisão Igor): info redundante quando o
+  // Empenho deriva de Ata/Contrato. Continua obrigatório em Ata/Contrato.
+  procedimentoSelecao    ProcedimentoSelecao?
   numeroLicitacao        String?
 
   // Campos específicos por instrumento (todos opcionais — só preenchidos
@@ -760,6 +762,10 @@ model Empenho {
   vigenciaFim             DateTime
   prazoEntregaDias        Int?
   prazoEntregaUnidade     PrazoEntregaUnidade @default(DIAS)
+  // Módulo 3.3 — modo do prazo: relativo (qtd+unidade) ou data fixa.
+  // Mesmo enum compartilhado com Contrato (PrazoEntregaModo).
+  prazoEntregaModo        PrazoEntregaModo    @default(RELATIVO)
+  dataEntregaCerta        DateTime?
   prazoPagamentoDias      Int?
 
   status StatusExecucao @default(EMPENHADO)

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -11,13 +11,19 @@ import { EnderecosEntregaEditor, PontosFocaisEditor } from "@/components/Editore
 import type { ItemInicial } from "@/components/ItensEditor";
 import { criarEmpenhoAction, editarEmpenhoAction } from "@/app/actions/contratacoes";
 import { extrairEmpenhoPdfAction } from "@/app/actions/iaExtracao";
-import { OPCOES_PROCEDIMENTO, OPCOES_TIPO } from "@/lib/validators";
+import { OPCOES_TIPO } from "@/lib/validators";
 import type { EmpenhoExtraido } from "@/lib/extrairAta";
 import {
   labelInstrumento,
   labelNumeroInstrumento,
 } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
+import { TextareaGlass, CnpjInput } from "@/components/forms/glass";
+import {
+  calcularVigenciaFim,
+  detectarPrazoVigencia,
+} from "@/components/forms/vigencia";
+import { AnexosAdicionaisEditor } from "@/components/forms/AnexosAdicionaisEditor";
 
 type EmpresaOpt = { value: string; label: string };
 type AtaOpt = { value: string; label: string; itens: AtaItemRef[] };
@@ -32,7 +38,7 @@ export type EmpenhoValoresIniciais = {
   numero: string;
   numeroOrdemFornecimento: string | null;
   processoAdministrativo: string;
-  procedimentoSelecao: string;
+  procedimentoSelecao: string | null;
   numeroLicitacao: string | null;
   objeto: string;
   orgaoNome: string;
@@ -44,6 +50,9 @@ export type EmpenhoValoresIniciais = {
   vigenciaInicio: string;
   vigenciaFim: string;
   prazoEntregaDias: number | null;
+  prazoEntregaUnidade?: "DIAS" | "MESES";
+  prazoEntregaModo?: "RELATIVO" | "DATA_CERTA";
+  dataEntregaCerta?: string | null;
   prazoPagamentoDias: number | null;
   // Campos específicos por instrumento (todos opcionais; só aparecem no
   // form quando o instrumento correspondente está selecionado).
@@ -104,6 +113,57 @@ export default function NovoEmpenhoForm({
   const [contratoId, setContratoId] = useState(vi?.contratoId ?? "");
   const [dados, setDados] = useState<EmpenhoExtraido | null>(null);
 
+  // Vigência calc (Ajuste 4) — Início + Prazo + Fim calculado
+  const [vigenciaInicio, setVigenciaInicio] = useState<string>(vi?.vigenciaInicio ?? "");
+  const prazoDetectado = detectarPrazoVigencia(
+    vi?.vigenciaInicio ?? "",
+    vi?.vigenciaFim ?? "",
+  );
+  const [prazoVigQtd, setPrazoVigQtd] = useState<number>(prazoDetectado?.qtd ?? 1);
+  const [prazoVigUnidade, setPrazoVigUnidade] = useState<"DIAS" | "MESES" | "ANOS">(
+    prazoDetectado?.unidade ??
+      (instrumentoProp === "AUTORIZACAO_ENTREGA" ? "DIAS" : "ANOS"),
+  );
+  const vigenciaFim = calcularVigenciaFim(vigenciaInicio, prazoVigQtd, prazoVigUnidade);
+
+  // Prazo entrega 2 modos (Ajuste 5)
+  const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA">(
+    vi?.prazoEntregaModo ?? "RELATIVO",
+  );
+  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES">(
+    vi?.prazoEntregaUnidade ?? "DIAS",
+  );
+
+  // PDF + badge AUTO (Ajuste 6 — single PDF principal; múltiplos anexos
+  // adicionais ficam em outra seção mais abaixo)
+  const [arquivoPdfUrl, setArquivoPdfUrl] = useState<string | null>(null);
+  const [arquivoPdfNome, setArquivoPdfNome] = useState<string | null>(null);
+  const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set());
+  // Anexos adicionais cadastrados na criação (PDFs de Ordem de Fornecimento,
+  // aditivos etc). Cada um tem URL persistida (Vercel Blob) + nome + categoria.
+  const [anexosAdicionais, setAnexosAdicionais] = useState<
+    { url: string; nome: string; categoria: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (!dados) return;
+    if (dados.vigenciaInicio) setVigenciaInicio(dados.vigenciaInicio);
+    if (dados.vigenciaInicio && dados.vigenciaFim) {
+      const det = detectarPrazoVigencia(dados.vigenciaInicio, dados.vigenciaFim);
+      if (det) {
+        setPrazoVigQtd(det.qtd);
+        setPrazoVigUnidade(det.unidade);
+      }
+    }
+    const auto = new Set<string>();
+    const d = dados as unknown as Record<string, unknown>;
+    for (const k of Object.keys(d)) {
+      const v = d[k];
+      if (v != null && v !== "" && !(Array.isArray(v) && v.length === 0)) auto.add(k);
+    }
+    setCamposAuto(auto);
+  }, [dados]);
+
   const ataSelecionada = origem === "ata" ? atas.find((a) => a.value === ataId) : undefined;
   const formKey = dados ? `auto-${dados.numero}` : "manual";
 
@@ -162,6 +222,10 @@ export default function NovoEmpenhoForm({
             descricao="Anexe o PDF da NE. A IA extrai número, identificador, processo, órgão, vigência, prazos e os itens empenhados. Você confere e edita antes de salvar."
             action={extrairEmpenhoPdfAction}
             onSuccess={setDados}
+            onArquivoSalvo={(info) => {
+              setArquivoPdfUrl(info.url);
+              setArquivoPdfNome(info.nome);
+            }}
             badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchido(s)`}
           />
         </div>
@@ -197,6 +261,26 @@ export default function NovoEmpenhoForm({
         {modo === "editar" && empenhoId && (
           <input type="hidden" name="empenhoId" value={empenhoId} />
         )}
+        {/* PDF da IA — cria Anexo (CONTRATUAL) após save */}
+        {arquivoPdfUrl && (
+          <>
+            <input type="hidden" name="arquivoPdfUrl" value={arquivoPdfUrl} />
+            <input type="hidden" name="arquivoPdfNome" value={arquivoPdfNome ?? ""} />
+          </>
+        )}
+        {/* Anexos adicionais — cada um vira um registro Anexo após save */}
+        {anexosAdicionais.map((a, i) => (
+          <div key={i}>
+            <input type="hidden" name={`anexosAdicionais[${i}][url]`} value={a.url} />
+            <input type="hidden" name={`anexosAdicionais[${i}][nome]`} value={a.nome} />
+            <input type="hidden" name={`anexosAdicionais[${i}][categoria]`} value={a.categoria} />
+          </div>
+        ))}
+        {/* Hidden inputs dos campos controlados */}
+        <input type="hidden" name="vigenciaInicio" value={vigenciaInicio} />
+        <input type="hidden" name="vigenciaFim" value={vigenciaFim} />
+        <input type="hidden" name="prazoEntregaModo" value={prazoEntregaModo} />
+        <input type="hidden" name="prazoEntregaUnidade" value={prazoEntregaUnidade} />
         <Secao titulo="Origem">
           <div className="flex gap-3">
             {(["livre", "ata", "contrato"] as const).map((op) => (
@@ -264,15 +348,10 @@ export default function NovoEmpenhoForm({
               span={2}
               defaultValue={dados?.processoAdministrativo ?? vi?.processoAdministrativo}
             />
-            <Select
-              label="Procedimento de seleção"
-              name="procedimentoSelecao"
-              options={OPCOES_PROCEDIMENTO}
-              required
-              erro={e.procedimentoSelecao}
-              span={1}
-              defaultValue={dados?.procedimentoSelecao ?? vi?.procedimentoSelecao}
-            />
+            {/* Procedimento de seleção removido do form (M3.3 ajuste 2,
+                decisão Igor). Quando vinculado a Ata/Contrato a info é
+                herdada; quando avulso é dispensável. Schema mantém o campo
+                opcional pra preservar dados legacy. */}
             <Field
               label="Nº da Licitação (opcional)"
               name="numeroLicitacao"
@@ -280,13 +359,15 @@ export default function NovoEmpenhoForm({
               span={2}
               defaultValue={dados?.numeroLicitacao ?? vi?.numeroLicitacao ?? ""}
             />
-            <Field
+            <TextareaGlass
               label="Objeto"
               name="objeto"
               required
               erro={e.objeto}
               span={4}
+              minRows={3}
               defaultValue={dados?.objeto ?? vi?.objeto}
+              auto={camposAuto.has("objeto")}
             />
           </div>
         </Secao>
@@ -301,14 +382,14 @@ export default function NovoEmpenhoForm({
               span={2}
               defaultValue={dados?.orgaoNome ?? vi?.orgaoNome}
             />
-            <Field
+            <CnpjInput
               label="CNPJ do órgão"
               name="orgaoCnpj"
-              placeholder="00.000.000/0000-00"
               required
               erro={e.orgaoCnpj}
               span={2}
               defaultValue={dados?.orgaoCnpj ?? vi?.orgaoCnpj}
+              auto={camposAuto.has("orgaoCnpj")}
             />
             <Field
               label="Endereço"
@@ -338,8 +419,12 @@ export default function NovoEmpenhoForm({
 
         <Secao titulo="Datas e prazos">
           <div className="grid grid-cols-4 gap-4">
+            {/* Ajuste 3 — rótulo "Data de recebimento do documento" (a empresa
+                não controla quando o órgão emite o documento; o que conta é
+                quando chegou pra ela). Campo no banco continua `dataEmissao`
+                pra manter dados antigos. */}
             <Field
-              label={`Data de emissão ${instrumento === "NOTA_EMPENHO" ? "da NE" : "do documento"}`}
+              label="Data de recebimento do documento"
               name="dataEmissao"
               type="date"
               required
@@ -347,33 +432,159 @@ export default function NovoEmpenhoForm({
               span={1}
               defaultValue={dados?.dataEmissao ?? vi?.dataEmissao}
             />
-            <Field
-              label="Vigência — início"
-              name="vigenciaInicio"
-              type="date"
-              required
-              erro={e.vigenciaInicio}
-              span={1}
-              defaultValue={dados?.vigenciaInicio ?? vi?.vigenciaInicio}
-            />
-            <Field
-              label="Vigência — fim"
-              name="vigenciaFim"
-              type="date"
-              required
-              erro={e.vigenciaFim}
-              span={1}
-              defaultValue={dados?.vigenciaFim ?? vi?.vigenciaFim}
-            />
-            <Field
-              label="Prazo de entrega (dias)"
-              name="prazoEntregaDias"
-              type="number"
-              min="0"
-              erro={e.prazoEntregaDias}
-              span={1}
-              defaultValue={dados?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""}
-            />
+            {/* Ajuste 4 — Bloco Vigência (Início + Prazo + Fim calculado) */}
+            <div className="col-span-1">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Vigência — início *
+              </span>
+              <input
+                type="date"
+                value={vigenciaInicio}
+                onChange={(ev) => setVigenciaInicio(ev.target.value)}
+                required
+                className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+              />
+            </div>
+            <div className="col-span-1">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Vigência — prazo
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={prazoVigQtd}
+                  onChange={(ev) => setPrazoVigQtd(Number(ev.target.value) || 0)}
+                  className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
+                />
+                <select
+                  value={prazoVigUnidade}
+                  onChange={(ev) =>
+                    setPrazoVigUnidade(ev.target.value as "DIAS" | "MESES" | "ANOS")
+                  }
+                  className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
+                  style={{
+                    border: "0.5px solid var(--hairline)",
+                    background: "rgba(255,255,255,0.7)",
+                    color: "var(--text)",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  <option value="DIAS">Dias</option>
+                  <option value="MESES">Meses</option>
+                  <option value="ANOS">Anos</option>
+                </select>
+              </div>
+            </div>
+            <div className="col-span-1">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Vigência — fim (calc.)
+              </span>
+              <input
+                type="text"
+                readOnly
+                value={
+                  vigenciaFim
+                    ? new Date(vigenciaFim + "T12:00:00").toLocaleDateString("pt-BR")
+                    : "—"
+                }
+                className="w-full rounded-xl px-4 py-3 text-sm font-bold tabular"
+                style={{
+                  border: "0.5px solid var(--hairline)",
+                  background: "rgba(15,14,12,0.04)",
+                  color: vigenciaFim ? "var(--text)" : "var(--text-mute)",
+                }}
+              />
+              {e.vigenciaFim && (
+                <span className="mt-1 block text-[11px]" style={{ color: "var(--coral-deep)" }}>
+                  {e.vigenciaFim}
+                </span>
+              )}
+            </div>
+
+            {/* Ajuste 5 — Prazo de entrega com 2 modos (RELATIVO ou DATA_CERTA) */}
+            <div className="col-span-2">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Prazo de entrega/execução
+              </span>
+              <div
+                className="mb-2 inline-flex rounded-full p-0.5 text-[11px] font-bold"
+                style={{
+                  background: "rgba(15,14,12,0.05)",
+                  border: "0.5px solid var(--hairline)",
+                }}
+              >
+                {([
+                  { v: "RELATIVO" as const, label: "Prazo (dias/meses)" },
+                  { v: "DATA_CERTA" as const, label: "Data certa" },
+                ]).map((opt) => {
+                  const ativo = prazoEntregaModo === opt.v;
+                  return (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setPrazoEntregaModo(opt.v)}
+                      className="rounded-full px-3 py-1 transition"
+                      style={{
+                        background: ativo ? "var(--primary-deep)" : "transparent",
+                        color: ativo ? "white" : "var(--text-soft)",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {prazoEntregaModo === "RELATIVO" ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    name="prazoEntregaDias"
+                    min="0"
+                    placeholder="Quantidade"
+                    defaultValue={
+                      dados?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""
+                    }
+                    className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
+                  />
+                  <select
+                    value={prazoEntregaUnidade}
+                    onChange={(ev) =>
+                      setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES")
+                    }
+                    className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
+                    style={{
+                      border: "0.5px solid var(--hairline)",
+                      background: "rgba(255,255,255,0.7)",
+                      color: "var(--text)",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    <option value="DIAS">Dias</option>
+                    <option value="MESES">Meses</option>
+                  </select>
+                </div>
+              ) : (
+                <input
+                  type="date"
+                  name="dataEntregaCerta"
+                  defaultValue={vi?.dataEntregaCerta ?? ""}
+                  className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+                />
+              )}
+            </div>
             <Field
               label="Prazo de pagamento (dias)"
               name="prazoPagamentoDias"
@@ -387,11 +598,25 @@ export default function NovoEmpenhoForm({
               label="Nº da Ordem de Fornecimento (se houver)"
               name="numeroOrdemFornecimento"
               placeholder="OF nº/ano"
-              span={2}
+              span={1}
               defaultValue={vi?.numeroOrdemFornecimento ?? ""}
             />
           </div>
         </Secao>
+
+        {/* Ajuste 6 — Anexos adicionais (Ordem de Fornecimento, aditivos, etc.) */}
+        {modo !== "editar" && (
+          <Secao titulo="Anexos adicionais (opcional)">
+            <p className="mb-3 text-xs" style={{ color: "var(--text-soft)" }}>
+              PDFs complementares: Ordem de Fornecimento, aditivos, apostilamentos.
+              Para o PDF principal use o painel da IA acima.
+            </p>
+            <AnexosAdicionaisEditor
+              anexos={anexosAdicionais}
+              onChange={setAnexosAdicionais}
+            />
+          </Secao>
+        )}
 
         {instrumento !== "NOTA_EMPENHO" || vi?.classificacaoOrcamentaria ? (
           <Secao titulo={`Detalhes — ${nomeInstr}`}>

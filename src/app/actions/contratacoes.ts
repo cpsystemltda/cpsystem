@@ -1219,6 +1219,8 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
         vigenciaFim: v.vigenciaFim,
         prazoEntregaDias: v.prazoEntregaDias || null,
         prazoEntregaUnidade: v.prazoEntregaUnidade,
+        prazoEntregaModo: v.prazoEntregaModo,
+        dataEntregaCerta: v.dataEntregaCerta ?? null,
         prazoPagamentoDias: v.prazoPagamentoDias || null,
         numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
         classificacaoOrcamentaria: v.classificacaoOrcamentaria || null,
@@ -1282,6 +1284,51 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
       recursoId: empenho.id,
     });
 
+    // PDF principal da IA — vira Anexo (CONTRATUAL)
+    const arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
+    const arquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
+    if (arquivoPdfUrl) {
+      try {
+        await prisma.anexo.create({
+          data: {
+            empenhoId: empenho.id,
+            categoria: "CONTRATUAL",
+            nome: arquivoPdfNome || "documento.pdf",
+            url: arquivoPdfUrl,
+            mimeType: "application/pdf",
+          },
+        });
+      } catch (errAnexo) {
+        console.warn("[criarEmpenhoAction] falha ao criar Anexo do PDF:", errAnexo);
+      }
+    }
+
+    // Anexos adicionais (Ordem de Fornecimento, aditivos, apostilamentos)
+    let idx = 0;
+    while (formData.has(`anexosAdicionais[${idx}][url]`)) {
+      const url = String(formData.get(`anexosAdicionais[${idx}][url]`) || "").trim();
+      const nome = String(formData.get(`anexosAdicionais[${idx}][nome]`) || "").trim();
+      const categoria = String(
+        formData.get(`anexosAdicionais[${idx}][categoria]`) || "OUTRO",
+      );
+      if (url) {
+        try {
+          await prisma.anexo.create({
+            data: {
+              empenhoId: empenho.id,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              categoria: categoria as any,
+              nome: nome || `anexo-${idx + 1}.pdf`,
+              url,
+            },
+          });
+        } catch (errAnexo) {
+          console.warn(`[criarEmpenhoAction] falha ao criar anexo adicional #${idx}:`, errAnexo);
+        }
+      }
+      idx++;
+    }
+
     revalidatePath("/execucao");
     revalidatePath("/contratos");
     revalidatePath("/atas");
@@ -1324,6 +1371,9 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
 
   const empenhoExistente = await prisma.empenho.findFirst({
     where: { id: empenhoId, empresa: { contaId: usuario.contaId } },
+    include: {
+      itens: { select: { id: true, quantidade: true, ataItemId: true, descricao: true } },
+    },
   });
   if (!empenhoExistente) return { erro: "Empenho não encontrado ou sem permissão." };
 
@@ -1346,6 +1396,58 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
       campos: { empresaId: "Selecione uma empresa válida." },
       valores: dados,
     };
+  }
+
+  // Ajuste 7 — validação de saldo na edição (ARP ou Contrato pai),
+  // considerando que os itens antigos deste empenho vão ser substituídos.
+  if (v.contratoId) {
+    const saldo = await calcularSaldoContrato(v.contratoId);
+    const qtyAntigaPorDescricao = new Map<string, number>();
+    for (const item of empenhoExistente.itens) {
+      qtyAntigaPorDescricao.set(
+        item.descricao,
+        (qtyAntigaPorDescricao.get(item.descricao) ?? 0) + item.quantidade,
+      );
+    }
+    for (const itemNovo of v.itens) {
+      const linha = saldo.itens.find((s) => s.descricao === itemNovo.descricao);
+      if (linha) {
+        const qtyAntiga = qtyAntigaPorDescricao.get(itemNovo.descricao) ?? 0;
+        const saldoReal = linha.quantidadeDisponivel + qtyAntiga;
+        if (itemNovo.quantidade > saldoReal) {
+          return {
+            erro: `Quantidade excede o saldo disponível no Contrato. "${linha.descricao}" tem ${saldoReal} ${linha.unidade} disponíveis (incluindo este empenho). Solicitado: ${itemNovo.quantidade}.`,
+            valores: dados,
+          };
+        }
+      }
+    }
+  } else if (v.ataId) {
+    const saldo = await calcularSaldoAta(v.ataId);
+    const qtyAntigaPorAtaItem = new Map<string, number>();
+    for (const item of empenhoExistente.itens) {
+      if (item.ataItemId) {
+        qtyAntigaPorAtaItem.set(
+          item.ataItemId,
+          (qtyAntigaPorAtaItem.get(item.ataItemId) ?? 0) + item.quantidade,
+        );
+      }
+    }
+    for (const itemNovo of v.itens) {
+      if (!itemNovo.ataItemId) continue;
+      const linha = saldo.itens.find((s) => s.ataItemId === itemNovo.ataItemId);
+      if (!linha) {
+        return { erro: "Item da Ata não encontrado.", valores: dados };
+      }
+      const qtyAntiga = qtyAntigaPorAtaItem.get(itemNovo.ataItemId) ?? 0;
+      const saldoReal = linha.quantidadeDisponivel + qtyAntiga;
+      if (itemNovo.quantidade > saldoReal) {
+        return {
+          erro: `Quantidade excede o saldo disponível na ARP. "${linha.descricao}" tem ${saldoReal} ${linha.unidade} disponíveis (incluindo este empenho). Solicitado: ${itemNovo.quantidade}.`,
+          valores: dados,
+        };
+      }
+    }
   }
 
   const idsNovos = new Set(
@@ -1377,6 +1479,8 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
           vigenciaFim: v.vigenciaFim,
           prazoEntregaDias: v.prazoEntregaDias || null,
           prazoEntregaUnidade: v.prazoEntregaUnidade,
+          prazoEntregaModo: v.prazoEntregaModo,
+          dataEntregaCerta: v.dataEntregaCerta ?? null,
           prazoPagamentoDias: v.prazoPagamentoDias || null,
           numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
           classificacaoOrcamentaria: v.classificacaoOrcamentaria || null,
@@ -1476,6 +1580,50 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
       titulo: `${labelInstrumento(v.instrumento)} ${v.numero}`,
       mudancas,
     });
+
+    // PDF da IA — cria Anexo se vier do form (substitui/anexa nova versão)
+    const editArquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
+    const editArquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
+    if (editArquivoPdfUrl) {
+      try {
+        await prisma.anexo.create({
+          data: {
+            empenhoId,
+            categoria: "CONTRATUAL",
+            nome: editArquivoPdfNome || "documento.pdf",
+            url: editArquivoPdfUrl,
+            mimeType: "application/pdf",
+          },
+        });
+      } catch (errAnexo) {
+        console.warn("[editarEmpenhoAction] falha ao criar Anexo do PDF:", errAnexo);
+      }
+    }
+    // Anexos adicionais
+    let idx = 0;
+    while (formData.has(`anexosAdicionais[${idx}][url]`)) {
+      const url = String(formData.get(`anexosAdicionais[${idx}][url]`) || "").trim();
+      const nome = String(formData.get(`anexosAdicionais[${idx}][nome]`) || "").trim();
+      const categoria = String(
+        formData.get(`anexosAdicionais[${idx}][categoria]`) || "OUTRO",
+      );
+      if (url) {
+        try {
+          await prisma.anexo.create({
+            data: {
+              empenhoId,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              categoria: categoria as any,
+              nome: nome || `anexo-${idx + 1}.pdf`,
+              url,
+            },
+          });
+        } catch (errAnexo) {
+          console.warn(`[editarEmpenhoAction] falha ao criar anexo adicional #${idx}:`, errAnexo);
+        }
+      }
+      idx++;
+    }
 
     revalidatePath("/execucao");
     revalidatePath(`/execucao/${empenhoId}`);

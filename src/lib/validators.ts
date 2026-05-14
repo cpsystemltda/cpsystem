@@ -395,6 +395,15 @@ export const novoEmpenhoSchema = contratacaoBase
     contratoId: z.string().optional(),
     numeroOrdemFornecimento: z.string().optional(),
     dataEmissao: z.coerce.date(),
+    // Procedimento de seleção: opcional pro Empenho (decisão Igor M3.3).
+    // Quando há vínculo com Ata/Contrato, o procedimento é herdado.
+    procedimentoSelecao: z.enum(procedimentosSelecao).optional(),
+    // Prazo de entrega com 2 modos (igual ao Contrato)
+    prazoEntregaModo: z.enum(["RELATIVO", "DATA_CERTA"]).default("RELATIVO"),
+    dataEntregaCerta: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.date().optional(),
+    ),
     enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
     pontosFocais: z.array(pontoFocalSchema).optional(),
     itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
