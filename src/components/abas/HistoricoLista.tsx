@@ -99,6 +99,10 @@ const ENUM_LABEL: Record<string, Record<string, string>> = {
     DIAS: "Dias",
     MESES: "Meses",
   },
+  prazoEntregaModo: {
+    RELATIVO: "Prazo relativo (dias/meses)",
+    DATA_CERTA: "Data certa",
+  },
   funcao: {
     AUTORIDADE_COMPETENTE: "Autoridade competente",
     GESTOR: "Gestor",

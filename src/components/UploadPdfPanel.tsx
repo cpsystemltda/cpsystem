@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Sparkles, Upload, Check, AlertCircle, Loader2, Beaker } from "lucide-react";
 
 type Resultado<T> =
-  | { ok: true; dados: T; demo?: boolean }
+  | { ok: true; dados: T; demo?: boolean; arquivoUrl?: string; nomeArquivo?: string; tamanhoBytes?: number }
   | { ok: false; erro: string };
 
 export function UploadPdfPanel<T>({
@@ -12,12 +12,16 @@ export function UploadPdfPanel<T>({
   descricao,
   action,
   onSuccess,
+  onArquivoSalvo,
   badgeAposExtracao,
 }: {
   titulo: string;
   descricao: string;
   action: (formData: FormData) => Promise<Resultado<T>>;
   onSuccess: (dados: T) => void;
+  /** Callback opcional acionado quando o PDF foi persistido no storage.
+   * Recebe a URL pública pra ser usada como hidden input no form principal. */
+  onArquivoSalvo?: (info: { url: string; nome: string }) => void;
   /** ex: (dados) => `${dados.itens.length} item(ns) preenchido(s)` */
   badgeAposExtracao?: (dados: T) => string;
 }) {
@@ -45,6 +49,9 @@ export function UploadPdfPanel<T>({
       return;
     }
     onSuccess(res.dados);
+    if (res.arquivoUrl && onArquivoSalvo) {
+      onArquivoSalvo({ url: res.arquivoUrl, nome: res.nomeArquivo ?? file.name });
+    }
     if (res.demo) setModoDemo(true);
     if (badgeAposExtracao) setBadge(badgeAposExtracao(res.dados));
     else setBadge("Dados preenchidos");

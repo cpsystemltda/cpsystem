@@ -330,6 +330,15 @@ enum PrazoEntregaUnidade {
   MESES
 }
 
+// Modo de inclusão do prazo de entrega. RELATIVO = qtd+unidade contada a
+// partir do pedido (típico de Fornecimento). DATA_CERTA = data fixa de
+// execução (típico de Locação para evento). Por enquanto só Contrato usa
+// — Ata e Empenho seguem só RELATIVO.
+enum PrazoEntregaModo {
+  RELATIVO
+  DATA_CERTA
+}
+
 // Marco a partir do qual conta o prazo de entrega.
 // O contrato define qual é (Lei 14.133 — fluxograma do contrato não-continuado).
 enum MarcoInicialPrazoEntrega {
@@ -547,8 +556,13 @@ model Contrato {
   vigenciaFim            DateTime
   prazoEntregaDias       Int?
   prazoEntregaUnidade    PrazoEntregaUnidade @default(DIAS)
+  // Modo de prazo de entrega: RELATIVO usa qtd+unidade (prazoEntregaDias),
+  // DATA_CERTA usa dataEntregaCerta (ex.: locação de evento com data fixa).
+  prazoEntregaModo       PrazoEntregaModo    @default(RELATIVO)
+  dataEntregaCerta       DateTime?
   prazoPagamentoDias     Int?
   marcoOrcamentoEstimado DateTime?
+  marcoReajusteOrigem    MarcoReajusteOrigem?
 
   // Fluxograma da contratação — Lei 14.133 (contratos não-continuados):
   // como o quantitativo é entregue e qual o marco inicial do prazo.

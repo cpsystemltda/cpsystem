@@ -405,7 +405,11 @@ function DadosContrato({
     dataPublicacao: Date | null; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null;
     prazoEntregaUnidade: "DIAS" | "MESES";
+    prazoEntregaModo: "RELATIVO" | "DATA_CERTA";
+    dataEntregaCerta: Date | null;
     prazoPagamentoDias: number | null;
+    marcoReajusteOrigem: string | null;
+    marcoOrcamentoEstimado: Date | null;
     modalidadeEntrega: string;
     marcoInicialPrazo: string | null;
     marcoInicialDescricao: string | null;
@@ -428,12 +432,28 @@ function DadosContrato({
         <Info
           label="Prazo de entrega"
           valor={
-            c.prazoEntregaDias
-              ? `${c.prazoEntregaDias} ${c.prazoEntregaUnidade === "MESES" ? (c.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
-              : "—"
+            c.prazoEntregaModo === "DATA_CERTA"
+              ? c.dataEntregaCerta
+                ? `Data certa: ${c.dataEntregaCerta.toLocaleDateString("pt-BR")}`
+                : "Data certa não informada"
+              : c.prazoEntregaDias
+                ? `${c.prazoEntregaDias} ${c.prazoEntregaUnidade === "MESES" ? (c.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
+                : "—"
           }
         />
         <Info label="Prazo de pagamento" valor={c.prazoPagamentoDias ? `${c.prazoPagamentoDias} dias` : "—"} />
+        <Info
+          label="Marco de reajuste"
+          valor={
+            c.marcoReajusteOrigem === "ASSINATURA"
+              ? `Assinatura — próximo reajuste em ${calcularProximoReajusteContrato(c.dataAssinatura)}`
+              : c.marcoReajusteOrigem === "ORCAMENTO_ESTIMADO" && c.marcoOrcamentoEstimado
+                ? `Orçamento estimado em ${c.marcoOrcamentoEstimado.toLocaleDateString("pt-BR")} — próximo reajuste em ${calcularProximoReajusteContrato(c.marcoOrcamentoEstimado)}`
+                : c.marcoReajusteOrigem === "OMISSA"
+                  ? "Cláusula omissa (sem reajuste programado)"
+                  : "—"
+          }
+        />
         <Info
           label="Modalidade de entrega"
           valor={ROTULO_MODALIDADE_ENTREGA[c.modalidadeEntrega as keyof typeof ROTULO_MODALIDADE_ENTREGA] || c.modalidadeEntrega}
@@ -504,4 +524,11 @@ function Info({ label, valor }: { label: string; valor: string }) {
       <dd className="mt-0.5 text-sm font-medium text-slate-900">{valor}</dd>
     </div>
   );
+}
+
+// Próximo reajuste = marco + 12 meses. Formato dd/mm/yyyy.
+function calcularProximoReajusteContrato(marco: Date): string {
+  const d = new Date(marco);
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toLocaleDateString("pt-BR");
 }

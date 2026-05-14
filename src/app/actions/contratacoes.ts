@@ -739,8 +739,11 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
         vigenciaFim: v.vigenciaFim,
         prazoEntregaDias: v.prazoEntregaDias || null,
         prazoEntregaUnidade: v.prazoEntregaUnidade,
+        prazoEntregaModo: v.prazoEntregaModo,
+        dataEntregaCerta: v.dataEntregaCerta ?? null,
         prazoPagamentoDias: v.prazoPagamentoDias || null,
         marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
+        marcoReajusteOrigem: v.marcoReajusteOrigem ?? null,
         modalidadeEntrega: v.modalidadeEntrega,
         marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
         marcoInicialDescricao:
@@ -778,6 +781,25 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
         }),
       },
     });
+
+    // PDF da IA — cria registro Anexo vinculado ao Contrato (Ajuste 6)
+    const arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
+    const arquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
+    if (arquivoPdfUrl) {
+      try {
+        await prisma.anexo.create({
+          data: {
+            contratoId: contrato.id,
+            categoria: "CONTRATUAL",
+            nome: arquivoPdfNome || "contrato.pdf",
+            url: arquivoPdfUrl,
+            mimeType: "application/pdf",
+          },
+        });
+      } catch (errAnexo) {
+        console.warn("[criarContratoAction] falha ao criar Anexo do PDF:", errAnexo);
+      }
+    }
 
     revalidatePath("/contratos");
     revalidatePath("/atas");
@@ -823,7 +845,7 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
   const contratoExistente = await prisma.contrato.findFirst({
     where: { id: contratoId, empresa: { contaId: usuario.contaId } },
     include: {
-      itens: { select: { id: true, descricao: true } },
+      itens: { select: { id: true, descricao: true, ataItemId: true, quantidade: true } },
       empenhos: { select: { id: true } },
     },
   });
@@ -843,12 +865,42 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
     };
   }
 
-  // Se for derivado de Ata, validar saldo dos itens (igual ao criar)
+  // Se for derivado de Ata, validar saldo dos itens considerando que os
+  // itens DESTE contrato vão ser substituídos (Ajuste 7 — devolução
+  // proporcional de saldo na edição).
   if (v.ataId) {
     const ata = await prisma.ata.findFirst({
       where: { id: v.ataId, empresa: { contaId: usuario.contaId } },
     });
     if (!ata) return { erro: "Ata vinculada inválida.", valores: dados };
+
+    const saldo = await calcularSaldoAta(v.ataId);
+    // Quantidade que ESTE contrato hoje consome por ataItemId — devolve
+    // ao saldo ao validar o novo valor.
+    const qtyAntigaPorAtaItem = new Map<string, number>();
+    for (const item of contratoExistente.itens) {
+      if (item.ataItemId) {
+        qtyAntigaPorAtaItem.set(
+          item.ataItemId,
+          (qtyAntigaPorAtaItem.get(item.ataItemId) ?? 0) + item.quantidade,
+        );
+      }
+    }
+    for (const itemNovo of v.itens) {
+      if (!itemNovo.ataItemId) continue;
+      const linhaSaldo = saldo.itens.find((s) => s.ataItemId === itemNovo.ataItemId);
+      if (!linhaSaldo) {
+        return { erro: "Item da Ata não encontrado.", valores: dados };
+      }
+      const qtyAntiga = qtyAntigaPorAtaItem.get(itemNovo.ataItemId) ?? 0;
+      const saldoReal = linhaSaldo.quantidadeDisponivel + qtyAntiga;
+      if (itemNovo.quantidade > saldoReal) {
+        return {
+          erro: `Quantidade excede o saldo disponível na ARP. "${linhaSaldo.descricao}" tem ${saldoReal} ${linhaSaldo.unidade} disponíveis (incluindo a quantidade atual deste contrato). Solicitado: ${itemNovo.quantidade}.`,
+          valores: dados,
+        };
+      }
+    }
   }
 
   // Se há empenhos vinculados, avisar antes de remover itens — o saldo pode ficar
@@ -902,8 +954,11 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
           vigenciaFim: v.vigenciaFim,
           prazoEntregaDias: v.prazoEntregaDias || null,
           prazoEntregaUnidade: v.prazoEntregaUnidade,
+          prazoEntregaModo: v.prazoEntregaModo,
+          dataEntregaCerta: v.dataEntregaCerta ?? null,
           prazoPagamentoDias: v.prazoPagamentoDias || null,
           marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
+          marcoReajusteOrigem: v.marcoReajusteOrigem ?? null,
           modalidadeEntrega: v.modalidadeEntrega,
           marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
           marcoInicialDescricao:
@@ -1005,6 +1060,25 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
       titulo: `Contrato ${v.numero}`,
       mudancas,
     });
+
+    // PDF da IA — cria registro Anexo se veio do upload novo no editar
+    const editArquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
+    const editArquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
+    if (editArquivoPdfUrl) {
+      try {
+        await prisma.anexo.create({
+          data: {
+            contratoId,
+            categoria: "CONTRATUAL",
+            nome: editArquivoPdfNome || "contrato.pdf",
+            url: editArquivoPdfUrl,
+            mimeType: "application/pdf",
+          },
+        });
+      } catch (errAnexo) {
+        console.warn("[editarContratoAction] falha ao criar Anexo do PDF:", errAnexo);
+      }
+    }
 
     revalidatePath("/contratos");
     revalidatePath(`/contratos/${contratoId}`);

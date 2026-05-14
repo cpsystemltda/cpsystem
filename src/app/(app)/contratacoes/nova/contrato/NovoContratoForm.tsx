@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { ChevronLeft, MapPin, Users, FileSignature } from "lucide-react";
 import { Field, Select } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -19,6 +19,14 @@ import {
 } from "@/lib/validators";
 import { Plus, Trash2 } from "lucide-react";
 import type { ContratoExtraido } from "@/lib/extrairAta";
+import {
+  TextareaGlass,
+  CnpjInput,
+} from "@/components/forms/glass";
+import {
+  calcularVigenciaFim,
+  detectarPrazoVigencia,
+} from "@/components/forms/vigencia";
 
 type EmpresaOpt = { value: string; label: string };
 type AtaOpt = { value: string; label: string; itens: AtaItemRef[] };
@@ -44,7 +52,11 @@ export type ContratoValoresIniciais = {
   vigenciaInicio: string;
   vigenciaFim: string;
   prazoEntregaDias: number | null;
+  prazoEntregaUnidade?: "DIAS" | "MESES";
+  prazoEntregaModo?: "RELATIVO" | "DATA_CERTA";
+  dataEntregaCerta?: string | null;
   prazoPagamentoDias: number | null;
+  marcoReajusteOrigem?: string | null;
   marcoOrcamentoEstimado: string | null;
   modalidadeEntrega: "INTEGRAL" | "PARCELADA" | "SOB_DEMANDA";
   marcoInicialPrazo: string | null;
@@ -92,6 +104,67 @@ export default function NovoContratoForm({
     vi?.modalidadeEntrega ?? "INTEGRAL",
   );
   const [marcoInicialPrazo, setMarcoInicialPrazo] = useState<string>(vi?.marcoInicialPrazo ?? "");
+
+  // Ajuste 3 — Bloco de Vigência (Início + Prazo + Fim calculado)
+  const [vigenciaInicio, setVigenciaInicio] = useState<string>(vi?.vigenciaInicio ?? "");
+  const prazoDetectado = detectarPrazoVigencia(vi?.vigenciaInicio ?? "", vi?.vigenciaFim ?? "");
+  const [prazoVigQtd, setPrazoVigQtd] = useState<number>(prazoDetectado?.qtd ?? 1);
+  const [prazoVigUnidade, setPrazoVigUnidade] = useState<"DIAS" | "MESES" | "ANOS">(
+    prazoDetectado?.unidade ?? "ANOS",
+  );
+  const vigenciaFim = calcularVigenciaFim(vigenciaInicio, prazoVigQtd, prazoVigUnidade);
+
+  // Ajuste 4 — Prazo de entrega com 2 modos (relativo OU data certa)
+  const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA">(
+    vi?.prazoEntregaModo ?? "RELATIVO",
+  );
+  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES">(
+    vi?.prazoEntregaUnidade ?? "DIAS",
+  );
+
+  // Ajuste 5 — Marco de reajuste (Origem + data inicial auto-preenchida)
+  const [marcoReajusteOrigem, setMarcoReajusteOrigem] = useState<string>(
+    vi?.marcoReajusteOrigem ?? "",
+  );
+  const [dataAssinaturaState, setDataAssinaturaState] = useState<string>(vi?.dataAssinatura ?? "");
+  const [marcoOrcamentoEstimado, setMarcoOrcamentoEstimado] = useState<string>(
+    vi?.marcoOrcamentoEstimado ?? "",
+  );
+  // Quando marco = ASSINATURA, a data inicial é a data de assinatura.
+  // Quando = ORCAMENTO_ESTIMADO, usuário preenche. Quando = OMISSA, desabilitado.
+  const dataInicialMarcoCalculada =
+    marcoReajusteOrigem === "ASSINATURA"
+      ? dataAssinaturaState
+      : marcoReajusteOrigem === "ORCAMENTO_ESTIMADO"
+        ? marcoOrcamentoEstimado
+        : "";
+
+  // Ajuste 6 — PDF persistido + badge AUTO
+  const [arquivoPdfUrl, setArquivoPdfUrl] = useState<string | null>(null);
+  const [arquivoPdfNome, setArquivoPdfNome] = useState<string | null>(null);
+  const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set());
+
+  // Quando IA preenche, atualiza states locais (vigência, dataAssinatura) e
+  // marca campos preenchidos como AUTO.
+  useEffect(() => {
+    if (!dados) return;
+    if (dados.vigenciaInicio) setVigenciaInicio(dados.vigenciaInicio);
+    if (dados.dataAssinatura) setDataAssinaturaState(dados.dataAssinatura);
+    if (dados.vigenciaInicio && dados.vigenciaFim) {
+      const det = detectarPrazoVigencia(dados.vigenciaInicio, dados.vigenciaFim);
+      if (det) {
+        setPrazoVigQtd(det.qtd);
+        setPrazoVigUnidade(det.unidade);
+      }
+    }
+    const auto = new Set<string>();
+    const d = dados as unknown as Record<string, unknown>;
+    for (const k of Object.keys(d)) {
+      const v = d[k];
+      if (v != null && v !== "" && !(Array.isArray(v) && v.length === 0)) auto.add(k);
+    }
+    setCamposAuto(auto);
+  }, [dados]);
 
   const ataSelecionada = atas.find((a) => a.value === ataId);
   const formKey = dados ? `auto-${dados.numero}` : "manual";
@@ -149,6 +222,10 @@ export default function NovoContratoForm({
             descricao="Anexe o PDF do contrato administrativo. A IA extrai número, processo, órgão, vigência, prazos e a lista completa de itens. Você confere e edita antes de salvar."
             action={extrairContratoPdfAction}
             onSuccess={setDados}
+            onArquivoSalvo={(info) => {
+              setArquivoPdfUrl(info.url);
+              setArquivoPdfNome(info.nome);
+            }}
             badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchido(s)`}
           />
         </div>
@@ -173,6 +250,26 @@ export default function NovoContratoForm({
         {modo === "editar" && contratoId && (
           <input type="hidden" name="contratoId" value={contratoId} />
         )}
+        {/* PDF persistido pela IA — vira Anexo do Contrato após save */}
+        {arquivoPdfUrl && (
+          <>
+            <input type="hidden" name="arquivoPdfUrl" value={arquivoPdfUrl} />
+            <input type="hidden" name="arquivoPdfNome" value={arquivoPdfNome ?? ""} />
+          </>
+        )}
+        {/* Hidden inputs dos campos controlados que viram payload do server */}
+        <input type="hidden" name="vigenciaInicio" value={vigenciaInicio} />
+        <input type="hidden" name="vigenciaFim" value={vigenciaFim} />
+        <input type="hidden" name="prazoEntregaModo" value={prazoEntregaModo} />
+        <input type="hidden" name="prazoEntregaUnidade" value={prazoEntregaUnidade} />
+        <input type="hidden" name="marcoReajusteOrigem" value={marcoReajusteOrigem} />
+        {/* Quando marco = ASSINATURA, a data inicial é a dataAssinatura;
+            quando = ORCAMENTO_ESTIMADO, é o marcoOrcamentoEstimado */}
+        <input
+          type="hidden"
+          name="marcoOrcamentoEstimado"
+          value={dataInicialMarcoCalculada}
+        />
         <Secao titulo="Identificação">
           <div className="grid grid-cols-4 gap-4">
             <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} defaultValue={vi?.empresaId} />
@@ -272,13 +369,15 @@ export default function NovoContratoForm({
               span={1}
               defaultValue={dados?.numeroLicitacao ?? vi?.numeroLicitacao ?? ""}
             />
-            <Field
+            <TextareaGlass
               label="Objeto"
               name="objeto"
               required
               erro={e.objeto}
               span={4}
+              minRows={3}
               defaultValue={dados?.objeto ?? vi?.objeto}
+              auto={camposAuto.has("objeto")}
             />
           </div>
         </Secao>
@@ -293,14 +392,14 @@ export default function NovoContratoForm({
               span={2}
               defaultValue={dados?.orgaoNome ?? vi?.orgaoNome}
             />
-            <Field
+            <CnpjInput
               label="CNPJ do órgão"
               name="orgaoCnpj"
-              placeholder="00.000.000/0000-00"
               required
               erro={e.orgaoCnpj}
               span={2}
               defaultValue={dados?.orgaoCnpj ?? vi?.orgaoCnpj}
+              auto={camposAuto.has("orgaoCnpj")}
             />
             <Field
               label="Endereço"
@@ -330,6 +429,8 @@ export default function NovoContratoForm({
 
         <Secao titulo="Datas e prazos">
           <div className="grid grid-cols-4 gap-4">
+            {/* Data de assinatura — auto-preenche o marco de reajuste quando
+                origem = ASSINATURA */}
             <Field
               label="Data de assinatura"
               name="dataAssinatura"
@@ -337,7 +438,8 @@ export default function NovoContratoForm({
               required
               erro={e.dataAssinatura}
               span={1}
-              defaultValue={dados?.dataAssinatura ?? vi?.dataAssinatura}
+              value={dataAssinaturaState || dados?.dataAssinatura || vi?.dataAssinatura || ""}
+              onChange={(ev) => setDataAssinaturaState(ev.currentTarget.value)}
             />
             <Field
               label="Data de publicação"
@@ -349,31 +451,163 @@ export default function NovoContratoForm({
             />
             <Field
               label="Vigência — início"
-              name="vigenciaInicio"
+              name="__vigenciaInicio_display"
               type="date"
               required
               erro={e.vigenciaInicio}
               span={1}
-              defaultValue={dados?.vigenciaInicio ?? vi?.vigenciaInicio}
+              value={vigenciaInicio}
+              onChange={(ev) => setVigenciaInicio(ev.currentTarget.value)}
             />
-            <Field
-              label="Vigência — fim"
-              name="vigenciaFim"
-              type="date"
-              required
-              erro={e.vigenciaFim}
-              span={1}
-              defaultValue={dados?.vigenciaFim ?? vi?.vigenciaFim}
-            />
-            <Field
-              label="Prazo de entrega (dias)"
-              name="prazoEntregaDias"
-              type="number"
-              min="0"
-              erro={e.prazoEntregaDias}
-              span={1}
-              defaultValue={dados?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""}
-            />
+            {/* Prazo de vigência — qtd + unidade. Calcula vigenciaFim auto. */}
+            <div className="col-span-1">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Vigência — prazo
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={prazoVigQtd}
+                  onChange={(ev) => setPrazoVigQtd(Number(ev.target.value) || 0)}
+                  className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
+                />
+                <select
+                  value={prazoVigUnidade}
+                  onChange={(ev) =>
+                    setPrazoVigUnidade(ev.target.value as "DIAS" | "MESES" | "ANOS")
+                  }
+                  className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
+                  style={{
+                    border: "0.5px solid var(--hairline)",
+                    background: "rgba(255,255,255,0.7)",
+                    color: "var(--text)",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  <option value="DIAS">Dias</option>
+                  <option value="MESES">Meses</option>
+                  <option value="ANOS">Anos</option>
+                </select>
+              </div>
+              <span className="mt-1 block text-[11px]" style={{ color: "var(--text-mute)" }}>
+                Sugestão: 1 Ano (ajustável).
+              </span>
+            </div>
+            {/* Vigência fim — readonly, derivada do cálculo */}
+            <div className="col-span-2">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Vigência — fim (calculado)
+              </span>
+              <input
+                type="text"
+                readOnly
+                value={
+                  vigenciaFim
+                    ? new Date(vigenciaFim + "T12:00:00").toLocaleDateString("pt-BR")
+                    : "—"
+                }
+                className="w-full rounded-xl px-4 py-3 text-sm font-bold tabular"
+                style={{
+                  border: "0.5px solid var(--hairline)",
+                  background: "rgba(15,14,12,0.04)",
+                  color: vigenciaFim ? "var(--text)" : "var(--text-mute)",
+                }}
+              />
+              {e.vigenciaFim && (
+                <span className="mt-1 block text-[11px]" style={{ color: "var(--coral-deep)" }}>
+                  {e.vigenciaFim}
+                </span>
+              )}
+            </div>
+
+            {/* Prazo de entrega/execução — 2 modos: RELATIVO ou DATA_CERTA */}
+            <div className="col-span-2">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Prazo de entrega/execução
+              </span>
+              {/* Toggle entre os 2 modos */}
+              <div
+                className="mb-2 inline-flex rounded-full p-0.5 text-[11px] font-bold"
+                style={{
+                  background: "rgba(15,14,12,0.05)",
+                  border: "0.5px solid var(--hairline)",
+                }}
+              >
+                {([
+                  { v: "RELATIVO" as const, label: "Prazo (dias/meses)" },
+                  { v: "DATA_CERTA" as const, label: "Data certa" },
+                ]).map((opt) => {
+                  const ativo = prazoEntregaModo === opt.v;
+                  return (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setPrazoEntregaModo(opt.v)}
+                      className="rounded-full px-3 py-1 transition"
+                      style={{
+                        background: ativo ? "var(--primary-deep)" : "transparent",
+                        color: ativo ? "white" : "var(--text-soft)",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {prazoEntregaModo === "RELATIVO" ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    name="prazoEntregaDias"
+                    min="0"
+                    placeholder="Quantidade"
+                    defaultValue={
+                      dados?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""
+                    }
+                    className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
+                  />
+                  <select
+                    value={prazoEntregaUnidade}
+                    onChange={(ev) =>
+                      setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES")
+                    }
+                    className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
+                    style={{
+                      border: "0.5px solid var(--hairline)",
+                      background: "rgba(255,255,255,0.7)",
+                      color: "var(--text)",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    <option value="DIAS">Dias</option>
+                    <option value="MESES">Meses</option>
+                  </select>
+                </div>
+              ) : (
+                <input
+                  type="date"
+                  name="dataEntregaCerta"
+                  defaultValue={vi?.dataEntregaCerta ?? ""}
+                  className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+                />
+              )}
+              <span className="mt-1 block text-[11px]" style={{ color: "var(--text-mute)" }}>
+                {prazoEntregaModo === "RELATIVO"
+                  ? "Prazo contado a partir do pedido/empenho."
+                  : "Data específica de execução (ex.: locação para evento)."}
+              </span>
+            </div>
+
             <Field
               label="Prazo de pagamento (dias)"
               name="prazoPagamentoDias"
@@ -383,14 +617,62 @@ export default function NovoContratoForm({
               span={1}
               defaultValue={dados?.prazoPagamentoDias?.toString() ?? vi?.prazoPagamentoDias?.toString() ?? ""}
             />
-            <Field
-              label="Marco do orçamento estimado (alerta de reajuste em +1 ano)"
-              name="marcoOrcamentoEstimado"
-              type="date"
-              erro={e.marcoOrcamentoEstimado}
-              span={2}
-              defaultValue={vi?.marcoOrcamentoEstimado ?? ""}
-            />
+
+            {/* Marco de reajuste — mesma estrutura da ARP */}
+            <div className="col-span-4">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Marco de reajuste (alerta em +12 meses)
+              </span>
+              <div className="grid grid-cols-4 gap-3">
+                <select
+                  value={marcoReajusteOrigem}
+                  onChange={(ev) => setMarcoReajusteOrigem(ev.target.value)}
+                  className="col-span-2 rounded-xl px-4 py-3 text-sm font-medium"
+                  style={{ border: "0.5px solid var(--hairline)", background: "rgba(255,255,255,0.7)" }}
+                >
+                  <option value="">— Sem reajuste / não aplicável —</option>
+                  <option value="ORCAMENTO_ESTIMADO">Orçamento estimado</option>
+                  <option value="ASSINATURA">Assinatura do Contrato</option>
+                  <option value="OMISSA">Omisso</option>
+                </select>
+                <input
+                  type="date"
+                  value={
+                    marcoReajusteOrigem === "ORCAMENTO_ESTIMADO"
+                      ? marcoOrcamentoEstimado
+                      : marcoReajusteOrigem === "ASSINATURA"
+                        ? dataAssinaturaState
+                        : ""
+                  }
+                  onChange={(ev) => {
+                    if (marcoReajusteOrigem === "ORCAMENTO_ESTIMADO") {
+                      setMarcoOrcamentoEstimado(ev.target.value);
+                    }
+                  }}
+                  disabled={marcoReajusteOrigem !== "ORCAMENTO_ESTIMADO"}
+                  className="col-span-2 rounded-xl px-4 py-3 text-sm font-medium"
+                  style={{
+                    border: "0.5px solid var(--hairline)",
+                    background:
+                      marcoReajusteOrigem === "ORCAMENTO_ESTIMADO"
+                        ? "rgba(255,255,255,0.7)"
+                        : "rgba(15,14,12,0.04)",
+                    opacity: marcoReajusteOrigem === "OMISSA" || marcoReajusteOrigem === "" ? 0.5 : 1,
+                  }}
+                />
+              </div>
+              <span className="mt-1 block text-[11px]" style={{ color: "var(--text-mute)" }}>
+                {marcoReajusteOrigem === "ASSINATURA" &&
+                  "Auto-preenchida com a Data de assinatura do contrato."}
+                {marcoReajusteOrigem === "ORCAMENTO_ESTIMADO" &&
+                  "Informe a data do orçamento estimado."}
+                {(!marcoReajusteOrigem || marcoReajusteOrigem === "OMISSA") &&
+                  "Cláusula omissa = sem reajuste programado."}
+              </span>
+            </div>
           </div>
         </Secao>
 

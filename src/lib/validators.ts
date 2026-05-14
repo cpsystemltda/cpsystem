@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validarCnpj } from "@/lib/cnpj";
 
 const cnpjRegex = /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/;
 const cepRegex = /^\d{5}-?\d{3}$/;
@@ -42,7 +43,7 @@ export const signupSchema = z
 
     razaoSocial: z.string().min(2, "Informe a razão social"),
     nomeFantasia: z.string().optional(),
-    cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
+    cnpj: z.string().regex(cnpjRegex, "CNPJ inválido").refine((v) => validarCnpj(v), "CNPJ inválido — verifique os dígitos verificadores"),
     porte: z.enum(portes),
     cnaePrincipal: z.string().optional(), // Igor: opcional, não trava cadastro
     naturezaJuridica: z.enum(naturezasJuridicas, { message: "Selecione a natureza jurídica" }),
@@ -143,7 +144,7 @@ export const novaEmpresaSchema = z
   .object({
     razaoSocial: z.string().min(2),
     nomeFantasia: z.string().optional(),
-    cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
+    cnpj: z.string().regex(cnpjRegex, "CNPJ inválido").refine((v) => validarCnpj(v), "CNPJ inválido — verifique os dígitos verificadores"),
     porte: z.enum(portes),
     cnaePrincipal: z.string().min(4),
     cnaesSecundarios: z.string().optional(),
@@ -223,7 +224,10 @@ const contratacaoBase = z.object({
   procedimentoSelecao: z.enum(procedimentosSelecao),
   numeroLicitacao: z.string().optional(),
   orgaoNome: z.string().min(2, "Órgão obrigatório"),
-  orgaoCnpj: z.string().regex(cnpjRegex, "CNPJ do órgão inválido"),
+  orgaoCnpj: z
+    .string()
+    .regex(cnpjRegex, "CNPJ do órgão inválido")
+    .refine((v) => validarCnpj(v), "CNPJ inválido — verifique os dígitos verificadores"),
   orgaoEndereco: z.string().min(5, "Endereço do órgão obrigatório"),
   orgaoEmail: z.string().email().optional().or(z.literal("")),
   orgaoTelefone: z.string().optional(),
@@ -295,7 +299,7 @@ const orgaoNaAtaSchema = z.object({
   id: z.string().optional(),
   tipo: z.enum(tiposOrgaoNaAta).default("PARTICIPANTE"),
   nome: z.string().min(2, "Nome do órgão obrigatório"),
-  cnpj: z.string().regex(cnpjRegex, "CNPJ inválido"),
+  cnpj: z.string().regex(cnpjRegex, "CNPJ inválido").refine((v) => validarCnpj(v), "CNPJ inválido — verifique os dígitos verificadores"),
   endereco: z.string().min(5, "Endereço obrigatório"),
   email: z.string().email().optional().or(z.literal("")),
   telefone: z.string().optional(),
@@ -340,6 +344,16 @@ export const novoContratoSchema = contratacaoBase
     enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
     pontosFocais: z.array(pontoFocalSchema).optional(),
     itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
+    // Módulo 3.2 — Prazo de entrega com 2 modos + Marco de reajuste
+    prazoEntregaModo: z.enum(["RELATIVO", "DATA_CERTA"]).default("RELATIVO"),
+    dataEntregaCerta: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.date().optional(),
+    ),
+    marcoReajusteOrigem: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.enum(marcosReajusteOrigem).optional(),
+    ),
   })
   .superRefine((v, ctx) => {
     if (v.modalidadeEntrega !== "SOB_DEMANDA" && !v.marcoInicialPrazo) {
