@@ -247,7 +247,7 @@ export function ComissoesVariaveisBloco({
         <select
           value={filtroEmpresa}
           onChange={(ev) => setFiltroEmpresa(ev.target.value)}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5 text-xs"
         >
           <option value="">Todas empresas</option>
           {empresas.map((e) => (
@@ -259,7 +259,7 @@ export function ComissoesVariaveisBloco({
         <select
           value={filtroStatus}
           onChange={(ev) => setFiltroStatus(ev.target.value as StatusComissao | "")}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5 text-xs"
         >
           <option value="">Todos status</option>
           {(Object.keys(ROTULO_STATUS) as StatusComissao[]).map((s) => (
@@ -272,14 +272,14 @@ export function ComissoesVariaveisBloco({
           type="month"
           value={filtroMes}
           onChange={(ev) => setFiltroMes(ev.target.value)}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5 text-xs"
           title="Filtrar por mês do pagamento da comissão"
         />
         {opcoesOrigem.length > 1 && (
           <select
             value={filtroOrigem}
             onChange={(ev) => setFiltroOrigem(ev.target.value)}
-            className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5 text-xs"
             title="Filtrar por documento de origem do empenho"
           >
             <option value="">Toda origem</option>
@@ -426,7 +426,7 @@ function ItemComissao({ comissao: c }: { comissao: ComissaoLinha }) {
           </p>
 
           {/* Linha A — read-only */}
-          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+          <div className="mt-3 rounded-[10px] border-[0.5px] border-[color:var(--hairline)] bg-white/60 px-3 py-2 text-xs">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-bold uppercase tracking-wide text-slate-500" style={{ fontSize: 10 }}>
                 Linha A — órgão pagou empresa
@@ -586,17 +586,24 @@ function FormMarcar({
   return (
     <form
       action={formAction}
-      className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs"
+      className="glass-tile mt-3 rounded-[14px] p-4 text-xs"
+      style={{
+        background: "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.06)), rgba(255,255,255,0.6)",
+      }}
     >
       <input type="hidden" name="id" value={c.id} />
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-bold uppercase tracking-wide text-amber-900">
+      <div className="mb-3 flex items-center justify-between">
+        <span
+          className="text-[10px] font-bold uppercase"
+          style={{ letterSpacing: "0.16em", color: "var(--primary-deep)" }}
+        >
           Atualizar Linha B
         </span>
         <button
           type="button"
           onClick={onFechar}
-          className="rounded p-1 text-amber-900 hover:bg-amber-100"
+          className="rounded p-1 transition hover:opacity-70"
+          style={{ color: "var(--primary-deep)" }}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -609,7 +616,7 @@ function FormMarcar({
             name="status"
             value={statusEscolhido}
             onChange={(ev) => setStatusEscolhido(ev.target.value as StatusComissao)}
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
           >
             <option value="A_RECEBER">A receber</option>
             <option value="ATRASADO">Atrasado</option>
@@ -632,7 +639,7 @@ function FormMarcar({
               name="valorRecebido"
               defaultValue={c.valorRecebido || ""}
               required
-              className="rounded border border-slate-300 px-2 py-1"
+              className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
             />
             <span className="text-[10px] text-slate-500">
               Comissão devida: {brl(c.valorCalculado)}
@@ -650,7 +657,7 @@ function FormMarcar({
                 new Date().toISOString().slice(0, 10)
               }
               required
-              className="rounded border border-slate-300 px-2 py-1"
+              className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
             />
           </label>
         )}
@@ -660,7 +667,7 @@ function FormMarcar({
             name="observacao"
             defaultValue={c.observacao ?? ""}
             rows={2}
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
           />
         </label>
         {exigeData && (
@@ -670,7 +677,7 @@ function FormMarcar({
               type="file"
               name="comprovante"
               accept="application/pdf,image/*"
-              className="rounded border border-slate-300 bg-white px-2 py-1"
+              className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
             />
             {c.comprovanteUrl && (
               <span className="text-[10px] text-slate-500">
@@ -691,7 +698,7 @@ function FormMarcar({
       </div>
 
       {state?.erro && (
-        <div className="mt-2 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-red-800">
+        <div className="mt-2 flex items-start gap-2 rounded-[10px] px-3 py-1.5 text-[color:var(--coral-deep)] bg-[rgba(232,138,152,0.10)] border-[0.5px] border-[rgba(232,138,152,0.30)]">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{state.erro}</span>
         </div>
@@ -717,7 +724,7 @@ function FormMarcar({
         <button
           type="button"
           onClick={onFechar}
-          className="rounded border border-slate-300 px-3 py-1.5"
+          className="rounded-[10px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-3 py-1.5"
         >
           Cancelar
         </button>
@@ -750,17 +757,21 @@ function FormOverride({
   return (
     <form
       action={formAction}
-      className="mt-3 rounded-md border border-slate-300 bg-slate-50 p-3 text-xs"
+      className="glass-tile mt-3 rounded-[14px] p-4 text-xs"
     >
       <input type="hidden" name="id" value={c.id} />
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-bold uppercase tracking-wide text-slate-700">
+      <div className="mb-3 flex items-center justify-between">
+        <span
+          className="text-[10px] font-bold uppercase"
+          style={{ letterSpacing: "0.16em", color: "var(--primary-deep)" }}
+        >
           Ajustar percentual desta execução
         </span>
         <button
           type="button"
           onClick={onFechar}
-          className="rounded p-1 text-slate-700 hover:bg-slate-200"
+          className="rounded p-1 transition hover:opacity-70"
+          style={{ color: "var(--text-soft)" }}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -783,7 +794,7 @@ function FormOverride({
             value={novoPct}
             onChange={(ev) => setNovoPct(Number(ev.target.value) || 0)}
             required
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
           />
         </label>
         <div className="flex flex-col gap-1">
@@ -809,13 +820,13 @@ function FormOverride({
             rows={2}
             required
             placeholder="Ex: cliente negociou redução temporária; acordo verbal por e-mail em 12/05."
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
           />
         </label>
       </div>
 
       {state?.erro && (
-        <div className="mt-2 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-red-800">
+        <div className="mt-2 flex items-start gap-2 rounded-[10px] px-3 py-1.5 text-[color:var(--coral-deep)] bg-[rgba(232,138,152,0.10)] border-[0.5px] border-[rgba(232,138,152,0.30)]">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{state.erro}</span>
         </div>
@@ -840,7 +851,7 @@ function FormOverride({
         <button
           type="button"
           onClick={onFechar}
-          className="rounded border border-slate-300 px-3 py-1.5"
+          className="rounded-[10px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-3 py-1.5"
         >
           Cancelar
         </button>

@@ -136,7 +136,7 @@ export function ComissoesFixasBloco({
         <select
           value={filtroEmpresa}
           onChange={(ev) => setFiltroEmpresa(ev.target.value)}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5 text-xs"
         >
           <option value="">Todas empresas</option>
           {empresas.map((e) => (
@@ -148,7 +148,7 @@ export function ComissoesFixasBloco({
         <select
           value={filtroStatus}
           onChange={(ev) => setFiltroStatus(ev.target.value as StatusFixo | "")}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5 text-xs"
         >
           <option value="">Todos status</option>
           {(Object.keys(ROTULO_STATUS) as StatusFixo[]).map((s) => (
@@ -161,7 +161,7 @@ export function ComissoesFixasBloco({
           type="month"
           value={filtroMes}
           onChange={(ev) => setFiltroMes(ev.target.value)}
-          className="rounded-md border border-slate-300 px-2 py-1.5 text-xs"
+          className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5 text-xs"
           title="Filtrar por competência (YYYY-MM)"
         />
         {(filtroEmpresa || filtroStatus || filtroMes) && (
@@ -195,25 +195,27 @@ export function ComissoesFixasBloco({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Empresa</th>
-                <th className="px-3 py-2 text-left">Competência</th>
-                <th className="px-3 py-2 text-right">Valor</th>
-                <th className="px-3 py-2 text-left">Vencimento</th>
-                <th className="px-3 py-2 text-left">Status</th>
-                <th className="px-3 py-2 text-left">Pagamento</th>
-                <th className="px-3 py-2 text-center">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtradas.map((l) => (
-                <LinhaTabela key={l.id} linha={l} />
-              ))}
-            </tbody>
-          </table>
+        <div className="glass overflow-hidden rounded-[20px]">
+          <div style={{ overflowX: "auto" }}>
+            <table className="table-glass">
+              <thead>
+                <tr>
+                  <th>Empresa</th>
+                  <th>Competência</th>
+                  <th className="num">Valor</th>
+                  <th>Vencimento</th>
+                  <th>Status</th>
+                  <th>Pagamento</th>
+                  <th className="center">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtradas.map((l) => (
+                  <LinhaTabela key={l.id} linha={l} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </section>
@@ -385,16 +387,26 @@ function FormMarcar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
   const exigeData = statusEscolhido === "PAGO" || statusEscolhido === "PAGO_PARCIAL";
 
   return (
-    <form action={formAction} className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs">
+    <form
+      action={formAction}
+      className="glass-tile rounded-[14px] p-4 text-xs"
+      style={{
+        background: "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.06)), rgba(255,255,255,0.6)",
+      }}
+    >
       <input type="hidden" name="id" value={l.id} />
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-bold uppercase tracking-wide text-amber-900">
+      <div className="mb-3 flex items-center justify-between">
+        <span
+          className="text-[10px] font-bold uppercase"
+          style={{ letterSpacing: "0.16em", color: "var(--primary-deep)" }}
+        >
           Marcar pagamento · {competenciaLabel(l.competencia)} · {nomeEmpresa(l)}
         </span>
         <button
           type="button"
           onClick={onFechar}
-          className="rounded p-1 text-amber-900 hover:bg-amber-100"
+          className="rounded p-1 transition hover:opacity-70"
+          style={{ color: "var(--primary-deep)" }}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -406,7 +418,7 @@ function FormMarcar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
             name="status"
             value={statusEscolhido}
             onChange={(ev) => setStatusEscolhido(ev.target.value as StatusFixo)}
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
           >
             <option value="A_RECEBER">A receber</option>
             <option value="ATRASADO">Atrasado</option>
@@ -425,7 +437,7 @@ function FormMarcar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
               name="valorRecebido"
               defaultValue={l.valorRecebido || ""}
               required
-              className="rounded border border-slate-300 px-2 py-1"
+              className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
             />
             <span className="text-[10px] text-slate-500">
               Valor combinado: {brl(l.valor)}
@@ -443,7 +455,7 @@ function FormMarcar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
                 new Date().toISOString().slice(0, 10)
               }
               required
-              className="rounded border border-slate-300 px-2 py-1"
+              className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
             />
           </label>
         )}
@@ -453,7 +465,7 @@ function FormMarcar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
             name="observacoes"
             defaultValue={l.observacoes ?? ""}
             rows={2}
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
           />
         </label>
         {exigeData && (
@@ -463,7 +475,7 @@ function FormMarcar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
               type="file"
               name="comprovante"
               accept="application/pdf,image/*"
-              className="rounded border border-slate-300 bg-white px-2 py-1"
+              className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
             />
             {l.comprovanteUrl && (
               <span className="text-[10px] text-slate-500">
@@ -483,7 +495,7 @@ function FormMarcar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
         )}
       </div>
       {state?.erro && (
-        <div className="mt-2 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-red-800">
+        <div className="mt-2 flex items-start gap-2 rounded-[10px] px-3 py-1.5 text-[color:var(--coral-deep)] bg-[rgba(232,138,152,0.10)] border-[0.5px] border-[rgba(232,138,152,0.30)]">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{state.erro}</span>
         </div>
@@ -508,7 +520,7 @@ function FormMarcar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
         <button
           type="button"
           onClick={onFechar}
-          className="rounded border border-slate-300 px-3 py-1.5"
+          className="rounded-[10px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-3 py-1.5"
         >
           Cancelar
         </button>
@@ -524,16 +536,23 @@ function FormEditar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
   }, [state, onFechar]);
 
   return (
-    <form action={formAction} className="rounded-md border border-slate-300 bg-slate-50 p-3 text-xs">
+    <form
+      action={formAction}
+      className="glass-tile rounded-[14px] p-4 text-xs"
+    >
       <input type="hidden" name="id" value={l.id} />
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-bold uppercase tracking-wide text-slate-700">
+      <div className="mb-3 flex items-center justify-between">
+        <span
+          className="text-[10px] font-bold uppercase"
+          style={{ letterSpacing: "0.16em", color: "var(--primary-deep)" }}
+        >
           Editar valor/vencimento · {competenciaLabel(l.competencia)} · {nomeEmpresa(l)}
         </span>
         <button
           type="button"
           onClick={onFechar}
-          className="rounded p-1 text-slate-700 hover:bg-slate-200"
+          className="rounded p-1 transition hover:opacity-70"
+          style={{ color: "var(--text-soft)" }}
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -548,7 +567,7 @@ function FormEditar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
             name="valor"
             defaultValue={l.valor}
             required
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
           />
           <span className="text-[10px] text-slate-500">
             Acordo padrão: {brl(l.vinculo.fixoMensal)}
@@ -560,12 +579,12 @@ function FormEditar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
             type="date"
             name="vencimento"
             defaultValue={l.vencimento?.toISOString().slice(0, 10) ?? ""}
-            className="rounded border border-slate-300 px-2 py-1"
+            className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5"
           />
         </label>
       </div>
       {state?.erro && (
-        <div className="mt-2 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-red-800">
+        <div className="mt-2 flex items-start gap-2 rounded-[10px] px-3 py-1.5 text-[color:var(--coral-deep)] bg-[rgba(232,138,152,0.10)] border-[0.5px] border-[rgba(232,138,152,0.30)]">
           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{state.erro}</span>
         </div>
@@ -589,7 +608,7 @@ function FormEditar({ linha: l, onFechar }: { linha: Linha; onFechar: () => void
         <button
           type="button"
           onClick={onFechar}
-          className="rounded border border-slate-300 px-3 py-1.5"
+          className="rounded-[10px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-3 py-1.5"
         >
           Cancelar
         </button>
