@@ -9,20 +9,45 @@ import {
   type ContratoExtraido,
   type EmpenhoExtraido,
 } from "@/lib/extrairAta";
+import { salvarArquivo } from "@/lib/uploads";
 
 function modoDemo(): boolean {
   const k = process.env.ANTHROPIC_API_KEY;
   return !k || k.trim() === "";
 }
 
+// Após a extração da IA, o PDF é persistido no Vercel Blob. O form usa
+// `arquivoUrl`/`nomeArquivo` como hidden inputs pra criar o registro Anexo
+// vinculado ao recurso (Ata/Contrato/Empenho) quando o save acontece.
 export type ExtracaoAtaResult =
-  | { ok: true; dados: AtaExtraida; demo: boolean }
+  | {
+      ok: true;
+      dados: AtaExtraida;
+      demo: boolean;
+      arquivoUrl?: string;
+      nomeArquivo?: string;
+      tamanhoBytes?: number;
+    }
   | { ok: false; erro: string };
 export type ExtracaoContratoResult =
-  | { ok: true; dados: ContratoExtraido; demo: boolean }
+  | {
+      ok: true;
+      dados: ContratoExtraido;
+      demo: boolean;
+      arquivoUrl?: string;
+      nomeArquivo?: string;
+      tamanhoBytes?: number;
+    }
   | { ok: false; erro: string };
 export type ExtracaoEmpenhoResult =
-  | { ok: true; dados: EmpenhoExtraido; demo: boolean }
+  | {
+      ok: true;
+      dados: EmpenhoExtraido;
+      demo: boolean;
+      arquivoUrl?: string;
+      nomeArquivo?: string;
+      tamanhoBytes?: number;
+    }
   | { ok: false; erro: string };
 
 // retro-compat
@@ -34,7 +59,22 @@ export async function extrairAtaPdfAction(formData: FormData): Promise<ExtracaoA
   if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
   try {
     const dados = await extrairAtaDoPdf(file);
-    return { ok: true, dados, demo: modoDemo() };
+    // Persiste o PDF — em modo demo a IA não roda mas o PDF mesmo assim é
+    // salvo, pra que o anexo apareça quando o usuário gravar a Ata.
+    let arquivoUrl: string | undefined;
+    let nomeArquivo: string | undefined;
+    let tamanhoBytes: number | undefined;
+    try {
+      const salvo = await salvarArquivo(file);
+      arquivoUrl = salvo.url;
+      nomeArquivo = salvo.nome;
+      tamanhoBytes = salvo.tamanhoBytes;
+    } catch (errSave) {
+      // Falha no upload não bloqueia extração — usuário ainda pode revisar
+      // os dados e salvar a Ata sem anexo automático.
+      console.warn("[extrairAtaPdfAction] falha ao persistir PDF:", errSave);
+    }
+    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
@@ -46,7 +86,18 @@ export async function extrairContratoPdfAction(formData: FormData): Promise<Extr
   if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
   try {
     const dados = await extrairContratoDoPdf(file);
-    return { ok: true, dados, demo: modoDemo() };
+    let arquivoUrl: string | undefined;
+    let nomeArquivo: string | undefined;
+    let tamanhoBytes: number | undefined;
+    try {
+      const salvo = await salvarArquivo(file);
+      arquivoUrl = salvo.url;
+      nomeArquivo = salvo.nome;
+      tamanhoBytes = salvo.tamanhoBytes;
+    } catch (errSave) {
+      console.warn("[extrairContratoPdfAction] falha ao persistir PDF:", errSave);
+    }
+    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
@@ -58,7 +109,18 @@ export async function extrairEmpenhoPdfAction(formData: FormData): Promise<Extra
   if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
   try {
     const dados = await extrairEmpenhoDoPdf(file);
-    return { ok: true, dados, demo: modoDemo() };
+    let arquivoUrl: string | undefined;
+    let nomeArquivo: string | undefined;
+    let tamanhoBytes: number | undefined;
+    try {
+      const salvo = await salvarArquivo(file);
+      arquivoUrl = salvo.url;
+      nomeArquivo = salvo.nome;
+      tamanhoBytes = salvo.tamanhoBytes;
+    } catch (errSave) {
+      console.warn("[extrairEmpenhoPdfAction] falha ao persistir PDF:", errSave);
+    }
+    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }

@@ -103,6 +103,7 @@ export default async function EditarAtaPage({ params }: { params: Promise<{ id: 
     vigenciaInicio: toDateInput(ata.vigenciaInicio) ?? "",
     vigenciaFim: toDateInput(ata.vigenciaFim) ?? "",
     prazoEntregaDias: ata.prazoEntregaDias,
+    prazoEntregaUnidade: ata.prazoEntregaUnidade,
     prazoEntregaNaoAplica: ata.prazoEntregaNaoAplica,
     prazoPagamentoDias: ata.prazoPagamentoDias,
     marcoReajusteOrigem: ata.marcoReajusteOrigem,

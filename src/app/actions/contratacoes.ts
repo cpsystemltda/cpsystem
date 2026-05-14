@@ -311,6 +311,7 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
         vigenciaInicio: v.vigenciaInicio,
         vigenciaFim: v.vigenciaFim,
         prazoEntregaDias: v.prazoEntregaNaoAplica ? null : (v.prazoEntregaDias || null),
+        prazoEntregaUnidade: v.prazoEntregaUnidade,
         prazoEntregaNaoAplica: !!v.prazoEntregaNaoAplica,
         prazoPagamentoDias: v.prazoPagamentoDias || null,
         marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
@@ -362,6 +363,27 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
         }),
       },
     });
+
+    // PDF da IA: se o form tinha hidden inputs `arquivoPdfUrl`/`arquivoPdfNome`,
+    // cria registro Anexo vinculado à Ata recém-criada.
+    const arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
+    const arquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
+    if (arquivoPdfUrl) {
+      try {
+        await prisma.anexo.create({
+          data: {
+            ataId: ata.id,
+            categoria: "CONTRATUAL",
+            nome: arquivoPdfNome || "ata.pdf",
+            url: arquivoPdfUrl,
+            mimeType: "application/pdf",
+          },
+        });
+      } catch (errAnexo) {
+        // Não bloqueia o save da Ata — usuário pode re-anexar manualmente.
+        console.warn("[criarAtaAction] falha ao criar Anexo do PDF:", errAnexo);
+      }
+    }
 
     revalidatePath("/atas");
     revalidatePath("/dashboard");
@@ -486,6 +508,7 @@ export async function editarAtaAction(_prev: ActionResult | null, formData: Form
           vigenciaInicio: v.vigenciaInicio,
           vigenciaFim: v.vigenciaFim,
           prazoEntregaDias: v.prazoEntregaNaoAplica ? null : (v.prazoEntregaDias || null),
+          prazoEntregaUnidade: v.prazoEntregaUnidade,
           prazoEntregaNaoAplica: !!v.prazoEntregaNaoAplica,
           prazoPagamentoDias: v.prazoPagamentoDias || null,
           marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
@@ -586,6 +609,7 @@ export async function editarAtaAction(_prev: ActionResult | null, formData: Form
         ...v,
         orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
         prazoEntregaDias: v.prazoEntregaNaoAplica ? null : (v.prazoEntregaDias ?? null),
+        prazoEntregaUnidade: v.prazoEntregaUnidade,
         prazoEntregaNaoAplica: !!v.prazoEntregaNaoAplica,
         marcoReajusteOrigem: v.marcoReajusteOrigem ?? null,
         marcoOrcamentoEstimado: v.marcoOrcamentoEstimado ?? null,
@@ -602,6 +626,26 @@ export async function editarAtaAction(_prev: ActionResult | null, formData: Form
       titulo: `Ata ${v.numero}`,
       mudancas,
     });
+
+    // PDF da IA (mesmo padrão do criar) — aqui é adicionado como nova versão
+    // sem substituir os anexos anteriores.
+    const editArquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
+    const editArquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
+    if (editArquivoPdfUrl) {
+      try {
+        await prisma.anexo.create({
+          data: {
+            ataId,
+            categoria: "CONTRATUAL",
+            nome: editArquivoPdfNome || "ata.pdf",
+            url: editArquivoPdfUrl,
+            mimeType: "application/pdf",
+          },
+        });
+      } catch (errAnexo) {
+        console.warn("[editarAtaAction] falha ao criar Anexo do PDF:", errAnexo);
+      }
+    }
 
     revalidatePath("/atas");
     revalidatePath(`/atas/${ataId}`);
@@ -694,6 +738,7 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
         vigenciaInicio: v.vigenciaInicio,
         vigenciaFim: v.vigenciaFim,
         prazoEntregaDias: v.prazoEntregaDias || null,
+        prazoEntregaUnidade: v.prazoEntregaUnidade,
         prazoPagamentoDias: v.prazoPagamentoDias || null,
         marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
         modalidadeEntrega: v.modalidadeEntrega,
@@ -856,6 +901,7 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
           vigenciaInicio: v.vigenciaInicio,
           vigenciaFim: v.vigenciaFim,
           prazoEntregaDias: v.prazoEntregaDias || null,
+          prazoEntregaUnidade: v.prazoEntregaUnidade,
           prazoPagamentoDias: v.prazoPagamentoDias || null,
           marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
           modalidadeEntrega: v.modalidadeEntrega,
@@ -1098,6 +1144,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
         vigenciaInicio: v.vigenciaInicio,
         vigenciaFim: v.vigenciaFim,
         prazoEntregaDias: v.prazoEntregaDias || null,
+        prazoEntregaUnidade: v.prazoEntregaUnidade,
         prazoPagamentoDias: v.prazoPagamentoDias || null,
         numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
         classificacaoOrcamentaria: v.classificacaoOrcamentaria || null,
@@ -1255,6 +1302,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
           vigenciaInicio: v.vigenciaInicio,
           vigenciaFim: v.vigenciaFim,
           prazoEntregaDias: v.prazoEntregaDias || null,
+          prazoEntregaUnidade: v.prazoEntregaUnidade,
           prazoPagamentoDias: v.prazoPagamentoDias || null,
           numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
           classificacaoOrcamentaria: v.classificacaoOrcamentaria || null,

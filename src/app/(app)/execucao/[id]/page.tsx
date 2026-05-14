@@ -583,7 +583,9 @@ function DadosEmpenho({
     tipo: string; procedimentoSelecao: string; processoAdministrativo: string;
     numeroLicitacao: string | null; orgaoNome: string; orgaoCnpj: string;
     dataEmissao: Date; vigenciaInicio: Date; vigenciaFim: Date;
-    prazoEntregaDias: number | null; prazoPagamentoDias: number | null;
+    prazoEntregaDias: number | null;
+    prazoEntregaUnidade: "DIAS" | "MESES";
+    prazoPagamentoDias: number | null;
     classificacaoOrcamentaria: string | null;
     signatario: string | null;
     dataAssinatura: Date | null;
@@ -603,7 +605,14 @@ function DadosEmpenho({
       <Info label="Órgão" valor={`${e.orgaoNome} (${formatarCnpj(e.orgaoCnpj)})`} />
       <Info label="Data de emissão" valor={e.dataEmissao.toLocaleDateString("pt-BR")} />
       <Info label="Vigência" valor={`${e.vigenciaInicio.toLocaleDateString("pt-BR")} → ${e.vigenciaFim.toLocaleDateString("pt-BR")}`} />
-      <Info label="Prazo de entrega" valor={e.prazoEntregaDias ? `${e.prazoEntregaDias} dias` : "—"} />
+      <Info
+        label="Prazo de entrega"
+        valor={
+          e.prazoEntregaDias
+            ? `${e.prazoEntregaDias} ${e.prazoEntregaUnidade === "MESES" ? (e.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
+            : "—"
+        }
+      />
       <Info label="Prazo de pagamento" valor={e.prazoPagamentoDias ? `${e.prazoPagamentoDias} dias` : "—"} />
       {e.classificacaoOrcamentaria && (
         <Info label="Classificação orçamentária" valor={e.classificacaoOrcamentaria} />

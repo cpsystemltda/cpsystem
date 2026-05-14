@@ -506,7 +506,9 @@ function DadosAta({
     numeroLicitacao: string | null; orgaoNome: string; orgaoCnpj: string;
     idAtaPncp: string | null; dataAssinatura: Date; dataPublicacao: Date | null;
     vigenciaInicio: Date; vigenciaFim: Date; aceitaCarona: boolean;
-    prazoEntregaDias: number | null; prazoPagamentoDias: number | null;
+    prazoEntregaDias: number | null;
+    prazoEntregaUnidade: "DIAS" | "MESES";
+    prazoPagamentoDias: number | null;
   };
 }) {
   return (
@@ -521,7 +523,14 @@ function DadosAta({
       <Info label="Data de publicação" valor={ata.dataPublicacao?.toLocaleDateString("pt-BR") || "—"} />
       <Info label="Vigência" valor={`${ata.vigenciaInicio.toLocaleDateString("pt-BR")} → ${ata.vigenciaFim.toLocaleDateString("pt-BR")}`} />
       <Info label="Aceita carona" valor={ata.aceitaCarona ? "Sim" : "Não"} />
-      <Info label="Prazo de entrega" valor={ata.prazoEntregaDias ? `${ata.prazoEntregaDias} dias` : "—"} />
+      <Info
+        label="Prazo de entrega"
+        valor={
+          ata.prazoEntregaDias
+            ? `${ata.prazoEntregaDias} ${ata.prazoEntregaUnidade === "MESES" ? (ata.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
+            : "—"
+        }
+      />
       <Info label="Prazo de pagamento" valor={ata.prazoPagamentoDias ? `${ata.prazoPagamentoDias} dias` : "—"} />
     </div>
   );

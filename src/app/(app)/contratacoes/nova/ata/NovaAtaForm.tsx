@@ -52,6 +52,7 @@ export type AtaValoresIniciais = {
   vigenciaInicio: string;
   vigenciaFim: string;
   prazoEntregaDias: number | null;
+  prazoEntregaUnidade?: "DIAS" | "MESES";
   prazoEntregaNaoAplica: boolean;
   prazoPagamentoDias: number | null;
   marcoReajusteOrigem: string | null;
@@ -81,6 +82,65 @@ export type AtaValoresIniciais = {
 /* ============================================================
    Helpers de máscara
    ============================================================ */
+// Chip pequeno "Auto" pra marcar campos preenchidos pela IA. Usuário pode
+// editar normalmente — quando edita, o chip some (camposAuto.delete).
+function BadgeAuto() {
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-extrabold"
+      style={{
+        background: "rgba(212,175,55,0.22)",
+        border: "0.5px solid rgba(168,137,71,0.5)",
+        color: "var(--primary-deep)",
+        letterSpacing: "0.06em",
+      }}
+      title="Preenchido pela IA — revise antes de salvar"
+    >
+      AUTO
+    </span>
+  );
+}
+
+// Soma um prazo (qtd + unidade) à data de início e devolve "YYYY-MM-DD" da
+// data fim. JS preserva o dia ao somar meses/anos quando possível (15/10 +
+// 1 ano → 15/10 do ano seguinte; 31/01 + 1 mês → 02/03, por overflow).
+function calcularVigenciaFim(
+  inicio: string,
+  qtd: number,
+  unidade: "DIAS" | "MESES" | "ANOS",
+): string {
+  if (!inicio || !qtd || qtd <= 0) return "";
+  const [a, m, d] = inicio.split("-").map(Number);
+  if (!a || !m || !d) return "";
+  const dt = new Date(Date.UTC(a, m - 1, d));
+  if (unidade === "DIAS") dt.setUTCDate(dt.getUTCDate() + qtd);
+  else if (unidade === "MESES") dt.setUTCMonth(dt.getUTCMonth() + qtd);
+  else dt.setUTCFullYear(dt.getUTCFullYear() + qtd);
+  return dt.toISOString().slice(0, 10);
+}
+
+// Em modo editar, descobre qual qtd/unidade gera o vigenciaFim cadastrado.
+// Tenta ANOS, MESES, DIAS nessa ordem (Atas costumam ser em anos). Se nada
+// bater exatamente, devolve dias direto.
+function detectarPrazoVigencia(
+  inicio: string,
+  fim: string,
+): { qtd: number; unidade: "DIAS" | "MESES" | "ANOS" } | null {
+  if (!inicio || !fim) return null;
+  for (let anos = 1; anos <= 20; anos++) {
+    if (calcularVigenciaFim(inicio, anos, "ANOS") === fim) return { qtd: anos, unidade: "ANOS" };
+  }
+  for (let meses = 1; meses <= 240; meses++) {
+    if (calcularVigenciaFim(inicio, meses, "MESES") === fim) return { qtd: meses, unidade: "MESES" };
+  }
+  const [ai, mi, di] = inicio.split("-").map(Number);
+  const [af, mf, df] = fim.split("-").map(Number);
+  if (!ai || !af) return null;
+  const di1 = Date.UTC(ai, mi - 1, di);
+  const di2 = Date.UTC(af, mf - 1, df);
+  return { qtd: Math.round((di2 - di1) / 86400000), unidade: "DIAS" };
+}
+
 function formatarCnpjInput(valor: string): string {
   const d = valor.replace(/\D/g, "").slice(0, 14);
   if (d.length <= 2) return d;
@@ -115,6 +175,7 @@ function TextareaGlass({
   span = 4,
   helper,
   minRows = 3,
+  auto,
 }: {
   label: string;
   name: string;
@@ -125,6 +186,7 @@ function TextareaGlass({
   span?: 1 | 2 | 3 | 4;
   helper?: string;
   minRows?: number;
+  auto?: boolean;
 }) {
   const colSpan = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" }[span];
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -138,7 +200,7 @@ function TextareaGlass({
   return (
     <label className={`${colSpan} block`}>
       <span
-        className="mb-1.5 flex items-end text-[11px] font-bold uppercase"
+        className="mb-1.5 flex items-end gap-2 text-[11px] font-bold uppercase"
         style={{
           letterSpacing: "0.16em",
           color: "var(--text-mute)",
@@ -150,6 +212,7 @@ function TextareaGlass({
           {label}
           {required && <span style={{ color: "var(--primary)" }}> *</span>}
         </span>
+        {auto && <BadgeAuto />}
       </span>
       <textarea
         ref={ref}
@@ -189,6 +252,7 @@ function FieldGlass({
   onChange,
   disabled,
   helper,
+  auto,
 }: {
   label: string;
   name?: string;
@@ -202,12 +266,15 @@ function FieldGlass({
   onChange?: (v: string) => void;
   disabled?: boolean;
   helper?: string;
+  // Quando true, mostra chip "Auto" ao lado do label indicando que o valor
+  // veio da IA. Usuário deve revisar antes de salvar.
+  auto?: boolean;
 }) {
   const colSpan = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" }[span];
   return (
     <label className={`${colSpan} block`}>
       <span
-        className="mb-1.5 flex items-end text-[11px] font-bold uppercase"
+        className="mb-1.5 flex items-end gap-2 text-[11px] font-bold uppercase"
         style={{
           letterSpacing: "0.16em",
           color: "var(--text-mute)",
@@ -219,6 +286,7 @@ function FieldGlass({
           {label}
           {required && <span style={{ color: "var(--primary)" }}> *</span>}
         </span>
+        {auto && <BadgeAuto />}
       </span>
       <input
         type={type}
@@ -315,6 +383,7 @@ function CnpjInput({
   erro,
   defaultValue,
   span = 2,
+  auto,
 }: {
   label: string;
   name: string;
@@ -322,6 +391,7 @@ function CnpjInput({
   erro?: string;
   defaultValue?: string;
   span?: 1 | 2 | 3 | 4;
+  auto?: boolean;
 }) {
   const [val, setVal] = useState(defaultValue ? formatarCnpjInput(defaultValue) : "");
   return (
@@ -334,6 +404,7 @@ function CnpjInput({
       span={span}
       value={val}
       onChange={(v) => setVal(formatarCnpjInput(v))}
+      auto={auto}
     />
   );
 }
@@ -542,6 +613,13 @@ export default function NovaAtaForm({
   const [extracaoErro, setExtracaoErro] = useState<string | null>(null);
   const [dados, setDados] = useState<AtaExtraida | null>(null);
   const [pdfNome, setPdfNome] = useState<string | null>(null);
+  // URL persistida do PDF (Vercel Blob) e nome original — preenchidos quando
+  // o usuário sobe o PDF pra IA. Vão como hidden inputs e criam o Anexo no save.
+  const [arquivoPdfUrl, setArquivoPdfUrl] = useState<string | null>(null);
+  const [arquivoPdfNome, setArquivoPdfNome] = useState<string | null>(null);
+  // Conjunto de campos preenchidos pela IA — usado pro badge "Auto".
+  // Quando o usuário edita um campo, ele sai da set (= revisado/sobrescrito).
+  const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set());
 
   // Em modo edição, valoresIniciais é o fallback final pra cada campo.
   // Helper pra ler string-like sem espalhar `?? valoresIniciais?.foo` em
@@ -563,6 +641,11 @@ export default function NovaAtaForm({
 
   // Estados controlados (PDF apontamentos / pré-preenchidos em modo edição)
   const [prazoNaoAplica, setPrazoNaoAplica] = useState(vi?.prazoEntregaNaoAplica ?? false);
+  // Unidade do prazo de entrega (DIAS ou MESES). Default DIAS pra retrocompat
+  // — todos os registros antigos foram cadastrados em dias.
+  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES">(
+    (vi?.prazoEntregaUnidade as "DIAS" | "MESES") ?? "DIAS",
+  );
   const [marcoOrigem, setMarcoOrigem] = useState<string>(vi?.marcoReajusteOrigem ?? "");
   const [temParticipantes, setTemParticipantes] = useState(
     (vi?.orgaosParticipantes?.length ?? 0) > 0,
@@ -571,13 +654,46 @@ export default function NovaAtaForm({
   // Endereço auto-preenchido pelo CEP do órgão gerenciador
   const [orgaoEndereco, setOrgaoEndereco] = useState(vi?.orgaoEndereco ?? "");
 
-  // Vigência fim controlada — pra warnar quando o usuário escolhe data no passado
-  // (caso reportado pela Regina: cadastrou Ata e ela não apareceu como vigente
-  // porque a vigenciaFim já tinha passado).
-  const [vigenciaFim, setVigenciaFim] = useState<string>(vi?.vigenciaFim ?? "");
+  // Vigência: usuário preenche Início + Prazo (qtd + unidade). Sistema
+  // calcula Fim automaticamente (readonly). Default ARP = 1 ano (Lei 14.133).
+  const [vigenciaInicio, setVigenciaInicio] = useState<string>(
+    vi?.vigenciaInicio ?? "",
+  );
+  // Detecta unidade/qtd a partir da vigenciaFim cadastrada — usado em modo
+  // editar pra preencher o campo Prazo com a unidade certa quando possível.
+  const prazoDetectado = detectarPrazoVigencia(
+    vi?.vigenciaInicio ?? "",
+    vi?.vigenciaFim ?? "",
+  );
+  const [prazoVigenciaQtd, setPrazoVigenciaQtd] = useState<number>(
+    prazoDetectado?.qtd ?? 1,
+  );
+  const [prazoVigenciaUnidade, setPrazoVigenciaUnidade] = useState<
+    "DIAS" | "MESES" | "ANOS"
+  >(prazoDetectado?.unidade ?? "ANOS");
+  // vigenciaFim sempre derivada do cálculo (Início + Prazo) — não editável.
+  const vigenciaFim = calcularVigenciaFim(
+    vigenciaInicio,
+    prazoVigenciaQtd,
+    prazoVigenciaUnidade,
+  );
   const vigenciaFimNoPassado = vigenciaFim
     ? new Date(vigenciaFim + "T23:59:59") < new Date()
     : false;
+
+  // Quando a IA preenche o form (dados muda), atualiza state local de
+  // Início e Prazo de vigência pra refletir o que veio do PDF.
+  useEffect(() => {
+    if (!dados) return;
+    if (dados.vigenciaInicio) setVigenciaInicio(dados.vigenciaInicio);
+    if (dados.vigenciaInicio && dados.vigenciaFim) {
+      const det = detectarPrazoVigencia(dados.vigenciaInicio, dados.vigenciaFim);
+      if (det) {
+        setPrazoVigenciaQtd(det.qtd);
+        setPrazoVigenciaUnidade(det.unidade);
+      }
+    }
+  }, [dados]);
 
   async function handleArquivo(file: File) {
     setExtraindo(true);
@@ -592,6 +708,16 @@ export default function NovaAtaForm({
       return;
     }
     setDados(res.dados);
+    if (res.arquivoUrl) setArquivoPdfUrl(res.arquivoUrl);
+    if (res.nomeArquivo) setArquivoPdfNome(res.nomeArquivo);
+    // Marca cada campo não-vazio do retorno da IA como "Auto"
+    const auto = new Set<string>();
+    const d = res.dados as Record<string, unknown>;
+    for (const k of Object.keys(d)) {
+      const v = d[k];
+      if (v != null && v !== "" && !(Array.isArray(v) && v.length === 0)) auto.add(k);
+    }
+    setCamposAuto(auto);
   }
 
   const formKey = dados ? `auto-${pdfNome}` : "manual";
@@ -756,6 +882,13 @@ export default function NovaAtaForm({
         {modo === "editar" && ataId && (
           <input type="hidden" name="ataId" value={ataId} />
         )}
+        {/* PDF persistido pela IA — vira Anexo da Ata após save */}
+        {arquivoPdfUrl && (
+          <>
+            <input type="hidden" name="arquivoPdfUrl" value={arquivoPdfUrl} />
+            <input type="hidden" name="arquivoPdfNome" value={arquivoPdfNome ?? ""} />
+          </>
+        )}
         {/* Resumo de erros — clicável, scroll-into-view + focus */}
         {(state?.erro || errosResumo.length > 0) && (
           <div
@@ -816,6 +949,7 @@ export default function NovaAtaForm({
             <FieldGlass
               label="Número da Ata"
               name="numero"
+              auto={camposAuto.has("numero")}
               placeholder="42/2026"
               required
               erro={e.numero}
@@ -825,6 +959,7 @@ export default function NovaAtaForm({
             <FieldGlass
               label="Processo administrativo"
               name="processoAdministrativo"
+              auto={camposAuto.has("processoAdministrativo")}
               required
               erro={e.processoAdministrativo}
               span={1}
@@ -851,6 +986,7 @@ export default function NovaAtaForm({
             <FieldGlass
               label="Nº do Pregão Eletrônico"
               name="numeroLicitacao"
+              auto={camposAuto.has("numeroLicitacao")}
               placeholder="123/2025"
               erro={e.numeroLicitacao}
               span={1}
@@ -867,6 +1003,7 @@ export default function NovaAtaForm({
             <TextareaGlass
               label="Objeto (descrição geral)"
               name="objeto"
+              auto={camposAuto.has("objeto")}
               required
               erro={e.objeto}
               span={4}
@@ -888,6 +1025,7 @@ export default function NovaAtaForm({
             <FieldGlass
               label="Nome do órgão"
               name="orgaoNome"
+              auto={camposAuto.has("orgaoNome")}
               required
               erro={e.orgaoNome}
               span={2}
@@ -896,6 +1034,7 @@ export default function NovaAtaForm({
             <CnpjInput
               label="CNPJ do órgão"
               name="orgaoCnpj"
+              auto={camposAuto.has("orgaoCnpj")}
               required
               erro={e.orgaoCnpj}
               span={2}
@@ -988,6 +1127,7 @@ export default function NovaAtaForm({
             <FieldGlass
               label="Data de assinatura"
               name="dataAssinatura"
+              auto={camposAuto.has("dataAssinatura")}
               type="date"
               required
               erro={e.dataAssinatura}
@@ -1009,18 +1149,78 @@ export default function NovaAtaForm({
               required
               erro={e.vigenciaInicio}
               span={1}
-              defaultValue={dados?.vigenciaInicio ?? vi?.vigenciaInicio}
+              value={vigenciaInicio || dados?.vigenciaInicio || ""}
+              onChange={setVigenciaInicio}
             />
-            <FieldGlass
-              label="Vigência — fim"
-              name="vigenciaFim"
-              type="date"
-              required
-              erro={e.vigenciaFim}
-              span={1}
-              value={vigenciaFim || (v.vigenciaFim as string) || dados?.vigenciaFim || vi?.vigenciaFim || ""}
-              onChange={setVigenciaFim}
-            />
+            {/* Prazo de vigência: qtd + unidade. Sistema calcula Vigência fim. */}
+            <div className="col-span-1">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Vigência — prazo
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={prazoVigenciaQtd}
+                  onChange={(ev) => setPrazoVigenciaQtd(Number(ev.target.value) || 0)}
+                  className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
+                />
+                <select
+                  value={prazoVigenciaUnidade}
+                  onChange={(ev) =>
+                    setPrazoVigenciaUnidade(ev.target.value as "DIAS" | "MESES" | "ANOS")
+                  }
+                  className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
+                  style={{
+                    border: "0.5px solid var(--hairline)",
+                    background: "rgba(255,255,255,0.7)",
+                    color: "var(--text)",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  <option value="DIAS">Dias</option>
+                  <option value="MESES">Meses</option>
+                  <option value="ANOS">Anos</option>
+                </select>
+              </div>
+              <span className="mt-1 block text-[11px]" style={{ color: "var(--text-mute)" }}>
+                Sugestão para ARP: 1 ano (Lei 14.133/2021).
+              </span>
+            </div>
+            {/* Fim calculado — readonly. O input visível é meramente decorativo;
+                o valor é enviado pro server via input hidden abaixo. */}
+            <div className="col-span-2">
+              <span
+                className="mb-1.5 block text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+              >
+                Vigência — fim (calculado)
+              </span>
+              <input
+                type="text"
+                readOnly
+                value={
+                  vigenciaFim
+                    ? new Date(vigenciaFim + "T12:00:00").toLocaleDateString("pt-BR")
+                    : "—"
+                }
+                className="w-full rounded-xl px-4 py-3 text-sm font-bold tabular"
+                style={{
+                  border: "0.5px solid var(--hairline)",
+                  background: "rgba(15,14,12,0.04)",
+                  color: vigenciaFim ? "var(--text)" : "var(--text-mute)",
+                }}
+              />
+              <input type="hidden" name="vigenciaFim" value={vigenciaFim} />
+              {e.vigenciaFim && (
+                <span className="mt-1 block text-[11px]" style={{ color: "var(--coral-deep)" }}>
+                  {e.vigenciaFim}
+                </span>
+              )}
+            </div>
             {vigenciaFimNoPassado && (
               <div
                 className="col-span-2 flex items-start gap-2.5 rounded-[12px] px-4 py-3 text-sm"
@@ -1055,12 +1255,29 @@ export default function NovaAtaForm({
                   type="number"
                   name="prazoEntregaDias"
                   min="0"
-                  placeholder="Dias"
+                  placeholder="Quantidade"
                   disabled={prazoNaoAplica}
                   defaultValue={dados?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""}
                   className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
                   style={{ opacity: prazoNaoAplica ? 0.5 : 1 }}
                 />
+                <select
+                  name="prazoEntregaUnidade"
+                  value={prazoEntregaUnidade}
+                  onChange={(ev) => setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES")}
+                  disabled={prazoNaoAplica}
+                  className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
+                  style={{
+                    border: "0.5px solid var(--hairline)",
+                    background: "rgba(255,255,255,0.7)",
+                    color: "var(--text)",
+                    letterSpacing: "0.06em",
+                    opacity: prazoNaoAplica ? 0.5 : 1,
+                  }}
+                >
+                  <option value="DIAS">Dias</option>
+                  <option value="MESES">Meses</option>
+                </select>
                 <label
                   className="flex cursor-pointer items-center gap-2 rounded-full px-4 py-2.5 text-xs font-bold uppercase"
                   style={{

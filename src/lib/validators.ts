@@ -231,6 +231,8 @@ const contratacaoBase = z.object({
   vigenciaInicio: z.coerce.date(),
   vigenciaFim: z.coerce.date(),
   prazoEntregaDias: z.coerce.number().int().nonnegative().optional(),
+  // Unidade do prazo de entrega — DIAS é default por retrocompat
+  prazoEntregaUnidade: z.enum(["DIAS", "MESES"]).default("DIAS"),
   prazoPagamentoDias: z.coerce.number().int().nonnegative().optional(),
   marcoOrcamentoEstimado: z.coerce.date().optional(),
 });

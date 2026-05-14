@@ -55,3 +55,4 @@ uploads/
 *.pdf
 /System R&I/
 /Análise*
+.env*.local

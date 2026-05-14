@@ -403,7 +403,9 @@ function DadosContrato({
     numeroLicitacao: string | null; numeroNotaEmpenho: string | null;
     orgaoNome: string; orgaoCnpj: string; dataAssinatura: Date;
     dataPublicacao: Date | null; vigenciaInicio: Date; vigenciaFim: Date;
-    prazoEntregaDias: number | null; prazoPagamentoDias: number | null;
+    prazoEntregaDias: number | null;
+    prazoEntregaUnidade: "DIAS" | "MESES";
+    prazoPagamentoDias: number | null;
     modalidadeEntrega: string;
     marcoInicialPrazo: string | null;
     marcoInicialDescricao: string | null;
@@ -423,7 +425,14 @@ function DadosContrato({
         <Info label="Data de assinatura" valor={c.dataAssinatura.toLocaleDateString("pt-BR")} />
         <Info label="Data de publicação" valor={c.dataPublicacao?.toLocaleDateString("pt-BR") || "—"} />
         <Info label="Vigência" valor={`${c.vigenciaInicio.toLocaleDateString("pt-BR")} → ${c.vigenciaFim.toLocaleDateString("pt-BR")}`} />
-        <Info label="Prazo de entrega" valor={c.prazoEntregaDias ? `${c.prazoEntregaDias} dias` : "—"} />
+        <Info
+          label="Prazo de entrega"
+          valor={
+            c.prazoEntregaDias
+              ? `${c.prazoEntregaDias} ${c.prazoEntregaUnidade === "MESES" ? (c.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
+              : "—"
+          }
+        />
         <Info label="Prazo de pagamento" valor={c.prazoPagamentoDias ? `${c.prazoPagamentoDias} dias` : "—"} />
         <Info
           label="Modalidade de entrega"

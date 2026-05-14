@@ -1,10 +1,8 @@
 import "server-only";
-import { writeFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { put } from "@vercel/blob";
 import { join, extname } from "node:path";
 import { randomBytes } from "node:crypto";
 
-const UPLOAD_DIR = join(process.cwd(), "uploads");
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 const TIPOS_PERMITIDOS: Record<string, string> = {
   "application/pdf": ".pdf",
@@ -14,11 +12,20 @@ const TIPOS_PERMITIDOS: Record<string, string> = {
 
 export type ArquivoSalvo = {
   nome: string;
-  url: string; // /api/anexos/<id>
+  url: string; // URL pública do Vercel Blob
   mimeType: string;
   tamanhoBytes: number;
 };
 
+/**
+ * Persiste o arquivo no Vercel Blob (cpsystem-anexos store, public access).
+ * Antes usava filesystem local — não funcionava em prod porque Vercel
+ * Functions têm filesystem ephemeral.
+ *
+ * URL retornada é pública, mas com hash de 16 bytes (32 hex chars) ela é
+ * essencialmente unguessable. Atas e Contratos são documentos PNCP-públicos
+ * por natureza (Lei 14.133), então OK.
+ */
 export async function salvarArquivo(file: File): Promise<ArquivoSalvo> {
   if (!file || file.size === 0) throw new Error("Arquivo vazio.");
   if (file.size > MAX_BYTES) throw new Error(`Arquivo excede ${MAX_BYTES / 1024 / 1024}MB.`);
@@ -28,27 +35,29 @@ export async function salvarArquivo(file: File): Promise<ArquivoSalvo> {
     throw new Error("Tipo de arquivo não permitido. Use PDF, PNG ou JPG.");
   }
 
-  if (!existsSync(UPLOAD_DIR)) {
-    await mkdir(UPLOAD_DIR, { recursive: true });
-  }
-
   const id = randomBytes(16).toString("hex");
-  const filename = `${id}${ext}`;
-  const fullPath = join(UPLOAD_DIR, filename);
+  const pathname = `anexos/${id}${ext}`;
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(fullPath, buffer);
+  const blob = await put(pathname, file, {
+    access: "public",
+    contentType: file.type,
+    addRandomSuffix: false, // já temos hash random no path
+  });
 
   return {
     nome: file.name,
-    url: `/api/anexos/${filename}`,
+    url: blob.url,
     mimeType: file.type,
     tamanhoBytes: file.size,
   };
 }
 
+// Legacy: arquivos antigos cadastrados antes da migração pro Vercel Blob
+// têm URL no formato `/api/anexos/<id>.<ext>`. A rota /api/anexos ainda
+// existe e usa este helper. Em prod o filesystem é ephemeral e retorna
+// 404; em dev local continua funcionando enquanto não rodar o backfill.
+const UPLOAD_DIR_LEGACY = join(process.cwd(), "uploads");
 export function caminhoArquivo(filename: string): string {
-  // sanitize: só alfanum + ponto + hífen
   if (!/^[a-zA-Z0-9.\-_]+$/.test(filename)) throw new Error("Nome inválido.");
-  return join(UPLOAD_DIR, filename);
+  return join(UPLOAD_DIR_LEGACY, filename);
 }

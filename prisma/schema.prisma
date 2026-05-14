@@ -323,6 +323,13 @@ enum ModalidadeEntrega {
   SOB_DEMANDA
 }
 
+// Unidade em que o prazo de entrega/execução é expresso. Default DIAS pra
+// retrocompat com registros antigos (todos cadastrados como dias até aqui).
+enum PrazoEntregaUnidade {
+  DIAS
+  MESES
+}
+
 // Marco a partir do qual conta o prazo de entrega.
 // O contrato define qual é (Lei 14.133 — fluxograma do contrato não-continuado).
 enum MarcoInicialPrazoEntrega {
@@ -393,6 +400,7 @@ model Ata {
   vigenciaInicio         DateTime
   vigenciaFim            DateTime
   prazoEntregaDias       Int?
+  prazoEntregaUnidade    PrazoEntregaUnidade @default(DIAS)
   prazoEntregaNaoAplica  Boolean   @default(false)
   prazoPagamentoDias     Int?
   marcoOrcamentoEstimado DateTime?
@@ -538,6 +546,7 @@ model Contrato {
   vigenciaInicio         DateTime
   vigenciaFim            DateTime
   prazoEntregaDias       Int?
+  prazoEntregaUnidade    PrazoEntregaUnidade @default(DIAS)
   prazoPagamentoDias     Int?
   marcoOrcamentoEstimado DateTime?
 
@@ -736,6 +745,7 @@ model Empenho {
   vigenciaInicio          DateTime
   vigenciaFim             DateTime
   prazoEntregaDias        Int?
+  prazoEntregaUnidade     PrazoEntregaUnidade @default(DIAS)
   prazoPagamentoDias      Int?
 
   status StatusExecucao @default(EMPENHADO)

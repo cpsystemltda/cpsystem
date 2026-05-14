@@ -95,6 +95,10 @@ const ENUM_LABEL: Record<string, Record<string, string>> = {
     AUTORIZACAO_ENTREGA: "Autorização de Entrega",
     ORDEM_SERVICO: "Ordem de Execução de Serviço",
   },
+  prazoEntregaUnidade: {
+    DIAS: "Dias",
+    MESES: "Meses",
+  },
   funcao: {
     AUTORIDADE_COMPETENTE: "Autoridade competente",
     GESTOR: "Gestor",
