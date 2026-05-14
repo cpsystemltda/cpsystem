@@ -1,7 +1,7 @@
 const ETAPAS = [
   { key: "EMPENHADO", label: "Empenhado" },
   { key: "PEDIDO_RECEBIDO", label: "Pedido recebido" },
-  { key: "EM_TRANSITO", label: "Em trânsito" },
+  { key: "EM_TRANSITO", label: "Em trânsito/Em execução" },
   { key: "ENTREGUE", label: "Entregue" },
   { key: "NF_EMITIDA", label: "NF emitida" },
   { key: "NF_ENCAMINHADA", label: "NF enviada" },

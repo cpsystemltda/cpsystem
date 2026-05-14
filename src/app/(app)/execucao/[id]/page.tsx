@@ -25,7 +25,7 @@ import { labelInstrumento } from "@/lib/instrumentoLabel";
 
 const PASSOS = [
   { marco: "PEDIDO_RECEBIDO", label: "Pedido recebido", campo: "dataPedidoRecebido" },
-  { marco: "EM_TRANSITO", label: "Despachado / em trânsito", campo: "dataDespacho" },
+  { marco: "EM_TRANSITO", label: "Em trânsito/Em execução", campo: "dataDespacho" },
   { marco: "ENTREGUE", label: "Entregue", campo: "dataEntrega" },
   { marco: "NF_EMITIDA", label: "Nota Fiscal emitida", campo: "dataNfEmitida" },
   { marco: "NF_ENCAMINHADA", label: "Nota Fiscal encaminhada", campo: "dataNfEncaminhada" },
@@ -208,6 +208,9 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
                   empenho={{
                     id: e.id,
                     prazoEntregaDias: e.prazoEntregaDias,
+                    prazoEntregaUnidade: e.prazoEntregaUnidade,
+                    prazoEntregaModo: e.prazoEntregaModo,
+                    dataEntregaCerta: e.dataEntregaCerta,
                     prazoPagamentoDias: e.prazoPagamentoDias,
                     dataPedidoRecebido: e.dataPedidoRecebido,
                     arquivoPedidoRecebido: e.arquivoPedidoRecebido,
@@ -367,6 +370,9 @@ function Timeline({
   empenho: {
     id: string;
     prazoEntregaDias: number | null;
+    prazoEntregaUnidade?: "DIAS" | "MESES";
+    prazoEntregaModo?: "RELATIVO" | "DATA_CERTA";
+    dataEntregaCerta?: Date | null;
     prazoPagamentoDias: number | null;
     dataPedidoRecebido: Date | null;
     arquivoPedidoRecebido: string | null;
@@ -382,11 +388,23 @@ function Timeline({
     arquivoPagamento: string | null;
   };
 }) {
-  // Prazo-limite calculado a partir de quando o pedido foi recebido
-  const prazoLimiteEntrega =
-    empenho.dataPedidoRecebido && empenho.prazoEntregaDias
-      ? new Date(empenho.dataPedidoRecebido.getTime() + empenho.prazoEntregaDias * 86400000)
-      : null;
+  // Prazo-limite — duas formas:
+  //  - DATA_CERTA: a data já é o limite tempestivo (vale pra Locação,
+  //    eventos com data fixa, etc.). Não depende de pedido recebido.
+  //  - RELATIVO: contado a partir do recebimento do pedido. Multiplica
+  //    pela unidade (DIAS direto, MESES = 30 dias por mês).
+  const prazoLimiteEntrega: Date | null = (() => {
+    if (empenho.prazoEntregaModo === "DATA_CERTA") {
+      return empenho.dataEntregaCerta ?? null;
+    }
+    if (!empenho.dataPedidoRecebido || !empenho.prazoEntregaDias) return null;
+    const fatorDias =
+      empenho.prazoEntregaUnidade === "MESES" ? 30 : 1;
+    return new Date(
+      empenho.dataPedidoRecebido.getTime() +
+        empenho.prazoEntregaDias * fatorDias * 86400000,
+    );
+  })();
 
   // Prazo-limite de pagamento (30 dias após NF encaminhada, ou prazoPagamentoDias se definido)
   const diasPgto = empenho.prazoPagamentoDias ?? 30;
@@ -518,10 +536,13 @@ function Timeline({
                   <div className="h-5 w-5 shrink-0 rounded-full border-2 border-amber-400 bg-amber-400" />
                   <div>
                     <p className={`text-xs font-semibold ${entregaAtrasada || entregaComAtraso ? "text-red-800" : "text-amber-800"}`}>
-                      Prazo-limite de entrega
+                      Prazo-limite de entrega/execução tempestiva
                     </p>
                     <p className={`text-xs ${entregaAtrasada || entregaComAtraso ? "text-red-700" : "text-amber-700"}`}>
-                      {prazoLimiteEntrega.toLocaleDateString("pt-BR")} ({empenho.prazoEntregaDias} dias após recebimento do pedido)
+                      {prazoLimiteEntrega.toLocaleDateString("pt-BR")}{" "}
+                      {empenho.prazoEntregaModo === "DATA_CERTA"
+                        ? "(data certa cadastrada)"
+                        : `(${empenho.prazoEntregaDias} ${empenho.prazoEntregaUnidade === "MESES" ? "meses" : "dias"} após recebimento do pedido)`}
                       {entregaAtrasada && " — vencido"}
                       {entregaComAtraso && " — entregue com atraso"}
                     </p>

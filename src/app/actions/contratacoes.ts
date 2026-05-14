@@ -1643,6 +1643,19 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
 // ============================================================
 // EXECUÇÃO — registrar marco com data + arquivo (useActionState)
 // ============================================================
+
+/**
+ * Bug do D-1: `new Date("2026-05-14")` parseia como UTC midnight; em fuso
+ * BR (-3h) vira 2026-05-13T21:00, e toLocaleDateString("pt-BR") mostra
+ * "13/05/2026". Solução: ancora ao meio-dia UTC (12h) — qualquer fuso
+ * brasileiro mostra o dia certo.
+ */
+function parseDataInputBr(dataIso: string): Date | null {
+  if (!dataIso || !/^\d{4}-\d{2}-\d{2}$/.test(dataIso)) return null;
+  const d = new Date(dataIso + "T12:00:00Z");
+  return isNaN(d.getTime()) ? null : d;
+}
+
 const CAMPO_DATA: Record<string, string> = {
   PEDIDO_RECEBIDO: "dataPedidoRecebido",
   EM_TRANSITO:     "dataDespacho",
@@ -1676,8 +1689,8 @@ export async function registrarMarcoAction(
   });
   if (!empenho) return { erro: "Empenho não encontrado." };
 
-  const data = new Date(dataIso);
-  if (isNaN(data.getTime())) return { erro: "Data inválida." };
+  const data = parseDataInputBr(dataIso);
+  if (!data) return { erro: "Data inválida." };
 
   const update: Record<string, Date | string> = {
     [CAMPO_DATA[marco]]: data,
@@ -1738,8 +1751,8 @@ export async function avancarStatusAction(empenhoId: string, marco: string, data
   });
   if (!empenho) throw new Error("Empenho não encontrado.");
 
-  const data = new Date(dataIso);
-  if (isNaN(data.getTime())) throw new Error("Data inválida.");
+  const data = parseDataInputBr(dataIso);
+  if (!data) throw new Error("Data inválida.");
 
   const update: Record<string, Date | string> = {};
   switch (marco) {

@@ -72,7 +72,7 @@ export default async function RelatoriosPage() {
   const ROTULO_STATUS: Record<string, string> = {
     EMPENHADO: "Empenhado",
     PEDIDO_RECEBIDO: "Pedido recebido",
-    EM_TRANSITO: "Em trânsito",
+    EM_TRANSITO: "Em trânsito/Em execução",
     ENTREGUE: "Entregue",
     NF_EMITIDA: "NF emitida",
     NF_ENCAMINHADA: "NF encaminhada",
