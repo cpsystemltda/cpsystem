@@ -8,9 +8,14 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { isContratoNaoContinuado, ROTULO_TIPO } from "@/lib/validators";
 
 type Result = { erro?: string; ok?: boolean };
-type Vinculo = { contratoId?: string; empenhoId?: string };
+type Vinculo = { contratoId?: string; empenhoId?: string; ataId?: string };
 
-async function validarVinculo(usuario: { contaId: string }, v: Vinculo) {
+type LinkValido =
+  | { contratoId: string; contratoTipo: keyof typeof ROTULO_TIPO; paiPath: string; empenhoId?: undefined; ataId?: undefined }
+  | { empenhoId: string; paiPath: string; contratoId?: undefined; contratoTipo?: undefined; ataId?: undefined }
+  | { ataId: string; paiPath: string; contratoId?: undefined; contratoTipo?: undefined; empenhoId?: undefined };
+
+async function validarVinculo(usuario: { contaId: string }, v: Vinculo): Promise<LinkValido> {
   if (v.contratoId) {
     const c = await prisma.contrato.findFirst({
       where: { id: v.contratoId, empresa: { contaId: usuario.contaId } },
@@ -25,6 +30,13 @@ async function validarVinculo(usuario: { contaId: string }, v: Vinculo) {
     if (!e) throw new Error("Empenho inválido.");
     return { empenhoId: e.id, paiPath: `/execucao/${e.id}` };
   }
+  if (v.ataId) {
+    const a = await prisma.ata.findFirst({
+      where: { id: v.ataId, empresa: { contaId: usuario.contaId } },
+    });
+    if (!a) throw new Error("Ata inválida.");
+    return { ataId: a.id, paiPath: `/atas/${a.id}` };
+  }
   throw new Error("Vínculo obrigatório.");
 }
 
@@ -36,6 +48,7 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
   const v: Vinculo = {
     contratoId: String(formData.get("contratoId") || "") || undefined,
     empenhoId: String(formData.get("empenhoId") || "") || undefined,
+    ataId: String(formData.get("ataId") || "") || undefined,
   };
 
   try {
@@ -79,10 +92,11 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
         arquivoPdfUrl: arquivoPdfUrl || null,
         contratoId: link.contratoId || null,
         empenhoId: link.empenhoId || null,
+        ataId: link.ataId || null,
       },
     });
 
-    // Reflete no contrato/empenho se aplicável
+    // Reflete no contrato/empenho/ata se aplicável
     if (link.contratoId) {
       const updates: Record<string, Date | number> = {};
       if (aditivo.alteraPrazoVigencia && aditivo.novaVigenciaFim) updates.vigenciaFim = aditivo.novaVigenciaFim;
@@ -90,6 +104,17 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
         updates.prazoEntregaDias = aditivo.novoPrazoEntregaDias;
       if (Object.keys(updates).length > 0) {
         await prisma.contrato.update({ where: { id: link.contratoId }, data: updates });
+      }
+    }
+    if (link.ataId) {
+      // Aditivos de Ata podem prorrogar vigência (Lei 14.133 art. 84 — ARP
+      // pode ser estendida até 12 meses).
+      const updates: Record<string, Date> = {};
+      if (aditivo.alteraPrazoVigencia && aditivo.novaVigenciaFim) {
+        updates.vigenciaFim = aditivo.novaVigenciaFim;
+      }
+      if (Object.keys(updates).length > 0) {
+        await prisma.ata.update({ where: { id: link.ataId }, data: updates });
       }
     }
 
@@ -117,6 +142,7 @@ export async function criarApostilamentoAction(_p: Result | null, formData: Form
   const v: Vinculo = {
     contratoId: String(formData.get("contratoId") || "") || undefined,
     empenhoId: String(formData.get("empenhoId") || "") || undefined,
+    ataId: String(formData.get("ataId") || "") || undefined,
   };
 
   try {
@@ -145,6 +171,7 @@ export async function criarApostilamentoAction(_p: Result | null, formData: Form
         arquivoPdfUrl: arquivoPdfUrl || null,
         contratoId: link.contratoId || null,
         empenhoId: link.empenhoId || null,
+        ataId: link.ataId || null,
       },
     });
 
@@ -154,6 +181,30 @@ export async function criarApostilamentoAction(_p: Result | null, formData: Form
       if (ap.alteraPrazoEntrega && ap.novoPrazoEntregaDias) updates.prazoEntregaDias = ap.novoPrazoEntregaDias;
       if (Object.keys(updates).length > 0) {
         await prisma.contrato.update({ where: { id: link.contratoId }, data: updates });
+      }
+    }
+    if (link.ataId) {
+      // Apostilamento de reajuste percentual: atualiza valorUnitario dos itens
+      // proporcionalmente. Campo `percentualReajusteItens` opcional no form.
+      const pctStr = String(formData.get("percentualReajusteItens") || "").trim();
+      const pct = pctStr ? Number(pctStr) : 0;
+      if (pct > 0) {
+        const itens = await prisma.ataItem.findMany({ where: { ataId: link.ataId } });
+        for (const it of itens) {
+          const novoValorUnit = it.valorUnitario * (1 + pct / 100);
+          const novoValorTotal = novoValorUnit * it.quantidade;
+          await prisma.ataItem.update({
+            where: { id: it.id },
+            data: { valorUnitario: novoValorUnit, valorTotal: novoValorTotal },
+          });
+        }
+      }
+      // Aplica também alteração de vigência se houver
+      if (ap.alteraPrazoVigencia && ap.novaVigenciaFim) {
+        await prisma.ata.update({
+          where: { id: link.ataId },
+          data: { vigenciaFim: ap.novaVigenciaFim },
+        });
       }
     }
 

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, FileText, ArrowRight } from "lucide-react";
+import { Plus, FileText, ArrowRight, Coins, TrendingUp, AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, ROTULO_TIPO } from "@/lib/validators";
@@ -8,6 +8,8 @@ import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { KpiVencimentos } from "@/components/KpiVencimentos";
 import { PageHeader } from "@/components/ui/SecaoGlass";
+import { KPI } from "@/components/ui/KPI";
+import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 
 export default async function AtasPage({
   searchParams,
@@ -78,6 +80,65 @@ export default async function AtasPage({
     return { ...a, saldo: { valorTotal, valorUsado, valorDisponivel: valorTotal - valorUsado, percentualUsado: valorTotal === 0 ? 0 : (valorUsado / valorTotal) * 100 } };
   });
 
+  // ============================================================
+  // Bloco Financeiro de ARPs (Ampliação 1 do M3 Painel de Atas)
+  // ============================================================
+  // Universo: apenas Atas vigentes da empresa (não inclui contratos avulsos).
+  // - Contratados = soma valorTotal das Atas vigentes
+  // - Executados  = soma do consumo via ContratoItem + EmpenhoItem solto
+  // - A executar  = Contratados − Executados (não-negativo)
+  // - Recebidos   = soma de Empenhos PAGOS vinculados à Atas (linha A
+  //   concluída pelo órgão à empresa)
+  // - A receber   = soma de Empenhos NF_ENCAMINHADA vinculados à Atas
+  //   (faturados, esperando pagamento do órgão)
+  // - Reajuste    = nº de Atas com marco + 12 meses dentro de 90 dias
+  const atasVigentesFin = atasComSaldo.filter((a) => a.vigenciaFim >= hoje);
+  const valoresContratadosARPs = atasVigentesFin.reduce((s, a) => s + a.saldo.valorTotal, 0);
+  const valoresExecutadosARPs = atasVigentesFin.reduce((s, a) => s + a.saldo.valorUsado, 0);
+  const valoresAExecutarARPs = Math.max(0, valoresContratadosARPs - valoresExecutadosARPs);
+
+  // Empenhos vinculados a Atas (direto OU via Contrato) — calcula recebido /
+  // a receber em uma única query
+  const empenhosDeArps = await prisma.empenho.findMany({
+    where: {
+      empresa: filtroEmpresa,
+      OR: [
+        { ataId: { not: null } },
+        { contrato: { ataId: { not: null } } },
+      ],
+    },
+    select: { status: true, itens: { select: { valorTotal: true } } },
+  });
+  const valorEmpenho = (e: { itens: { valorTotal: number }[] }) =>
+    e.itens.reduce((ss, it) => ss + it.valorTotal, 0);
+  const valoresRecebidosARPs = empenhosDeArps
+    .filter((e) => e.status === "PAGO")
+    .reduce((s, e) => s + valorEmpenho(e), 0);
+  const valoresAReceberARPs = empenhosDeArps
+    .filter((e) => e.status === "NF_ENCAMINHADA" || e.status === "NF_EMITIDA")
+    .reduce((s, e) => s + valorEmpenho(e), 0);
+
+  // Atas com janela de reajuste próxima (≤90 dias até marco+12meses)
+  const atasComReajuste = atasVigentesFin
+    .filter((a) => a.marcoOrcamentoEstimado)
+    .map((a) => {
+      const janelaReajuste = new Date(a.marcoOrcamentoEstimado!);
+      janelaReajuste.setFullYear(janelaReajuste.getFullYear() + 1);
+      const dias = Math.ceil((janelaReajuste.getTime() - hoje.getTime()) / 86400000);
+      return { id: a.id, numero: a.numero, dias };
+    })
+    .filter((a) => a.dias >= 0 && a.dias <= 90);
+
+  // Itens da timeline — só Atas vigentes em janela de 120 dias.
+  // O componente filtra >= 0 dias internamente.
+  const itensTimeline = atasVigentesFin.map((a) => ({
+    id: a.id,
+    tipo: "ata" as const,
+    numero: a.numero,
+    orgaoNome: a.orgaoNome,
+    vigenciaFim: a.vigenciaFim,
+  }));
+
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
       <BannerEmpresaEmFoco contaId={usuario.contaId} />
@@ -108,6 +169,61 @@ export default async function AtasPage({
           hrefFinalizados="/atas?status=vencidas"
           hrefBaseAlerta="/atas?alerta="
         />
+      </div>
+
+      {/* Bloco Financeiro de ARPs — Ampliação 1 do M3 */}
+      <div className="mt-4 grid gap-3.5 lg:grid-cols-3">
+        <KPI
+          tone="lavender"
+          icon={Coins}
+          label="Contratados em ARPs"
+          value={brl(valoresContratadosARPs)}
+          meta="Soma do valor total das ARPs vigentes"
+        />
+        <KPI
+          tone="primary"
+          icon={TrendingUp}
+          label="Executados em ARPs"
+          value={brl(valoresExecutadosARPs)}
+          meta="Consumido via Contratos + Empenhos diretos"
+        />
+        <KPI
+          tone="mint"
+          icon={ArrowRight}
+          label="A executar em ARPs"
+          value={brl(valoresAExecutarARPs)}
+          meta="Contratados − Executados"
+        />
+        <KPI
+          tone="mint"
+          icon={Coins}
+          label="Valores recebidos"
+          value={brl(valoresRecebidosARPs)}
+          meta="Empenhos PAGOS vinculados a ARPs"
+          href="/execucao?status=PAGO"
+        />
+        <KPI
+          tone="primary"
+          icon={Coins}
+          label="Valores a receber"
+          value={brl(valoresAReceberARPs)}
+          meta="NF emitida/encaminhada, aguardando pagamento"
+          href="/execucao?status=NF_ENCAMINHADA"
+        />
+        <KPI
+          tone="rose"
+          icon={AlertTriangle}
+          label="ARPs em janela de reajuste"
+          value={atasComReajuste.length}
+          meta="Marco + 12 meses dentro de 90 dias"
+          pulse={atasComReajuste.length > 0}
+          href="/reajustes"
+        />
+      </div>
+
+      {/* Timeline de vencimentos — Ampliação 2 do M3, só ARPs */}
+      <div className="mt-4">
+        <TimelineVencimentos itens={itensTimeline} />
       </div>
 
       {alertaDias > 0 && (

@@ -24,11 +24,13 @@ export function AditivosTab({
   aditivos,
   contratoId,
   empenhoId,
+  ataId,
   contratoTipo,
 }: {
   aditivos: Aditivo[];
   contratoId?: string;
   empenhoId?: string;
+  ataId?: string;
   contratoTipo?: keyof typeof ROTULO_TIPO;
 }) {
   const [state, formAction] = useActionState(criarTermoAditivoAction, null);
@@ -84,6 +86,7 @@ export function AditivosTab({
         <form action={formAction} className="mt-4 grid grid-cols-2 gap-3 text-sm">
           {contratoId && <input type="hidden" name="contratoId" value={contratoId} />}
           {empenhoId && <input type="hidden" name="empenhoId" value={empenhoId} />}
+          {ataId && <input type="hidden" name="ataId" value={ataId} />}
           <Campo label="Número" name="numero" required />
           <Campo label="Data de assinatura" name="dataAssinatura" type="date" required />
           <Campo label="Objeto" name="objeto" required colSpan={2} />

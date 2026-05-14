@@ -24,10 +24,12 @@ export function ApostilamentosTab({
   apostilamentos,
   contratoId,
   empenhoId,
+  ataId,
 }: {
   apostilamentos: Apostilamento[];
   contratoId?: string;
   empenhoId?: string;
+  ataId?: string;
 }) {
   const [state, formAction] = useActionState(criarApostilamentoAction, null);
 
@@ -59,6 +61,7 @@ export function ApostilamentosTab({
         <form action={formAction} className="mt-4 grid grid-cols-2 gap-3 text-sm">
           {contratoId && <input type="hidden" name="contratoId" value={contratoId} />}
           {empenhoId && <input type="hidden" name="empenhoId" value={empenhoId} />}
+          {ataId && <input type="hidden" name="ataId" value={ataId} />}
           <Campo label="Número" name="numero" required />
           <Campo label="Data" name="dataAssinatura" type="date" required />
           <Campo label="Objeto" name="objeto" required colSpan={2} />
@@ -67,6 +70,16 @@ export function ApostilamentosTab({
           <Campo label="Novo valor" name="novoValor" type="number" step="0.01" />
           <Toggle label="Altera vigência?" name="alteraPrazoVigencia" />
           <Campo label="Nova vigência fim" name="novaVigenciaFim" type="date" />
+          {ataId && (
+            <Campo
+              label="Reajuste % nos itens (opcional)"
+              name="percentualReajusteItens"
+              type="number"
+              step="0.01"
+              placeholder="Ex: 5 para +5%"
+              colSpan={2}
+            />
+          )}
           <label className="col-span-2 flex flex-col gap-1">
             <span className="text-xs font-medium text-slate-600">Arquivo (PDF)</span>
             <input type="file" name="arquivo" accept="application/pdf" className="text-xs" />

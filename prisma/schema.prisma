@@ -442,6 +442,8 @@ model Ata {
   procedimentos         ProcedimentoApuratorio[]
   anexos                Anexo[]
   anotacoes             Anotacao[]
+  termosAditivos        TermoAditivo[]
+  apostilamentos        Apostilamento[]
 
   @@index([empresaId])
   @@index([criadoPorId])
@@ -877,9 +879,12 @@ model TermoAditivo {
   contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
   empenhoId  String?
   empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  ataId      String?
+  ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
 
   @@index([contratoId])
   @@index([empenhoId])
+  @@index([ataId])
 }
 
 model Apostilamento {
@@ -902,9 +907,12 @@ model Apostilamento {
   contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
   empenhoId  String?
   empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  ataId      String?
+  ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
 
   @@index([contratoId])
   @@index([empenhoId])
+  @@index([ataId])
 }
 
 enum InstrumentoReajuste {

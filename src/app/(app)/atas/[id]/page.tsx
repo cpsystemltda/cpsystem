@@ -13,6 +13,8 @@ import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { OrgaosTab, EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
+import { AditivosTab } from "@/components/abas/AditivosTab";
+import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 import { LerMais } from "@/components/LerMais";
@@ -41,6 +43,8 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
       },
       anexos: { orderBy: { criadoEm: "desc" } },
       anotacoes: { orderBy: { criadoEm: "desc" } },
+      termosAditivos: { orderBy: { dataAssinatura: "desc" } },
+      apostilamentos: { orderBy: { dataAssinatura: "desc" } },
     },
   });
 
@@ -216,6 +220,18 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
               label: "Derivados",
               badge: ata.contratos.length + ata.empenhos.length,
               content: <DerivadosLista contratos={ata.contratos} empenhos={ata.empenhos} />,
+            },
+            {
+              key: "aditivos",
+              label: "Aditivos",
+              badge: ata.termosAditivos.length,
+              content: <AditivosTab aditivos={ata.termosAditivos} ataId={ata.id} />,
+            },
+            {
+              key: "apostilamentos",
+              label: "Apostilamentos",
+              badge: ata.apostilamentos.length,
+              content: <ApostilamentosTab apostilamentos={ata.apostilamentos} ataId={ata.id} />,
             },
             {
               key: "notificacoes",
