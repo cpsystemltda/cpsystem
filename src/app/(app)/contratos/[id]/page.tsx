@@ -179,7 +179,13 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               key: "garantias",
               label: "Garantias",
               badge: contrato.garantias.length,
-              content: <GarantiasTab garantias={contrato.garantias} contratoId={contrato.id} />,
+              content: (
+                <GarantiasTab
+                  garantias={contrato.garantias}
+                  contratoId={contrato.id}
+                  temGarantia={contrato.temGarantia}
+                />
+              ),
             },
             {
               key: "enderecos",

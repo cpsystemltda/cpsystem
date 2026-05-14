@@ -514,7 +514,21 @@ export async function criarGarantiaAction(_p: Result | null, formData: FormData)
     const link = await validarVinculo(usuario, v);
     const file = formData.get("arquivo") as File | null;
     let arquivoPdfUrl: string | undefined;
-    if (file && file.size > 0) arquivoPdfUrl = (await salvarArquivo(file)).url;
+    let arquivoPdfNome: string | undefined;
+    if (file && file.size > 0) {
+      const salvo = await salvarArquivo(file);
+      arquivoPdfUrl = salvo.url;
+      arquivoPdfNome = salvo.nome;
+    }
+    // M5 — quando a IA já persistiu o PDF antes (extrairGarantiaPdfAction),
+    // form envia URL/nome em hidden inputs. Usa esses se não veio file novo.
+    if (!arquivoPdfUrl) {
+      const url = String(formData.get("arquivoPdfUrlIa") || "").trim();
+      if (url) {
+        arquivoPdfUrl = url;
+        arquivoPdfNome = String(formData.get("arquivoPdfNomeIa") || "").trim() || "garantia.pdf";
+      }
+    }
 
     const g = await prisma.garantia.create({
       data: {
@@ -532,6 +546,41 @@ export async function criarGarantiaAction(_p: Result | null, formData: FormData)
       },
     });
 
+    // Auto-anexo (M5): se houver PDF, registra também na aba "Anexos"
+    // do contrato/empenho com categoria GARANTIA.
+    if (arquivoPdfUrl) {
+      try {
+        await prisma.anexo.create({
+          data: {
+            nome: arquivoPdfNome || "garantia.pdf",
+            url: arquivoPdfUrl,
+            mimeType: "application/pdf",
+            categoria: "GARANTIA",
+            contratoId: link.contratoId || null,
+            empenhoId: link.empenhoId || null,
+          },
+        });
+      } catch (errAnexo) {
+        console.warn("[criarGarantiaAction] falha ao criar Anexo:", errAnexo);
+      }
+    }
+
+    // Garante que `temGarantia=true` quando o usuário cadastra garantia
+    // (em registros que vieram marcados como "Sem garantia" mas o usuário
+    // mudou de ideia).
+    if (link.contratoId) {
+      await prisma.contrato.update({
+        where: { id: link.contratoId },
+        data: { temGarantia: true },
+      });
+    }
+    if (link.empenhoId) {
+      await prisma.empenho.update({
+        where: { id: link.empenhoId },
+        data: { temGarantia: true },
+      });
+    }
+
     await registrarAuditoria({
       contaId: usuario.contaId,
       usuarioId: usuario.id,
@@ -542,6 +591,50 @@ export async function criarGarantiaAction(_p: Result | null, formData: FormData)
     });
 
     revalidatePath(link.paiPath);
+    return { ok: true };
+  } catch (err) {
+    return { erro: err instanceof Error ? err.message : "Erro." };
+  }
+}
+
+/**
+ * Marca a previsão de garantia do contrato/empenho.
+ * - temGarantia=false: usuário declara explicitamente "sem garantia"
+ * - temGarantia=true: volta pro fluxo de cadastro normal (limpa flag)
+ * Sem isso, marcar "Não" no GarantiasTab não persistia nada e o status
+ * ficava como "não declarado" pra sempre.
+ */
+export async function marcarSemGarantiaAction(_p: Result | null, formData: FormData): Promise<Result> {
+  const usuario = await exigirUsuario();
+  const contratoId = String(formData.get("contratoId") || "") || undefined;
+  const empenhoId = String(formData.get("empenhoId") || "") || undefined;
+  const valor = formData.get("valor") === "true"; // false = sem garantia
+
+  if (!contratoId && !empenhoId) return { erro: "Vínculo obrigatório." };
+
+  try {
+    if (contratoId) {
+      const c = await prisma.contrato.findFirst({
+        where: { id: contratoId, empresa: { contaId: usuario.contaId } },
+      });
+      if (!c) return { erro: "Contrato inválido." };
+      await prisma.contrato.update({
+        where: { id: contratoId },
+        data: { temGarantia: valor },
+      });
+      revalidatePath(`/contratos/${contratoId}`);
+    }
+    if (empenhoId) {
+      const e = await prisma.empenho.findFirst({
+        where: { id: empenhoId, empresa: { contaId: usuario.contaId } },
+      });
+      if (!e) return { erro: "Empenho inválido." };
+      await prisma.empenho.update({
+        where: { id: empenhoId },
+        data: { temGarantia: valor },
+      });
+      revalidatePath(`/execucao/${empenhoId}`);
+    }
     return { ok: true };
   } catch (err) {
     return { erro: err instanceof Error ? err.message : "Erro." };
@@ -568,16 +661,28 @@ export async function adicionarEndossoAction(_p: Result | null, formData: FormDa
     let arquivoPdfUrl: string | undefined;
     if (file && file.size > 0) arquivoPdfUrl = (await salvarArquivo(file)).url;
 
+    const dataFimEndosso = formData.get("dataFim") ? new Date(String(formData.get("dataFim"))) : null;
     await prisma.endosso.create({
       data: {
         garantiaId,
         valor: Number(formData.get("valor") || 0),
         dataInicio: new Date(String(formData.get("dataInicio"))),
-        dataFim: formData.get("dataFim") ? new Date(String(formData.get("dataFim"))) : null,
+        dataFim: dataFimEndosso,
         observacoes: String(formData.get("observacoes") || "") || null,
         arquivoPdfUrl: arquivoPdfUrl || null,
       },
     });
+
+    // Bug do Contrato 82/2024 UNB: o endosso prorroga a vigência da
+    // garantia mas a tela continuava mostrando "expirada" porque só lia
+    // garantia.dataFim. Quando o endosso estende a vigência, propagamos
+    // pra garantia pai. Caso comum: endosso 30/12 sobre garantia 30/06.
+    if (dataFimEndosso && (!g.dataFim || dataFimEndosso > g.dataFim)) {
+      await prisma.garantia.update({
+        where: { id: garantiaId },
+        data: { dataFim: dataFimEndosso },
+      });
+    }
 
     if (g.contratoId) revalidatePath(`/contratos/${g.contratoId}`);
     if (g.empenhoId) revalidatePath(`/execucao/${g.empenhoId}`);

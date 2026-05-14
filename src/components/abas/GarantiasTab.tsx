@@ -2,9 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { useActionState } from "react";
-import { Shield, Plus, AlertTriangle, FileText, X } from "lucide-react";
+import { Shield, Plus, AlertTriangle, FileText, X, Sparkles, Loader2, Check } from "lucide-react";
 import { brl } from "@/lib/validators";
-import { criarGarantiaAction, adicionarEndossoAction } from "@/app/actions/contratuais";
+import {
+  criarGarantiaAction,
+  adicionarEndossoAction,
+  marcarSemGarantiaAction,
+} from "@/app/actions/contratuais";
+import { extrairGarantiaPdfAction } from "@/app/actions/iaExtracao";
+import type { GarantiaExtraida } from "@/lib/extrairAta";
 
 type Endosso = {
   id: string;
@@ -51,19 +57,49 @@ export function GarantiasTab({
   garantias,
   contratoId,
   empenhoId,
+  temGarantia,
 }: {
   garantias: Garantia[];
   contratoId?: string;
   empenhoId?: string;
+  // null = ainda não declarado; true = há previsão; false = sem previsão (explícito)
+  temGarantia?: boolean | null;
 }) {
   const semGarantia = garantias.length === 0;
-  const [resposta, setResposta] = useState<"sim" | "nao" | null>(semGarantia ? null : "sim");
+  const [resposta, setResposta] = useState<"sim" | "nao" | null>(
+    semGarantia ? (temGarantia === false ? "nao" : null) : "sim",
+  );
   const [adicionando, setAdicionando] = useState(false);
+  const [stateMarcar, marcarAction] = useActionState(marcarSemGarantiaAction, null);
 
   return (
     <div className="space-y-4">
-      {/* Pergunta Sim/Não — só quando não há garantias cadastradas */}
-      {semGarantia && !adicionando && (
+      {/* Banner "Sem previsão" quando user declarou explicitamente */}
+      {semGarantia && !adicionando && temGarantia === false && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <div className="mb-2 flex items-center gap-2">
+            <Shield className="h-4 w-4 text-slate-500" />
+            <h3 className="text-sm font-semibold text-slate-900">Sem previsão de garantia</h3>
+          </div>
+          <p className="text-xs text-slate-600">
+            Este registro foi marcado como sem garantia contratual. Pode alterar a qualquer momento.
+          </p>
+          <form action={marcarAction} className="mt-3">
+            {contratoId && <input type="hidden" name="contratoId" value={contratoId} />}
+            {empenhoId && <input type="hidden" name="empenhoId" value={empenhoId} />}
+            <input type="hidden" name="valor" value="true" />
+            <button
+              type="submit"
+              className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+            >
+              Marcar que há previsão de garantia
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Pergunta Sim/Não — só quando não há garantias cadastradas E não foi declarado "Não" antes */}
+      {semGarantia && !adicionando && temGarantia !== false && (
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="mb-3 flex items-center gap-2">
             <Shield className="h-5 w-5 text-slate-500" />
@@ -95,9 +131,25 @@ export function GarantiasTab({
             </button>
           </div>
           {resposta === "nao" && (
-            <p className="mt-3 text-xs text-slate-500">
-              Nenhuma garantia contratual prevista. Você pode alterar essa resposta a qualquer momento clicando em &ldquo;Sim&rdquo;.
-            </p>
+            <>
+              <p className="mt-3 text-xs text-slate-500">
+                Nenhuma garantia contratual prevista. Confirme abaixo pra registrar essa decisão.
+              </p>
+              <form action={marcarAction} className="mt-3">
+                {contratoId && <input type="hidden" name="contratoId" value={contratoId} />}
+                {empenhoId && <input type="hidden" name="empenhoId" value={empenhoId} />}
+                <input type="hidden" name="valor" value="false" />
+                <button
+                  type="submit"
+                  className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                >
+                  Salvar — Sem previsão de garantia
+                </button>
+              </form>
+              {stateMarcar?.erro && (
+                <p className="mt-2 text-xs text-red-700">{stateMarcar.erro}</p>
+              )}
+            </>
           )}
         </div>
       )}
@@ -147,10 +199,36 @@ function FormNovaGarantia({
 }) {
   const [state, formAction] = useActionState(criarGarantiaAction, null);
   const [modalidade, setModalidade] = useState<Modalidade>("SEGURO_GARANTIA");
+  // IA — extração via PDF (M5)
+  const [iaDados, setIaDados] = useState<GarantiaExtraida | null>(null);
+  const [iaArquivoUrl, setIaArquivoUrl] = useState<string | null>(null);
+  const [iaArquivoNome, setIaArquivoNome] = useState<string | null>(null);
+  const [iaExtraindo, setIaExtraindo] = useState(false);
+  const [iaErro, setIaErro] = useState<string | null>(null);
 
   useEffect(() => {
     if (state?.ok) onSucesso();
   }, [state?.ok]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (iaDados?.modalidade) setModalidade(iaDados.modalidade);
+  }, [iaDados]);
+
+  async function handleIa(file: File) {
+    setIaExtraindo(true);
+    setIaErro(null);
+    const fd = new FormData();
+    fd.append("pdf", file);
+    const res = await extrairGarantiaPdfAction(fd);
+    setIaExtraindo(false);
+    if (!res.ok) {
+      setIaErro(res.erro);
+      return;
+    }
+    setIaDados(res.dados);
+    if (res.arquivoUrl) setIaArquivoUrl(res.arquivoUrl);
+    if (res.nomeArquivo) setIaArquivoNome(res.nomeArquivo);
+  }
 
   const isSeguro = modalidade === "SEGURO_GARANTIA";
   const isFianca = modalidade === "FIANCA_BANCARIA";
@@ -171,9 +249,51 @@ function FormNovaGarantia({
         </button>
       </div>
 
-      <form action={formAction} className="space-y-4">
+      {/* IA — extração automática do PDF (M5) */}
+      <div className="mb-4 rounded-lg border border-dashed border-blue-300 bg-white p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Sparkles className="h-4 w-4 text-blue-600" />
+          <span className="text-xs font-medium text-slate-700">
+            Preencher automaticamente a partir do PDF (apólice, fiança, recibo)
+          </span>
+          <input
+            type="file"
+            accept="application/pdf"
+            disabled={iaExtraindo}
+            onChange={(ev) => {
+              const f = ev.target.files?.[0];
+              if (f) handleIa(f);
+            }}
+            className="text-xs text-slate-600 file:mr-2 file:rounded file:border-0 file:bg-blue-50 file:px-2 file:py-1 file:text-xs file:font-medium file:text-blue-700"
+          />
+          {iaExtraindo && (
+            <span className="inline-flex items-center gap-1 text-xs text-blue-700">
+              <Loader2 className="h-3 w-3 animate-spin" /> Extraindo…
+            </span>
+          )}
+          {iaDados && !iaExtraindo && (
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
+              <Check className="h-3 w-3" /> Dados preenchidos · revisar
+            </span>
+          )}
+        </div>
+        {iaErro && <p className="mt-2 text-xs text-red-700">{iaErro}</p>}
+        {iaArquivoNome && (
+          <p className="mt-2 text-[10px] text-slate-500">
+            PDF anexado: <strong>{iaArquivoNome}</strong> (será salvo na aba Anexos)
+          </p>
+        )}
+      </div>
+
+      <form action={formAction} key={iaDados ? `ia-${iaArquivoNome}` : "manual"} className="space-y-4">
         {contratoId && <input type="hidden" name="contratoId" value={contratoId} />}
         {empenhoId && <input type="hidden" name="empenhoId" value={empenhoId} />}
+        {iaArquivoUrl && (
+          <>
+            <input type="hidden" name="arquivoPdfUrlIa" value={iaArquivoUrl} />
+            <input type="hidden" name="arquivoPdfNomeIa" value={iaArquivoNome ?? ""} />
+          </>
+        )}
 
         {/* Modalidade */}
         <Campo label="Modalidade *">
@@ -191,21 +311,53 @@ function FormNovaGarantia({
 
         {/* Seguradora */}
         {isSeguro && (
-          <CampoInput label="Seguradora *" name="seguradora" required placeholder="Nome da seguradora" />
+          <CampoInput
+            label="Seguradora *"
+            name="seguradora"
+            required
+            placeholder="Nome da seguradora"
+            defaultValue={iaDados?.seguradora ?? undefined}
+          />
         )}
 
         {/* Banco */}
         {isFianca && (
-          <CampoInput label="Banco *" name="banco" required placeholder="Nome do banco" />
+          <CampoInput
+            label="Banco *"
+            name="banco"
+            required
+            placeholder="Nome do banco"
+            defaultValue={iaDados?.banco ?? undefined}
+          />
         )}
 
         {/* Valor + Datas */}
         {temValorDatas && (
           <div className="grid grid-cols-2 gap-3">
-            <CampoInput label="Valor (R$) *" name="valor" type="number" step="0.01" min="0" required placeholder="0,00" />
+            <CampoInput
+              label="Valor (R$) *"
+              name="valor"
+              type="number"
+              step="0.01"
+              min="0"
+              required
+              placeholder="0,00"
+              defaultValue={iaDados?.valor != null ? String(iaDados.valor) : undefined}
+            />
             <div />
-            <CampoInput label="Data de início *" name="dataInicio" type="date" required />
-            <CampoInput label="Data de fim" name="dataFim" type="date" />
+            <CampoInput
+              label="Data de início *"
+              name="dataInicio"
+              type="date"
+              required
+              defaultValue={iaDados?.dataInicio}
+            />
+            <CampoInput
+              label="Data de fim"
+              name="dataFim"
+              type="date"
+              defaultValue={iaDados?.dataFim ?? undefined}
+            />
           </div>
         )}
 
@@ -224,6 +376,7 @@ function FormNovaGarantia({
             name="descricao"
             required
             placeholder="Descreva os títulos da dívida pública"
+            defaultValue={iaDados?.descricao ?? undefined}
           />
         )}
 

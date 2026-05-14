@@ -81,6 +81,22 @@ export type EmpenhoExtraido = {
   itens: ItemExtraido[];
 };
 
+export type ModalidadeGarantiaExtraida =
+  | "SEGURO_GARANTIA"
+  | "FIANCA_BANCARIA"
+  | "CAUCAO_DINHEIRO"
+  | "TITULOS_DIVIDA_PUBLICA";
+
+export type GarantiaExtraida = {
+  modalidade: ModalidadeGarantiaExtraida;
+  seguradora: string | null; // só pra SEGURO_GARANTIA
+  banco: string | null;      // só pra FIANCA_BANCARIA
+  valor: number;
+  dataInicio: string;        // YYYY-MM-DD
+  dataFim: string | null;
+  descricao: string | null;  // detalhes adicionais (TÍTULOS DA DÍVIDA PÚBLICA)
+};
+
 const SYSTEM_PROMPT = `Você é um analista jurídico especializado em contratações públicas brasileiras (Lei 14.133/2021 e legado da 8.666/93). Sua tarefa é extrair dados estruturados de Atas de Registro de Preços a partir do PDF anexado.
 
 REGRAS DE EXTRAÇÃO:
@@ -399,6 +415,75 @@ export async function extrairEmpenhoDoPdf(file: File): Promise<EmpenhoExtraido> 
       ) as Promise<EmpenhoExtraido>,
     () => mockEmpenho(file.name),
   );
+}
+
+/**
+ * Extrai dados de uma apólice/instrumento de garantia (seguro-garantia,
+ * fiança bancária, recibo de caução em dinheiro, ou comprovante de
+ * vinculação de títulos da dívida pública). M5 — Lei 14.133 art. 96.
+ */
+export async function extrairGarantiaDoPdf(file: File): Promise<GarantiaExtraida> {
+  const schema = {
+    type: "object",
+    properties: {
+      modalidade: {
+        type: "string",
+        enum: ["SEGURO_GARANTIA", "FIANCA_BANCARIA", "CAUCAO_DINHEIRO", "TITULOS_DIVIDA_PUBLICA"],
+      },
+      seguradora: { type: ["string", "null"] },
+      banco: { type: ["string", "null"] },
+      valor: { type: "number" },
+      dataInicio: { type: "string", format: "date" },
+      dataFim: { type: ["string", "null"], format: "date" },
+      descricao: { type: ["string", "null"] },
+    },
+    required: ["modalidade", "seguradora", "banco", "valor", "dataInicio", "dataFim", "descricao"],
+    additionalProperties: false,
+  };
+  return tentarOuMock<GarantiaExtraida>(
+    () =>
+      chamarClaudeComPdf(
+        file,
+        schema,
+        "Extraia os dados do instrumento de garantia contratual deste PDF (apólice de seguro-garantia, carta de fiança bancária, recibo de caução ou vinculação de títulos públicos) conforme o schema JSON. Identifique a modalidade pelo cabeçalho do documento. Preencha `seguradora` apenas se SEGURO_GARANTIA; `banco` apenas se FIANCA_BANCARIA; em CAUCAO_DINHEIRO/TITULOS_DIVIDA_PUBLICA deixe ambos null. `descricao` resume detalhes (número da apólice, código do título, etc.).",
+      ) as Promise<GarantiaExtraida>,
+    () => mockGarantia(file.name),
+  );
+}
+
+function mockGarantia(filename: string): GarantiaExtraida {
+  const lower = filename.toLowerCase();
+  if (lower.includes("fianca") || lower.includes("fiança")) {
+    return {
+      modalidade: "FIANCA_BANCARIA",
+      seguradora: null,
+      banco: "Banco do Brasil",
+      valor: 50000,
+      dataInicio: dataIso(0),
+      dataFim: dataIso(365),
+      descricao: `Fiança bancária extraída de ${nomeBase(filename)}`,
+    };
+  }
+  if (lower.includes("caucao") || lower.includes("caução")) {
+    return {
+      modalidade: "CAUCAO_DINHEIRO",
+      seguradora: null,
+      banco: null,
+      valor: 25000,
+      dataInicio: dataIso(0),
+      dataFim: dataIso(365),
+      descricao: `Caução em dinheiro extraída de ${nomeBase(filename)}`,
+    };
+  }
+  return {
+    modalidade: "SEGURO_GARANTIA",
+    seguradora: "Pottencial Seguradora",
+    banco: null,
+    valor: 100000,
+    dataInicio: dataIso(0),
+    dataFim: dataIso(365),
+    descricao: `Apólice extraída de ${nomeBase(filename)}`,
+  };
 }
 
 // ============================================================

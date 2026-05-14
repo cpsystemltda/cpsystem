@@ -258,7 +258,13 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
               key: "garantias",
               label: "Garantias",
               badge: e.garantias.length,
-              content: <GarantiasTab garantias={e.garantias} empenhoId={e.id} />,
+              content: (
+                <GarantiasTab
+                  garantias={e.garantias}
+                  empenhoId={e.id}
+                  temGarantia={e.temGarantia}
+                />
+              ),
             },
             {
               key: "enderecos",

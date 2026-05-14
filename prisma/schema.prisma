@@ -572,6 +572,10 @@ model Contrato {
   marcoInicialPrazo     MarcoInicialPrazoEntrega? // null quando SOB_DEMANDA (não há prazo único)
   marcoInicialDescricao String?                   // só preenchido quando marcoInicialPrazo = OUTRO
 
+  // M5 Garantia — tri-estado: null = não declarado, true = há previsão,
+  // false = explicitamente sem previsão (usuário marcou "Não" e salvou).
+  temGarantia Boolean?
+
   // Documentos de suporte do contrato (Lei 14.133)
   numeroOrdemFornecimento String? // ex: "OF 042/2024" — quando o órgão emite OF/AF
   arquivoOfUrl            String?
@@ -749,6 +753,9 @@ model Empenho {
   pontoColeta               String?        // Autorização de Entrega (origem)
   contatoRecebedor          String?        // Autorização de Entrega (nome/contato)
   fiscalResponsavel         String?        // Ordem de Execução de Serviço
+
+  // M5 Garantia — tri-estado igual ao Contrato.
+  temGarantia               Boolean?
 
   orgaoNome      String
   orgaoCnpj      String
