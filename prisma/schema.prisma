@@ -332,11 +332,13 @@ enum PrazoEntregaUnidade {
 
 // Modo de inclusão do prazo de entrega. RELATIVO = qtd+unidade contada a
 // partir do pedido (típico de Fornecimento). DATA_CERTA = data fixa de
-// execução (típico de Locação para evento). Por enquanto só Contrato usa
-// — Ata e Empenho seguem só RELATIVO.
+// execução (típico de Locação para evento). SOB_DEMANDA = data definida
+// posteriormente pelo cliente — prazo/data ficam vazios no Contrato.
+// Por enquanto só Contrato usa SOB_DEMANDA — Empenho segue só RELATIVO/DATA_CERTA.
 enum PrazoEntregaModo {
   RELATIVO
   DATA_CERTA
+  SOB_DEMANDA
 }
 
 // Marco a partir do qual conta o prazo de entrega.
@@ -565,6 +567,11 @@ model Contrato {
   prazoPagamentoDias     Int?
   marcoOrcamentoEstimado DateTime?
   marcoReajusteOrigem    MarcoReajusteOrigem?
+
+  // Valor inicial do contrato (somatório de itens no momento da criação).
+  // Preservado pra exibir "Valor Inicial" mesmo após aditivos com reajuste.
+  // null em contratos pré-M3-aditivo (backfill aplica o valor corrente).
+  valorInicial           Float?
 
   // Fluxograma da contratação — Lei 14.133 (contratos não-continuados):
   // como o quantitativo é entregue e qual o marco inicial do prazo.
@@ -871,16 +878,42 @@ model TermoAditivo {
   numero          String
   objeto          String
   dataAssinatura  DateTime
-  natureza        String              // CSV de NaturezaAlteracao
-  alteraValor     Boolean             @default(false)
-  novoValor       Float?
-  alteraPrazoVigencia Boolean         @default(false)
-  novaVigenciaFim DateTime?
-  alteraPrazoEntrega Boolean          @default(false)
-  novoPrazoEntregaDias Int?
+  natureza        String              // CSV de NaturezaAlteracao (legado)
+
+  // ---- Bloco Valor ----
+  alteraValor        Boolean             @default(false)
+  tipoAlteracaoValor TipoAlteracaoValor?
+  novoValor          Float?              // delta do aditivo (positivo p/ acréscimo, pode ser negativo p/ supressão)
+
+  // ---- Bloco Vigência ----
+  alteraPrazoVigencia Boolean             @default(false)
+  novaVigenciaInicio  DateTime?
+  novaVigenciaFim     DateTime?
+  novaVigenciaPrazo   Int?
+  novaVigenciaUnidade PrazoEntregaUnidade?
+
+  // ---- Bloco Entrega ----
+  alteraPrazoEntrega       Boolean              @default(false)
+  novoPrazoEntregaDias     Int?
+  novoPrazoEntregaUnidade  PrazoEntregaUnidade?
+
+  // ---- Bloco Reajuste (aplica em todos os itens do contrato/ata) ----
+  aplicaReajuste        Boolean         @default(false)
+  reajusteIndice        IndiceReajuste?
+  reajusteIndiceOutro   String?         // texto livre quando indice=OUTRO
+  reajustePeriodoInicio DateTime?
+  reajustePeriodoFim    DateTime?
+  reajustePercentual    Float?
+
   observacoes     String?
   arquivoPdfUrl   String?
+
+  // Snapshot dos valores anteriores (JSON) pra reverter no excluir/editar:
+  // { valor, vigenciaFim, prazoEntregaDias, prazoEntregaUnidade, itens: [{id, valorUnitario, valorTotal}] }
+  dadosAnteriores Json?
+
   criadoEm        DateTime            @default(now())
+  atualizadoEm    DateTime            @default(now()) @updatedAt
 
   contratoId String?
   contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -900,15 +933,44 @@ model Apostilamento {
   objeto              String
   dataAssinatura      DateTime
   natureza            String
-  alteraValor         Boolean  @default(false)
+
+  // M3 — Comprasnet layout
+  finalidade          FinalidadeApostilamento?
+  motivo              String?
+
+  // ---- Bloco Valor ----
+  alteraValor         Boolean             @default(false)
+  tipoAlteracaoValor  TipoAlteracaoValor?
   novoValor           Float?
-  alteraPrazoVigencia Boolean  @default(false)
+
+  // ---- Bloco Vigência ----
+  alteraPrazoVigencia Boolean             @default(false)
+  novaVigenciaInicio  DateTime?
   novaVigenciaFim     DateTime?
-  alteraPrazoEntrega  Boolean  @default(false)
-  novoPrazoEntregaDias Int?
+  novaVigenciaPrazo   Int?
+  novaVigenciaUnidade PrazoEntregaUnidade?
+
+  // ---- Bloco Entrega ----
+  alteraPrazoEntrega       Boolean              @default(false)
+  novoPrazoEntregaDias     Int?
+  novoPrazoEntregaUnidade  PrazoEntregaUnidade?
+
+  // ---- Bloco Reajuste ----
+  aplicaReajuste        Boolean         @default(false)
+  reajusteIndice        IndiceReajuste?
+  reajusteIndiceOutro   String?
+  reajustePeriodoInicio DateTime?
+  reajustePeriodoFim    DateTime?
+  reajustePercentual    Float?
+
   observacoes         String?
   arquivoPdfUrl       String?
+
+  // Snapshot do estado anterior pra reverter (mesmo formato do aditivo)
+  dadosAnteriores     Json?
+
   criadoEm            DateTime @default(now())
+  atualizadoEm        DateTime @default(now()) @updatedAt
 
   contratoId String?
   contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -929,11 +991,36 @@ enum InstrumentoReajuste {
 
 enum IndiceReajuste {
   IPCA
+  IPCA_E
+  IPCA_15
   IGPM
   INCC
   INPC
+  IST
   CONTRATUAL
   OUTRO
+}
+
+// M3 — Aditivo: classificação da alteração de valor contratual.
+// Acréscimo/Supressão = aumenta/reduz quantitativo (Lei 14.133 art. 125).
+// Reajuste/Repactuação = aplica índice ou recomposição contratual.
+// Reequilíbrio = recompõe equilíbrio econômico-financeiro (art. 124, II, d).
+enum TipoAlteracaoValor {
+  ACRESCIMO
+  SUPRESSAO
+  REAJUSTE_REPACTUACAO
+  REEQUILIBRIO
+}
+
+// M3 — Apostilamento: finalidade conforme Comprasnet.
+// Apostilamento (Lei 14.133 art. 136) é alteração unilateral simples
+// (não exige novo instrumento) — tipicamente reajuste por índice já
+// contratado, penalidade, empenho suplementar ou outra anotação.
+enum FinalidadeApostilamento {
+  REAJUSTE
+  APLICACAO_PENALIDADE
+  EMPENHO_CREDITO_SUPLEMENTAR
+  OUTROS
 }
 
 model Reajuste {
@@ -1002,6 +1089,9 @@ model AndamentoNotificacao {
   status        StatusNotificacao
   descricao     String
   dataEvento    DateTime
+  // M3 — anexar comprovante/resposta junto ao andamento (ex.: PDF da
+  // resposta enviada ao órgão, comprovante de entrega de defesa, etc.)
+  arquivoPdfUrl String?
   criadoEm      DateTime          @default(now())
 
   @@index([notificacaoId])
@@ -1039,10 +1129,16 @@ model ProcedimentoApuratorio {
   notificacaoNumero String?
   assunto           String
   descricao         String
-  comissao          String?  // nome dos servidores da comissão
+  // M3 — comissão agora suporta múltiplos membros (mínimo 2 servidores).
+  // `comissao` (CSV legado) mantido pra retrocompatibilidade.
+  comissao          String?
+  comissaoMembros   String[] @default([])
   autoridade        String?  // autoridade competente
   dataAbertura      DateTime
-  prazoDefesaDias   Int      @default(15) // padrão Lei 14.133
+  // Prazos da Lei 14.133 contados em DIAS ÚTEIS.
+  // Defesa: art. 157 — 15 dias úteis (padrão).
+  // Recurso: art. 165 — 15 dias úteis (padrão).
+  prazoDefesaDias   Int      @default(15)
   prazoRecursoDias  Int      @default(15)
   arquivado         Boolean  @default(false)
   arquivoPdfUrl     String?

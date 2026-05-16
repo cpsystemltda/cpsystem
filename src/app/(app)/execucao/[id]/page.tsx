@@ -254,8 +254,41 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
             {
               key: "reajustes",
               label: "Reajustes",
-              badge: e.reajustes.length,
-              content: <ReajustesTab reajustes={e.reajustes} empenhoId={e.id} />,
+              badge:
+                e.reajustes.length +
+                e.termosAditivos.filter((a) => a.aplicaReajuste).length +
+                e.apostilamentos.filter((a) => a.aplicaReajuste).length,
+              content: (
+                <ReajustesTab
+                  reajustesLegado={e.reajustes}
+                  aditivosComReajuste={e.termosAditivos
+                    .filter((a) => a.aplicaReajuste)
+                    .map((a) => ({
+                      id: a.id,
+                      numero: a.numero,
+                      dataAssinatura: a.dataAssinatura,
+                      reajusteIndice: a.reajusteIndice,
+                      reajusteIndiceOutro: a.reajusteIndiceOutro,
+                      reajustePercentual: a.reajustePercentual,
+                      reajustePeriodoInicio: a.reajustePeriodoInicio,
+                      reajustePeriodoFim: a.reajustePeriodoFim,
+                      arquivoPdfUrl: a.arquivoPdfUrl,
+                    }))}
+                  apostilamentosComReajuste={e.apostilamentos
+                    .filter((a) => a.aplicaReajuste)
+                    .map((a) => ({
+                      id: a.id,
+                      numero: a.numero,
+                      dataAssinatura: a.dataAssinatura,
+                      reajusteIndice: a.reajusteIndice,
+                      reajusteIndiceOutro: a.reajusteIndiceOutro,
+                      reajustePercentual: a.reajustePercentual,
+                      reajustePeriodoInicio: a.reajustePeriodoInicio,
+                      reajustePeriodoFim: a.reajustePeriodoFim,
+                      arquivoPdfUrl: a.arquivoPdfUrl,
+                    }))}
+                />
+              ),
             },
             {
               key: "garantias",
@@ -289,7 +322,7 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
             },
             {
               key: "procedimentos",
-              label: "Procedimentos",
+              label: "Procedimentos apuratórios",
               badge: e.procedimentos.length,
               content: <ProcedimentosTab procedimentos={e.procedimentos} empenhoId={e.id} />,
             },
@@ -371,7 +404,7 @@ function Timeline({
     id: string;
     prazoEntregaDias: number | null;
     prazoEntregaUnidade?: "DIAS" | "MESES";
-    prazoEntregaModo?: "RELATIVO" | "DATA_CERTA";
+    prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA";
     dataEntregaCerta?: Date | null;
     prazoPagamentoDias: number | null;
     dataPedidoRecebido: Date | null;
@@ -612,7 +645,7 @@ function DadosEmpenho({
     dataEmissao: Date; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null;
     prazoEntregaUnidade: "DIAS" | "MESES";
-    prazoEntregaModo: "RELATIVO" | "DATA_CERTA";
+    prazoEntregaModo: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA";
     dataEntregaCerta: Date | null;
     prazoPagamentoDias: number | null;
     classificacaoOrcamentaria: string | null;

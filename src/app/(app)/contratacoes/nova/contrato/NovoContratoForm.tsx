@@ -11,6 +11,8 @@ import { EnderecosEntregaEditor, PontosFocaisEditor } from "@/components/Editore
 import type { ItemInicial } from "@/components/ItensEditor";
 import { criarContratoAction, editarContratoAction } from "@/app/actions/contratacoes";
 import { extrairContratoPdfAction } from "@/app/actions/iaExtracao";
+import { matchItensIaAction, type Sugestao as SugestaoIa } from "@/app/actions/iaMatchItens";
+import { usePrefillIa } from "@/lib/usePrefillIa";
 import {
   OPCOES_PROCEDIMENTO,
   OPCOES_TIPO,
@@ -53,7 +55,7 @@ export type ContratoValoresIniciais = {
   vigenciaFim: string;
   prazoEntregaDias: number | null;
   prazoEntregaUnidade?: "DIAS" | "MESES";
-  prazoEntregaModo?: "RELATIVO" | "DATA_CERTA";
+  prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA";
   dataEntregaCerta?: string | null;
   prazoPagamentoDias: number | null;
   marcoReajusteOrigem?: string | null;
@@ -115,7 +117,7 @@ export default function NovoContratoForm({
   const vigenciaFim = calcularVigenciaFim(vigenciaInicio, prazoVigQtd, prazoVigUnidade);
 
   // Ajuste 4 — Prazo de entrega com 2 modos (relativo OU data certa)
-  const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA">(
+  const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA">(
     vi?.prazoEntregaModo ?? "RELATIVO",
   );
   const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES">(
@@ -144,6 +146,18 @@ export default function NovoContratoForm({
   const [arquivoPdfNome, setArquivoPdfNome] = useState<string | null>(null);
   const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set());
 
+  // M9 IA — sugestões de matching de itens contra a Ata vinculada
+  const [sugestoesItens, setSugestoesItens] = useState<SugestaoIa[]>([]);
+
+  // M9 IA — prefill via UploadInteligenteCard (?prefill=key)
+  const prefill = usePrefillIa<ContratoExtraido>("CONTRATO");
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.dados) setDados(prefill.dados);
+    if (prefill.arquivoUrl) setArquivoPdfUrl(prefill.arquivoUrl);
+    if (prefill.arquivoNome) setArquivoPdfNome(prefill.arquivoNome);
+  }, [prefill]);
+
   // Quando IA preenche, atualiza states locais (vigência, dataAssinatura) e
   // marca campos preenchidos como AUTO.
   useEffect(() => {
@@ -168,6 +182,23 @@ export default function NovoContratoForm({
 
   const ataSelecionada = atas.find((a) => a.value === ataId);
   const formKey = dados ? `auto-${dados.numero}` : "manual";
+
+  // M9 IA — quando IA extraiu itens E há ata vinculada, dispara matching.
+  useEffect(() => {
+    if (!dados || !dados.itens || dados.itens.length === 0) return;
+    if (!ataSelecionada || !ataSelecionada.itens.length) {
+      setSugestoesItens([]);
+      return;
+    }
+    let cancelled = false;
+    matchItensIaAction(dados.itens, ataSelecionada.itens).then((res) => {
+      if (cancelled) return;
+      if (res.ok) setSugestoesItens(res.sugestoes);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dados, ataSelecionada]);
 
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
@@ -546,6 +577,7 @@ export default function NovoContratoForm({
                 {([
                   { v: "RELATIVO" as const, label: "Prazo (dias/meses)" },
                   { v: "DATA_CERTA" as const, label: "Data certa" },
+                  { v: "SOB_DEMANDA" as const, label: "Sob demanda" },
                 ]).map((opt) => {
                   const ativo = prazoEntregaModo === opt.v;
                   return (
@@ -593,18 +625,32 @@ export default function NovoContratoForm({
                     <option value="MESES">Meses</option>
                   </select>
                 </div>
-              ) : (
+              ) : prazoEntregaModo === "DATA_CERTA" ? (
                 <input
                   type="date"
                   name="dataEntregaCerta"
                   defaultValue={vi?.dataEntregaCerta ?? ""}
                   className="w-full rounded-xl px-4 py-3 text-sm font-medium"
                 />
+              ) : (
+                <input
+                  type="date"
+                  disabled
+                  placeholder="A definir"
+                  className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+                  style={{
+                    background: "rgba(15,14,12,0.04)",
+                    opacity: 0.6,
+                    cursor: "not-allowed",
+                  }}
+                />
               )}
               <span className="mt-1 block text-[11px]" style={{ color: "var(--text-mute)" }}>
                 {prazoEntregaModo === "RELATIVO"
                   ? "Prazo contado a partir do pedido/empenho."
-                  : "Data específica de execução (ex.: locação para evento)."}
+                  : prazoEntregaModo === "DATA_CERTA"
+                    ? "Data específica de execução (ex.: locação para evento)."
+                    : "Data definida posteriormente pelo cliente — preenchida no Empenho/Ordem."}
               </span>
             </div>
 
@@ -762,7 +808,12 @@ export default function NovoContratoForm({
               Vinculando à Ata <strong>{ataSelecionada.label}</strong>. Selecione cada item da Ata na primeira coluna — o saldo será validado automaticamente.
             </p>
           )}
-          <ItensEditor ataItens={ataSelecionada?.itens} itensIniciais={vi?.itens ?? dados?.itens} permitirLotes={false} />
+          <ItensEditor
+            ataItens={ataSelecionada?.itens}
+            itensIniciais={vi?.itens ?? dados?.itens}
+            permitirLotes={false}
+            sugestoesIa={sugestoesItens}
+          />
         </Secao>
 
         {state?.erro && (

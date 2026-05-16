@@ -118,7 +118,7 @@ export default async function EditarEmpenhoPage({ params }: { params: Promise<{ 
     vigenciaFim: toDateInput(empenho.vigenciaFim) ?? "",
     prazoEntregaDias: empenho.prazoEntregaDias,
     prazoEntregaUnidade: empenho.prazoEntregaUnidade,
-    prazoEntregaModo: empenho.prazoEntregaModo,
+    prazoEntregaModo: empenho.prazoEntregaModo === "SOB_DEMANDA" ? "RELATIVO" : empenho.prazoEntregaModo,
     dataEntregaCerta: toDateInput(empenho.dataEntregaCerta),
     prazoPagamentoDias: empenho.prazoPagamentoDias,
     classificacaoOrcamentaria: empenho.classificacaoOrcamentaria,

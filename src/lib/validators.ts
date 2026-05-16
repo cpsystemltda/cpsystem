@@ -344,8 +344,9 @@ export const novoContratoSchema = contratacaoBase
     enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
     pontosFocais: z.array(pontoFocalSchema).optional(),
     itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
-    // Módulo 3.2 — Prazo de entrega com 2 modos + Marco de reajuste
-    prazoEntregaModo: z.enum(["RELATIVO", "DATA_CERTA"]).default("RELATIVO"),
+    // Módulo 3.2 — Prazo de entrega com 3 modos + Marco de reajuste
+    // SOB_DEMANDA: data conhecida só depois — prazo/data ficam em branco.
+    prazoEntregaModo: z.enum(["RELATIVO", "DATA_CERTA", "SOB_DEMANDA"]).default("RELATIVO"),
     dataEntregaCerta: z.preprocess(
       (v) => (v === "" || v == null ? undefined : v),
       z.coerce.date().optional(),

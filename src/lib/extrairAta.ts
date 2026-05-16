@@ -97,6 +97,100 @@ export type GarantiaExtraida = {
   descricao: string | null;  // detalhes adicionais (TÍTULOS DA DÍVIDA PÚBLICA)
 };
 
+export type TipoAlteracaoValorExtraida =
+  | "ACRESCIMO"
+  | "SUPRESSAO"
+  | "REAJUSTE_REPACTUACAO"
+  | "REEQUILIBRIO";
+
+export type IndiceReajusteExtraido =
+  | "IPCA"
+  | "IPCA_E"
+  | "IPCA_15"
+  | "IGPM"
+  | "INCC"
+  | "INPC"
+  | "IST"
+  | "CONTRATUAL"
+  | "OUTRO";
+
+export type FinalidadeApostilamentoExtraida =
+  | "REAJUSTE"
+  | "APLICACAO_PENALIDADE"
+  | "EMPENHO_CREDITO_SUPLEMENTAR"
+  | "OUTROS";
+
+export type ProcedimentoExtraido = {
+  numero: string | null;
+  notificacaoNumero: string | null;
+  assunto: string;
+  descricao: string;
+  comissaoMembros: string[];
+  autoridade: string | null;
+  dataAbertura: string; // YYYY-MM-DD
+};
+
+export type ApostilamentoExtraido = {
+  numero: string;
+  objeto: string;
+  dataAssinatura: string; // YYYY-MM-DD
+
+  finalidade: FinalidadeApostilamentoExtraida | null;
+  motivo: string | null;
+
+  alteraValor: boolean;
+  tipoAlteracaoValor: TipoAlteracaoValorExtraida | null;
+  novoValor: number | null;
+
+  alteraPrazoVigencia: boolean;
+  novaVigenciaInicio: string | null;
+  novaVigenciaFim: string | null;
+  novaVigenciaPrazo: number | null;
+  novaVigenciaUnidade: "DIAS" | "MESES" | null;
+
+  alteraPrazoEntrega: boolean;
+  novoPrazoEntregaDias: number | null;
+  novoPrazoEntregaUnidade: "DIAS" | "MESES" | null;
+
+  aplicaReajuste: boolean;
+  reajusteIndice: IndiceReajusteExtraido | null;
+  reajusteIndiceOutro: string | null;
+  reajustePeriodoInicio: string | null;
+  reajustePeriodoFim: string | null;
+  reajustePercentual: number | null;
+
+  observacoes: string | null;
+};
+
+export type AditivoExtraido = {
+  numero: string;
+  objeto: string;
+  dataAssinatura: string; // YYYY-MM-DD
+
+  alteraValor: boolean;
+  tipoAlteracaoValor: TipoAlteracaoValorExtraida | null;
+  novoValor: number | null;
+
+  alteraPrazoVigencia: boolean;
+  novaVigenciaInicio: string | null;
+  novaVigenciaFim: string | null;
+  novaVigenciaPrazo: number | null;
+  novaVigenciaUnidade: "DIAS" | "MESES" | null;
+
+  alteraPrazoEntrega: boolean;
+  novoPrazoEntregaDias: number | null;
+  novoPrazoEntregaUnidade: "DIAS" | "MESES" | null;
+
+  aplicaReajuste: boolean;
+  reajusteIndice: IndiceReajusteExtraido | null;
+  reajusteIndiceOutro: string | null;
+  reajustePeriodoInicio: string | null;
+  reajustePeriodoFim: string | null;
+  reajustePercentual: number | null;
+
+  observacoes: string | null;
+};
+
 const SYSTEM_PROMPT = `Você é um analista jurídico especializado em contratações públicas brasileiras (Lei 14.133/2021 e legado da 8.666/93). Sua tarefa é extrair dados estruturados de Atas de Registro de Preços a partir do PDF anexado.
 
 REGRAS DE EXTRAÇÃO:
@@ -451,6 +545,87 @@ export async function extrairGarantiaDoPdf(file: File): Promise<GarantiaExtraida
   );
 }
 
+/**
+ * M3 — IA extrai dados de Termo Aditivo. Classifica natureza da alteração
+ * (acréscimo/supressão/reajuste/reequilíbrio), detecta reajuste por índice
+ * (IPCA, IPCA-E, IPCA-15, INCC, IST, OUTRO) e identifica blocos de alteração
+ * de prazo (vigência, entrega).
+ */
+export async function extrairAditivoDoPdf(file: File): Promise<AditivoExtraido> {
+  const schema = {
+    type: "object",
+    properties: {
+      numero: { type: "string" },
+      objeto: { type: "string" },
+      dataAssinatura: { type: "string", format: "date" },
+
+      alteraValor: { type: "boolean" },
+      tipoAlteracaoValor: {
+        type: ["string", "null"],
+        enum: ["ACRESCIMO", "SUPRESSAO", "REAJUSTE_REPACTUACAO", "REEQUILIBRIO", null],
+      },
+      novoValor: { type: ["number", "null"] },
+
+      alteraPrazoVigencia: { type: "boolean" },
+      novaVigenciaInicio: { type: ["string", "null"], format: "date" },
+      novaVigenciaFim: { type: ["string", "null"], format: "date" },
+      novaVigenciaPrazo: { type: ["integer", "null"] },
+      novaVigenciaUnidade: { type: ["string", "null"], enum: ["DIAS", "MESES", null] },
+
+      alteraPrazoEntrega: { type: "boolean" },
+      novoPrazoEntregaDias: { type: ["integer", "null"] },
+      novoPrazoEntregaUnidade: { type: ["string", "null"], enum: ["DIAS", "MESES", null] },
+
+      aplicaReajuste: { type: "boolean" },
+      reajusteIndice: {
+        type: ["string", "null"],
+        enum: ["IPCA", "IPCA_E", "IPCA_15", "IGPM", "INCC", "INPC", "IST", "CONTRATUAL", "OUTRO", null],
+      },
+      reajusteIndiceOutro: { type: ["string", "null"] },
+      reajustePeriodoInicio: { type: ["string", "null"], format: "date" },
+      reajustePeriodoFim: { type: ["string", "null"], format: "date" },
+      reajustePercentual: { type: ["number", "null"] },
+
+      observacoes: { type: ["string", "null"] },
+    },
+    required: [
+      "numero", "objeto", "dataAssinatura",
+      "alteraValor", "tipoAlteracaoValor", "novoValor",
+      "alteraPrazoVigencia", "novaVigenciaInicio", "novaVigenciaFim",
+      "novaVigenciaPrazo", "novaVigenciaUnidade",
+      "alteraPrazoEntrega", "novoPrazoEntregaDias", "novoPrazoEntregaUnidade",
+      "aplicaReajuste", "reajusteIndice", "reajusteIndiceOutro",
+      "reajustePeriodoInicio", "reajustePeriodoFim", "reajustePercentual",
+      "observacoes",
+    ],
+    additionalProperties: false,
+  };
+  return tentarOuMock<AditivoExtraido>(
+    () =>
+      chamarClaudeComPdf(
+        file,
+        schema,
+        `Extraia os dados do Termo Aditivo contratual conforme o schema JSON. Diretrizes:
+
+1) **alteraValor**: true se o aditivo modifica valor contratual. **tipoAlteracaoValor**:
+   - ACRESCIMO: aumento de quantitativo (Lei 14.133 art. 125)
+   - SUPRESSAO: redução de quantitativo (art. 125, §1º)
+   - REAJUSTE_REPACTUACAO: aplicação de índice ou recomposição contratual
+   - REEQUILIBRIO: recomposição do equilíbrio econômico-financeiro (art. 124, II, d)
+   **novoValor**: o valor monetário do aditivo (delta positivo p/ acréscimo, negativo p/ supressão).
+
+2) **alteraPrazoVigencia**: true se prorroga vigência. Preencha dataInicio/dataFim quando explícitos. Se o aditivo só informar prazo (ex.: "+12 meses"), preencha novaVigenciaPrazo + novaVigenciaUnidade.
+
+3) **alteraPrazoEntrega**: true se altera prazo de entrega/execução. Preencha novoPrazoEntregaDias + novoPrazoEntregaUnidade.
+
+4) **aplicaReajuste** (subset de alteraValor): true APENAS se o aditivo aplica índice de reajuste sobre itens. Identifique o índice (IPCA, IPCA-E, IPCA-15, INCC, IST...) e preencha período de apuração e percentual.
+
+Campos não aplicáveis vêm como null. Não invente dados — se não está no PDF, retorne null.`,
+      ) as Promise<AditivoExtraido>,
+    () => mockAditivo(file.name),
+  );
+}
+
 function mockGarantia(filename: string): GarantiaExtraida {
   const lower = filename.toLowerCase();
   if (lower.includes("fianca") || lower.includes("fiança")) {
@@ -617,5 +792,315 @@ function mockEmpenho(filename: string): EmpenhoExtraido {
         valorUnitario: 850.0,
       },
     ],
+  };
+}
+
+/**
+ * M3 — IA extrai dados de Apostilamento. Identifica a finalidade
+ * (Reajuste, Penalidade, Empenho Suplementar, Outros), detecta blocos
+ * de alteração (valor, vigência, entrega) e, quando reajuste, captura
+ * índice/período/percentual.
+ */
+export async function extrairApostilamentoDoPdf(file: File): Promise<ApostilamentoExtraido> {
+  const schema = {
+    type: "object",
+    properties: {
+      numero: { type: "string" },
+      objeto: { type: "string" },
+      dataAssinatura: { type: "string", format: "date" },
+
+      finalidade: {
+        type: ["string", "null"],
+        enum: ["REAJUSTE", "APLICACAO_PENALIDADE", "EMPENHO_CREDITO_SUPLEMENTAR", "OUTROS", null],
+      },
+      motivo: { type: ["string", "null"] },
+
+      alteraValor: { type: "boolean" },
+      tipoAlteracaoValor: {
+        type: ["string", "null"],
+        enum: ["ACRESCIMO", "SUPRESSAO", "REAJUSTE_REPACTUACAO", "REEQUILIBRIO", null],
+      },
+      novoValor: { type: ["number", "null"] },
+
+      alteraPrazoVigencia: { type: "boolean" },
+      novaVigenciaInicio: { type: ["string", "null"], format: "date" },
+      novaVigenciaFim: { type: ["string", "null"], format: "date" },
+      novaVigenciaPrazo: { type: ["integer", "null"] },
+      novaVigenciaUnidade: { type: ["string", "null"], enum: ["DIAS", "MESES", null] },
+
+      alteraPrazoEntrega: { type: "boolean" },
+      novoPrazoEntregaDias: { type: ["integer", "null"] },
+      novoPrazoEntregaUnidade: { type: ["string", "null"], enum: ["DIAS", "MESES", null] },
+
+      aplicaReajuste: { type: "boolean" },
+      reajusteIndice: {
+        type: ["string", "null"],
+        enum: ["IPCA", "IPCA_E", "IPCA_15", "IGPM", "INCC", "INPC", "IST", "CONTRATUAL", "OUTRO", null],
+      },
+      reajusteIndiceOutro: { type: ["string", "null"] },
+      reajustePeriodoInicio: { type: ["string", "null"], format: "date" },
+      reajustePeriodoFim: { type: ["string", "null"], format: "date" },
+      reajustePercentual: { type: ["number", "null"] },
+
+      observacoes: { type: ["string", "null"] },
+    },
+    required: [
+      "numero", "objeto", "dataAssinatura",
+      "finalidade", "motivo",
+      "alteraValor", "tipoAlteracaoValor", "novoValor",
+      "alteraPrazoVigencia", "novaVigenciaInicio", "novaVigenciaFim",
+      "novaVigenciaPrazo", "novaVigenciaUnidade",
+      "alteraPrazoEntrega", "novoPrazoEntregaDias", "novoPrazoEntregaUnidade",
+      "aplicaReajuste", "reajusteIndice", "reajusteIndiceOutro",
+      "reajustePeriodoInicio", "reajustePeriodoFim", "reajustePercentual",
+      "observacoes",
+    ],
+    additionalProperties: false,
+  };
+  return tentarOuMock<ApostilamentoExtraido>(
+    () =>
+      chamarClaudeComPdf(
+        file,
+        schema,
+        `Extraia os dados do Termo de Apostilamento contratual (Lei 14.133 art. 136) conforme o schema JSON. Diretrizes:
+
+1) **finalidade**: identifique a natureza do apostilamento:
+   - REAJUSTE: aplicação de índice de reajuste (IPCA, INCC, IST...)
+   - APLICACAO_PENALIDADE: registro de penalidade administrativa
+   - EMPENHO_CREDITO_SUPLEMENTAR: alteração de dotação orçamentária / empenho suplementar
+   - OUTROS: qualquer outra alteração simples (mudança de fonte, conta, etc.)
+
+2) **motivo**: campo textual livre — descrição curta do que motivou o apostilamento (ex.: "Variação acumulada do IPCA no período 12 meses").
+
+3) **alteraValor / tipoAlteracaoValor / novoValor**: idem aditivo (raramente usado em apostilamento — apostilamentos típicos não criam alteração quantitativa).
+
+4) **alteraPrazoVigencia / alteraPrazoEntrega**: idem aditivo.
+
+5) **aplicaReajuste**: true quando finalidade=REAJUSTE. Capture índice, período de apuração e percentual.
+
+Campos não aplicáveis vêm como null. Não invente dados.`,
+      ) as Promise<ApostilamentoExtraido>,
+    () => mockApostilamento(file.name),
+  );
+}
+
+/**
+ * M3 — IA extrai dados de Procedimento Apuratório (Lei 14.133 art. 157+).
+ * Tipicamente parseia uma Portaria de Abertura de Procedimento ou
+ * Notificação Inicial — extrai número, comissão, autoridade competente,
+ * data e descrição.
+ */
+export async function extrairProcedimentoDoPdf(file: File): Promise<ProcedimentoExtraido> {
+  const schema = {
+    type: "object",
+    properties: {
+      numero: { type: ["string", "null"] },
+      notificacaoNumero: { type: ["string", "null"] },
+      assunto: { type: "string" },
+      descricao: { type: "string" },
+      comissaoMembros: { type: "array", items: { type: "string" } },
+      autoridade: { type: ["string", "null"] },
+      dataAbertura: { type: "string", format: "date" },
+    },
+    required: [
+      "numero", "notificacaoNumero", "assunto", "descricao",
+      "comissaoMembros", "autoridade", "dataAbertura",
+    ],
+    additionalProperties: false,
+  };
+  return tentarOuMock<ProcedimentoExtraido>(
+    () =>
+      chamarClaudeComPdf(
+        file,
+        schema,
+        `Extraia os dados de um Procedimento Apuratório (Lei 14.133/2021 art. 157+) conforme o schema JSON. Tipicamente o PDF é uma Portaria de Abertura, Notificação Inicial ou Termo de Instauração. Diretrizes:
+
+1) **numero**: número do procedimento se atribuído (ex.: "PA 042/2026"). Se ainda não houver, null.
+2) **notificacaoNumero**: número da notificação prévia que originou o procedimento (se houver). null se não mencionado.
+3) **assunto**: descrição curta da irregularidade (ex.: "Atraso na entrega do empenho 2025NE000123").
+4) **descricao**: descrição expandida com fatos relatados.
+5) **comissaoMembros**: array com nomes dos servidores da comissão processante (mínimo 2 — Lei 14.133 exige composição). Cada item é o nome completo do servidor.
+6) **autoridade**: autoridade competente para aplicar (ou não) a sanção (ex.: "Secretário de Administração").
+7) **dataAbertura**: data de abertura/instauração do procedimento (YYYY-MM-DD).
+
+Não invente dados. Se não está no PDF, retorne null/lista vazia.`,
+      ) as Promise<ProcedimentoExtraido>,
+    () => mockProcedimento(file.name),
+  );
+}
+
+function mockProcedimento(filename: string): ProcedimentoExtraido {
+  return {
+    numero: `PA-${ano()}/0042`,
+    notificacaoNumero: `NOT-${ano()}/0117`,
+    assunto: `[DEMO · ${nomeBase(filename)}] Inadimplência na entrega do objeto contratado`,
+    descricao:
+      "Procedimento administrativo apuratório instaurado em razão de atraso na entrega dos itens 01 e 03 do empenho 2025NE000456, conforme apontado no relatório técnico de fiscalização nº 87/2026.",
+    comissaoMembros: ["Maria Helena Souza (mat. 12345)", "João Pedro Vieira (mat. 67890)"],
+    autoridade: "Secretário de Administração",
+    dataAbertura: dataIso(-2),
+  };
+}
+
+function mockApostilamento(filename: string): ApostilamentoExtraido {
+  const lower = filename.toLowerCase();
+  if (lower.includes("penalidade") || lower.includes("multa")) {
+    return {
+      numero: `01/${ano()}`,
+      objeto: `[DEMO · ${nomeBase(filename)}] Registro de penalidade administrativa aplicada à contratada.`,
+      dataAssinatura: dataIso(0),
+      finalidade: "APLICACAO_PENALIDADE",
+      motivo: "Atraso na entrega — multa moratória de 0,5% por dia.",
+      alteraValor: false,
+      tipoAlteracaoValor: null,
+      novoValor: null,
+      alteraPrazoVigencia: false,
+      novaVigenciaInicio: null,
+      novaVigenciaFim: null,
+      novaVigenciaPrazo: null,
+      novaVigenciaUnidade: null,
+      alteraPrazoEntrega: false,
+      novoPrazoEntregaDias: null,
+      novoPrazoEntregaUnidade: null,
+      aplicaReajuste: false,
+      reajusteIndice: null,
+      reajusteIndiceOutro: null,
+      reajustePeriodoInicio: null,
+      reajustePeriodoFim: null,
+      reajustePercentual: null,
+      observacoes: "Penalidade registrada por apostilamento conforme art. 136 da Lei 14.133.",
+    };
+  }
+  if (lower.includes("empenho") || lower.includes("suplementar") || lower.includes("dotacao") || lower.includes("dotação")) {
+    return {
+      numero: `01/${ano()}`,
+      objeto: `[DEMO · ${nomeBase(filename)}] Empenho de crédito suplementar — atualização da dotação orçamentária.`,
+      dataAssinatura: dataIso(0),
+      finalidade: "EMPENHO_CREDITO_SUPLEMENTAR",
+      motivo: "Reforço de empenho para fazer face às obrigações do exercício.",
+      alteraValor: false,
+      tipoAlteracaoValor: null,
+      novoValor: null,
+      alteraPrazoVigencia: false,
+      novaVigenciaInicio: null,
+      novaVigenciaFim: null,
+      novaVigenciaPrazo: null,
+      novaVigenciaUnidade: null,
+      alteraPrazoEntrega: false,
+      novoPrazoEntregaDias: null,
+      novoPrazoEntregaUnidade: null,
+      aplicaReajuste: false,
+      reajusteIndice: null,
+      reajusteIndiceOutro: null,
+      reajustePeriodoInicio: null,
+      reajustePeriodoFim: null,
+      reajustePercentual: null,
+      observacoes: null,
+    };
+  }
+  // Padrão: reajuste por IPCA
+  return {
+    numero: `01/${ano()}`,
+    objeto: `[DEMO · ${nomeBase(filename)}] Apostilamento de reajuste pela variação acumulada do IPCA-IBGE.`,
+    dataAssinatura: dataIso(0),
+    finalidade: "REAJUSTE",
+    motivo: "Aplicação do índice contratual IPCA — variação acumulada de 12 meses.",
+    alteraValor: true,
+    tipoAlteracaoValor: "REAJUSTE_REPACTUACAO",
+    novoValor: null,
+    alteraPrazoVigencia: false,
+    novaVigenciaInicio: null,
+    novaVigenciaFim: null,
+    novaVigenciaPrazo: null,
+    novaVigenciaUnidade: null,
+    alteraPrazoEntrega: false,
+    novoPrazoEntregaDias: null,
+    novoPrazoEntregaUnidade: null,
+    aplicaReajuste: true,
+    reajusteIndice: "IPCA",
+    reajusteIndiceOutro: null,
+    reajustePeriodoInicio: dataIso(-365),
+    reajustePeriodoFim: dataIso(0),
+    reajustePercentual: 4.85,
+    observacoes: null,
+  };
+}
+
+function mockAditivo(filename: string): AditivoExtraido {
+  const lower = filename.toLowerCase();
+  // Heurística pra demo: o nome do PDF guia o tipo de aditivo simulado.
+  if (lower.includes("reajuste") || lower.includes("ipca")) {
+    return {
+      numero: `01/${ano()}`,
+      objeto: `[DEMO · ${nomeBase(filename)}] Reajuste contratual pela variação acumulada do IPCA no período de 12 meses.`,
+      dataAssinatura: dataIso(0),
+      alteraValor: true,
+      tipoAlteracaoValor: "REAJUSTE_REPACTUACAO",
+      novoValor: null,
+      alteraPrazoVigencia: false,
+      novaVigenciaInicio: null,
+      novaVigenciaFim: null,
+      novaVigenciaPrazo: null,
+      novaVigenciaUnidade: null,
+      alteraPrazoEntrega: false,
+      novoPrazoEntregaDias: null,
+      novoPrazoEntregaUnidade: null,
+      aplicaReajuste: true,
+      reajusteIndice: "IPCA",
+      reajusteIndiceOutro: null,
+      reajustePeriodoInicio: dataIso(-365),
+      reajustePeriodoFim: dataIso(0),
+      reajustePercentual: 4.85,
+      observacoes: "Reajuste calculado pela variação acumulada do IPCA-IBGE no período de 12 meses.",
+    };
+  }
+  if (lower.includes("prorroga") || lower.includes("vigencia") || lower.includes("vigência")) {
+    return {
+      numero: `01/${ano()}`,
+      objeto: `[DEMO · ${nomeBase(filename)}] Prorrogação da vigência contratual por mais 12 meses.`,
+      dataAssinatura: dataIso(0),
+      alteraValor: false,
+      tipoAlteracaoValor: null,
+      novoValor: null,
+      alteraPrazoVigencia: true,
+      novaVigenciaInicio: dataIso(0),
+      novaVigenciaFim: dataIso(365),
+      novaVigenciaPrazo: 12,
+      novaVigenciaUnidade: "MESES",
+      alteraPrazoEntrega: false,
+      novoPrazoEntregaDias: null,
+      novoPrazoEntregaUnidade: null,
+      aplicaReajuste: false,
+      reajusteIndice: null,
+      reajusteIndiceOutro: null,
+      reajustePeriodoInicio: null,
+      reajustePeriodoFim: null,
+      reajustePercentual: null,
+      observacoes: "Prorrogação por interesse da administração.",
+    };
+  }
+  // Padrão: acréscimo quantitativo
+  return {
+    numero: `01/${ano()}`,
+    objeto: `[DEMO · ${nomeBase(filename)}] Acréscimo quantitativo de 15% sobre o valor inicial do contrato (Lei 14.133 art. 125).`,
+    dataAssinatura: dataIso(0),
+    alteraValor: true,
+    tipoAlteracaoValor: "ACRESCIMO",
+    novoValor: 1675.35,
+    alteraPrazoVigencia: false,
+    novaVigenciaInicio: null,
+    novaVigenciaFim: null,
+    novaVigenciaPrazo: null,
+    novaVigenciaUnidade: null,
+    alteraPrazoEntrega: false,
+    novoPrazoEntregaDias: null,
+    novoPrazoEntregaUnidade: null,
+    aplicaReajuste: false,
+    reajusteIndice: null,
+    reajusteIndiceOutro: null,
+    reajustePeriodoInicio: null,
+    reajustePeriodoFim: null,
+    reajustePercentual: null,
+    observacoes: "Acréscimo dentro do limite de 25% previsto em lei.",
   };
 }

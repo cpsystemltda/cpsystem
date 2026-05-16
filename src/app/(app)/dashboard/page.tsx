@@ -32,6 +32,7 @@ import { Block } from "@/components/ui/Block";
 import { KPI, CurrencyValue } from "@/components/ui/KPI";
 import { ChartCard } from "@/components/ui/ChartCard";
 import { TimelineVencimentos } from "@/components/TimelineVencimentos";
+import { UploadInteligenteCard } from "@/components/UploadInteligenteCard";
 import { labelCurtoInstrumento, labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
@@ -530,6 +531,11 @@ export default async function DashboardPage() {
           </Link>
         </div>
       )}
+
+      {/* Upload Inteligente — drop universal de PDF (camada IA) */}
+      <div className="mt-6">
+        <UploadInteligenteCard />
+      </div>
 
       {/* === Bloco I — Financeiro === */}
       <Block numero="01" eyebrow="Performance financeira" titulo="Financeiro">
@@ -1181,60 +1187,107 @@ function FaixasVencimentoChart({
   ate12meses: number;
   acima12meses: number;
 }) {
-  const faixas: { rotulo: string; valor: number; cor: string; glow: string }[] = [
-    { rotulo: "Em menos de 30 dias", valor: ate30, cor: "var(--coral)", glow: "var(--coral-glow)" },
-    { rotulo: "Entre 30 e 60 dias", valor: de30a60, cor: "var(--rose)", glow: "var(--rose-glow)" },
-    { rotulo: "Entre 60 e 90 dias", valor: de60a90, cor: "var(--primary)", glow: "var(--primary-glow)" },
-    { rotulo: "Entre 90 e 180 dias", valor: de90a180, cor: "var(--lavender)", glow: "var(--lavender-glow)" },
-    { rotulo: "Em até 12 meses", valor: ate12meses, cor: "var(--sky)", glow: "var(--sky-glow)" },
-    { rotulo: "Acima de 12 meses", valor: acima12meses, cor: "var(--mint)", glow: "var(--mint-glow)" },
+  const faixas: { rotuloCurto: string; rotuloLongo: string; valor: number; cor: string; glow: string }[] = [
+    { rotuloCurto: "< 30d", rotuloLongo: "Em menos de 30 dias", valor: ate30, cor: "var(--coral)", glow: "var(--coral-glow)" },
+    { rotuloCurto: "30–60d", rotuloLongo: "Entre 30 e 60 dias", valor: de30a60, cor: "var(--rose)", glow: "var(--rose-glow)" },
+    { rotuloCurto: "60–90d", rotuloLongo: "Entre 60 e 90 dias", valor: de60a90, cor: "var(--primary)", glow: "var(--primary-glow)" },
+    { rotuloCurto: "90–180d", rotuloLongo: "Entre 90 e 180 dias", valor: de90a180, cor: "var(--lavender)", glow: "var(--lavender-glow)" },
+    { rotuloCurto: "Até 12m", rotuloLongo: "Em até 12 meses", valor: ate12meses, cor: "var(--sky)", glow: "var(--sky-glow)" },
+    { rotuloCurto: "+12m", rotuloLongo: "Acima de 12 meses", valor: acima12meses, cor: "var(--mint)", glow: "var(--mint-glow)" },
   ];
   const max = Math.max(1, ...faixas.map((f) => f.valor));
+  const total = faixas.reduce((acc, f) => acc + f.valor, 0);
 
   return (
-    <div className="flex flex-col gap-3">
-      {faixas.map((f) => {
-        const pct = (f.valor / max) * 100;
-        return (
-          <div key={f.rotulo} className="flex items-center gap-4">
+    <div className="flex flex-col gap-4">
+      {/* Grid 6 colunas — compacto, todas faixas visíveis lado a lado.
+          Tiles com valor > 0 ganham fundo saturado + sombra; zero fica suave. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
+        {faixas.map((f) => {
+          const ativo = f.valor > 0;
+          const pct = (f.valor / max) * 100;
+          return (
             <div
-              className="w-[180px] shrink-0 text-[12px] font-medium"
-              style={{ color: "var(--text-soft)", letterSpacing: "-0.005em" }}
+              key={f.rotuloLongo}
+              className="relative flex flex-col items-start justify-between gap-2 overflow-hidden rounded-2xl px-3 py-3 transition"
+              title={f.rotuloLongo}
+              style={{
+                background: ativo
+                  ? `linear-gradient(135deg, ${f.cor}22, ${f.cor}0d)`
+                  : "rgba(15,14,12,0.03)",
+                border: `0.5px solid ${ativo ? `${f.cor}55` : "rgba(15,14,12,0.06)"}`,
+                boxShadow: ativo ? `0 4px 18px ${f.glow}` : "none",
+                minHeight: "76px",
+              }}
             >
-              {f.rotulo}
-            </div>
-            <div
-              className="relative flex-1 overflow-hidden rounded-full"
-              style={{ background: "rgba(15,14,12,0.06)", height: "20px" }}
-            >
-              <div
-                className="absolute inset-y-0 left-0 flex items-center justify-end pr-2.5 rounded-full"
+              {/* topo: dot + rótulo curto */}
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{
+                    background: ativo ? f.cor : "rgba(15,14,12,0.18)",
+                    boxShadow: ativo ? `0 0 8px ${f.glow}` : "none",
+                  }}
+                />
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{
+                    color: ativo ? "var(--text)" : "var(--text-mute)",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {f.rotuloCurto}
+                </span>
+              </div>
+
+              {/* número grande */}
+              <span
+                className="text-[26px] font-extrabold leading-none tabular-nums"
                 style={{
-                  width: `${pct}%`,
-                  background: `linear-gradient(90deg, ${f.cor}99, ${f.cor})`,
-                  boxShadow: `0 0 16px ${f.glow}`,
-                  minWidth: f.valor > 0 ? "32px" : "0",
+                  color: ativo ? "var(--text)" : "var(--text-mute)",
+                  letterSpacing: "-0.04em",
+                  opacity: ativo ? 1 : 0.35,
                 }}
               >
-                {f.valor > 0 && (
-                  <span
-                    className="text-[11px] font-extrabold"
-                    style={{ color: "#0A0A0A", letterSpacing: "-0.02em" }}
-                  >
-                    {f.valor}
-                  </span>
-                )}
+                {f.valor}
+              </span>
+
+              {/* trilho sutil no rodapé com a proporção */}
+              <div
+                className="h-[3px] w-full overflow-hidden rounded-full"
+                style={{ background: "rgba(15,14,12,0.05)" }}
+              >
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: ativo ? `${Math.max(8, pct)}%` : "0%",
+                    background: `linear-gradient(90deg, ${f.cor}aa, ${f.cor})`,
+                  }}
+                />
               </div>
             </div>
-            <div
-              className="w-[40px] text-right text-[14px] font-extrabold tabular-nums"
-              style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
-            >
-              {f.valor}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {/* Resumo abaixo do grid */}
+      <div
+        className="flex items-center justify-between rounded-xl px-3 py-2"
+        style={{ background: "rgba(15,14,12,0.03)" }}
+      >
+        <span
+          className="text-[10px] font-bold uppercase"
+          style={{ letterSpacing: "0.14em", color: "var(--text-mute)" }}
+        >
+          Total no horizonte
+        </span>
+        <span
+          className="text-[14px] font-extrabold tabular-nums"
+          style={{ color: total > 0 ? "var(--text)" : "var(--text-mute)" }}
+        >
+          {total} {total === 1 ? "vencimento" : "vencimentos"}
+        </span>
+      </div>
     </div>
   );
 }

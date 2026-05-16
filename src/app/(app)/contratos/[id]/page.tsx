@@ -135,7 +135,11 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
         </div>
       </div>
 
-      <AlertaReajuste marcoOrcamentoEstimado={contrato.marcoOrcamentoEstimado} hrefReajustes="/reajustes" />
+      <AlertaReajuste
+        marcoOrcamentoEstimado={contrato.marcoOrcamentoEstimado}
+        hrefReajustes="/reajustes"
+        contratoId={contrato.id}
+      />
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         <Stat titulo="Valor total contratado" valor={brl(saldo.valorTotal)} />
@@ -160,6 +164,8 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
                   aditivos={contrato.termosAditivos}
                   contratoId={contrato.id}
                   contratoTipo={contrato.tipo}
+                  valorInicialContrato={contrato.valorInicial ?? saldo.valorTotal}
+                  valorAtualContrato={saldo.valorTotal}
                 />
               ),
             },
@@ -167,13 +173,54 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               key: "apostilamentos",
               label: "Apostilamentos",
               badge: contrato.apostilamentos.length,
-              content: <ApostilamentosTab apostilamentos={contrato.apostilamentos} contratoId={contrato.id} />,
+              content: (
+                <ApostilamentosTab
+                  apostilamentos={contrato.apostilamentos}
+                  contratoId={contrato.id}
+                  valorInicialContrato={contrato.valorInicial ?? saldo.valorTotal}
+                  valorAtualContrato={saldo.valorTotal}
+                />
+              ),
             },
             {
               key: "reajustes",
               label: "Reajustes",
-              badge: contrato.reajustes.length,
-              content: <ReajustesTab reajustes={contrato.reajustes} contratoId={contrato.id} />,
+              badge:
+                contrato.reajustes.length +
+                contrato.termosAditivos.filter((a) => a.aplicaReajuste).length +
+                contrato.apostilamentos.filter((a) => a.aplicaReajuste).length,
+              content: (
+                <ReajustesTab
+                  reajustesLegado={contrato.reajustes}
+                  aditivosComReajuste={contrato.termosAditivos
+                    .filter((a) => a.aplicaReajuste)
+                    .map((a) => ({
+                      id: a.id,
+                      numero: a.numero,
+                      dataAssinatura: a.dataAssinatura,
+                      reajusteIndice: a.reajusteIndice,
+                      reajusteIndiceOutro: a.reajusteIndiceOutro,
+                      reajustePercentual: a.reajustePercentual,
+                      reajustePeriodoInicio: a.reajustePeriodoInicio,
+                      reajustePeriodoFim: a.reajustePeriodoFim,
+                      arquivoPdfUrl: a.arquivoPdfUrl,
+                    }))}
+                  apostilamentosComReajuste={contrato.apostilamentos
+                    .filter((a) => a.aplicaReajuste)
+                    .map((a) => ({
+                      id: a.id,
+                      numero: a.numero,
+                      dataAssinatura: a.dataAssinatura,
+                      reajusteIndice: a.reajusteIndice,
+                      reajusteIndiceOutro: a.reajusteIndiceOutro,
+                      reajustePercentual: a.reajustePercentual,
+                      reajustePeriodoInicio: a.reajustePeriodoInicio,
+                      reajustePeriodoFim: a.reajustePeriodoFim,
+                      arquivoPdfUrl: a.arquivoPdfUrl,
+                    }))}
+                  marcoOrcamentoEstimado={contrato.marcoOrcamentoEstimado}
+                />
+              ),
             },
             {
               key: "garantias",
@@ -213,7 +260,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
             },
             {
               key: "procedimentos",
-              label: "Procedimentos",
+              label: "Procedimentos apuratórios",
               badge: contrato.procedimentos.length,
               content: <ProcedimentosTab procedimentos={contrato.procedimentos} contratoId={contrato.id} />,
             },
@@ -246,6 +293,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               content: (
                 <RelatorioContratacao
                   rotuloRecurso="Contrato"
+                  pdfLink={{ tipo: "contrato", id: contrato.id }}
                   contrato={{
                     numero: contrato.numero,
                     vigenciaInicio: contrato.vigenciaInicio,
@@ -411,7 +459,7 @@ function DadosContrato({
     dataPublicacao: Date | null; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null;
     prazoEntregaUnidade: "DIAS" | "MESES";
-    prazoEntregaModo: "RELATIVO" | "DATA_CERTA";
+    prazoEntregaModo: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA";
     dataEntregaCerta: Date | null;
     prazoPagamentoDias: number | null;
     marcoReajusteOrigem: string | null;
@@ -438,13 +486,15 @@ function DadosContrato({
         <Info
           label="Prazo de entrega"
           valor={
-            c.prazoEntregaModo === "DATA_CERTA"
-              ? c.dataEntregaCerta
-                ? `Data certa: ${c.dataEntregaCerta.toLocaleDateString("pt-BR")}`
-                : "Data certa não informada"
-              : c.prazoEntregaDias
-                ? `${c.prazoEntregaDias} ${c.prazoEntregaUnidade === "MESES" ? (c.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
-                : "—"
+            c.prazoEntregaModo === "SOB_DEMANDA"
+              ? "Sob demanda (a definir)"
+              : c.prazoEntregaModo === "DATA_CERTA"
+                ? c.dataEntregaCerta
+                  ? `Data certa: ${c.dataEntregaCerta.toLocaleDateString("pt-BR")}`
+                  : "Data certa não informada"
+                : c.prazoEntregaDias
+                  ? `${c.prazoEntregaDias} ${c.prazoEntregaUnidade === "MESES" ? (c.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
+                  : "—"
           }
         />
         <Info label="Prazo de pagamento" valor={c.prazoPagamentoDias ? `${c.prazoPagamentoDias} dias` : "—"} />
