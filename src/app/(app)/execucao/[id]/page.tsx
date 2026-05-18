@@ -141,14 +141,27 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
       </div>
 
       <div className="mt-6 space-y-2">
-        {prazoEntrega && !e.dataEntrega && Date.now() > prazoEntrega.getTime() && (
-          <Alerta cor="red">Entrega atrasada — prazo era {prazoEntrega.toLocaleDateString("pt-BR")}.</Alerta>
-        )}
-        {prazoPagamento && !e.dataPagamento && Date.now() > prazoPagamento.getTime() && (
-          <Alerta cor="red">
-            Pagamento em atraso pelo órgão — prazo era {prazoPagamento.toLocaleDateString("pt-BR")} ({e.prazoPagamentoDias} dias após NF).
-          </Alerta>
-        )}
+        {(() => {
+          // Mesmo critério usado em Timeline() lá embaixo: compara só o dia
+          // calendário UTC, ignorando hora. Evita falso atraso quando o
+          // pedido recebido cai no mesmo dia do limite.
+          const nowDay = (() => { const n = new Date(); return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()); })();
+          const dia = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+          const entregaAtrasada = prazoEntrega && !e.dataEntrega && nowDay > dia(prazoEntrega);
+          const pagamentoAtrasado = prazoPagamento && !e.dataPagamento && nowDay > dia(prazoPagamento);
+          return (
+            <>
+              {entregaAtrasada && (
+                <Alerta cor="red">Entrega atrasada — prazo era {prazoEntrega!.toLocaleDateString("pt-BR")}.</Alerta>
+              )}
+              {pagamentoAtrasado && (
+                <Alerta cor="red">
+                  Pagamento em atraso pelo órgão — prazo era {prazoPagamento!.toLocaleDateString("pt-BR")} ({e.prazoPagamentoDias} dias após NF).
+                </Alerta>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       <AlertaReajuste marcoOrcamentoEstimado={marcoReajusteHerdado} hrefReajustes="/reajustes" />
@@ -446,20 +459,30 @@ function Timeline({
       ? new Date(empenho.dataNfEncaminhada.getTime() + diasPgto * 86400000)
       : null;
 
+  // Compara duas datas só pelo dia calendário em UTC (ignora hora).
+  // Necessário porque marcos são salvos como meio-dia UTC (parseDataInputBr)
+  // e dataEntregaCerta cai como meia-noite UTC (z.coerce.date) — ambas
+  // representam o mesmo dia, mas `>` direto trataria entrega = prazo como atraso.
+  const diaUtc = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const hojeDiaUtc = (() => {
+    const n = new Date();
+    return Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+  })();
+
   const entregaAtrasada =
     prazoLimiteEntrega &&
     !empenho.dataEntrega &&
-    Date.now() > prazoLimiteEntrega.getTime();
+    hojeDiaUtc > diaUtc(prazoLimiteEntrega);
 
   const pagamentoAtrasado =
     prazoLimitePagamento &&
     !empenho.dataPagamento &&
-    Date.now() > prazoLimitePagamento.getTime();
+    hojeDiaUtc > diaUtc(prazoLimitePagamento);
 
   const entregaComAtraso =
     empenho.dataEntrega &&
     prazoLimiteEntrega &&
-    empenho.dataEntrega > prazoLimiteEntrega;
+    diaUtc(empenho.dataEntrega) > diaUtc(prazoLimiteEntrega);
 
   return (
     <div className="space-y-3">
@@ -534,7 +557,7 @@ function Timeline({
                           ⚠ Entregue com atraso
                         </span>
                       )}
-                      {isPago && prazoLimitePagamento && concluido && empenho.dataPagamento! > prazoLimitePagamento && (
+                      {isPago && prazoLimitePagamento && concluido && diaUtc(empenho.dataPagamento!) > diaUtc(prazoLimitePagamento) && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
                           ⚠ Pago com atraso pelo órgão
                         </span>

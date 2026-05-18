@@ -183,7 +183,15 @@ export default async function ExecucaoPage({
             const prazo = e.dataPedidoRecebido && e.prazoEntregaDias
               ? new Date(e.dataPedidoRecebido.getTime() + e.prazoEntregaDias * 86400000)
               : null;
-            const atrasoDias = prazo && !e.dataEntrega ? Math.ceil((Date.now() - prazo.getTime()) / 86400000) : 0;
+            // Conta dias só por dia calendário UTC (não conta horas).
+            // Day-of-prazo ainda é tempestivo; atraso começa no dia seguinte.
+            const atrasoDias = (() => {
+              if (!prazo || e.dataEntrega) return 0;
+              const dia = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+              const n = new Date();
+              const hoje = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+              return Math.max(0, Math.round((hoje - dia(prazo)) / 86400000));
+            })();
             return (
               <Link
                 key={e.id}
