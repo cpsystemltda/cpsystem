@@ -31,6 +31,31 @@ export function UploadPdfPanel<T>({
   const [pdfNome, setPdfNome] = useState<string | null>(null);
   const [badge, setBadge] = useState<string | null>(null);
   const [modoDemo, setModoDemo] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  function onDragOver(ev: React.DragEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (!extraindo) setDragOver(true);
+  }
+  function onDragLeave(ev: React.DragEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragOver(false);
+  }
+  function onDrop(ev: React.DragEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragOver(false);
+    if (extraindo) return;
+    const file = ev.dataTransfer.files?.[0];
+    if (!file) return;
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setErro("Arquivo precisa ser um PDF.");
+      return;
+    }
+    handleArquivo(file);
+  }
 
   async function handleArquivo(file: File) {
     setExtraindo(true);
@@ -59,10 +84,18 @@ export function UploadPdfPanel<T>({
 
   return (
     <section
-      className="glass-tile overflow-hidden rounded-[20px] px-7 py-6"
+      onDragOver={onDragOver}
+      onDragEnter={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={`glass-tile overflow-hidden rounded-[20px] px-7 py-6 transition ${
+        dragOver ? "ring-2 ring-offset-2" : ""
+      }`}
       style={{
-        background:
-          "linear-gradient(135deg, rgba(197,180,255,0.12), rgba(184,197,214,0.04)), var(--glass-2)",
+        background: dragOver
+          ? "linear-gradient(135deg, rgba(197,180,255,0.28), rgba(184,197,214,0.10)), var(--glass-2)"
+          : "linear-gradient(135deg, rgba(197,180,255,0.12), rgba(184,197,214,0.04)), var(--glass-2)",
+        ...(dragOver ? { boxShadow: "0 0 0 2px var(--lavender)" } : {}),
       }}
     >
       <div className="relative z-[1] flex items-start gap-4">
@@ -84,6 +117,9 @@ export function UploadPdfPanel<T>({
           </h2>
           <p className="mt-1 text-[13px]" style={{ color: "var(--text-soft)" }}>
             {descricao}
+          </p>
+          <p className="mt-1 text-[12px]" style={{ color: "var(--text-mute)" }}>
+            {dragOver ? "Solte o PDF aqui…" : "Arraste o PDF aqui ou clique no botão abaixo."}
           </p>
 
           <input

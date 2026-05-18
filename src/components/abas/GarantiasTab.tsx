@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useActionState } from "react";
-import { Shield, Plus, AlertTriangle, FileText, X, Sparkles, Loader2, Check } from "lucide-react";
+import { Shield, Plus, AlertTriangle, FileText, X } from "lucide-react";
 import { brl } from "@/lib/validators";
 import {
   criarGarantiaAction,
@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/contratuais";
 import { extrairGarantiaPdfAction } from "@/app/actions/iaExtracao";
 import type { GarantiaExtraida } from "@/lib/extrairAta";
+import { UploadPdfPanel } from "@/components/UploadPdfPanel";
 
 type Endosso = {
   id: string;
@@ -66,11 +67,10 @@ export function GarantiasTab({
   temGarantia?: boolean | null;
 }) {
   const semGarantia = garantias.length === 0;
-  const [resposta, setResposta] = useState<"sim" | "nao" | null>(
-    semGarantia ? (temGarantia === false ? "nao" : null) : "sim",
-  );
   const [adicionando, setAdicionando] = useState(false);
-  const [stateMarcar, marcarAction] = useActionState(marcarSemGarantiaAction, null);
+  // Submete imediatamente quando user clica "Sim" ou "Não" — um clique só,
+  // sem etapa de "confirmar" que era confusa (Igor: "não tem opção de salvar").
+  const [stateMarcar, marcarAction, marcarPending] = useActionState(marcarSemGarantiaAction, null);
 
   return (
     <div className="space-y-4">
@@ -87,18 +87,22 @@ export function GarantiasTab({
           <form action={marcarAction} className="mt-3">
             {contratoId && <input type="hidden" name="contratoId" value={contratoId} />}
             {empenhoId && <input type="hidden" name="empenhoId" value={empenhoId} />}
-            <input type="hidden" name="valor" value="true" />
+            <input type="hidden" name="valor" value="reset" />
             <button
               type="submit"
-              className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+              disabled={marcarPending}
+              className="rounded-md border border-slate-300 bg-white px-4 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
             >
-              Marcar que há previsão de garantia
+              {marcarPending ? "Alterando…" : "Alterar — passar a ter previsão de garantia"}
             </button>
           </form>
+          {stateMarcar?.erro && (
+            <p className="mt-2 text-xs text-red-700">{stateMarcar.erro}</p>
+          )}
         </div>
       )}
 
-      {/* Pergunta Sim/Não — só quando não há garantias cadastradas E não foi declarado "Não" antes */}
+      {/* Pergunta Sim/Não — clique direto salva (sem etapa intermediária) */}
       {semGarantia && !adicionando && temGarantia !== false && (
         <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="mb-3 flex items-center gap-2">
@@ -109,47 +113,26 @@ export function GarantiasTab({
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => { setResposta("sim"); setAdicionando(true); }}
-              className={`rounded-md border px-5 py-2 text-sm font-medium transition ${
-                resposta === "sim"
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
+              onClick={() => setAdicionando(true)}
+              className="rounded-md border border-blue-600 bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
             >
-              Sim
+              Sim, cadastrar garantia
             </button>
-            <button
-              type="button"
-              onClick={() => setResposta("nao")}
-              className={`rounded-md border px-5 py-2 text-sm font-medium transition ${
-                resposta === "nao"
-                  ? "border-slate-700 bg-slate-700 text-white"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              Não
-            </button>
+            <form action={marcarAction}>
+              {contratoId && <input type="hidden" name="contratoId" value={contratoId} />}
+              {empenhoId && <input type="hidden" name="empenhoId" value={empenhoId} />}
+              <input type="hidden" name="valor" value="false" />
+              <button
+                type="submit"
+                disabled={marcarPending}
+                className="rounded-md border border-slate-300 bg-white px-5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                {marcarPending ? "Salvando…" : "Não, sem previsão"}
+              </button>
+            </form>
           </div>
-          {resposta === "nao" && (
-            <>
-              <p className="mt-3 text-xs text-slate-500">
-                Nenhuma garantia contratual prevista. Confirme abaixo pra registrar essa decisão.
-              </p>
-              <form action={marcarAction} className="mt-3">
-                {contratoId && <input type="hidden" name="contratoId" value={contratoId} />}
-                {empenhoId && <input type="hidden" name="empenhoId" value={empenhoId} />}
-                <input type="hidden" name="valor" value="false" />
-                <button
-                  type="submit"
-                  className="rounded-md bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                >
-                  Salvar — Sem previsão de garantia
-                </button>
-              </form>
-              {stateMarcar?.erro && (
-                <p className="mt-2 text-xs text-red-700">{stateMarcar.erro}</p>
-              )}
-            </>
+          {stateMarcar?.erro && (
+            <p className="mt-3 text-xs text-red-700">{stateMarcar.erro}</p>
           )}
         </div>
       )}
@@ -199,12 +182,11 @@ function FormNovaGarantia({
 }) {
   const [state, formAction] = useActionState(criarGarantiaAction, null);
   const [modalidade, setModalidade] = useState<Modalidade>("SEGURO_GARANTIA");
-  // IA — extração via PDF (M5)
+  // IA — extração via PDF (M5). Usa o UploadPdfPanel padrão (mesmo layout
+  // e drag-and-drop usados nos forms de Ata/Contrato/Empenho).
   const [iaDados, setIaDados] = useState<GarantiaExtraida | null>(null);
   const [iaArquivoUrl, setIaArquivoUrl] = useState<string | null>(null);
   const [iaArquivoNome, setIaArquivoNome] = useState<string | null>(null);
-  const [iaExtraindo, setIaExtraindo] = useState(false);
-  const [iaErro, setIaErro] = useState<string | null>(null);
 
   useEffect(() => {
     if (state?.ok) onSucesso();
@@ -213,22 +195,6 @@ function FormNovaGarantia({
   useEffect(() => {
     if (iaDados?.modalidade) setModalidade(iaDados.modalidade);
   }, [iaDados]);
-
-  async function handleIa(file: File) {
-    setIaExtraindo(true);
-    setIaErro(null);
-    const fd = new FormData();
-    fd.append("pdf", file);
-    const res = await extrairGarantiaPdfAction(fd);
-    setIaExtraindo(false);
-    if (!res.ok) {
-      setIaErro(res.erro);
-      return;
-    }
-    setIaDados(res.dados);
-    if (res.arquivoUrl) setIaArquivoUrl(res.arquivoUrl);
-    if (res.nomeArquivo) setIaArquivoNome(res.nomeArquivo);
-  }
 
   const isSeguro = modalidade === "SEGURO_GARANTIA";
   const isFianca = modalidade === "FIANCA_BANCARIA";
@@ -249,35 +215,20 @@ function FormNovaGarantia({
         </button>
       </div>
 
-      {/* IA — extração automática do PDF (M5) */}
-      <div className="mb-4 rounded-lg border border-dashed border-blue-300 bg-white p-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Sparkles className="h-4 w-4 text-blue-600" />
-          <span className="text-xs font-medium text-slate-700">
-            Preencher automaticamente a partir do PDF (apólice, fiança, recibo)
-          </span>
-          <input
-            type="file"
-            accept="application/pdf"
-            disabled={iaExtraindo}
-            onChange={(ev) => {
-              const f = ev.target.files?.[0];
-              if (f) handleIa(f);
-            }}
-            className="text-xs text-slate-600 file:mr-2 file:rounded file:border-0 file:bg-blue-50 file:px-2 file:py-1 file:text-xs file:font-medium file:text-blue-700"
-          />
-          {iaExtraindo && (
-            <span className="inline-flex items-center gap-1 text-xs text-blue-700">
-              <Loader2 className="h-3 w-3 animate-spin" /> Extraindo…
-            </span>
-          )}
-          {iaDados && !iaExtraindo && (
-            <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
-              <Check className="h-3 w-3" /> Dados preenchidos · revisar
-            </span>
-          )}
-        </div>
-        {iaErro && <p className="mt-2 text-xs text-red-700">{iaErro}</p>}
+      {/* IA — extração automática do PDF (M5). Mesmo painel premium das
+          outras telas (drag-and-drop + layout consistente). */}
+      <div className="mb-4">
+        <UploadPdfPanel
+          titulo="Preencher automaticamente a partir do PDF"
+          descricao="Anexe a apólice (seguro), o contrato de fiança bancária ou o recibo da caução. A IA extrai modalidade, valor, datas e dados específicos. Você confere antes de salvar."
+          action={extrairGarantiaPdfAction}
+          onSuccess={setIaDados}
+          onArquivoSalvo={(info) => {
+            setIaArquivoUrl(info.url);
+            setIaArquivoNome(info.nome);
+          }}
+          badgeAposExtracao={() => "Dados preenchidos · revisar"}
+        />
         {iaArquivoNome && (
           <p className="mt-2 text-[10px] text-slate-500">
             PDF anexado: <strong>{iaArquivoNome}</strong> (será salvo na aba Anexos)
@@ -428,10 +379,29 @@ function FormNovaGarantia({
 // ─────────────────────────────────────────────
 function CardGarantia({ g }: { g: Garantia }) {
   const [endossando, setEndossando] = useState(false);
-  const diasAteVencer = g.dataFim
-    ? Math.ceil((g.dataFim.getTime() - Date.now()) / 86400000)
+  // Vigência efetiva = max(garantia.dataFim, ...endossos.dataFim). Calcular
+  // dinamicamente garante que dados legacy (endosso cadastrado antes do
+  // write-through em adicionarEndossoAction) também mostrem a vigência
+  // estendida — sem precisar de migração retroativa.
+  const datasFim = [
+    g.dataFim,
+    ...g.endossos.map((e) => e.dataFim),
+  ].filter((d): d is Date => d != null);
+  const dataFimEfetiva = datasFim.length
+    ? new Date(Math.max(...datasFim.map((d) => d.getTime())))
     : null;
+  const estendidaPorEndosso =
+    dataFimEfetiva != null && g.dataFim != null && dataFimEfetiva.getTime() > g.dataFim.getTime();
+  // Conta dias só por dia calendário UTC (igual ao fix do prazo da entrega).
+  const diasAteVencer = (() => {
+    if (!dataFimEfetiva) return null;
+    const dia = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const n = new Date();
+    const hoje = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+    return Math.round((dia(dataFimEfetiva) - hoje) / 86400000);
+  })();
   const venceBreve = diasAteVencer !== null && diasAteVencer <= 30;
+  const vencida = diasAteVencer !== null && diasAteVencer < 0;
   const valorTotal = g.valor + g.endossos.reduce((s, e) => s + e.valor, 0);
   const temEndosso = g.modalidade === "SEGURO_GARANTIA" || g.modalidade === "FIANCA_BANCARIA";
 
@@ -447,10 +417,16 @@ function CardGarantia({ g }: { g: Garantia }) {
           <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
             {LABEL[g.modalidade as Modalidade] ?? g.modalidade}
           </span>
-          {venceBreve && (
+          {venceBreve && !vencida && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
               <AlertTriangle className="h-3 w-3" />
               Vence em {diasAteVencer}d
+            </span>
+          )}
+          {vencida && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+              <AlertTriangle className="h-3 w-3" />
+              Vencida há {Math.abs(diasAteVencer!)}d
             </span>
           )}
         </div>
@@ -490,6 +466,11 @@ function CardGarantia({ g }: { g: Garantia }) {
           <span className={venceBreve ? "font-semibold text-amber-700" : ""}>
             <span className="font-medium text-slate-700">Fim:</span>{" "}
             {g.dataFim.toLocaleDateString("pt-BR")}
+            {estendidaPorEndosso && dataFimEfetiva && (
+              <span className="ml-1 text-slate-500">
+                → prorrogada até <strong>{dataFimEfetiva.toLocaleDateString("pt-BR")}</strong> via endosso
+              </span>
+            )}
           </span>
         )}
         {g.descricao && <span className="col-span-2 mt-1 text-slate-700">{g.descricao}</span>}
