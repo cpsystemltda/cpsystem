@@ -11,6 +11,8 @@ import { EnderecosEntregaEditor, PontosFocaisEditor } from "@/components/Editore
 import type { ItemInicial } from "@/components/ItensEditor";
 import { criarEmpenhoAction, editarEmpenhoAction } from "@/app/actions/contratacoes";
 import { extrairEmpenhoPdfAction } from "@/app/actions/iaExtracao";
+import { matchItensIaAction, type Sugestao as SugestaoIa } from "@/app/actions/iaMatchItens";
+import { usePrefillIa } from "@/lib/usePrefillIa";
 import { OPCOES_TIPO } from "@/lib/validators";
 import type { EmpenhoExtraido } from "@/lib/extrairAta";
 import {
@@ -27,7 +29,36 @@ import { AnexosAdicionaisEditor } from "@/components/forms/AnexosAdicionaisEdito
 
 type EmpresaOpt = { value: string; label: string };
 type AtaOpt = { value: string; label: string; itens: AtaItemRef[] };
-type ContratoOpt = { value: string; label: string; ataId: string | null };
+
+// Dados herdáveis do Contrato pai pra pré-preencher o form de execução.
+// Opcional: quando ausente (rota editar), o seletor de contrato não auto-preenche.
+type ContratoDados = {
+  empresaId: string;
+  tipo: string;
+  processoAdministrativo: string;
+  numeroLicitacao: string | null;
+  objeto: string;
+  orgaoNome: string;
+  orgaoCnpj: string;
+  orgaoEndereco: string;
+  orgaoEmail: string | null;
+  orgaoTelefone: string | null;
+  prazoEntregaDias: number | null;
+  prazoEntregaUnidade: "DIAS" | "MESES";
+  prazoEntregaModo: "RELATIVO" | "DATA_CERTA";
+  dataEntregaCerta: string | null;
+  prazoPagamentoDias: number | null;
+  enderecosEntrega: { id: string; rotulo: string | null; endereco: string }[];
+  pontosFocais: {
+    id: string;
+    nome: string;
+    email: string | null;
+    telefone: string | null;
+    funcao: string;
+    funcaoDescricao: string | null;
+  }[];
+};
+type ContratoOpt = { value: string; label: string; ataId: string | null; dados?: ContratoDados };
 
 export type EmpenhoValoresIniciais = {
   empresaId: string;
@@ -113,6 +144,14 @@ export default function NovoEmpenhoForm({
   const [contratoId, setContratoId] = useState(vi?.contratoId ?? "");
   const [dados, setDados] = useState<EmpenhoExtraido | null>(null);
 
+  // Contrato selecionado — usado pra herdar campos no modo "Derivado de
+  // Contrato". O `key` do form muda quando contratoId muda, então os
+  // defaultValues abaixo são reaplicados.
+  const contratoSelecionado = origem === "contrato"
+    ? contratos.find((c) => c.value === contratoId)
+    : undefined;
+  const heranca = contratoSelecionado?.dados;
+
   // Vigência calc (Ajuste 4) — Início + Prazo + Fim calculado
   const [vigenciaInicio, setVigenciaInicio] = useState<string>(vi?.vigenciaInicio ?? "");
   const prazoDetectado = detectarPrazoVigencia(
@@ -164,8 +203,49 @@ export default function NovoEmpenhoForm({
     setCamposAuto(auto);
   }, [dados]);
 
+  // Sincroniza estados controlados quando troca o contrato selecionado
+  // (defaultValue só age na montagem, então estado precisa de useEffect).
+  useEffect(() => {
+    if (!heranca) return;
+    setPrazoEntregaModo(heranca.prazoEntregaModo);
+    if (heranca.prazoEntregaUnidade) setPrazoEntregaUnidade(heranca.prazoEntregaUnidade);
+  }, [heranca]);
+
   const ataSelecionada = origem === "ata" ? atas.find((a) => a.value === ataId) : undefined;
-  const formKey = dados ? `auto-${dados.numero}` : "manual";
+  // Quando troca de contrato (ou volta pra origem "livre"), remonta o form
+  // pra que defaultValue/iniciais sejam reaplicados com os dados do contrato.
+  const formKey = dados
+    ? `auto-${dados.numero}`
+    : heranca
+      ? `contrato-${contratoId}`
+      : "manual";
+
+  // M9 IA — matching dos itens extraídos contra a Ata vinculada
+  const [sugestoesItens, setSugestoesItens] = useState<SugestaoIa[]>([]);
+
+  // M9 IA — prefill via UploadInteligenteCard
+  const prefill = usePrefillIa<EmpenhoExtraido>("EMPENHO");
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.dados) setDados(prefill.dados);
+    if (prefill.arquivoUrl) setArquivoPdfUrl(prefill.arquivoUrl);
+    if (prefill.arquivoNome) setArquivoPdfNome(prefill.arquivoNome);
+  }, [prefill]);
+  useEffect(() => {
+    if (!dados || !dados.itens || dados.itens.length === 0) return;
+    if (!ataSelecionada || !ataSelecionada.itens.length) {
+      setSugestoesItens([]);
+      return;
+    }
+    let cancelled = false;
+    matchItensIaAction(dados.itens, ataSelecionada.itens).then((res) => {
+      if (cancelled) return;
+      if (res.ok) setSugestoesItens(res.sugestoes);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dados, ataSelecionada]);
 
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
@@ -315,23 +395,32 @@ export default function NovoEmpenhoForm({
             />
           )}
           {origem === "contrato" && (
-            <Select
-              label="Contrato vinculado"
-              name="contratoId"
-              options={contratos.map((c) => ({ value: c.value, label: c.label }))}
-              required
-              value={contratoId}
-              onChange={(ev) => setContratoId(ev.currentTarget.value)}
-              span={4}
-              className="mt-4"
-            />
+            <>
+              <Select
+                label="Contrato vinculado"
+                name="contratoId"
+                options={contratos.map((c) => ({ value: c.value, label: c.label }))}
+                required
+                value={contratoId}
+                onChange={(ev) => setContratoId(ev.currentTarget.value)}
+                span={4}
+                className="mt-4"
+              />
+              {heranca && modo !== "editar" && (
+                <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  Dados do contrato herdados (órgão, objeto, prazos, endereços e pontos focais). Confira
+                  e ajuste o que for específico desta execução — número, data de recebimento, vigência e itens
+                  continuam por preencher.
+                </p>
+              )}
+            </>
           )}
         </Secao>
 
         <Secao titulo="Identificação">
           <div className="grid grid-cols-4 gap-4">
-            <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} defaultValue={vi?.empresaId} />
-            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={vi?.tipo} />
+            <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} defaultValue={heranca?.empresaId ?? vi?.empresaId} />
+            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={heranca?.tipo ?? vi?.tipo} />
             <Field
               label={`${labelNumero} (nº/ano)`}
               name="numero"
@@ -346,7 +435,7 @@ export default function NovoEmpenhoForm({
               required
               erro={e.processoAdministrativo}
               span={2}
-              defaultValue={dados?.processoAdministrativo ?? vi?.processoAdministrativo}
+              defaultValue={dados?.processoAdministrativo ?? heranca?.processoAdministrativo ?? vi?.processoAdministrativo}
             />
             {/* Procedimento de seleção removido do form (M3.3 ajuste 2,
                 decisão Igor). Quando vinculado a Ata/Contrato a info é
@@ -357,7 +446,7 @@ export default function NovoEmpenhoForm({
               name="numeroLicitacao"
               erro={e.numeroLicitacao}
               span={2}
-              defaultValue={dados?.numeroLicitacao ?? vi?.numeroLicitacao ?? ""}
+              defaultValue={dados?.numeroLicitacao ?? heranca?.numeroLicitacao ?? vi?.numeroLicitacao ?? ""}
             />
             <TextareaGlass
               label="Objeto"
@@ -366,8 +455,8 @@ export default function NovoEmpenhoForm({
               erro={e.objeto}
               span={4}
               minRows={3}
-              defaultValue={dados?.objeto ?? vi?.objeto}
-              auto={camposAuto.has("objeto")}
+              defaultValue={dados?.objeto ?? heranca?.objeto ?? vi?.objeto}
+              auto={camposAuto.has("objeto") || (!!heranca && !dados)}
             />
           </div>
         </Secao>
@@ -380,7 +469,7 @@ export default function NovoEmpenhoForm({
               required
               erro={e.orgaoNome}
               span={2}
-              defaultValue={dados?.orgaoNome ?? vi?.orgaoNome}
+              defaultValue={dados?.orgaoNome ?? heranca?.orgaoNome ?? vi?.orgaoNome}
             />
             <CnpjInput
               label="CNPJ do órgão"
@@ -388,8 +477,8 @@ export default function NovoEmpenhoForm({
               required
               erro={e.orgaoCnpj}
               span={2}
-              defaultValue={dados?.orgaoCnpj ?? vi?.orgaoCnpj}
-              auto={camposAuto.has("orgaoCnpj")}
+              defaultValue={dados?.orgaoCnpj ?? heranca?.orgaoCnpj ?? vi?.orgaoCnpj}
+              auto={camposAuto.has("orgaoCnpj") || (!!heranca && !dados)}
             />
             <Field
               label="Endereço"
@@ -397,7 +486,7 @@ export default function NovoEmpenhoForm({
               required
               erro={e.orgaoEndereco}
               span={4}
-              defaultValue={dados?.orgaoEndereco ?? vi?.orgaoEndereco}
+              defaultValue={dados?.orgaoEndereco ?? heranca?.orgaoEndereco ?? vi?.orgaoEndereco}
             />
             <Field
               label="E-mail"
@@ -405,14 +494,14 @@ export default function NovoEmpenhoForm({
               type="email"
               erro={e.orgaoEmail}
               span={2}
-              defaultValue={dados?.orgaoEmail ?? vi?.orgaoEmail ?? ""}
+              defaultValue={dados?.orgaoEmail ?? heranca?.orgaoEmail ?? vi?.orgaoEmail ?? ""}
             />
             <Field
               label="Telefone"
               name="orgaoTelefone"
               erro={e.orgaoTelefone}
               span={2}
-              defaultValue={dados?.orgaoTelefone ?? vi?.orgaoTelefone ?? ""}
+              defaultValue={dados?.orgaoTelefone ?? heranca?.orgaoTelefone ?? vi?.orgaoTelefone ?? ""}
             />
           </div>
         </Secao>
@@ -555,7 +644,7 @@ export default function NovoEmpenhoForm({
                     min="0"
                     placeholder="Quantidade"
                     defaultValue={
-                      dados?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""
+                      dados?.prazoEntregaDias?.toString() ?? heranca?.prazoEntregaDias?.toString() ?? vi?.prazoEntregaDias?.toString() ?? ""
                     }
                     className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
                   />
@@ -580,7 +669,7 @@ export default function NovoEmpenhoForm({
                 <input
                   type="date"
                   name="dataEntregaCerta"
-                  defaultValue={vi?.dataEntregaCerta ?? ""}
+                  defaultValue={heranca?.dataEntregaCerta ?? vi?.dataEntregaCerta ?? ""}
                   className="w-full rounded-xl px-4 py-3 text-sm font-medium"
                 />
               )}
@@ -592,7 +681,7 @@ export default function NovoEmpenhoForm({
               min="0"
               erro={e.prazoPagamentoDias}
               span={1}
-              defaultValue={dados?.prazoPagamentoDias?.toString() ?? vi?.prazoPagamentoDias?.toString() ?? ""}
+              defaultValue={dados?.prazoPagamentoDias?.toString() ?? heranca?.prazoPagamentoDias?.toString() ?? vi?.prazoPagamentoDias?.toString() ?? ""}
             />
             <Field
               label="Nº da Ordem de Fornecimento (se houver)"
@@ -700,14 +789,14 @@ export default function NovoEmpenhoForm({
           <p className="mb-3 text-xs text-slate-600">
             Locais onde este {nomeInstr.toLowerCase()} será cumprido.
           </p>
-          <EnderecosEntregaEditor iniciais={vi?.enderecosEntrega} />
+          <EnderecosEntregaEditor iniciais={heranca?.enderecosEntrega ?? vi?.enderecosEntrega} />
         </Secao>
 
         <Secao titulo="Pontos focais do órgão (Lei 14.133 art. 117)">
           <p className="mb-3 text-xs text-slate-600">
             Gestor + Fiscais Técnico/Administrativo do contrato.
           </p>
-          <PontosFocaisEditor iniciais={vi?.pontosFocais} />
+          <PontosFocaisEditor iniciais={heranca?.pontosFocais ?? vi?.pontosFocais} />
         </Secao>
 
         <Secao titulo="Itens">
@@ -716,7 +805,12 @@ export default function NovoEmpenhoForm({
               Selecione cada item da Ata na primeira coluna — o saldo será validado.
             </p>
           )}
-          <ItensEditor ataItens={ataSelecionada?.itens} itensIniciais={vi?.itens ?? dados?.itens} permitirLotes={false} />
+          <ItensEditor
+            ataItens={ataSelecionada?.itens}
+            itensIniciais={vi?.itens ?? dados?.itens}
+            permitirLotes={false}
+            sugestoesIa={sugestoesItens}
+          />
         </Secao>
 
         {state?.erro && (
