@@ -1672,6 +1672,17 @@ const CAMPO_ARQUIVO: Record<string, string> = {
   NF_ENCAMINHADA:  "arquivoNfEncaminhada",
   PAGO:            "arquivoPagamento",
 };
+// Ordem dos marcos no fluxo. Usado pra não fazer downgrade do status quando
+// o usuário re-registra uma etapa anterior só pra editar a data/anexo.
+const ORDEM_MARCO: Record<string, number> = {
+  EMPENHADO: 0,
+  PEDIDO_RECEBIDO: 1,
+  EM_TRANSITO: 2,
+  ENTREGUE: 3,
+  NF_EMITIDA: 4,
+  NF_ENCAMINHADA: 5,
+  PAGO: 6,
+};
 
 export async function registrarMarcoAction(
   _p: { erro?: string; ok?: boolean } | null,
@@ -1692,10 +1703,17 @@ export async function registrarMarcoAction(
   const data = parseDataInputBr(dataIso);
   if (!data) return { erro: "Data inválida." };
 
+  // Edição de etapa já concluída: se o status atual está MAIS adiantado que
+  // o marco sendo registrado, mantém o status atual (não regride). Só avança
+  // status quando o marco é igual ou posterior ao atual.
+  const ordemAtual = ORDEM_MARCO[empenho.status] ?? -1;
+  const ordemMarco = ORDEM_MARCO[marco] ?? -1;
   const update: Record<string, Date | string> = {
     [CAMPO_DATA[marco]]: data,
-    status: marco,
   };
+  if (ordemMarco >= ordemAtual) {
+    update.status = marco;
+  }
 
   const file = formData.get("arquivo") as File | null;
   if (file && file.size > 0) {
@@ -1705,7 +1723,10 @@ export async function registrarMarcoAction(
 
   await prisma.empenho.update({ where: { id: empenhoId }, data: update });
 
-  if (marco === "PAGO") {
+  // Side-effects de PAGO só rodam na transição (status anterior != PAGO).
+  // Sem isso, editar a data de pagamento dispararia notificações duplicadas.
+  const ehTransicaoParaPago = marco === "PAGO" && empenho.status !== "PAGO";
+  if (ehTransicaoParaPago) {
     const empenhoCompleto = await prisma.empenho.findUnique({
       where: { id: empenhoId },
       include: { itens: { select: { valorTotal: true } } },
