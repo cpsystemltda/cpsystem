@@ -107,6 +107,8 @@ export default async function DashboardPage() {
         orgaoNome: true,
         orgaoCnpj: true,
         orgaoEndereco: true,
+        ataId: true,
+        contratoId: true,
       },
     }),
     prisma.contrato.findMany({
@@ -119,6 +121,7 @@ export default async function DashboardPage() {
         orgaoEndereco: true,
         tipo: true,
         vigenciaFim: true,
+        valorInicial: true,
         itens: { select: { valorTotal: true } },
       },
     }),
@@ -467,13 +470,13 @@ export default async function DashboardPage() {
     if (!cur.endereco && endereco) cur.endereco = endereco;
     return cur;
   }
-  for (const e of empenhosCompletos) {
-    const cnpjLimpo = (e.orgaoCnpj ?? "").replace(/\D/g, "");
-    if (!cnpjLimpo) continue;
-    const cur = getOuCriar(cnpjLimpo, e.orgaoNome, e.orgaoEndereco ?? null);
-    cur.valor += sumItens(e);
-    cur.qtdEmpenhos += 1;
-  }
+  // Valor CONTRATADO (não executado):
+  //   - Atas vigentes (potencial de fornecimento)
+  //   - Contratos vigentes (compromisso firmado)
+  //   - Empenhos LIVRES (contratação direta sem ata/contrato prévio)
+  // Empenhos derivados de ata/contrato NÃO somam — duplicariam o valor que
+  // já está no instrumento de origem. A qtdEmpenhos continua contando todos
+  // (informativo) mas o valor monetário não.
   for (const a of atasVigentesDetalhe) {
     if (!a.orgaoCnpj) continue;
     const cnpjLimpo = a.orgaoCnpj.replace(/\D/g, "");
@@ -487,8 +490,20 @@ export default async function DashboardPage() {
     const cnpjLimpo = c.orgaoCnpj.replace(/\D/g, "");
     if (!cnpjLimpo) continue;
     const cur = getOuCriar(cnpjLimpo, c.orgaoNome, c.orgaoEndereco ?? null);
-    cur.valor += c.itens.reduce((s, it) => s + it.valorTotal, 0);
+    // Valor inicial do contrato (snapshot da contratação); fallback pra soma
+    // de itens atuais quando o backfill não preencheu valorInicial ainda.
+    cur.valor += c.valorInicial ?? c.itens.reduce((s, it) => s + it.valorTotal, 0);
     cur.qtdContratos += 1;
+  }
+  for (const e of empenhosCompletos) {
+    const cnpjLimpo = (e.orgaoCnpj ?? "").replace(/\D/g, "");
+    if (!cnpjLimpo) continue;
+    const cur = getOuCriar(cnpjLimpo, e.orgaoNome, e.orgaoEndereco ?? null);
+    cur.qtdEmpenhos += 1;
+    // Só soma valor de empenhos LIVRES (sem instrumento de origem).
+    if (!e.ataId && !e.contratoId) {
+      cur.valor += sumItens(e);
+    }
   }
   const rankingOrgaos = Array.from(orgaoMap.values())
     .map((r) => ({ ...r, uf: extrairUf(r.endereco) }))
