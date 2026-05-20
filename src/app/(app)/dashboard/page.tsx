@@ -115,6 +115,8 @@ export default async function DashboardPage() {
         id: true,
         numero: true,
         orgaoNome: true,
+        orgaoCnpj: true,
+        orgaoEndereco: true,
         tipo: true,
         vigenciaFim: true,
         itens: { select: { valorTotal: true } },
@@ -441,46 +443,64 @@ export default async function DashboardPage() {
   }
   const qtdOrgaos = orgaosUnicos.size;
 
-  // Ranking de órgãos por valor contratado — soma empenhos + atas vigentes.
-  // Mantém também o endereço e CNPJ pra sync lista↔mapa (por UF no
-  // choropleth, por pin individual no Leaflet).
+  // Agregação de órgãos: valor total + contagem de atas/contratos vigentes.
+  // Soma empenhos + atas + contratos vigentes (todos da empresa atual).
+  // Mantém endereço e CNPJ pra sync lista↔mapa.
   const orgaoMap = new Map<
     string,
-    { cnpj: string; nome: string; valor: number; endereco: string | null }
+    {
+      cnpj: string;
+      nome: string;
+      valor: number;
+      endereco: string | null;
+      qtdAtas: number;
+      qtdContratos: number;
+      qtdEmpenhos: number;
+    }
   >();
+  function getOuCriar(cnpj: string, nome: string, endereco: string | null) {
+    let cur = orgaoMap.get(cnpj);
+    if (!cur) {
+      cur = { cnpj, nome, valor: 0, endereco, qtdAtas: 0, qtdContratos: 0, qtdEmpenhos: 0 };
+      orgaoMap.set(cnpj, cur);
+    }
+    if (!cur.endereco && endereco) cur.endereco = endereco;
+    return cur;
+  }
   for (const e of empenhosCompletos) {
     const cnpjLimpo = (e.orgaoCnpj ?? "").replace(/\D/g, "");
     if (!cnpjLimpo) continue;
-    const cur = orgaoMap.get(cnpjLimpo) ?? {
-      cnpj: cnpjLimpo,
-      nome: e.orgaoNome,
-      valor: 0,
-      endereco: e.orgaoEndereco ?? null,
-    };
+    const cur = getOuCriar(cnpjLimpo, e.orgaoNome, e.orgaoEndereco ?? null);
     cur.valor += sumItens(e);
-    if (!cur.endereco && e.orgaoEndereco) cur.endereco = e.orgaoEndereco;
-    orgaoMap.set(cnpjLimpo, cur);
+    cur.qtdEmpenhos += 1;
   }
   for (const a of atasVigentesDetalhe) {
     if (!a.orgaoCnpj) continue;
     const cnpjLimpo = a.orgaoCnpj.replace(/\D/g, "");
     if (!cnpjLimpo) continue;
-    const valorAta = a.itens.reduce((s, it) => s + it.valorTotal, 0);
-    const cur = orgaoMap.get(cnpjLimpo) ?? {
-      cnpj: cnpjLimpo,
-      nome: a.orgaoNome,
-      valor: 0,
-      endereco: a.orgaoEndereco ?? null,
-    };
-    cur.valor += valorAta;
-    if (!cur.endereco && a.orgaoEndereco) cur.endereco = a.orgaoEndereco;
-    orgaoMap.set(cnpjLimpo, cur);
+    const cur = getOuCriar(cnpjLimpo, a.orgaoNome, a.orgaoEndereco ?? null);
+    cur.valor += a.itens.reduce((s, it) => s + it.valorTotal, 0);
+    cur.qtdAtas += 1;
+  }
+  for (const c of contratosVigentesDetalhe) {
+    if (!c.orgaoCnpj) continue;
+    const cnpjLimpo = c.orgaoCnpj.replace(/\D/g, "");
+    if (!cnpjLimpo) continue;
+    const cur = getOuCriar(cnpjLimpo, c.orgaoNome, c.orgaoEndereco ?? null);
+    cur.valor += c.itens.reduce((s, it) => s + it.valorTotal, 0);
+    cur.qtdContratos += 1;
   }
   const rankingOrgaos = Array.from(orgaoMap.values())
     .map((r) => ({ ...r, uf: extrairUf(r.endereco) }))
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 5);
   const maiorRanking = rankingOrgaos[0]?.valor ?? 1;
+
+  // Lista detalhada de clientes (órgãos) com qtd de atas/contratos e valor.
+  // Ordenada por valor desc; mostra todos (não limitado a top 5).
+  const clientesDetalhe = Array.from(orgaoMap.values())
+    .filter((o) => o.qtdAtas > 0 || o.qtdContratos > 0)
+    .sort((a, b) => b.valor - a.valor);
 
   // Tabela clientes (órgão + UF a partir de dadosUf)
   // Como agregação, vamos usar os 5 primeiros do ranking
@@ -964,6 +984,55 @@ export default async function DashboardPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </ChartCard>
+        </div>
+
+        {/* Lista detalhada de clientes — todos os órgãos com qtd e valor */}
+        <div className="mt-3.5">
+          <ChartCard
+            title="Clientes — todos os órgãos com Atas ou Contratos vigentes"
+            subtitle={`${clientesDetalhe.length} órgão(s) · quantidade e valor por instrumento`}
+          >
+            {clientesDetalhe.length === 0 ? (
+              <p
+                className="grid h-[120px] place-items-center text-sm"
+                style={{ color: "var(--text-mute)" }}
+              >
+                Nenhuma Ata ou Contrato vigente. Cadastre instrumentos para ver seus clientes aqui.
+              </p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="table-glass w-full">
+                  <thead>
+                    <tr>
+                      <th>Órgão</th>
+                      <th className="center">Atas</th>
+                      <th className="center">Contratos</th>
+                      <th className="center">Empenhos</th>
+                      <th className="num">Valor contratado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientesDetalhe.map((o) => (
+                      <tr key={o.cnpj}>
+                        <td>
+                          <div className="strong" style={{ color: "var(--text)" }}>
+                            {o.nome}
+                          </div>
+                          <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+                            CNPJ {o.cnpj.slice(0, 2)}.{o.cnpj.slice(2, 5)}.{o.cnpj.slice(5, 8)}/{o.cnpj.slice(8, 12)}-{o.cnpj.slice(12)}
+                          </div>
+                        </td>
+                        <td className="center tabular">{o.qtdAtas || "—"}</td>
+                        <td className="center tabular">{o.qtdContratos || "—"}</td>
+                        <td className="center tabular">{o.qtdEmpenhos || "—"}</td>
+                        <td className="num strong">{brl(o.valor)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </ChartCard>
