@@ -1005,8 +1005,8 @@ export default function NovaAtaForm({
         {/* === 2.5 ENDEREÇOS DE ENTREGA === */}
         <SecaoGlass
           numero="05"
-          titulo="Endereços de entrega"
-          subtitulo="Onde o órgão pode pedir entrega. CEP busca automaticamente."
+          titulo="Endereços de entrega (opcional)"
+          subtitulo="Cadastre os locais conhecidos; deixe em branco quando a execução for em locais diversos a definir. CEP busca automaticamente."
           icone={MapPin}
         >
           <EnderecosEntregaEditor iniciais={vi?.enderecosEntrega} />

@@ -134,11 +134,17 @@ function parseEnderecosEntrega(formData: FormData) {
   const out: { id?: string; rotulo?: string; endereco: string }[] = [];
   let i = 0;
   while (formData.has(`enderecosEntrega[${i}][endereco]`)) {
-    out.push({
-      id: String(formData.get(`enderecosEntrega[${i}][id]`) || "") || undefined,
-      rotulo: String(formData.get(`enderecosEntrega[${i}][rotulo]`) || "") || undefined,
-      endereco: String(formData.get(`enderecosEntrega[${i}][endereco]`) || ""),
-    });
+    const endereco = String(formData.get(`enderecosEntrega[${i}][endereco]`) || "").trim();
+    // Endereço de entrega é OPCIONAL: a UI sempre manda pelo menos 1 linha
+    // (vazia) por default; descartamos as vazias aqui. Quem realmente quer
+    // cadastrar um endereço preenche; quem não sabe ainda, deixa em branco.
+    if (endereco.length > 0) {
+      out.push({
+        id: String(formData.get(`enderecosEntrega[${i}][id]`) || "") || undefined,
+        rotulo: String(formData.get(`enderecosEntrega[${i}][rotulo]`) || "") || undefined,
+        endereco,
+      });
+    }
     i++;
   }
   return out;
