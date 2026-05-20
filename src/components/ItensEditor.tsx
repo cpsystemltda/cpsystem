@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Trash2, Plus, Layers } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Trash2, Plus, Layers, Sparkles } from "lucide-react";
 import { brl } from "@/lib/validators";
+
+export type SugestaoMatchIa = {
+  indexExtraido: number;
+  ataItemId: string | null;
+  confidence: number;
+  razao: string;
+};
 
 export type AtaItemRef = {
   id: string;
@@ -79,26 +86,66 @@ export function ItensEditor({
   ataItens,
   itensIniciais,
   permitirLotes = true,
+  sugestoesIa,
 }: {
   ataItens?: AtaItemRef[];
   itensIniciais?: ItemInicial[];
   permitirLotes?: boolean;
+  /** Sugestões de matching IA — quando presente, pré-popula o ataItemId
+   *  na ordem dos itens iniciais. Confidence >= 0.6 = badge AUTO verde. */
+  sugestoesIa?: SugestaoMatchIa[];
 }) {
+  // Mapeia sugestões IA por indexExtraido pra fácil lookup
+  const sugestoesPorIndex = new Map<number, SugestaoMatchIa>();
+  if (sugestoesIa) {
+    for (const s of sugestoesIa) sugestoesPorIndex.set(s.indexExtraido, s);
+  }
+
   const inicial: LinhaItem[] =
     itensIniciais && itensIniciais.length > 0
-      ? itensIniciais.map((i) => ({
-          id: i.id ?? "",
-          descricao: i.descricao,
-          unidade: i.unidade,
-          quantidade: String(i.quantidade),
-          marca: i.marca ?? "",
-          valorUnitario: String(i.valorUnitario),
-          ataItemId: "",
-          lote: i.lote ?? "",
-          numero: i.numero ?? "",
-        }))
+      ? itensIniciais.map((i, idx) => {
+          const sug = sugestoesPorIndex.get(idx);
+          return {
+            id: i.id ?? "",
+            descricao: i.descricao,
+            unidade: i.unidade,
+            quantidade: String(i.quantidade),
+            marca: i.marca ?? "",
+            valorUnitario: String(i.valorUnitario),
+            // Pré-popula a partir da sugestão IA se confidence >= 0.6
+            ataItemId: sug && sug.ataItemId && sug.confidence >= 0.6 ? sug.ataItemId : "",
+            lote: i.lote ?? "",
+            numero: i.numero ?? "",
+          };
+        })
       : [VAZIA("", "1")];
   const [linhas, setLinhas] = useState<LinhaItem[]>(inicial);
+
+  // Mantém ataItemId pré-popular se chegou nova sugestão (ex.: IA roda
+  // depois da montagem inicial). Só preenche linhas onde usuário não
+  // alterou manualmente (ataItemId vazio).
+  useEffect(() => {
+    if (!sugestoesIa || sugestoesIa.length === 0) return;
+    setLinhas((atuais) =>
+      atuais.map((l, idx) => {
+        if (l.ataItemId) return l; // usuário já escolheu — não sobrescreve
+        const sug = sugestoesPorIndex.get(idx);
+        if (!sug || !sug.ataItemId || sug.confidence < 0.6) return l;
+        const ref = ataItens?.find((a) => a.id === sug.ataItemId);
+        if (!ref) return l;
+        return {
+          ...l,
+          ataItemId: sug.ataItemId,
+          // Auto-preenche descrição/unidade da Ata se ainda em branco
+          descricao: l.descricao || ref.descricao,
+          unidade: l.unidade || ref.unidade,
+          valorUnitario: l.valorUnitario || String(ref.valorUnitario),
+        };
+      }),
+    );
+    // sugestoesPorIndex é derivada de sugestoesIa
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sugestoesIa]);
 
   // Estado da máscara monetária (display formatado por linha)
   const [valoresFormatados, setValoresFormatados] = useState<string[]>(() =>
@@ -370,20 +417,51 @@ export function ItensEditor({
                 </td>
                 {ataItens && (
                   <td className="px-2 py-2 align-middle">
-                    <select
-                      name={`itens[${idx}][ataItemId]`}
-                      value={l.ataItemId}
-                      onChange={(ev) => pickAtaItem(idx, ev.target.value)}
-                      className="w-full rounded-md px-2 py-1.5 text-xs"
-                    >
-                      <option value="">— Livre —</option>
-                      {ataItens.map((a) => (
-                        <option key={a.id} value={a.id} disabled={a.quantidadeDisponivel <= 0}>
-                          {a.descricao.slice(0, 30)}
-                          {a.descricao.length > 30 ? "…" : ""} ({a.quantidadeDisponivel} {a.unidade})
-                        </option>
-                      ))}
-                    </select>
+                    {(() => {
+                      const sug = sugestoesPorIndex.get(idx);
+                      const isAuto =
+                        !!sug &&
+                        sug.ataItemId === l.ataItemId &&
+                        l.ataItemId !== "" &&
+                        sug.confidence >= 0.6;
+                      return (
+                        <div className="relative">
+                          <select
+                            name={`itens[${idx}][ataItemId]`}
+                            value={l.ataItemId}
+                            onChange={(ev) => pickAtaItem(idx, ev.target.value)}
+                            className="w-full rounded-md px-2 py-1.5 pr-7 text-xs"
+                            style={
+                              isAuto
+                                ? {
+                                    background: "rgba(93,216,182,0.10)",
+                                    border: "0.5px solid rgba(93,216,182,0.4)",
+                                  }
+                                : undefined
+                            }
+                          >
+                            <option value="">— Livre —</option>
+                            {ataItens.map((a) => (
+                              <option key={a.id} value={a.id} disabled={a.quantidadeDisponivel <= 0}>
+                                {a.descricao.slice(0, 30)}
+                                {a.descricao.length > 30 ? "…" : ""} ({a.quantidadeDisponivel} {a.unidade})
+                              </option>
+                            ))}
+                          </select>
+                          {isAuto && (
+                            <span
+                              className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2"
+                              title={`IA · ${(sug.confidence * 100).toFixed(0)}% confiança — ${sug.razao}`}
+                            >
+                              <Sparkles
+                                className="h-3 w-3"
+                                style={{ color: "var(--mint)" }}
+                              />
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                 )}
                 <td className="px-2 py-2 align-middle">

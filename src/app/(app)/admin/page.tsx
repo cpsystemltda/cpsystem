@@ -1,10 +1,17 @@
-import { Settings, Users, TrendingUp, DollarSign, AlertTriangle } from "lucide-react";
+import { Users, TrendingUp, DollarSign, AlertTriangle, UserCheck, Building2 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { PageHeader } from "@/components/ui/SecaoGlass";
+import { Tabs } from "@/components/Tabs";
 
 const PRECOS = { BASICO: 397, PREMIUM: 997 };
+
+function formatarCpf(cpf: string): string {
+  const d = cpf.replace(/\D/g, "");
+  if (d.length !== 11) return cpf;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
 
 export default async function AdminPage() {
   const usuario = await exigirUsuario();
@@ -13,7 +20,7 @@ export default async function AdminPage() {
   // Filtro: ignora super admins (Igor/Regina) — não são clientes pagantes
   const semSuperAdmin = { usuarios: { none: { superAdmin: true } } };
 
-  const [contas, empresas, totalAtas, totalContratos, totalEmpenhos] = await Promise.all([
+  const [contas, empresas, totalAtas, totalContratos, totalEmpenhos, analistas] = await Promise.all([
     prisma.conta.findMany({
       where: semSuperAdmin,
       include: {
@@ -26,6 +33,14 @@ export default async function AdminPage() {
     prisma.ata.count({ where: { empresa: { conta: semSuperAdmin } } }),
     prisma.contrato.count({ where: { empresa: { conta: semSuperAdmin } } }),
     prisma.empenho.count({ where: { empresa: { conta: semSuperAdmin } } }),
+    prisma.analista.findMany({
+      include: {
+        vinculos: {
+          select: { id: true, status: true, conta: { select: { id: true, empresas: { select: { id: true } } } } },
+        },
+      },
+      orderBy: { criadoEm: "desc" },
+    }),
   ]);
 
   const ativas = contas.filter((c) => c.statusAssinatura === "ATIVA");
@@ -96,60 +111,22 @@ export default async function AdminPage() {
       </section>
 
       <section className="mt-8 rounded-xl border border-slate-200 bg-white">
-        <h2 className="border-b border-slate-100 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Contas cadastradas ({contas.length})
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-5 py-2 text-left">Usuário principal</th>
-                <th className="px-5 py-2 text-left">Plano</th>
-                <th className="px-5 py-2 text-left">Status</th>
-                <th className="px-5 py-2 text-right">CNPJs</th>
-                <th className="px-5 py-2 text-right">Criada</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contas.map((c) => (
-                <tr key={c.id} className="border-t border-slate-100">
-                  <td className="px-5 py-3">
-                    <div className="font-medium text-slate-900">{c.usuarios[0]?.nome || "—"}</div>
-                    <div className="text-xs text-slate-500">{c.usuarios[0]?.email || "—"}</div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`rounded px-2 py-0.5 text-xs font-medium ${
-                        c.plano === "PREMIUM" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
-                      }`}
-                    >
-                      {c.plano}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-xs">
-                    <span
-                      className={`rounded px-2 py-0.5 font-medium ${
-                        c.statusAssinatura === "ATIVA"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : c.statusAssinatura === "TRIAL"
-                            ? "bg-amber-100 text-amber-700"
-                            : c.statusAssinatura === "INADIMPLENTE"
-                              ? "bg-red-100 text-red-700"
-                              : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {c.statusAssinatura}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-right">{c.empresas.length}</td>
-                  <td className="px-5 py-3 text-right text-xs text-slate-500">
-                    {c.criadoEm.toLocaleDateString("pt-BR")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Tabs
+          abas={[
+            {
+              key: "empresas",
+              label: "Empresas",
+              badge: contas.length,
+              content: <TabelaEmpresas contas={contas} />,
+            },
+            {
+              key: "analistas",
+              label: "Analistas",
+              badge: analistas.length,
+              content: <TabelaAnalistas analistas={analistas} />,
+            },
+          ]}
+        />
       </section>
 
       {inadimplentes.length > 0 && (
@@ -236,6 +213,156 @@ function Mini({ label, valor }: { label: string; valor: string }) {
     <div>
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className="mt-0.5 text-lg font-bold text-slate-900">{valor}</p>
+    </div>
+  );
+}
+
+// ============================================================
+// ABA: EMPRESAS (assinantes/clientes do SaaS)
+// ============================================================
+type ContaResumo = {
+  id: string;
+  plano: string;
+  statusAssinatura: string;
+  criadoEm: Date;
+  usuarios: { nome: string; email: string }[];
+  empresas: { id: string }[];
+};
+
+function TabelaEmpresas({ contas }: { contas: ContaResumo[] }) {
+  if (contas.length === 0) {
+    return (
+      <p className="px-5 py-8 text-center text-sm text-slate-500">
+        <Building2 className="mx-auto h-8 w-8 opacity-40" />
+        <span className="mt-2 block">Nenhuma empresa cadastrada ainda.</span>
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-5 py-2 text-left">Usuário principal</th>
+            <th className="px-5 py-2 text-left">Plano</th>
+            <th className="px-5 py-2 text-left">Status</th>
+            <th className="px-5 py-2 text-right">CNPJs</th>
+            <th className="px-5 py-2 text-right">Criada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contas.map((c) => (
+            <tr key={c.id} className="border-t border-slate-100">
+              <td className="px-5 py-3">
+                <div className="font-medium text-slate-900">{c.usuarios[0]?.nome || "—"}</div>
+                <div className="text-xs text-slate-500">{c.usuarios[0]?.email || "—"}</div>
+              </td>
+              <td className="px-5 py-3">
+                <span
+                  className={`rounded px-2 py-0.5 text-xs font-medium ${
+                    c.plano === "PREMIUM" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
+                  }`}
+                >
+                  {c.plano}
+                </span>
+              </td>
+              <td className="px-5 py-3 text-xs">
+                <span
+                  className={`rounded px-2 py-0.5 font-medium ${
+                    c.statusAssinatura === "ATIVA"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : c.statusAssinatura === "TRIAL"
+                        ? "bg-amber-100 text-amber-700"
+                        : c.statusAssinatura === "INADIMPLENTE"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  {c.statusAssinatura}
+                </span>
+              </td>
+              <td className="px-5 py-3 text-right tabular-nums">{c.empresas.length}</td>
+              <td className="px-5 py-3 text-right text-xs text-slate-500">
+                {c.criadoEm.toLocaleDateString("pt-BR")}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ============================================================
+// ABA: ANALISTAS (de licitação, vinculados às empresas)
+// ============================================================
+type AnalistaResumo = {
+  id: string;
+  nomeCompleto: string;
+  cpf: string;
+  email: string;
+  telefone: string;
+  ativo: boolean;
+  criadoEm: Date;
+  vinculos: { id: string; status: string; conta: { id: string; empresas: { id: string }[] } }[];
+};
+
+function TabelaAnalistas({ analistas }: { analistas: AnalistaResumo[] }) {
+  if (analistas.length === 0) {
+    return (
+      <p className="px-5 py-8 text-center text-sm text-slate-500">
+        <UserCheck className="mx-auto h-8 w-8 opacity-40" />
+        <span className="mt-2 block">Nenhum analista cadastrado ainda.</span>
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-5 py-2 text-left">Analista</th>
+            <th className="px-5 py-2 text-left">CPF</th>
+            <th className="px-5 py-2 text-left">Status</th>
+            <th className="px-5 py-2 text-right">Vínculos ativos</th>
+            <th className="px-5 py-2 text-right">CNPJs atendidos</th>
+            <th className="px-5 py-2 text-right">Cadastrado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {analistas.map((a) => {
+            const vinculosAtivos = a.vinculos.filter((v) => v.status === "ATIVO").length;
+            const cnpjs = a.vinculos
+              .filter((v) => v.status === "ATIVO")
+              .reduce((s, v) => s + v.conta.empresas.length, 0);
+            return (
+              <tr key={a.id} className="border-t border-slate-100">
+                <td className="px-5 py-3">
+                  <div className="font-medium text-slate-900">{a.nomeCompleto}</div>
+                  <div className="text-xs text-slate-500">{a.email}</div>
+                </td>
+                <td className="px-5 py-3 text-xs text-slate-700 tabular-nums">{formatarCpf(a.cpf)}</td>
+                <td className="px-5 py-3 text-xs">
+                  <span
+                    className={`rounded px-2 py-0.5 font-medium ${
+                      a.ativo
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {a.ativo ? "ATIVO" : "INATIVO"}
+                  </span>
+                </td>
+                <td className="px-5 py-3 text-right tabular-nums">{vinculosAtivos}</td>
+                <td className="px-5 py-3 text-right tabular-nums">{cnpjs}</td>
+                <td className="px-5 py-3 text-right text-xs text-slate-500">
+                  {a.criadoEm.toLocaleDateString("pt-BR")}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

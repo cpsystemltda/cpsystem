@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TrendingUp } from "lucide-react";
+import { BotaoGerarMinuta } from "./MinutaIaPainel";
 
 /**
  * Banner de alerta de reajuste de preços.
@@ -11,9 +12,12 @@ import { TrendingUp } from "lucide-react";
 export function AlertaReajuste({
   marcoOrcamentoEstimado,
   hrefReajustes = "/reajustes",
+  contratoId,
 }: {
   marcoOrcamentoEstimado: Date | null;
   hrefReajustes?: string;
+  /** Quando fornecido, exibe botão "Gerar pedido de reajuste com IA". */
+  contratoId?: string;
 }) {
   if (!marcoOrcamentoEstimado) return null;
 
@@ -45,6 +49,16 @@ export function AlertaReajuste({
             Abrir tela de Reajustes
           </Link>
         </p>
+        {contratoId && cabivel && (
+          <div className="mt-2">
+            <BotaoGerarMinuta
+              tipo="PEDIDO_REAJUSTE"
+              recursoId={contratoId}
+              rotulo="Gerar pedido de reajuste com IA"
+              variante="ghost"
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
-import { TrendingUp, Wallet, Truck, FileSignature, Clock, AlertTriangle } from "lucide-react";
+import { TrendingUp, Wallet, Truck, FileSignature, Clock, AlertTriangle, Download } from "lucide-react";
+import Link from "next/link";
 import { brl } from "@/lib/validators";
 
 /**
@@ -33,6 +34,9 @@ type Aditivo = {
   novaVigenciaFim: Date | null;
 };
 
+/** id do recurso pra link de imprimir/baixar PDF — só funciona pra Contrato. */
+type PdfLink = { tipo: "contrato"; id: string };
+
 export function RelatorioContratacao({
   contrato,
   saldo,
@@ -45,6 +49,7 @@ export function RelatorioContratacao({
   qtdNotificacoes,
   qtdProcedimentos,
   rotuloRecurso,
+  pdfLink,
 }: {
   contrato: DadosContrato;
   saldo?: Saldo;
@@ -57,6 +62,7 @@ export function RelatorioContratacao({
   qtdNotificacoes: number;
   qtdProcedimentos: number;
   rotuloRecurso: "Contrato" | "Empenho";
+  pdfLink?: PdfLink;
 }) {
   const valorContratado = contrato.itens.reduce((s, i) => s + i.valorTotal, 0);
   const qtdItens = contrato.itens.length;
@@ -83,6 +89,30 @@ export function RelatorioContratacao({
 
   return (
     <div className="space-y-6">
+      {/* Cabeçalho com botão de exportar PDF */}
+      <header className="flex items-center justify-between gap-4">
+        <div>
+          <h2
+            className="text-[15px] font-extrabold"
+            style={{ color: "var(--text)", letterSpacing: "-0.01em" }}
+          >
+            Relatório consolidado
+          </h2>
+          <p className="mt-0.5 text-[12px]" style={{ color: "var(--text-soft)" }}>
+            Resumo financeiro, físico, prazos e movimentos contratuais.
+          </p>
+        </div>
+        {pdfLink?.tipo === "contrato" && (
+          <Link
+            href={`/contratos/${pdfLink.id}/imprimir`}
+            target="_blank"
+            className="btn-primary inline-flex"
+          >
+            <Download className="h-4 w-4" /> Baixar PDF
+          </Link>
+        )}
+      </header>
+
       {/* Cards financeiros */}
       <section>
         <h3 className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-500">
