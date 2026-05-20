@@ -1,15 +1,22 @@
 "use server";
 
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import {
   extrairAtaDoPdf,
   extrairContratoDoPdf,
   extrairEmpenhoDoPdf,
   extrairGarantiaDoPdf,
+  extrairAditivoDoPdf,
+  extrairApostilamentoDoPdf,
+  extrairProcedimentoDoPdf,
   type AtaExtraida,
   type ContratoExtraido,
   type EmpenhoExtraido,
   type GarantiaExtraida,
+  type AditivoExtraido,
+  type ApostilamentoExtraido,
+  type ProcedimentoExtraido,
 } from "@/lib/extrairAta";
 import { salvarArquivo } from "@/lib/uploads";
 
@@ -63,11 +70,45 @@ export type ExtracaoGarantiaResult =
     }
   | { ok: false; erro: string };
 
+export type ExtracaoAditivoResult =
+  | {
+      ok: true;
+      dados: AditivoExtraido;
+      demo: boolean;
+      arquivoUrl?: string;
+      nomeArquivo?: string;
+      tamanhoBytes?: number;
+    }
+  | { ok: false; erro: string };
+
+export type ExtracaoApostilamentoResult =
+  | {
+      ok: true;
+      dados: ApostilamentoExtraido;
+      demo: boolean;
+      arquivoUrl?: string;
+      nomeArquivo?: string;
+      tamanhoBytes?: number;
+    }
+  | { ok: false; erro: string };
+
+export type ExtracaoProcedimentoResult =
+  | {
+      ok: true;
+      dados: ProcedimentoExtraido;
+      demo: boolean;
+      arquivoUrl?: string;
+      nomeArquivo?: string;
+      tamanhoBytes?: number;
+    }
+  | { ok: false; erro: string };
+
 // retro-compat
 export type ExtracaoResult = ExtracaoAtaResult;
 
 export async function extrairAtaPdfAction(formData: FormData): Promise<ExtracaoAtaResult> {
   await exigirUsuario();
+  await bloquearEspionagem();
   const file = formData.get("pdf") as File | null;
   if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
   try {
@@ -95,6 +136,7 @@ export async function extrairAtaPdfAction(formData: FormData): Promise<ExtracaoA
 
 export async function extrairContratoPdfAction(formData: FormData): Promise<ExtracaoContratoResult> {
   await exigirUsuario();
+  await bloquearEspionagem();
   const file = formData.get("pdf") as File | null;
   if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
   try {
@@ -118,6 +160,7 @@ export async function extrairContratoPdfAction(formData: FormData): Promise<Extr
 
 export async function extrairEmpenhoPdfAction(formData: FormData): Promise<ExtracaoEmpenhoResult> {
   await exigirUsuario();
+  await bloquearEspionagem();
   const file = formData.get("pdf") as File | null;
   if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
   try {
@@ -146,6 +189,7 @@ export async function extrairEmpenhoPdfAction(formData: FormData): Promise<Extra
  */
 export async function extrairGarantiaPdfAction(formData: FormData): Promise<ExtracaoGarantiaResult> {
   await exigirUsuario();
+  await bloquearEspionagem();
   const file = formData.get("pdf") as File | null;
   if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
   try {
@@ -160,6 +204,89 @@ export async function extrairGarantiaPdfAction(formData: FormData): Promise<Extr
       tamanhoBytes = salvo.tamanhoBytes;
     } catch (errSave) {
       console.warn("[extrairGarantiaPdfAction] falha ao persistir PDF:", errSave);
+    }
+    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
+  } catch (err) {
+    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+  }
+}
+
+/**
+ * M3 — IA extrai dados de Termo Aditivo e persiste o PDF no Vercel Blob
+ * pra ser anexado ao registro quando o usuário salvar o formulário.
+ */
+export async function extrairAditivoPdfAction(formData: FormData): Promise<ExtracaoAditivoResult> {
+  await exigirUsuario();
+  await bloquearEspionagem();
+  const file = formData.get("pdf") as File | null;
+  if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
+  try {
+    const dados = await extrairAditivoDoPdf(file);
+    let arquivoUrl: string | undefined;
+    let nomeArquivo: string | undefined;
+    let tamanhoBytes: number | undefined;
+    try {
+      const salvo = await salvarArquivo(file);
+      arquivoUrl = salvo.url;
+      nomeArquivo = salvo.nome;
+      tamanhoBytes = salvo.tamanhoBytes;
+    } catch (errSave) {
+      console.warn("[extrairAditivoPdfAction] falha ao persistir PDF:", errSave);
+    }
+    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
+  } catch (err) {
+    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+  }
+}
+
+/**
+ * M3 — IA extrai dados de Procedimento Apuratório (Lei 14.133 art. 157+).
+ * Tipicamente uma Portaria de Abertura ou Notificação Inicial.
+ */
+export async function extrairProcedimentoPdfAction(formData: FormData): Promise<ExtracaoProcedimentoResult> {
+  await exigirUsuario();
+  await bloquearEspionagem();
+  const file = formData.get("pdf") as File | null;
+  if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
+  try {
+    const dados = await extrairProcedimentoDoPdf(file);
+    let arquivoUrl: string | undefined;
+    let nomeArquivo: string | undefined;
+    let tamanhoBytes: number | undefined;
+    try {
+      const salvo = await salvarArquivo(file);
+      arquivoUrl = salvo.url;
+      nomeArquivo = salvo.nome;
+      tamanhoBytes = salvo.tamanhoBytes;
+    } catch (errSave) {
+      console.warn("[extrairProcedimentoPdfAction] falha ao persistir PDF:", errSave);
+    }
+    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
+  } catch (err) {
+    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+  }
+}
+
+/**
+ * M3 — IA extrai dados de Termo de Apostilamento (Lei 14.133 art. 136).
+ */
+export async function extrairApostilamentoPdfAction(formData: FormData): Promise<ExtracaoApostilamentoResult> {
+  await exigirUsuario();
+  await bloquearEspionagem();
+  const file = formData.get("pdf") as File | null;
+  if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
+  try {
+    const dados = await extrairApostilamentoDoPdf(file);
+    let arquivoUrl: string | undefined;
+    let nomeArquivo: string | undefined;
+    let tamanhoBytes: number | undefined;
+    try {
+      const salvo = await salvarArquivo(file);
+      arquivoUrl = salvo.url;
+      nomeArquivo = salvo.nome;
+      tamanhoBytes = salvo.tamanhoBytes;
+    } catch (errSave) {
+      console.warn("[extrairApostilamentoPdfAction] falha ao persistir PDF:", errSave);
     }
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {

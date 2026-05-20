@@ -7,6 +7,7 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 
 const SESSION_COOKIE = "cp_session";
+const COOKIE_IMPERSONATE = "cp_impersonate";
 const SESSION_DAYS = 30;
 
 export async function hashSenha(senha: string): Promise<string> {
@@ -42,6 +43,8 @@ export async function destruirSessao(): Promise<void> {
     await prisma.sessao.deleteMany({ where: { token } });
     jar.delete(SESSION_COOKIE);
   }
+  // Garante que espionagem não vaza entre sessões.
+  jar.delete(COOKIE_IMPERSONATE);
 }
 
 export const getUsuarioAtual = cache(async function getUsuarioAtual() {
@@ -65,7 +68,30 @@ export const getUsuarioAtual = cache(async function getUsuarioAtual() {
     return null;
   }
 
-  return sessao.usuario;
+  const usuarioReal = sessao.usuario;
+
+  // Modo espionagem: super admin "entra como cliente" e vê o sistema em
+  // somente leitura. O swap substitui contaId/conta pelo alvo e zera os
+  // bypasses de super admin/perfil — escrita é bloqueada nas server actions
+  // por `bloquearEspionagem()`.
+  if (!usuarioReal.superAdmin) return usuarioReal;
+  const contaEspionadaId = jar.get(COOKIE_IMPERSONATE)?.value;
+  if (!contaEspionadaId) return usuarioReal;
+
+  const contaAlvo = await prisma.conta.findUnique({
+    where: { id: contaEspionadaId },
+    include: { empresas: true },
+  });
+  if (!contaAlvo) return usuarioReal;
+
+  const usuarioEspiao: typeof usuarioReal = {
+    ...usuarioReal,
+    contaId: contaAlvo.id,
+    conta: contaAlvo,
+    superAdmin: false,
+    perfil: "VISUALIZADOR",
+  };
+  return usuarioEspiao;
 });
 
 export async function exigirUsuario() {

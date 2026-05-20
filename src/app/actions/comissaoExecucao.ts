@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { calcularDiff, CAMPOS_COMISSAO_EXECUCAO } from "@/lib/diff";
 import { salvarArquivo } from "@/lib/uploads";
@@ -25,6 +26,7 @@ export async function marcarComissaoExecucaoAction(
   formData: FormData,
 ): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.conta.tipo !== "ANALISTA" && !usuario.superAdmin) {
     return { erro: "Apenas analistas podem marcar comissões." };
   }
@@ -147,6 +149,7 @@ export async function overridePercentualComissaoAction(
   formData: FormData,
 ): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.conta.tipo !== "ANALISTA" && !usuario.superAdmin) {
     return { erro: "Apenas analistas podem ajustar percentual." };
   }

@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario, hashSenha } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 
 type Result = { erro?: string; ok?: boolean };
 
 export async function convidarUsuarioAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins podem convidar usuários." };
 
   const email = String(formData.get("email") || "").toLowerCase().trim();
@@ -42,6 +44,7 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
 
 export async function alterarPerfilAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") throw new Error("Apenas admins.");
 
   const usuarioAlvoId = String(formData.get("usuarioId"));
@@ -67,6 +70,7 @@ export async function alterarPerfilAction(formData: FormData) {
 
 export async function removerUsuarioAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") throw new Error("Apenas admins.");
 
   const usuarioAlvoId = String(formData.get("usuarioId"));
@@ -90,6 +94,7 @@ export async function removerUsuarioAction(formData: FormData) {
 
 export async function aceitarTermosAction() {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.conta.termosAceitosEm) return;
   await prisma.conta.update({ where: { id: usuario.contaId }, data: { termosAceitosEm: new Date() } });
   await registrarAuditoria({

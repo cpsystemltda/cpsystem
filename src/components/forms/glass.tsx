@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { formatarCnpjInput, formatarCepInput, validarCnpj } from "./vigencia";
+import { TooltipAjuda } from "@/components/TooltipAjuda";
 
 // Chip pequeno "AUTO" pra marcar campos preenchidos pela IA. Usuário pode
 // editar normalmente — quando edita, o chip some (camposAuto.delete).
@@ -42,6 +43,7 @@ export function FieldGlass({
   disabled,
   helper,
   auto,
+  ajuda,
 }: {
   label: string;
   name?: string;
@@ -57,6 +59,7 @@ export function FieldGlass({
   disabled?: boolean;
   helper?: string;
   auto?: boolean;
+  ajuda?: string;
 }) {
   const colSpan = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" }[span];
   return (
@@ -75,6 +78,7 @@ export function FieldGlass({
           {required && <span style={{ color: "var(--primary)" }}> *</span>}
         </span>
         {auto && <BadgeAuto />}
+        {ajuda && <TooltipAjuda texto={ajuda} />}
       </span>
       <input
         type={type}
@@ -192,6 +196,7 @@ export function SelectGlass({
   span = 1,
   value,
   onChange,
+  ajuda,
 }: {
   label: string;
   name: string;
@@ -202,12 +207,13 @@ export function SelectGlass({
   span?: 1 | 2 | 3 | 4;
   value?: string;
   onChange?: (v: string) => void;
+  ajuda?: string;
 }) {
   const colSpan = { 1: "col-span-1", 2: "col-span-2", 3: "col-span-3", 4: "col-span-4" }[span];
   return (
     <label className={`${colSpan} block`}>
       <span
-        className="mb-1.5 flex items-end text-[11px] font-bold uppercase"
+        className="mb-1.5 flex items-end gap-2 text-[11px] font-bold uppercase"
         style={{
           letterSpacing: "0.16em",
           color: "var(--text-mute)",
@@ -219,6 +225,7 @@ export function SelectGlass({
           {label}
           {required && <span style={{ color: "var(--primary)" }}> *</span>}
         </span>
+        {ajuda && <TooltipAjuda texto={ajuda} />}
       </span>
       <select
         name={name}

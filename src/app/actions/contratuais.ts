@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { salvarArquivo } from "@/lib/uploads";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { isContratoNaoContinuado, ROTULO_TIPO } from "@/lib/validators";
@@ -373,6 +374,7 @@ function montarNaturezaCsv(input: AditivoInput): string {
 
 export async function criarTermoAditivoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const v: Vinculo = {
     contratoId: String(formData.get("contratoId") || "") || undefined,
     empenhoId: String(formData.get("empenhoId") || "") || undefined,
@@ -473,6 +475,7 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
 
 export async function editarTermoAditivoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const aditivoId = String(formData.get("aditivoId") || "");
   if (!aditivoId) return { erro: "Aditivo inválido." };
 
@@ -583,6 +586,7 @@ export async function editarTermoAditivoAction(_p: Result | null, formData: Form
 
 export async function excluirTermoAditivoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const aditivoId = String(formData.get("aditivoId") || "");
   if (!aditivoId) return { erro: "Aditivo inválido." };
 
@@ -653,6 +657,7 @@ function lerInputApostilamento(fd: FormData): ApostilamentoInput {
 
 export async function criarApostilamentoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const v: Vinculo = {
     contratoId: String(formData.get("contratoId") || "") || undefined,
     empenhoId: String(formData.get("empenhoId") || "") || undefined,
@@ -743,6 +748,7 @@ export async function criarApostilamentoAction(_p: Result | null, formData: Form
 
 export async function editarApostilamentoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("apostilamentoId") || "");
   if (!id) return { erro: "Apostilamento inválido." };
 
@@ -851,6 +857,7 @@ export async function editarApostilamentoAction(_p: Result | null, formData: For
 
 export async function excluirApostilamentoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("apostilamentoId") || "");
   if (!id) return { erro: "Apostilamento inválido." };
 
@@ -905,6 +912,7 @@ export async function excluirApostilamentoAction(_p: Result | null, formData: Fo
 // ============================================================
 export async function criarReajusteAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const v: Vinculo = {
     contratoId: String(formData.get("contratoId") || "") || undefined,
     empenhoId: String(formData.get("empenhoId") || "") || undefined,
@@ -955,6 +963,7 @@ export async function criarReajusteAction(_p: Result | null, formData: FormData)
 // ============================================================
 export async function criarNotificacaoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const ataId = String(formData.get("ataId") || "") || undefined;
   const contratoId = String(formData.get("contratoId") || "") || undefined;
   const empenhoId = String(formData.get("empenhoId") || "") || undefined;
@@ -1031,6 +1040,7 @@ export async function criarNotificacaoAction(_p: Result | null, formData: FormDa
 
 export async function avancarNotificacaoAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("notificacaoId"));
   const status = String(formData.get("status")) as "RECEBIDA" | "EM_TRATATIVA" | "RESPONDIDA" | "FINALIZADA";
   const descricao = String(formData.get("descricao") || "");
@@ -1082,6 +1092,7 @@ export async function avancarNotificacaoAction(formData: FormData) {
  */
 export async function editarNotificacaoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("notificacaoId") || "");
   if (!id) return { erro: "Notificação inválida." };
 
@@ -1148,6 +1159,7 @@ export async function editarNotificacaoAction(_p: Result | null, formData: FormD
 // ============================================================
 export async function criarProcedimentoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const ataId = String(formData.get("ataId") || "") || undefined;
   const contratoId = String(formData.get("contratoId") || "") || undefined;
   const empenhoId = String(formData.get("empenhoId") || "") || undefined;
@@ -1223,6 +1235,7 @@ export async function criarProcedimentoAction(_p: Result | null, formData: FormD
 
 export async function avancarProcedimentoAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("procedimentoId"));
   const fase = String(formData.get("fase")) as
     | "ABERTURA" | "NOTIFICACAO_DEFESA" | "DEFESA_APRESENTADA" | "PEDIDO_PROVAS"
@@ -1276,6 +1289,7 @@ export async function avancarProcedimentoAction(formData: FormData) {
 
 export async function aplicarPenalidadeAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const procedimentoId = String(formData.get("procedimentoId"));
 
   const p = await prisma.procedimentoApuratorio.findFirst({
@@ -1310,6 +1324,7 @@ export async function aplicarPenalidadeAction(formData: FormData) {
 // ============================================================
 export async function criarGarantiaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const v: Vinculo = {
     contratoId: String(formData.get("contratoId") || "") || undefined,
     empenhoId: String(formData.get("empenhoId") || "") || undefined,
@@ -1411,6 +1426,7 @@ export async function criarGarantiaAction(_p: Result | null, formData: FormData)
  */
 export async function marcarSemGarantiaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const contratoId = String(formData.get("contratoId") || "") || undefined;
   const empenhoId = String(formData.get("empenhoId") || "") || undefined;
   // valor pode ser "false" (sem previsão), "true" (há previsão) ou "reset"
@@ -1452,6 +1468,7 @@ export async function marcarSemGarantiaAction(_p: Result | null, formData: FormD
 
 export async function adicionarEndossoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const garantiaId = String(formData.get("garantiaId") || "");
   if (!garantiaId) return { erro: "Garantia não informada." };
 
@@ -1524,6 +1541,7 @@ export async function adicionarEndossoAction(_p: Result | null, formData: FormDa
 // ============================================================
 export async function adicionarAnexoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const ataId = String(formData.get("ataId") || "") || undefined;
   const contratoId = String(formData.get("contratoId") || "") || undefined;
   const empenhoId = String(formData.get("empenhoId") || "") || undefined;
@@ -1576,6 +1594,7 @@ export async function adicionarAnexoAction(_p: Result | null, formData: FormData
 
 export async function adicionarAnotacaoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const ataId = String(formData.get("ataId") || "") || undefined;
   const contratoId = String(formData.get("contratoId") || "") || undefined;
   const empenhoId = String(formData.get("empenhoId") || "") || undefined;

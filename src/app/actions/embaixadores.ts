@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { tierPorAtivos } from "@/lib/validators";
 import { registrarAuditoria } from "@/lib/auditoria";
 
@@ -12,6 +13,7 @@ const PRECOS = { BASICO: 397, PREMIUM: 997 };
 
 export async function cadastrarAnalistaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
 
   // Restrito ao admin do PO (em produção: roles)
   // Aqui no MVP, permite qualquer admin cadastrar.
@@ -60,6 +62,7 @@ export async function cadastrarAnalistaAction(_p: Result | null, formData: FormD
 
 export async function vincularEmbaixadorAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const analistaId = String(formData.get("analistaId") || "");
 
   if (!analistaId) {
@@ -89,6 +92,7 @@ export async function vincularEmbaixadorAction(_p: Result | null, formData: Form
 // Calcula e gera comissões da competência atual
 export async function calcularComissoesDoMesAction(_p: Result | null, _formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins podem rodar o cálculo." };
 
   const hoje = new Date();
@@ -127,6 +131,7 @@ export async function calcularComissoesDoMesAction(_p: Result | null, _formData:
 
 export async function marcarComissaoPagaAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") throw new Error("Apenas admins.");
   const id = String(formData.get("comissaoId"));
   await prisma.comissao.update({ where: { id }, data: { paga: true, pagaEm: new Date() } });

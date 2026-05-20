@@ -12,6 +12,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 
 export type ItemExtraido = {
   descricao: string;
@@ -55,6 +56,7 @@ export async function matchItensIaAction(
   itensRef: ItemReferencia[],
 ): Promise<MatchResult> {
   await exigirUsuario();
+  await bloquearEspionagem();
   if (itensExtraidos.length === 0 || itensRef.length === 0) {
     return { ok: true, sugestoes: [], modo: "heuristica" };
   }

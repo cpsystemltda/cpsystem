@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 
 export async function marcarLidaAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("notificacaoId"));
   await prisma.notificacaoSistema.updateMany({
     where: { id, usuarioId: usuario.id },
@@ -16,6 +18,7 @@ export async function marcarLidaAction(formData: FormData) {
 
 export async function marcarTodasLidasAction() {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   await prisma.notificacaoSistema.updateMany({
     where: { usuarioId: usuario.id, lida: false },
     data: { lida: true, lidaEm: new Date() },
@@ -26,6 +29,7 @@ export async function marcarTodasLidasAction() {
 // Job manual: gera PRAZO_PROXIMO pra empenhos com data prevista próxima
 export async function gerarAlertasPrazoAction() {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") throw new Error("Apenas admins.");
 
   const hoje = new Date();

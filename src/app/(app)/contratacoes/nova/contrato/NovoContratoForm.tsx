@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { ChevronLeft, MapPin, Users, FileSignature } from "lucide-react";
 import { Field, Select } from "@/components/Field";
+import { TooltipAjuda } from "@/components/TooltipAjuda";
+import { AJUDA } from "@/lib/textosAjuda";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor, type AtaItemRef } from "@/components/ItensEditor";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
@@ -304,13 +306,14 @@ export default function NovoContratoForm({
         <Secao titulo="Identificação">
           <div className="grid grid-cols-4 gap-4">
             <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} defaultValue={vi?.empresaId} />
-            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={vi?.tipo} />
+            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={vi?.tipo} ajuda={AJUDA.tipoContrato} />
 
             {/* Toggle Vinculado a ARP */}
             <div className="col-span-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
               <div className="flex flex-wrap items-center gap-4">
-                <span className="text-sm font-semibold text-slate-700">
-                  Este contrato é derivado de uma ARP (Ata de Registro de Preços)?
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+                  <span>Este contrato é derivado de uma ARP (Ata de Registro de Preços)?</span>
+                  <TooltipAjuda texto={AJUDA.origemContrato} />
                 </span>
                 <label className="flex items-center gap-1.5 text-sm">
                   <input

@@ -35,6 +35,7 @@ import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 import { UploadInteligenteCard } from "@/components/UploadInteligenteCard";
 import { labelCurtoInstrumento, labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
+import { HonorariosAnalistaBloco } from "@/components/HonorariosAnalistaBloco";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -182,6 +183,67 @@ export default async function DashboardPage() {
       },
     }).catch(() => 0),
   ]);
+
+  // === Honorários do analista ===
+  // Bloco só aparece se a empresa tem vínculo ativo com analista. Cobre as
+  // duas semânticas: fixo mensal (PagamentoFixoMensal) e variável por
+  // execução (ComissaoExecucao).
+  const [linhasFixoBruto, comissoesVarBruto] = await Promise.all([
+    prisma.pagamentoFixoMensal.findMany({
+      where: { vinculo: { contaId } },
+      include: {
+        vinculo: { select: { analista: { select: { nomeCompleto: true } } } },
+      },
+      orderBy: [{ competencia: "desc" }, { vencimento: "asc" }],
+    }),
+    prisma.comissaoExecucao.findMany({
+      where: { vinculo: { contaId }, status: { in: ["A_RECEBER", "ATRASADO", "PAGO_PARCIAL"] } },
+      include: {
+        empenho: { select: { numero: true, orgaoNome: true } },
+        vinculo: { select: { analista: { select: { nomeCompleto: true } } } },
+      },
+      orderBy: { criadoEm: "desc" },
+    }),
+  ]);
+  const mesAtualStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+  const linhasFixoPendentes = linhasFixoBruto
+    .filter((l) => l.status !== "PAGO" || l.competencia === mesAtualStr)
+    .slice(0, 12)
+    .map((l) => ({
+      id: l.id,
+      competencia: l.competencia,
+      valor: l.valor,
+      valorRecebido: l.valorRecebido ?? 0,
+      status: l.status as "A_RECEBER" | "ATRASADO" | "PAGO" | "PAGO_PARCIAL",
+      vencimento: l.vencimento,
+      pagaEm: l.pagaEm,
+      analistaNome: l.vinculo.analista?.nomeCompleto ?? "Analista",
+    }));
+  const comissoesVarPendentes = comissoesVarBruto.map((c) => ({
+    id: c.id,
+    empenhoNumero: `Empenho ${c.empenho.numero}`,
+    orgaoNome: c.empenho.orgaoNome,
+    valorBaseEmpenho: c.valorBaseEmpenho,
+    valorCalculado: c.valorCalculado,
+    valorRecebido: c.valorRecebido ?? 0,
+    percentual: c.percentual,
+    status: c.status as "AGUARDANDO_ORGAO" | "A_RECEBER" | "ATRASADO" | "PAGO" | "PAGO_PARCIAL",
+    analistaNome: c.vinculo.analista?.nomeCompleto ?? "Analista",
+  }));
+  const totalPagoFixoMes = linhasFixoBruto
+    .filter((l) => l.status === "PAGO" && l.pagaEm && l.pagaEm.toISOString().slice(0, 7) === mesAtualStr)
+    .reduce((s, l) => s + (l.valorRecebido ?? l.valor), 0);
+  const totalAtrasadoFixo = linhasFixoBruto
+    .filter((l) => l.status === "ATRASADO" || (l.status === "A_RECEBER" && l.vencimento && l.vencimento < hoje))
+    .reduce((s, l) => s + l.valor, 0);
+  const totalAPagarFixoMes = linhasFixoBruto
+    .filter((l) => l.status !== "PAGO" && l.competencia === mesAtualStr)
+    .reduce((s, l) => s + l.valor, 0);
+  const totalAPagarVar = comissoesVarBruto.reduce(
+    (s, c) => s + (c.status === "PAGO_PARCIAL" ? Math.max(0, c.valorCalculado - (c.valorRecebido ?? 0)) : c.valorCalculado),
+    0,
+  );
+  const temVinculoAnalista = linhasFixoBruto.length > 0 || comissoesVarBruto.length > 0;
 
   // Pins geocodificados — fora do Promise.all principal porque a primeira
   // chamada pode bater no Nominatim (até 5-6 segundos). Cache em
@@ -688,6 +750,17 @@ export default async function DashboardPage() {
           <TimelineVencimentos itens={itensTimeline} />
         </div>
       </Block>
+
+      {/* === Honorários do analista (só aparece se a empresa tem vínculo ativo) === */}
+      {temVinculoAnalista && (
+        <HonorariosAnalistaBloco
+          fixosPendentes={linhasFixoPendentes}
+          variaveisPendentes={comissoesVarPendentes}
+          totalPagoMes={totalPagoFixoMes}
+          totalAtrasado={totalAtrasadoFixo}
+          totalAPagar={totalAPagarFixoMes + totalAPagarVar}
+        />
+      )}
 
       {/* === Bloco III — Contratos contínuos (alertas de renovação) === */}
       <Block

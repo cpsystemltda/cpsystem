@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { notificar } from "@/lib/notificacoes";
 
@@ -11,6 +12,7 @@ type Result = { erro?: string; ok?: boolean; vinculoId?: string };
 // EMPRESA → vincula um analista ao seu grupo
 export async function criarVinculoAnalistaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.conta.tipo !== "EMPRESA") return { erro: "Só contas do tipo EMPRESA podem vincular analistas." };
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins podem vincular analistas." };
 
@@ -84,6 +86,7 @@ export async function criarVinculoAnalistaAction(_p: Result | null, formData: Fo
 // EMPRESA → atualiza fixo mensal e dia de vcto (não pode mexer no %, isso é do analista)
 export async function atualizarFixoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.conta.tipo !== "EMPRESA") return { erro: "Apenas empresas." };
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
 
@@ -131,6 +134,7 @@ export async function atualizarFixoAction(_p: Result | null, formData: FormData)
  */
 export async function atualizarPercentualAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const vinculoId = String(formData.get("vinculoId") || "");
   const percentual = Number(formData.get("percentualComissao") || 0);
   if (percentual < 0 || percentual > 100) return { erro: "Percentual fora do intervalo." };
@@ -179,6 +183,7 @@ export async function atualizarPercentualAction(_p: Result | null, formData: For
 // EMPRESA → encerra vínculo
 export async function encerrarVinculoAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.conta.tipo !== "EMPRESA") return { erro: "Apenas empresas." };
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
 
@@ -224,6 +229,7 @@ export async function encerrarVinculoAction(_p: Result | null, formData: FormDat
 
 export async function marcarFixoPagoAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.conta.tipo !== "EMPRESA") throw new Error("Apenas empresas.");
   if (usuario.perfil !== "ADMIN") throw new Error("Apenas admins.");
 

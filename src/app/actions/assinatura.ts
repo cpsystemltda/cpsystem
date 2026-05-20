@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { getGateway, type FormaPagamento, type Plano, PRECO_PLANO } from "@/lib/gateway";
 import { normalizarCnpj } from "@/lib/validators";
@@ -47,6 +48,7 @@ async function garantirCustomer(contaId: string) {
 
 export async function iniciarCheckoutAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins podem alterar a assinatura." };
 
   const plano = String(formData.get("plano") || "BASICO") as Plano;
@@ -148,6 +150,7 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
 
 export async function cancelarAssinaturaAction(_p: Result | null, _formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
 
   await prisma.conta.update({
@@ -189,6 +192,7 @@ export async function cancelarAssinaturaAction(_p: Result | null, _formData: For
 
 // Marcar plano como ativo após confirmação de pagamento
 export async function ativarPlano(contaId: string, plano: Plano) {
+  await bloquearEspionagem();
   const proximo = new Date();
   proximo.setMonth(proximo.getMonth() + 1);
   await prisma.conta.update({
@@ -208,6 +212,7 @@ export async function ativarPlano(contaId: string, plano: Plano) {
 // A lógica fica em `@/lib/regua` para ser reutilizada pelo endpoint /api/cron/regua-cobranca.
 export async function executarReguaCobrancaAction(_p: Result | null, _formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
   const { executarRegua } = await import("@/lib/regua");
   await executarRegua();

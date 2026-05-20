@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Crown, Search, ArrowUpRight, AlertTriangle, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Crown, Search, ArrowUpRight, AlertTriangle, CheckCircle2, Clock, XCircle, Eye, ShieldCheck } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { entrarEspionagemAction } from "@/lib/espionagem";
 
 const PRECO_BASICO = 397;
 const PRECO_PREMIUM = 997;
@@ -43,8 +44,9 @@ export default async function AdminClientesPage({
 
   const contas = await prisma.conta.findMany({
     where: {
-      // Ignora super admins (Igor/Regina) — não são clientes pagantes
-      usuarios: { none: { superAdmin: true } },
+      // Mostra todas as contas — inclusive as de super admin (Regina/Igor),
+      // pra permitir entrar via modo espionagem se necessário. Linhas com
+      // super admin recebem badge "Adm CP" pra distinguir.
       ...(statusFiltro && { statusAssinatura: statusFiltro as "TRIAL" | "ATIVA" | "INADIMPLENTE" | "CANCELADA" }),
       ...(tipo === "EMPRESA" && { tipo: "EMPRESA" }),
       ...(tipo === "ANALISTA" && { tipo: "ANALISTA" }),
@@ -66,7 +68,7 @@ export default async function AdminClientesPage({
     include: {
       empresas: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
       analista: { select: { nomeCompleto: true, email: true } },
-      usuarios: { select: { id: true, email: true } },
+      usuarios: { select: { id: true, email: true, superAdmin: true } },
       embaixador: { select: { nomeCompleto: true } },
       cobrancas: {
         select: { id: true, status: true, valor: true, vencimento: true, pagaEm: true },
@@ -140,6 +142,7 @@ export default async function AdminClientesPage({
               <th className="px-4 py-3 text-left font-medium">Origem</th>
               <th className="px-4 py-3 text-left font-medium">Adimplência</th>
               <th className="px-4 py-3 text-left font-medium">Criada em</th>
+              <th className="px-4 py-3 text-right font-medium">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -154,10 +157,20 @@ export default async function AdminClientesPage({
               const totalCob = c.cobrancas.length;
               const pagas = c.cobrancas.filter((cb) => cb.status === "PAGA").length;
               const adimplenciaPct = totalCob > 0 ? (pagas / totalCob) * 100 : null;
+              const ehContaAdmin = c.usuarios.some((u) => u.superAdmin);
+              const ehMinhaConta = c.usuarios.some((u) => u.id === usuario.id);
               return (
                 <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{nome}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-slate-900">{nome}</span>
+                      {ehContaAdmin && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                          <ShieldCheck className="h-2.5 w-2.5" />
+                          Adm CP
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-slate-500">
                       {c.tipo === "EMPRESA" && c.empresas[0]?.cnpj
                         ? `CNPJ ${c.empresas[0].cnpj}`
@@ -201,12 +214,29 @@ export default async function AdminClientesPage({
                   <td className="px-4 py-3 text-xs text-slate-500">
                     {c.criadoEm.toLocaleDateString("pt-BR")}
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    {ehMinhaConta ? (
+                      <span className="text-[11px] text-slate-400">você</span>
+                    ) : (
+                      <form action={entrarEspionagemAction} className="inline-flex">
+                        <input type="hidden" name="contaId" value={c.id} />
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition"
+                          title="Entrar no espaço deste cliente em somente leitura"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Ver como cliente
+                        </button>
+                      </form>
+                    )}
+                  </td>
                 </tr>
               );
             })}
             {contas.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-400">
+                <td colSpan={9} className="px-4 py-12 text-center text-sm text-slate-400">
                   Nenhum cliente encontrado com esses filtros.
                 </td>
               </tr>

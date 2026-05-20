@@ -12,6 +12,8 @@ import {
 import { extrairGarantiaPdfAction } from "@/app/actions/iaExtracao";
 import type { GarantiaExtraida } from "@/lib/extrairAta";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
+import { TooltipAjuda } from "@/components/TooltipAjuda";
+import { AJUDA } from "@/lib/textosAjuda";
 
 type Endosso = {
   id: string;
@@ -247,7 +249,7 @@ function FormNovaGarantia({
         )}
 
         {/* Modalidade */}
-        <Campo label="Modalidade *">
+        <Campo label="Modalidade *" ajuda={AJUDA.tipoGarantia}>
           <select
             name="modalidade"
             value={modalidade}
@@ -541,7 +543,10 @@ function FormEndosso({ garantiaId, onCancelar }: { garantiaId: string; onCancela
 
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-      <h5 className="mb-3 text-xs font-semibold text-slate-700">Novo endosso</h5>
+      <h5 className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+        <span>Novo endosso</span>
+        <TooltipAjuda texto={AJUDA.endossoGarantia} />
+      </h5>
       <form action={formAction} className="grid grid-cols-2 gap-3">
         <input type="hidden" name="garantiaId" value={garantiaId} />
         <CampoInput label="Valor (R$) *" name="valor" type="number" step="0.01" min="0" required placeholder="0,00" />
@@ -590,14 +595,19 @@ function Campo({
   label,
   children,
   className,
+  ajuda,
 }: {
   label: string;
   children: React.ReactNode;
   className?: string;
+  ajuda?: string;
 }) {
   return (
     <div className={`flex flex-col gap-1 ${className ?? ""}`}>
-      <span className="text-xs font-medium text-slate-600">{label}</span>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600">
+        <span>{label}</span>
+        {ajuda && <TooltipAjuda texto={ajuda} />}
+      </span>
       {children}
     </div>
   );

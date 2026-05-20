@@ -1,6 +1,7 @@
 "use server";
 
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { prisma } from "@/lib/prisma";
 import { analisarContratoIA, type AnaliseJuridica } from "@/lib/iaJuridica";
 
@@ -10,6 +11,7 @@ export type AnalisarContratoResult =
 
 export async function analisarContratoAction(contratoId: string): Promise<AnalisarContratoResult> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const contrato = await prisma.contrato.findFirst({
     where: { id: contratoId, empresa: { contaId: usuario.contaId } },
     include: { itens: { select: { descricao: true, quantidade: true, valorUnitario: true, valorTotal: true } } },

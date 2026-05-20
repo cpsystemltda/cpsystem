@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { calcularDiff } from "@/lib/diff";
 import { salvarArquivo } from "@/lib/uploads";
@@ -19,24 +20,27 @@ const CAMPOS_FIXO = [
   { chave: "observacoes", rotulo: "Observação" },
 ];
 
-async function carregarLinhaDoAnalista(id: string, contaId: string, superAdmin: boolean) {
+// Carrega a linha + valida que `contaId` é OU do analista (dono da comissão)
+// OU da empresa-cliente (dona do vínculo) — ambos podem marcar pagamento.
+// Super admin passa por cima.
+async function carregarLinhaPagamentoFixo(id: string, contaId: string, superAdmin: boolean) {
   const linha = await prisma.pagamentoFixoMensal.findUnique({
     where: { id },
     include: {
       vinculo: {
         select: {
           analistaId: true,
+          contaId: true,
           analista: { select: { contaId: true } },
         },
       },
     },
   });
   if (!linha) return null;
-  if (
-    !superAdmin &&
-    linha.vinculo.analista &&
-    linha.vinculo.analista.contaId !== contaId
-  ) {
+  if (superAdmin) return linha;
+  const contaDoAnalista = linha.vinculo.analista?.contaId;
+  const contaDaEmpresa = linha.vinculo.contaId;
+  if (contaDoAnalista !== contaId && contaDaEmpresa !== contaId) {
     return "sem-permissao";
   }
   return linha;
@@ -51,9 +55,10 @@ export async function marcarPagamentoFixoAction(
   formData: FormData,
 ): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
 
-  const linha = await carregarLinhaDoAnalista(id, usuario.contaId, usuario.superAdmin);
+  const linha = await carregarLinhaPagamentoFixo(id, usuario.contaId, usuario.superAdmin);
   if (!linha) return { erro: "Comissão não encontrada." };
   if (linha === "sem-permissao") return { erro: "Sem permissão." };
 
@@ -143,8 +148,9 @@ export async function atualizarValorVencimentoFixoAction(
   formData: FormData,
 ): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
-  const linha = await carregarLinhaDoAnalista(id, usuario.contaId, usuario.superAdmin);
+  const linha = await carregarLinhaPagamentoFixo(id, usuario.contaId, usuario.superAdmin);
   if (!linha) return { erro: "Comissão não encontrada." };
   if (linha === "sem-permissao") return { erro: "Sem permissão." };
 
@@ -191,8 +197,9 @@ function ehMesFuturo(competencia: string): boolean {
  */
 export async function excluirPagamentoFixoAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
-  const linha = await carregarLinhaDoAnalista(id, usuario.contaId, usuario.superAdmin);
+  const linha = await carregarLinhaPagamentoFixo(id, usuario.contaId, usuario.superAdmin);
   if (!linha) throw new Error("Comissão não encontrada.");
   if (linha === "sem-permissao") throw new Error("Sem permissão.");
   if (!ehMesFuturo(linha.competencia)) {

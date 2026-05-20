@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { Field, Select } from "@/components/Field";
+import { AJUDA } from "@/lib/textosAjuda";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor, type AtaItemRef } from "@/components/ItensEditor";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
@@ -420,7 +421,7 @@ export default function NovoEmpenhoForm({
         <Secao titulo="Identificação">
           <div className="grid grid-cols-4 gap-4">
             <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} defaultValue={heranca?.empresaId ?? vi?.empresaId} />
-            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={heranca?.tipo ?? vi?.tipo} />
+            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={heranca?.tipo ?? vi?.tipo} ajuda={AJUDA.tipoContrato} />
             <Field
               label={`${labelNumero} (nº/ano)`}
               name="numero"

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Clock, Upload, AlertCircle, X, ChevronDown, ChevronUp, Bell } from "lucide-react";
+import { Check, Clock, Upload, AlertCircle, X, Bell } from "lucide-react";
 import { brl } from "@/lib/validators";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
@@ -69,6 +69,14 @@ const COR_STATUS: Record<StatusComissao, { bg: string; fg: string }> = {
   PAGO_PARCIAL: { bg: "rgba(197,180,255,0.22)", fg: "#5a4795" },
 };
 
+// Simplificação pedida pela Regina: filtro com apenas 2 grupos (cobre os 5
+// status reais). "A receber" = qualquer pendente; "Recebido" = qualquer pago.
+type FiltroSimples = "" | "a_receber" | "recebido";
+
+function statusEmGrupoARecebido(s: StatusComissao): "a_receber" | "recebido" {
+  return s === "PAGO" || s === "PAGO_PARCIAL" ? "recebido" : "a_receber";
+}
+
 export function ComissoesVariaveisBloco({
   comissoes,
   empresas,
@@ -77,7 +85,7 @@ export function ComissoesVariaveisBloco({
   empresas: EmpresaOption[];
 }) {
   const [filtroEmpresa, setFiltroEmpresa] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState<StatusComissao | "">("");
+  const [filtroStatus, setFiltroStatus] = useState<FiltroSimples>("");
   const [filtroMes, setFiltroMes] = useState(""); // YYYY-MM
   // Origem: "" (todos), "direto", "ata:<id>", "contrato:<id>"
   const [filtroOrigem, setFiltroOrigem] = useState("");
@@ -103,7 +111,7 @@ export function ComissoesVariaveisBloco({
   const filtradas = useMemo(() => {
     return comissoes.filter((c) => {
       if (filtroEmpresa && c.empenho.empresa.id !== filtroEmpresa) return false;
-      if (filtroStatus && c.status !== filtroStatus) return false;
+      if (filtroStatus && statusEmGrupoARecebido(c.status) !== filtroStatus) return false;
       if (filtroMes && c.dataPagamento) {
         const mes = c.dataPagamento.toISOString().slice(0, 7);
         if (mes !== filtroMes) return false;
@@ -148,11 +156,10 @@ export function ComissoesVariaveisBloco({
     });
   }, [comissoes, filtroEmpresa]);
 
-  const mesCorrente = new Date().toISOString().slice(0, 7);
   const cards = useMemo(() => {
     let aguardandoOrgao = 0;
     let aReceber = 0;
-    let recebidoNoMes = 0;
+    let recebido = 0;
     for (const c of baseParaCards) {
       if (c.status === "AGUARDANDO_ORGAO") {
         aguardandoOrgao += c.valorBaseEmpenho * (c.percentual / 100);
@@ -160,17 +167,13 @@ export function ComissoesVariaveisBloco({
         aReceber += c.valorCalculado;
       } else if (c.status === "PAGO_PARCIAL") {
         aReceber += Math.max(0, c.valorCalculado - c.valorRecebido);
-        if (c.dataPagamento && c.dataPagamento.toISOString().slice(0, 7) === mesCorrente) {
-          recebidoNoMes += c.valorRecebido;
-        }
+        recebido += c.valorRecebido;
       } else if (c.status === "PAGO") {
-        if (c.dataPagamento && c.dataPagamento.toISOString().slice(0, 7) === mesCorrente) {
-          recebidoNoMes += c.valorRecebido || c.valorCalculado;
-        }
+        recebido += c.valorRecebido || c.valorCalculado;
       }
     }
-    return { aguardandoOrgao, aReceber, recebidoNoMes };
-  }, [baseParaCards, mesCorrente]);
+    return { aguardandoOrgao, aReceber, recebido };
+  }, [baseParaCards]);
 
   return (
     <section className="mt-10">
@@ -183,7 +186,7 @@ export function ComissoesVariaveisBloco({
             Comissões variáveis (por execução)
           </h2>
           <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-            Linha A (órgão → empresa) é só leitura. Linha B (empresa → você) é controlada manualmente.
+            Cada execução pagar pelo órgão libera sua comissão. Marque como recebido quando a empresa repassar.
           </p>
         </div>
       </header>
@@ -211,7 +214,7 @@ export function ComissoesVariaveisBloco({
           <button
             type="button"
             onClick={() => {
-              setFiltroStatus("A_RECEBER");
+              setFiltroStatus("a_receber");
               setFiltroMes("");
               setFiltroOrigem("");
             }}
@@ -237,9 +240,9 @@ export function ComissoesVariaveisBloco({
         />
         <MiniCard
           tone="mint"
-          label="Recebido no mês"
-          valor={cards.recebidoNoMes}
-          dica={`Pagas em ${new Date().toLocaleString("pt-BR", { month: "long", year: "numeric" })}.`}
+          label="Recebido"
+          valor={cards.recebido}
+          dica="Todos os repasses já confirmados pela empresa, sem filtro de tempo."
         />
       </div>
 
@@ -258,15 +261,12 @@ export function ComissoesVariaveisBloco({
         </select>
         <select
           value={filtroStatus}
-          onChange={(ev) => setFiltroStatus(ev.target.value as StatusComissao | "")}
+          onChange={(ev) => setFiltroStatus(ev.target.value as FiltroSimples)}
           className="rounded-[8px] border-[0.5px] border-[color:var(--hairline)] bg-white/70 px-2.5 py-1.5 text-xs"
         >
           <option value="">Todos status</option>
-          {(Object.keys(ROTULO_STATUS) as StatusComissao[]).map((s) => (
-            <option key={s} value={s}>
-              {ROTULO_STATUS[s]}
-            </option>
-          ))}
+          <option value="a_receber">A receber</option>
+          <option value="recebido">Recebido</option>
         </select>
         <input
           type="month"
@@ -425,111 +425,113 @@ function ItemComissao({ comissao: c }: { comissao: ComissaoLinha }) {
             )}
           </p>
 
-          {/* Linha A — read-only */}
-          <div className="mt-3 rounded-[10px] border-[0.5px] border-[color:var(--hairline)] bg-white/60 px-3 py-2 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-bold uppercase tracking-wide text-slate-500" style={{ fontSize: 10 }}>
-                Linha A — órgão pagou empresa
-              </span>
-              {orgaoPagou ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                  <Check className="h-3 w-3" /> Pago
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">
-                  <Clock className="h-3 w-3" /> Pendente
-                </span>
-              )}
-              {c.empenho.dataPagamento && (
-                <span className="text-slate-500">
-                  · em {c.empenho.dataPagamento.toLocaleDateString("pt-BR")}
-                </span>
-              )}
-              <span className="text-slate-500">· valor pago {brl(c.valorBasePago)}</span>
-            </div>
-          </div>
+          {/* Resumo do pagamento do órgão à empresa — discreto, só pra contexto */}
+          <p className="mt-2 text-[11px] text-slate-500">
+            {orgaoPagou ? (
+              <>
+                <Check className="mr-0.5 inline-block h-3 w-3 text-emerald-600" />
+                Órgão pagou {brl(c.valorBasePago)} à empresa
+                {c.empenho.dataPagamento &&
+                  ` em ${c.empenho.dataPagamento.toLocaleDateString("pt-BR")}`}
+              </>
+            ) : (
+              <>
+                <Clock className="mr-0.5 inline-block h-3 w-3 text-slate-400" />
+                Órgão ainda não pagou — empenho de {brl(c.valorBaseEmpenho)}
+              </>
+            )}
+          </p>
 
-          {/* Linha B — controlada pelo analista */}
+          {/* Sua comissão — bloco destacado */}
           <div
-            className="mt-2 rounded-md border px-3 py-2 text-xs"
+            className="mt-3 rounded-[12px] border-2 px-4 py-3"
             style={{
               borderColor: cor.fg,
               background: cor.bg,
             }}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span
-                className="font-bold uppercase tracking-wide"
-                style={{ fontSize: 10, color: cor.fg }}
-              >
-                Linha B — empresa paga você
-              </span>
-              <span className="font-bold tabular" style={{ color: cor.fg }}>
-                {c.percentual}%
-                {c.percentualOverride && (
-                  <span
-                    className="ml-1 rounded-full bg-white/40 px-1.5 py-0.5 text-[9px] font-extrabold"
-                    title={c.observacaoOverride ?? "Override aplicado"}
-                  >
-                    Override
-                  </span>
-                )}
-                {" · "}
-                {brl(c.valorCalculado)}
-              </span>
-            </div>
-            {c.status === "AGUARDANDO_ORGAO" && (
-              <p className="mt-1 text-[11px]" style={{ color: cor.fg }}>
-                Aguardando o órgão pagar a empresa. Quando isso acontecer, esta linha libera.
-              </p>
-            )}
-            {c.status === "PAGO" || c.status === "PAGO_PARCIAL" ? (
-              <p className="mt-1 text-[11px]" style={{ color: cor.fg }}>
-                Recebido {brl(c.valorRecebido)} em{" "}
-                {c.dataPagamento?.toLocaleDateString("pt-BR") ?? "—"}
-                {c.comprovanteUrl && (
-                  <>
-                    {" · "}
-                    <a
-                      href={c.comprovanteUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p
+                  className="text-[10px] font-bold uppercase"
+                  style={{ letterSpacing: "0.14em", color: cor.fg }}
+                >
+                  Sua comissão · {c.percentual}%
+                  {c.percentualOverride && (
+                    <span
+                      className="ml-1 rounded-full bg-white/40 px-1.5 py-0.5 text-[9px] font-extrabold"
+                      title={c.observacaoOverride ?? "Override aplicado"}
                     >
-                      ver comprovante
-                    </a>
-                  </>
+                      Override
+                    </span>
+                  )}
+                </p>
+                <p
+                  className="mt-0.5 text-[20px] font-extrabold tabular leading-tight"
+                  style={{ color: cor.fg }}
+                >
+                  {brl(c.valorCalculado)}
+                </p>
+                {c.status === "PAGO" || c.status === "PAGO_PARCIAL" ? (
+                  <p className="mt-0.5 text-[11px]" style={{ color: cor.fg }}>
+                    Recebido {brl(c.valorRecebido)} em{" "}
+                    {c.dataPagamento?.toLocaleDateString("pt-BR") ?? "—"}
+                    {c.comprovanteUrl && (
+                      <>
+                        {" · "}
+                        <a
+                          href={c.comprovanteUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          ver comprovante
+                        </a>
+                      </>
+                    )}
+                  </p>
+                ) : c.status === "AGUARDANDO_ORGAO" ? (
+                  <p className="mt-0.5 text-[11px]" style={{ color: cor.fg }}>
+                    Liberado quando o órgão pagar a empresa.
+                  </p>
+                ) : null}
+                {c.observacao && (
+                  <p className="mt-1 text-[11px] italic" style={{ color: cor.fg }}>
+                    &ldquo;{c.observacao}&rdquo;
+                  </p>
                 )}
-              </p>
-            ) : null}
-            {c.observacao && (
-              <p className="mt-1 text-[11px] italic" style={{ color: cor.fg }}>
-                &ldquo;{c.observacao}&rdquo;
-              </p>
-            )}
+              </div>
+              {!expandido && c.status !== "AGUARDANDO_ORGAO" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExpandido(true);
+                    setOverrideAberto(false);
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-bold text-white transition ${
+                    c.status === "PAGO" || c.status === "PAGO_PARCIAL"
+                      ? "bg-slate-600 hover:bg-slate-700"
+                      : "bg-amber-600 hover:bg-amber-700"
+                  }`}
+                >
+                  {c.status === "PAGO" || c.status === "PAGO_PARCIAL"
+                    ? "Editar / desfazer"
+                    : "Marcar como recebido"}
+                </button>
+              )}
+              {expandido && (
+                <button
+                  type="button"
+                  onClick={() => setExpandido(false)}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <X className="h-3 w-3" /> Fechar
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-            <span>Valor empenhado: {brl(c.valorBaseEmpenho)}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setExpandido(!expandido);
-                if (!expandido) setOverrideAberto(false);
-              }}
-              className="inline-flex items-center gap-1 text-slate-700 underline hover:text-slate-900"
-            >
-              {expandido ? (
-                <>
-                  <ChevronUp className="h-3 w-3" /> Fechar
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-3 w-3" />{" "}
-                  {c.status === "AGUARDANDO_ORGAO" ? "Detalhes" : "Marcar / editar"}
-                </>
-              )}
-            </button>
             {c.status !== "PAGO" && (
               <button
                 type="button"
@@ -537,7 +539,7 @@ function ItemComissao({ comissao: c }: { comissao: ComissaoLinha }) {
                   setOverrideAberto(!overrideAberto);
                   if (!overrideAberto) setExpandido(false);
                 }}
-                className="inline-flex items-center gap-1 text-slate-700 underline hover:text-slate-900"
+                className="text-slate-700 underline hover:text-slate-900"
                 title="Alterar o percentual desta execução com justificativa"
               >
                 {overrideAberto ? "Fechar % " : "Ajustar %"}
@@ -597,7 +599,7 @@ function FormMarcar({
           className="text-[10px] font-bold uppercase"
           style={{ letterSpacing: "0.16em", color: "var(--primary-deep)" }}
         >
-          Atualizar Linha B
+          Atualizar status da sua comissão
         </span>
         <button
           type="button"

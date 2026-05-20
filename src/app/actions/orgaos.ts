@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { LIMITE_CARONA_POR_ORGAO_PCT, LIMITE_CARONA_TOTAL_PCT, normalizarCnpj } from "@/lib/validators";
 import { registrarAuditoria } from "@/lib/auditoria";
 import {
@@ -67,6 +68,7 @@ async function valorTotalAta(ataId: string): Promise<number> {
 
 export async function adicionarOrgaoNaAtaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const ataId = String(formData.get("ataId") || "");
   const tipo = String(formData.get("tipo") || "") as "GERENCIADOR" | "PARTICIPANTE" | "CARONA";
 
@@ -124,6 +126,7 @@ export async function adicionarOrgaoNaAtaAction(_p: Result | null, formData: For
 
 export async function adicionarEnderecoEntregaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const ataId = String(formData.get("ataId") || "") || undefined;
   const contratoId = String(formData.get("contratoId") || "") || undefined;
   const empenhoId = String(formData.get("empenhoId") || "") || undefined;
@@ -160,6 +163,7 @@ export async function adicionarEnderecoEntregaAction(_p: Result | null, formData
 
 export async function atualizarEnderecoEntregaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const enderecoAntes = await prisma.enderecoEntrega.findUnique({ where: { id } });
   if (!enderecoAntes) return { erro: "Endereço não encontrado." };
@@ -201,6 +205,7 @@ export async function atualizarEnderecoEntregaAction(_p: Result | null, formData
 
 export async function removerEnderecoEntregaAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const endereco = await prisma.enderecoEntrega.findUnique({
     where: { id },
@@ -227,6 +232,7 @@ export async function removerEnderecoEntregaAction(formData: FormData) {
 
 export async function atualizarPontoFocalAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const pfAntes = await prisma.pontoFocal.findUnique({ where: { id } });
   if (!pfAntes) return { erro: "Ponto focal não encontrado." };
@@ -282,6 +288,7 @@ export async function atualizarPontoFocalAction(_p: Result | null, formData: For
 
 export async function removerPontoFocalAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const pf = await prisma.pontoFocal.findUnique({
     where: { id },
@@ -307,6 +314,7 @@ export async function removerPontoFocalAction(formData: FormData) {
 
 export async function atualizarOrgaoNaAtaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const orgaoAntes = await prisma.orgaoNaAta.findUnique({
     where: { id },
@@ -397,6 +405,7 @@ export async function atualizarOrgaoNaAtaAction(_p: Result | null, formData: For
 
 export async function removerOrgaoNaAtaAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const orgao = await prisma.orgaoNaAta.findUnique({
     where: { id },
@@ -433,6 +442,7 @@ export async function removerOrgaoNaAtaAction(formData: FormData) {
 
 export async function atualizarAtaItemAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const itemAntes = await prisma.ataItem.findUnique({
     where: { id },
@@ -487,6 +497,7 @@ export async function atualizarAtaItemAction(_p: Result | null, formData: FormDa
 
 export async function removerAtaItemAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const item = await prisma.ataItem.findUnique({
     where: { id },
@@ -527,6 +538,7 @@ export async function removerAtaItemAction(formData: FormData) {
 // ============================================================
 export async function atualizarContratoItemAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const itemAntes = await prisma.contratoItem.findUnique({
     where: { id },
@@ -580,6 +592,7 @@ export async function atualizarContratoItemAction(_p: Result | null, formData: F
 
 export async function removerContratoItemAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const item = await prisma.contratoItem.findUnique({
     where: { id },
@@ -625,6 +638,7 @@ export async function removerContratoItemAction(formData: FormData) {
 // ============================================================
 export async function atualizarEmpenhoItemAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const itemAntes = await prisma.empenhoItem.findUnique({
     where: { id },
@@ -686,6 +700,7 @@ export async function atualizarEmpenhoItemAction(_p: Result | null, formData: Fo
 
 export async function removerEmpenhoItemAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id") || "");
   const item = await prisma.empenhoItem.findUnique({
     where: { id },
@@ -722,6 +737,7 @@ export async function removerEmpenhoItemAction(formData: FormData) {
 
 export async function adicionarPontoFocalAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const ataId = String(formData.get("ataId") || "") || undefined;
   const contratoId = String(formData.get("contratoId") || "") || undefined;
   const empenhoId = String(formData.get("empenhoId") || "") || undefined;

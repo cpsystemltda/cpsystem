@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Building2, UserCheck, Search, X, AlertCircle } from "lucide-react";
 import { Field, Select } from "@/components/Field";
+import { AJUDA } from "@/lib/textosAjuda";
 import { SubmitButton } from "@/components/SubmitButton";
 import { CampoCnpj } from "@/components/CampoCnpj";
 import { CampoCpf } from "@/components/CampoCpf";
@@ -289,7 +290,7 @@ function FormEmpresa() {
       <CampoCnpj defaultValue={v.cnpj ?? ""} erro={e.cnpj} />
       <Field label="Razão social" name="razaoSocial" required defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={2} />
       <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={4} />
-      <Select label="Porte" name="porte" options={PORTES} required defaultValue={v.porte ?? ""} erro={e.porte} span={2} />
+      <Select label="Porte" name="porte" options={PORTES} required defaultValue={v.porte ?? ""} erro={e.porte} span={2} ajuda={AJUDA.porte} />
       <Select
         label="Natureza jurídica"
         name="naturezaJuridica"
@@ -298,8 +299,9 @@ function FormEmpresa() {
         defaultValue={v.naturezaJuridica ?? ""}
         erro={e.naturezaJuridica}
         span={2}
+        ajuda={AJUDA.naturezaJuridica}
       />
-      <Field label="CNAE principal (opcional)" name="cnaePrincipal" placeholder="ex.: 6201-5/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={4} />
+      <Field label="CNAE principal (opcional)" name="cnaePrincipal" placeholder="ex.: 6201-5/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={4} ajuda={AJUDA.cnaePrincipal} />
       <CampoCep defaultValue={v.cep ?? ""} erro={e.cep} span={1} />
       <Field label="Endereço" name="endereco" required defaultValue={v.endereco ?? ""} erro={e.endereco} span={3} />
       <Field label="Complemento" name="complemento" placeholder="Loja, sala, andar…" defaultValue={v.complemento ?? ""} erro={e.complemento} span={4} />
@@ -629,7 +631,7 @@ function FormAnalista() {
           <CampoCnpj defaultValue={v.cnpj ?? ""} erro={e.cnpj} required={false} />
           <Field label="Razão social" name="razaoSocial" defaultValue={v.razaoSocial ?? ""} erro={e.razaoSocial} span={3} />
           <Field label="Nome fantasia" name="nomeFantasia" defaultValue={v.nomeFantasia ?? ""} erro={e.nomeFantasia} span={1} />
-          <Select label="Porte" name="porte" options={PORTES} defaultValue={v.porte ?? ""} erro={e.porte} span={2} />
+          <Select label="Porte" name="porte" options={PORTES} defaultValue={v.porte ?? ""} erro={e.porte} span={2} ajuda={AJUDA.porte} />
           <Select
             label="Natureza jurídica"
             name="naturezaJuridica"
@@ -637,10 +639,13 @@ function FormAnalista() {
             defaultValue={v.naturezaJuridica ?? ""}
             erro={e.naturezaJuridica}
             span={2}
+            ajuda={AJUDA.naturezaJuridica}
           />
-          <Field label="CNAE principal (opcional)" name="cnaePrincipal" placeholder="ex.: 6911-7/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={2} />
-          <Field label="CNAEs secundários" name="cnaesSecundarios" placeholder="separar por vírgula" defaultValue={v.cnaesSecundarios ?? ""} erro={e.cnaesSecundarios} span={2} />
+          <Field label="CNAE principal (opcional)" name="cnaePrincipal" placeholder="ex.: 6911-7/01" defaultValue={v.cnaePrincipal ?? ""} erro={e.cnaePrincipal} span={2} ajuda={AJUDA.cnaePrincipal} />
+          <Field label="CNAEs secundários" name="cnaesSecundarios" placeholder="separar por vírgula" defaultValue={v.cnaesSecundarios ?? ""} erro={e.cnaesSecundarios} span={2} ajuda={AJUDA.cnaesSecundarios} />
           <Field label="Endereço da PJ" name="enderecoPj" defaultValue={v.enderecoPj ?? ""} erro={e.enderecoPj} span={4} />
+          <Field label="E-mail da PJ" name="emailPj" type="email" placeholder="contato@empresa.com" defaultValue={v.emailPj ?? ""} erro={e.emailPj} span={2} />
+          <Field label="Telefone da PJ" name="telefonePj" placeholder="(61) 9 9999-9999" defaultValue={v.telefonePj ?? ""} erro={e.telefonePj} span={2} />
         </>
       )}
 
@@ -656,7 +661,7 @@ function FormAnalista() {
       <Field label="Agência (com dígito, se houver)" name="agencia" placeholder="0000-0" defaultValue={v.agencia ?? ""} erro={e.agencia} span={1} />
       <Field label="Conta corrente (com dígito)" name="contaCorrente" placeholder="00000-0" defaultValue={v.contaCorrente ?? ""} erro={e.contaCorrente} span={1} />
       <Select label="Tipo de chave PIX" name="pixTipo" options={PIX_TIPOS} defaultValue={pixTipo} erro={e.pixTipo} span={2} onChange={(ev) => setPixTipo((ev.target as HTMLSelectElement).value)} />
-      <Field label="Chave PIX" name="pix" placeholder={pixTipo === "EMAIL" ? "voce@dominio.com" : pixTipo === "TELEFONE" ? "(61) 9 9999-9999" : pixTipo === "CPF" ? "000.000.000-00" : pixTipo === "CNPJ" ? "00.000.000/0000-00" : "chave"} defaultValue={v.pix ?? ""} erro={e.pix} span={2} />
+      <Field label="Chave PIX" name="pix" placeholder={pixTipo === "EMAIL" ? "voce@dominio.com" : pixTipo === "TELEFONE" ? "(61) 9 9999-9999" : pixTipo === "CPF" ? "000.000.000-00" : pixTipo === "CNPJ" ? "00.000.000/0000-00" : "chave"} defaultValue={v.pix ?? ""} erro={e.pix} span={2} ajuda={AJUDA.pixAnalista} />
 
       <div className="col-span-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
         Prezado analista, no <strong>CP System</strong> você <strong>não paga assinatura</strong>. Seu painel mostrará os dados de

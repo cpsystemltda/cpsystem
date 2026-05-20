@@ -107,6 +107,8 @@ export const signupAnalistaSchema = z
     cnaesSecundarios: z.string().optional(),
     naturezaJuridica: z.string().optional(),
     enderecoPj: z.string().optional(),
+    emailPj: z.string().optional(),
+    telefonePj: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.senha !== v.confirmacaoSenha) {

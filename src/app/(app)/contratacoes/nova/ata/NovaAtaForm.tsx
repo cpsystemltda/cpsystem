@@ -19,6 +19,8 @@ import {
   Package,
 } from "lucide-react";
 import { SubmitButton } from "@/components/SubmitButton";
+import { TooltipAjuda } from "@/components/TooltipAjuda";
+import { AJUDA } from "@/lib/textosAjuda";
 import { ItensEditor } from "@/components/ItensEditor";
 import type { ItemInicial } from "@/components/ItensEditor";
 import { criarAtaAction, editarAtaAction } from "@/app/actions/contratacoes";
@@ -30,6 +32,7 @@ import {
   OPCOES_MARCO_REAJUSTE,
 } from "@/lib/validators";
 import type { AtaExtraida } from "@/lib/extrairAta";
+import { usePrefillIa } from "@/lib/usePrefillIa";
 import {
   BadgeAuto,
   FieldGlass,
@@ -221,6 +224,18 @@ export default function NovaAtaForm({
   // o usuário sobe o PDF pra IA. Vão como hidden inputs e criam o Anexo no save.
   const [arquivoPdfUrl, setArquivoPdfUrl] = useState<string | null>(null);
   const [arquivoPdfNome, setArquivoPdfNome] = useState<string | null>(null);
+
+  // M9 IA — prefill via UploadInteligenteCard (dashboard)
+  const prefill = usePrefillIa<AtaExtraida>("ATA");
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.dados) {
+      setDados(prefill.dados);
+      setPdfNome(prefill.arquivoNome ?? null);
+    }
+    if (prefill.arquivoUrl) setArquivoPdfUrl(prefill.arquivoUrl);
+    if (prefill.arquivoNome) setArquivoPdfNome(prefill.arquivoNome);
+  }, [prefill]);
   // Conjunto de campos preenchidos pela IA — usado pro badge "Auto".
   // Quando o usuário edita um campo, ele sai da set (= revisado/sobrescrito).
   const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set());
@@ -691,10 +706,11 @@ export default function NovaAtaForm({
           <fieldset className="mb-4">
             <div className="flex items-center gap-6">
               <span
-                className="text-[13px] font-semibold"
+                className="inline-flex items-center gap-1.5 text-[13px] font-semibold"
                 style={{ color: "var(--text-soft)" }}
               >
-                Esta Ata possui órgão(s) participante(s)?
+                <span>Esta Ata possui órgão(s) participante(s)?</span>
+                <TooltipAjuda texto={AJUDA.tipoOrgaoAta} />
               </span>
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -755,6 +771,7 @@ export default function NovaAtaForm({
               span={1}
               value={vigenciaInicio || dados?.vigenciaInicio || ""}
               onChange={setVigenciaInicio}
+              ajuda={AJUDA.vigenciaAta}
             />
             {/* Prazo de vigência: qtd + unidade. Sistema calcula Vigência fim. */}
             <div className="col-span-1">
@@ -922,13 +939,16 @@ export default function NovaAtaForm({
             {/* Marco de reajuste — seletor + data */}
             <div className="col-span-4">
               <span
-                className="mb-1.5 block text-[11px] font-bold uppercase"
+                className="mb-1.5 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase"
                 style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
               >
-                Marco de reajuste
-                <span className="ml-2 font-normal normal-case tracking-normal" style={{ color: "var(--text-mute)" }}>
-                  · usado para calcular quando você terá direito ao reajuste de preços
+                <span>
+                  Marco de reajuste
+                  <span className="ml-2 font-normal normal-case tracking-normal" style={{ color: "var(--text-mute)" }}>
+                    · usado para calcular quando você terá direito ao reajuste de preços
+                  </span>
                 </span>
+                <TooltipAjuda texto={AJUDA.marcoReajuste} />
               </span>
               <div className="grid grid-cols-2 gap-3">
                 <select

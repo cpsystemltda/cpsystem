@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { invalidarCacheGateway } from "@/lib/gateway";
 import { registrarAuditoria } from "@/lib/auditoria";
 
@@ -10,6 +11,7 @@ type Result = { erro?: string; ok?: boolean };
 
 export async function salvarConfigGatewayAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
 
   const provider = String(formData.get("provider") || "DEMO") as "ASAAS" | "STRIPE" | "DEMO";

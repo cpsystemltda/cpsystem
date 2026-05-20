@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { calcularSaldoAta, calcularSaldoContrato } from "@/lib/saldo";
 import { notificarAnalistasDaEmpresa } from "@/lib/notificacoes";
 import {
@@ -256,6 +257,7 @@ async function pegarEmpresaDoUsuario(empresaId: string, contaId: string) {
 // ============================================================
 export async function criarAtaAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const dados = extrairCampos(formData);
   const parsed = novaAtaSchema.safeParse(dados);
 
@@ -415,6 +417,7 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
 //   - Órgãos / Endereços / Pontos focais: replace wholesale (sem FK externas).
 export async function editarAtaAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const ataId = String(formData.get("ataId") || "");
   const dados = extrairCampos(formData);
   const parsed = novaAtaSchema.safeParse(dados);
@@ -667,6 +670,7 @@ export async function editarAtaAction(_prev: ActionResult | null, formData: Form
 // ============================================================
 export async function criarContratoAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const dados = extrairCampos(formData);
   const parsed = novoContratoSchema.safeParse(dados);
 
@@ -827,6 +831,7 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
 //   - Endereços e Pontos focais do nível do contrato: replace wholesale.
 export async function editarContratoAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const contratoId = String(formData.get("contratoId") || "");
   const dados = extrairCampos(formData);
   const parsed = novoContratoSchema.safeParse(dados);
@@ -1100,6 +1105,7 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
 // ============================================================
 export async function excluirAtaAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id"));
   const ata = await prisma.ata.findFirst({
     where: { id, empresa: { contaId: usuario.contaId } },
@@ -1117,6 +1123,7 @@ export async function excluirAtaAction(formData: FormData) {
 
 export async function excluirContratoAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id"));
   const contrato = await prisma.contrato.findFirst({
     where: { id, empresa: { contaId: usuario.contaId } },
@@ -1134,6 +1141,7 @@ export async function excluirContratoAction(formData: FormData) {
 
 export async function excluirEmpenhoAction(formData: FormData) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const id = String(formData.get("id"));
   const empenho = await prisma.empenho.findFirst({
     where: { id, empresa: { contaId: usuario.contaId } },
@@ -1153,6 +1161,7 @@ export async function excluirEmpenhoAction(formData: FormData) {
 // ============================================================
 export async function criarEmpenhoAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const dados = extrairCampos(formData);
   const parsed = novoEmpenhoSchema.safeParse(dados);
 
@@ -1354,6 +1363,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
 // removidos livremente (diferente de AtaItem e ContratoItem).
 export async function editarEmpenhoAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const empenhoId = String(formData.get("empenhoId") || "");
   const dados = extrairCampos(formData);
   const parsed = novoEmpenhoSchema.safeParse(dados);
@@ -1689,6 +1699,7 @@ export async function registrarMarcoAction(
   formData: FormData,
 ): Promise<{ erro?: string; ok?: boolean }> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
   const empenhoId = String(formData.get("empenhoId") || "");
   const marco     = String(formData.get("marco") || "");
   const dataIso   = String(formData.get("data") || "");
@@ -1766,6 +1777,7 @@ export async function registrarMarcoAction(
 // ============================================================
 export async function avancarStatusAction(empenhoId: string, marco: string, dataIso: string) {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
 
   const empenho = await prisma.empenho.findFirst({
     where: { id: empenhoId, empresa: { contaId: usuario.contaId } },

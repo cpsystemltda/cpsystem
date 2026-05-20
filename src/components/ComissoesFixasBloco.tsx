@@ -191,7 +191,11 @@ export function ComissoesFixasBloco({
             Nenhuma comissão fixa neste filtro.
           </p>
           <p className="mt-2 text-xs" style={{ color: "var(--text-soft)" }}>
-            As linhas do mês são geradas pelo cron diário (06:00 BRT) na primeira passagem depois da virada.
+            {linhas.length === 0
+              ? empresas.length === 0
+                ? "Nenhuma empresa vinculou você ainda. Quando uma empresa cadastrar você como analista responsável, as linhas aparecem aqui automaticamente."
+                : "Você tem vínculos, mas sem honorário fixo configurado (valor R$ 0,00). Para cobrar fixo mensal, peça à empresa para definir o valor no vínculo."
+              : "Limpe os filtros para ver todas as linhas. As linhas do mês corrente são geradas automaticamente quando você abre o painel."}
           </p>
         </div>
       ) : (

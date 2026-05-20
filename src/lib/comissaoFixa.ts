@@ -39,7 +39,30 @@ export async function gerarLinhasComissaoFixaDoMes(
     where: { status: "ATIVO", fixoMensal: { gt: 0 } },
     select: { id: true, fixoMensal: true, diaVencimentoFixo: true },
   });
+  return criarLinhasParaVinculos(vinculos, competencia);
+}
 
+/**
+ * Versão focada num analista — usada pelo painel quando ele carrega, pra
+ * garantir que as linhas do mês corrente existem mesmo se o cron diário
+ * ainda não passou. Mais barata que `gerarLinhasComissaoFixaDoMes()` porque
+ * filtra pelo analista; idempotente via @@unique.
+ */
+export async function gerarLinhasComissaoFixaDoAnalista(
+  analistaId: string,
+  competencia = competenciaDoMes(),
+): Promise<number> {
+  const vinculos = await prisma.vinculoAnalista.findMany({
+    where: { analistaId, status: "ATIVO", fixoMensal: { gt: 0 } },
+    select: { id: true, fixoMensal: true, diaVencimentoFixo: true },
+  });
+  return criarLinhasParaVinculos(vinculos, competencia);
+}
+
+async function criarLinhasParaVinculos(
+  vinculos: { id: string; fixoMensal: number; diaVencimentoFixo: number }[],
+  competencia: string,
+): Promise<number> {
   let criadas = 0;
   for (const v of vinculos) {
     const vencimento = calcularVencimento(competencia, v.diaVencimentoFixo);

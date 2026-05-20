@@ -1,6 +1,7 @@
 "use server";
 
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { salvarArquivo } from "@/lib/uploads";
 
 // Server action genérica pra subir 1 arquivo no Vercel Blob e retornar a URL.
@@ -11,6 +12,7 @@ export async function salvarAnexoAdicionalAction(
   formData: FormData,
 ): Promise<{ ok: true; url: string; nome: string } | { ok: false; erro: string }> {
   await exigirUsuario();
+  await bloquearEspionagem();
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) return { ok: false, erro: "Arquivo vazio." };
   try {

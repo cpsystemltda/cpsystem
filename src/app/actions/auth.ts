@@ -300,6 +300,8 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
   const cnaesSecundarios = (v.cnaesSecundarios ?? "").trim();
   const naturezaJuridica = (v.naturezaJuridica ?? "").trim();
   const enderecoPj = (v.enderecoPj ?? "").trim();
+  const emailPj = (v.emailPj ?? "").trim();
+  const telefonePj = (v.telefonePj ?? "").trim();
 
   const emailExiste = await prisma.usuario.findUnique({ where: { email } });
   if (emailExiste) return { erro: "E-mail já cadastrado.", campos: { email: "E-mail já cadastrado" }, valores };
@@ -340,6 +342,8 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
           cnaesSecundarios: cnaesSecundarios || null,
           naturezaJuridica: naturezaJuridica || null,
           enderecoPj: enderecoPj || null,
+          emailPj: emailPj || null,
+          telefonePj: telefonePj || null,
           ativo: true,
         },
       },

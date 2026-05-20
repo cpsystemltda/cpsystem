@@ -8,6 +8,8 @@ import { NavigationProgress } from "@/components/NavigationProgress";
 import { contarNaoLidas } from "@/lib/notificacoes";
 import { lerVisao, type Visao } from "@/lib/visao";
 import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
+import { lerEspionagemAtual } from "@/lib/espionagem";
+import { BannerEspionagem } from "@/components/BannerEspionagem";
 
 // Rotas que SÓ a empresa acessa (analista é redirecionado pro painel dele)
 const ROTAS_SO_EMPRESA = [
@@ -41,11 +43,12 @@ const ROTAS_PERMITIDAS_INADIMPLENTE = [
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Todas as queries/cookies em paralelo — layout não pode bloquear a navegação
-  const [usuario, h, empresaSelecionadaCookie, visaoSalva] = await Promise.all([
+  const [usuario, h, empresaSelecionadaCookie, visaoSalva, espionagem] = await Promise.all([
     exigirUsuario(),
     headers(),
     lerEmpresaSelecionada(),
     lerVisao(),
+    lerEspionagemAtual(),
   ]);
 
   const qtdNotificacoes = await contarNaoLidas(usuario.id);
@@ -113,7 +116,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     : "EMPRESA";
 
   return (
-    <div className="app-shell flex h-screen">
+    <div className="app-shell flex h-screen flex-col">
       {/* Background atmosférico Liquid Glass — fixed atrás de tudo */}
       <div className="bg-image" aria-hidden />
       <div className="bg-blobs" aria-hidden>
@@ -125,7 +128,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
 
       <NavigationProgress />
-      <div className="app-content flex w-full">
+      {espionagem && <BannerEspionagem contaNome={espionagem.contaNome} />}
+      <div className="app-content flex flex-1 w-full overflow-hidden">
         <Sidebar
           nomeUsuario={usuario.nome}
           nomeConta={principal}

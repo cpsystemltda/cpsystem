@@ -12,6 +12,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { exigirUsuario } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { salvarArquivo } from "@/lib/uploads";
 import {
   extrairAtaDoPdf,
@@ -196,6 +197,7 @@ function mockClassificacao(filename: string): {
  */
 export async function processarPdfIaAction(formData: FormData): Promise<ProcessarResult> {
   await exigirUsuario();
+  await bloquearEspionagem();
   const file = formData.get("pdf") as File | null;
   if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
 

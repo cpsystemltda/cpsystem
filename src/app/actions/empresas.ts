@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario, hashSenha } from "@/lib/auth";
+import { bloquearEspionagem } from "@/lib/espionagem";
 import { normalizarCnpj, novaEmpresaSchema } from "@/lib/validators";
 
 const LIMITE_EMPRESAS_GRATIS = 4;
@@ -12,6 +13,7 @@ type ActionResult = { erro?: string; campos?: Record<string, string> };
 
 export async function criarEmpresaAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
+  await bloquearEspionagem();
 
   const total = await prisma.empresa.count({ where: { contaId: usuario.contaId } });
   if (total >= LIMITE_EMPRESAS_GRATIS) {

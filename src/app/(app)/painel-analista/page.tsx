@@ -4,7 +4,10 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularComissaoAnalista, listarExecucoesDoVinculo } from "@/lib/comissaoB2G";
 import { listarComissoesDoAnalista } from "@/lib/comissaoExecucao";
-import { listarComissoesFixasDoAnalista } from "@/lib/comissaoFixa";
+import {
+  listarComissoesFixasDoAnalista,
+  gerarLinhasComissaoFixaDoAnalista,
+} from "@/lib/comissaoFixa";
 import { ComissoesVariaveisBloco } from "@/components/ComissoesVariaveisBloco";
 import { ComissoesFixasBloco } from "@/components/ComissoesFixasBloco";
 import { brl, formatarCnpj } from "@/lib/validators";
@@ -254,25 +257,45 @@ export default async function PainelAnalistaPage({
 
   const consolidado = await calcularComissaoAnalista(analista.id);
   const comissoesExecucao = await listarComissoesDoAnalista(analista.id);
+  // Garante que existem linhas do mês corrente — caso o cron ainda não tenha
+  // rodado depois da virada ou de um vínculo recente. Idempotente.
+  await gerarLinhasComissaoFixaDoAnalista(analista.id).catch(() => 0);
   const comissoesFixas = await listarComissoesFixasDoAnalista(analista.id);
+  // Label do dropdown precisa incluir CNPJ pra desambiguar MEI/PJ cujo nome
+  // é o do dono (ex: "IGOR DA SILVA FERNANDES" pode ser tanto a pessoa
+  // quanto o MEI da pessoa — sem CNPJ fica confuso).
   const empresasOpcoes = Array.from(
     new Map(
       comissoesExecucao.map((c) => [
         c.empenho.empresa.id,
         {
           id: c.empenho.empresa.id,
-          label:
-            c.empenho.empresa.nomeFantasia || c.empenho.empresa.razaoSocial,
+          label: `${c.empenho.empresa.nomeFantasia || c.empenho.empresa.razaoSocial} · ${formatarCnpj(c.empenho.empresa.cnpj)}`,
         },
       ]),
     ).values(),
   );
-  // Opções de empresa pra filtro do bloco fixo (pode ter empresas sem
-  // execução ainda, então precisa unir com as empresas dos vínculos)
+  // Opções de empresa pro filtro do bloco fixo: vêm dos VÍNCULOS do analista,
+  // não das comissões fixas já geradas. Senão, quando o cron ainda não rodou
+  // (mês recém-virado ou vínculo novo), o dropdown ficaria vazio e o analista
+  // não consegue cadastrar/alimentar nada.
+  const vinculosDoAnalista = await prisma.vinculoAnalista.findMany({
+    where: { analistaId: analista.id },
+    select: {
+      conta: {
+        select: {
+          empresas: {
+            select: { id: true, razaoSocial: true, nomeFantasia: true },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
   const empresasFixoOpcoes = Array.from(
     new Map(
-      comissoesFixas
-        .map((l) => l.vinculo.conta.empresas[0])
+      vinculosDoAnalista
+        .map((v) => v.conta.empresas[0])
         .filter((e): e is { id: string; razaoSocial: string; nomeFantasia: string | null } => !!e)
         .map((e) => [e.id, { id: e.id, label: e.nomeFantasia || e.razaoSocial }]),
     ).values(),
