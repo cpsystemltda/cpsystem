@@ -295,6 +295,25 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
     };
   }
 
+  // Bloqueia cadastro duplicado: mesma empresa + mesmo número + mesmo órgão.
+  // Evita erro humano (cadastrar a mesma Ata duas vezes).
+  const orgaoCnpjNormalizado = normalizarCnpj(v.orgaoCnpj);
+  const ataExistente = await prisma.ata.findFirst({
+    where: {
+      empresaId: v.empresaId,
+      numero: v.numero,
+      orgaoCnpj: orgaoCnpjNormalizado,
+    },
+    select: { id: true },
+  });
+  if (ataExistente) {
+    return {
+      erro: `Já existe uma Ata nº ${v.numero} cadastrada para esse órgão nessa empresa. Edite a existente em vez de duplicar.`,
+      campos: { numero: "Ata duplicada (mesmo número + órgão + empresa)." },
+      valores: dados,
+    };
+  }
+
   const erroDuplicata = validarDuplicidadeLoteItem(v.itens, dados);
   if (erroDuplicata) return erroDuplicata;
 
@@ -691,6 +710,22 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
 
   const v = parsed.data;
   await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
+
+  // Bloqueia cadastro duplicado: mesma empresa + mesmo número + mesmo órgão.
+  const contratoExistente = await prisma.contrato.findFirst({
+    where: {
+      empresaId: v.empresaId,
+      numero: v.numero,
+      orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+    },
+    select: { id: true },
+  });
+  if (contratoExistente) {
+    return {
+      erro: `Já existe um Contrato nº ${v.numero} cadastrado para esse órgão nessa empresa. Edite o existente em vez de duplicar.`,
+      campos: { numero: "Contrato duplicado (mesmo número + órgão + empresa)." },
+    };
+  }
 
   // Se vincula a uma Ata, validar saldo
   if (v.ataId) {
@@ -1182,6 +1217,25 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
 
   const v = parsed.data;
   await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
+
+  // Bloqueia cadastro duplicado: mesma empresa + mesmo número + mesmo órgão.
+  // Empenho ainda admite mesmo número em órgãos diferentes (cada órgão usa
+  // sua própria numeração de NE/OC/OS/AC), mas dentro do mesmo órgão e
+  // empresa é duplicação por erro humano.
+  const empenhoExistente = await prisma.empenho.findFirst({
+    where: {
+      empresaId: v.empresaId,
+      numero: v.numero,
+      orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
+    },
+    select: { id: true },
+  });
+  if (empenhoExistente) {
+    return {
+      erro: `Já existe uma execução nº ${v.numero} cadastrada para esse órgão nessa empresa. Edite a existente em vez de duplicar.`,
+      campos: { numero: "Execução duplicada (mesmo número + órgão + empresa)." },
+    };
+  }
 
   // Trava de saldo
   if (v.contratoId) {

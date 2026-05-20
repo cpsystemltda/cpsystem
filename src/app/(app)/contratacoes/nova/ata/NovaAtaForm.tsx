@@ -755,12 +755,13 @@ export default function NovaAtaForm({
               defaultValue={dados?.dataAssinatura ?? vi?.dataAssinatura}
             />
             <FieldGlass
-              label="Data de publicação"
+              label="Data de publicação (opcional)"
               name="dataPublicacao"
               type="date"
               erro={e.dataPublicacao}
               span={1}
               defaultValue={dados?.dataPublicacao ?? vi?.dataPublicacao ?? ""}
+              helper="Pode deixar em branco se ainda não souber."
             />
             <FieldGlass
               label="Vigência — início"

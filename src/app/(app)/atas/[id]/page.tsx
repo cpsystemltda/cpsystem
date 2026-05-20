@@ -5,6 +5,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularSaldoAta } from "@/lib/saldo";
 import { podeEditarDocumento } from "@/lib/permissoes";
+import { BotaoExcluirAta } from "@/components/BotaoExcluirAta";
 import { brl, formatarCnpj, ROTULO_PROCEDIMENTO, ROTULO_TIPO } from "@/lib/validators";
 import { Tabs } from "@/components/Tabs";
 import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
@@ -136,6 +137,7 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
           <Link href="/contratacoes/nova/fornecimento" className="btn-secondary" style={{ height: "36px", padding: "0 14px", fontSize: "12px" }}>
             + Execução
           </Link>
+          {podeEditar && <BotaoExcluirAta ataId={ata.id} />}
         </div>
       </div>
 
