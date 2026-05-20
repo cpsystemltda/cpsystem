@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { Users, TrendingUp, DollarSign, AlertTriangle, UserCheck, Building2 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -15,7 +16,9 @@ function formatarCpf(cpf: string): string {
 
 export default async function AdminPage() {
   const usuario = await exigirUsuario();
-  // Em produção: gate por role/perfil. Aqui no MVP, qualquer usuário acessa pra demonstração.
+  // Restrito a super admin da plataforma (Regina/Igor). Tela mostra dados
+  // agregados de TODAS as contas — não pode ser acessível a cliente comum.
+  if (!usuario.superAdmin) redirect("/dashboard");
 
   // Filtro: ignora super admins (Igor/Regina) — não são clientes pagantes
   const semSuperAdmin = { usuarios: { none: { superAdmin: true } } };

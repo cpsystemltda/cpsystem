@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ChevronLeft, CreditCard } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -8,13 +9,12 @@ import { ReguaCobrancaButton } from "./ReguaCobrancaButton";
 
 export default async function GatewayPage() {
   const usuario = await exigirUsuario();
-  if (usuario.perfil !== "ADMIN") {
-    return (
-      <div className="mx-auto max-w-3xl px-8 py-12 text-center">
-        <p className="text-sm text-slate-600">Apenas administradores podem configurar o gateway.</p>
-      </div>
-    );
-  }
+  // Tela de configuração de gateway expõe chaves Asaas/Stripe da plataforma —
+  // SÓ super admin (Regina/Igor) pode acessar. Antes o guard era `perfil ===
+  // "ADMIN"`, mas esse é o perfil interno da empresa-cliente, não tem nada
+  // a ver com admin da plataforma → vazava as configurações pra qualquer
+  // ADMIN de qualquer empresa.
+  if (!usuario.superAdmin) redirect("/dashboard");
 
   const cfg = await prisma.configuracaoGateway.findUnique({ where: { id: "singleton" } });
   const gw = await statusGateway();

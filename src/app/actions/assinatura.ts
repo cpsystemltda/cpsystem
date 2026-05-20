@@ -213,7 +213,10 @@ export async function ativarPlano(contaId: string, plano: Plano) {
 export async function executarReguaCobrancaAction(_p: Result | null, _formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
-  if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
+  // Régua de cobrança roda em TODAS as contas da plataforma — só super
+  // admin (Regina/Igor). Antes era `perfil === "ADMIN"` (perfil interno
+  // da empresa-cliente), que vazava o gatilho para qualquer ADMIN.
+  if (!usuario.superAdmin) return { erro: "Apenas administradores da plataforma." };
   const { executarRegua } = await import("@/lib/regua");
   await executarRegua();
   return { ok: true };

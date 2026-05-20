@@ -12,7 +12,10 @@ type Result = { erro?: string; ok?: boolean };
 export async function salvarConfigGatewayAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
-  if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
+  // Gateway de pagamento é da plataforma — só super admin (Regina/Igor)
+  // configura. `perfil === "ADMIN"` é o perfil DENTRO da empresa-cliente,
+  // não tem nada a ver com admin de plataforma.
+  if (!usuario.superAdmin) return { erro: "Apenas administradores da plataforma." };
 
   const provider = String(formData.get("provider") || "DEMO") as "ASAAS" | "STRIPE" | "DEMO";
   const ambiente = String(formData.get("ambiente") || "sandbox");
