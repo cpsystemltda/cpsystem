@@ -476,12 +476,13 @@ export default function NovoContratoForm({
               onChange={(ev) => setDataAssinaturaState(ev.currentTarget.value)}
             />
             <Field
-              label="Data de publicação"
+              label="Data de publicação (opcional)"
               name="dataPublicacao"
               type="date"
               erro={e.dataPublicacao}
               span={1}
               defaultValue={dados?.dataPublicacao ?? vi?.dataPublicacao ?? ""}
+              helper="Pode deixar em branco se ainda não souber."
             />
             <Field
               label="Vigência — início"

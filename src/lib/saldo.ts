@@ -76,6 +76,18 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
   };
 }
 
+// Normaliza descrição pra match tolerante:
+// - trim de espaços nas pontas
+// - case-insensitive
+// - remove pontuação no final (. , ;)
+// - colapsa whitespace múltiplo
+// Necessário porque empenhos digitados manualmente acabam com micro-
+// diferenças (espaço inicial, ponto final, capitalização) que faziam o
+// match strict não bater → quantidades não eram descontadas.
+function normalizarDescricao(s: string): string {
+  return s.trim().toLowerCase().replace(/[.,;]+$/, "").replace(/\s+/g, " ");
+}
+
 // Saldo de um Contrato (não-SRP ou derivado): quanto já foi empenhado/executado.
 // EmpenhoItem se conecta a ContratoItem via ataItemId (ambos apontam pro mesmo AtaItem
 // quando o contrato derivou de uma Ata) ou ao Empenho.contratoId quando o contrato é direto.
@@ -91,8 +103,12 @@ export async function calcularSaldoContrato(contratoId: string) {
   });
 
   const linhas = itens.map((it) => {
+    const descContratoNorm = normalizarDescricao(it.descricao);
     const usado = empenhoItens
-      .filter((e) => (it.ataItemId && e.ataItemId === it.ataItemId) || e.descricao === it.descricao)
+      .filter((e) =>
+        (it.ataItemId && e.ataItemId === it.ataItemId) ||
+        normalizarDescricao(e.descricao) === descContratoNorm,
+      )
       .reduce((s, e) => s + e.quantidade, 0);
     const disponivel = Math.max(0, it.quantidade - usado);
     return {
