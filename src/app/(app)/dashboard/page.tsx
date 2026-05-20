@@ -1069,7 +1069,7 @@ function BarsPosicao({
   const barras: { val: number; cor: string; rotulo: string }[] = [
     { val: recebido, cor: "linear-gradient(180deg, #5DD8B6, #2EAB85)", rotulo: "Recebidos" },
     { val: aReceber, cor: "linear-gradient(180deg, #F0B8A8, #C66B4A)", rotulo: "A receber" },
-    { val: aExecutar, cor: "linear-gradient(180deg, #C5B4FF, #8E73E0)", rotulo: "Executados" },
+    { val: aExecutar, cor: "linear-gradient(180deg, #C5B4FF, #8E73E0)", rotulo: "A executar" },
   ];
   // Eixo Y — calcula 4 ticks múltiplos de mil/milhão pra "respirar" o gráfico
   const escala = (() => {
