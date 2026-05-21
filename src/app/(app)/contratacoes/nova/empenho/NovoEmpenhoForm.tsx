@@ -8,7 +8,6 @@ import { AJUDA } from "@/lib/textosAjuda";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor, type AtaItemRef } from "@/components/ItensEditor";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
-import { UploadArquivoSimples } from "@/components/UploadArquivoSimples";
 import { EnderecosEntregaEditor, PontosFocaisEditor } from "@/components/EditoresOrgao";
 import type { ItemInicial } from "@/components/ItensEditor";
 import { criarEmpenhoAction, editarEmpenhoAction } from "@/app/actions/contratacoes";
@@ -280,14 +279,19 @@ export default function NovoEmpenhoForm({
         </div>
       </header>
 
-      {/* IA de extração só é treinada para PDF de Nota de Empenho. Pra
-          outros instrumentos o usuário preenche manualmente — mas todos
-          podem anexar o documento (sem IA) via UploadArquivoSimples. */}
-      {modo !== "editar" && instrumento === "NOTA_EMPENHO" && (
+      {/* Upload com IA — único pra todos os instrumentos (NE, AE, OS, AC,
+          Carta-Contrato). A IA extrai campos comuns (número, processo, órgão,
+          itens, valores) — se algo específico do instrumento não vier, o
+          usuário ajusta manualmente. Diretriz: tudo no sistema deve ter IA. */}
+      {modo !== "editar" && (
         <div className="mt-6">
           <UploadPdfPanel
-            titulo="Preencher automaticamente a partir do PDF da Nota de Empenho"
-            descricao="Anexe o PDF da NE. A IA extrai número, identificador, processo, órgão, vigência, prazos e os itens empenhados. Você confere e edita antes de salvar."
+            titulo={`Preencher automaticamente a partir do PDF da ${nomeInstr}`}
+            descricao={`Anexe o PDF do documento. A IA extrai número, identificador, processo, órgão, vigência, prazos e itens. Você confere e edita antes de salvar.${
+              instrumento !== "NOTA_EMPENHO"
+                ? " (Treinada principalmente em Notas de Empenho — para outros instrumentos pode ser necessário ajuste manual.)"
+                : ""
+            }`}
             action={extrairEmpenhoPdfAction}
             onSuccess={setDados}
             onArquivoSalvo={(info) => {
@@ -295,18 +299,6 @@ export default function NovoEmpenhoForm({
               setArquivoPdfNome(info.nome);
             }}
             badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchido(s)`}
-          />
-        </div>
-      )}
-      {modo !== "editar" && instrumento !== "NOTA_EMPENHO" && (
-        <div className="mt-6">
-          <UploadArquivoSimples
-            titulo={`Anexar documento da ${nomeInstr}`}
-            descricao="Opcional. PDF ou imagem do documento (Autorização, Ordem, Carta-Contrato etc.). Será salvo como anexo do registro."
-            onArquivoSalvo={(info) => {
-              setArquivoPdfUrl(info.url);
-              setArquivoPdfNome(info.nome);
-            }}
           />
         </div>
       )}

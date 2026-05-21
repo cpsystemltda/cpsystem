@@ -49,6 +49,7 @@ const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
       { href: "/execucao", label: "Fornecimento/Execução", icon: Truck },
       { href: "/juridico", label: "Consultoria", icon: Scale },
       { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
+      { href: "/iasystem", label: "IAsystem (jurídico)", icon: Sparkles },
     ],
   },
 ];
@@ -91,6 +92,7 @@ const GRUPOS_ANALISTA: Grupo[] = [
       { href: "/painel-analista", label: "Dashboard", icon: LayoutDashboard },
       { href: "/painel-analista?tab=empresas", label: "Empresas vinculadas", icon: Wallet },
       { href: "/honorarios", label: "Comissões SaaS", icon: Sparkles },
+      { href: "/iasystem", label: "IAsystem (jurídico)", icon: Sparkles },
       { href: "/notificacoes", label: "Notificações", icon: Bell },
     ],
   },
