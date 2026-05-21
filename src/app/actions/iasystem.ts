@@ -50,7 +50,7 @@ export async function enviarMensagemIAsystemAction(
 
   let resposta: string;
   try {
-    resposta = await responderIAsystem(historico, pergunta);
+    resposta = await responderIAsystem(historico, pergunta, usuario.nome);
   } catch (err) {
     console.error("[enviarMensagemIAsystemAction]", err);
     return {

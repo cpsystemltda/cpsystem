@@ -17,6 +17,7 @@ import {
   carregarHistoricoIAsystem,
 } from "@/app/actions/iasystem";
 import type { MensagemIAsystem } from "@/lib/iasystem";
+import { MarkdownInline } from "@/lib/markdownInline";
 
 const SUGESTOES_INICIAIS = [
   "Posso aderir a uma Ata de outro órgão sem ter participado? Quais os limites?",
@@ -285,7 +286,13 @@ function Bolha({ mensagem }: { mensagem: MensagemIAsystem }) {
             : undefined
         }
       >
-        <p className="whitespace-pre-wrap break-words">{mensagem.content}</p>
+        {ehUsuario ? (
+          <p className="whitespace-pre-wrap break-words">{mensagem.content}</p>
+        ) : (
+          <div className="break-words">
+            <MarkdownInline texto={mensagem.content} />
+          </div>
+        )}
       </div>
     </div>
   );

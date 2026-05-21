@@ -143,7 +143,7 @@ export function AnaliseJuridicaPanel({
 
       {/* Resultado */}
       {resultado && resultado.ok && (
-        <ResultadoAnalise analise={resultado.analise} demo={resultado.demo} />
+        <ResultadoAnalise analise={resultado.analise} />
       )}
       {resultado && !resultado.ok && (
         <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -154,15 +154,9 @@ export function AnaliseJuridicaPanel({
   );
 }
 
-function ResultadoAnalise({ analise, demo }: { analise: AnaliseJuridica; demo: boolean }) {
+function ResultadoAnalise({ analise }: { analise: AnaliseJuridica }) {
   return (
     <div className="space-y-4">
-      {demo && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900">
-          <strong>Modo DEMO:</strong> configure ANTHROPIC_API_KEY no servidor para análise real via IA.
-        </div>
-      )}
-
       {/* Resumo executivo */}
       <div
         className="rounded-2xl px-5 py-4"

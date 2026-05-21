@@ -11,6 +11,7 @@ import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
 import { lerEspionagemAtual } from "@/lib/espionagem";
 import { BannerEspionagem } from "@/components/BannerEspionagem";
 import { FlutuanteIAsystem } from "@/components/FlutuanteIAsystem";
+import { ComandoRapido } from "@/components/ComandoRapido";
 
 // Rotas que SÓ a empresa acessa (analista é redirecionado pro painel dele)
 const ROTAS_SO_EMPRESA = [
@@ -131,6 +132,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <NavigationProgress />
       {espionagem && <BannerEspionagem contaNome={espionagem.contaNome} />}
       <FlutuanteIAsystem />
+      <ComandoRapido visao={visao} superAdmin={usuario.superAdmin} />
       <div className="app-content flex flex-1 w-full overflow-hidden">
         <Sidebar
           nomeUsuario={usuario.nome}
