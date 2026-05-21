@@ -461,6 +461,7 @@ model Ata {
   anotacoes             Anotacao[]
   termosAditivos        TermoAditivo[]
   apostilamentos        Apostilamento[]
+  vigencias             Vigencia[]
 
   @@index([empresaId])
   @@index([criadoPorId])
@@ -485,10 +486,16 @@ model AtaItem {
   ataId String
   ata   Ata    @relation(fields: [ataId], references: [id], onDelete: Cascade)
 
+  // Vigência da Ata a que o item pertence (Lei 14.133 — Ata 1+1 ano).
+  // Nullable em registros pré-feature; backfill atribui à vigência 1.
+  vigenciaId String?
+  vigencia   Vigencia? @relation(fields: [vigenciaId], references: [id], onDelete: SetNull)
+
   contratoItens ContratoItem[]
   empenhoItens  EmpenhoItem[]
 
   @@index([ataId])
+  @@index([vigenciaId])
 }
 
 model OrgaoNaAta {
@@ -629,6 +636,7 @@ model Contrato {
   garantias         Garantia[]
   anexos            Anexo[]
   anotacoes         Anotacao[]
+  vigencias         Vigencia[]
 
   @@index([empresaId])
   @@index([ataId])
@@ -668,8 +676,14 @@ model ContratoItem {
   ataItemId String?
   ataItem   AtaItem? @relation(fields: [ataItemId], references: [id])
 
+  // Vigência do Contrato a que o item pertence. Nullable em registros
+  // pré-feature; backfill atribui à vigência 1 do contrato.
+  vigenciaId String?
+  vigencia   Vigencia? @relation(fields: [vigenciaId], references: [id], onDelete: SetNull)
+
   @@index([contratoId])
   @@index([ataItemId])
+  @@index([vigenciaId])
 }
 
 enum StatusExecucao {
@@ -832,6 +846,12 @@ model Empenho {
   contratoId String?
   contrato   Contrato? @relation(fields: [contratoId], references: [id])
 
+  // Vigência (do Contrato OU da Ata) em que esse empenho foi executado.
+  // Resolvido automaticamente por dataEmissao na criação; nullable em
+  // registros pré-feature (backfill atribui).
+  vigenciaId String?
+  vigencia   Vigencia? @relation(fields: [vigenciaId], references: [id], onDelete: SetNull)
+
   criadoPorId String?
   criadoPor   Usuario? @relation("EmpenhosCriados", fields: [criadoPorId], references: [id])
 
@@ -851,6 +871,7 @@ model Empenho {
   @@index([empresaId])
   @@index([ataId])
   @@index([contratoId])
+  @@index([vigenciaId])
   @@index([criadoPorId])
 }
 
@@ -937,8 +958,51 @@ model TermoAditivo {
   ataId      String?
   ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
 
+  // Vigência que este aditivo originou (quando alterou prazo de vigência).
+  // Lado inverso de Vigencia.termoAditivoId (relação 1:1 opcional).
+  vigenciaOriginada Vigencia?
+
   @@index([contratoId])
   @@index([empenhoId])
+  @@index([ataId])
+}
+
+// Vigência de um Contrato continuado ou Ata — uma "caixa" de execução com
+// início, fim e valor próprios. Lei 14.133 permite Atas 1+1 ano e contratos
+// contínuos com prorrogações sucessivas; o saldo não-executado de uma
+// vigência NÃO cumula com a próxima.
+//
+// Ordem=1 é a vigência original (criada junto com o Contrato/Ata).
+// Ordem>1 vem de Termo Aditivo que prorroga vigência ou via botão manual
+// "Iniciar nova vigência". A relação termoAditivoId é única — um aditivo
+// só pode originar uma vigência.
+model Vigencia {
+  id              String        @id @default(cuid())
+  ordem           Int
+  dataInicio      DateTime
+  dataFim         DateTime
+  valorTotal      Float
+  observacao      String?
+
+  termoAditivoId  String?       @unique
+  termoAditivo    TermoAditivo? @relation(fields: [termoAditivoId], references: [id], onDelete: SetNull)
+
+  contratoId      String?
+  contrato        Contrato?     @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  ataId           String?
+  ata             Ata?          @relation(fields: [ataId], references: [id], onDelete: Cascade)
+
+  contratoItens   ContratoItem[]
+  ataItens        AtaItem[]
+  empenhos        Empenho[]
+
+  criadoEm        DateTime      @default(now())
+  atualizadoEm    DateTime      @default(now()) @updatedAt
+
+  @@unique([contratoId, ordem])
+  @@unique([ataId, ordem])
+  @@index([contratoId])
   @@index([ataId])
 }
 
