@@ -29,6 +29,7 @@ import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { ItensContratoTab } from "@/components/abas/ItensContratoTab";
+import { SaldoVigenciasPanel } from "@/components/SaldoVigenciasPanel";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
@@ -153,7 +154,16 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
             {
               key: "saldo",
               label: "Saldo de itens",
-              content: <ItensContratoTab saldo={saldo} />,
+              content: (
+                <SaldoVigenciasPanel
+                  saldo={saldo}
+                  renderTabela={(itens) => (
+                    <ItensContratoTab
+                      saldo={{ itens: itens as Parameters<typeof ItensContratoTab>[0]["saldo"]["itens"] }}
+                    />
+                  )}
+                />
+              ),
             },
             {
               key: "aditivos",

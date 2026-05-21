@@ -13,6 +13,7 @@ import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { OrgaosTab, EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
+import { SaldoVigenciasPanel } from "@/components/SaldoVigenciasPanel";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
@@ -190,7 +191,16 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
             {
               key: "saldo",
               label: "Saldo de itens",
-              content: <ItensAtaTab saldo={saldo} />,
+              content: (
+                <SaldoVigenciasPanel
+                  saldo={saldo}
+                  renderTabela={(itens) => (
+                    <ItensAtaTab
+                      saldo={{ itens: itens as Parameters<typeof ItensAtaTab>[0]["saldo"]["itens"] }}
+                    />
+                  )}
+                />
+              ),
             },
             {
               key: "orgaos",
