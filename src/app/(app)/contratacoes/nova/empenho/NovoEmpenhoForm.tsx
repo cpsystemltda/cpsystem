@@ -8,6 +8,7 @@ import { AJUDA } from "@/lib/textosAjuda";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ItensEditor, type AtaItemRef } from "@/components/ItensEditor";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
+import { UploadArquivoSimples } from "@/components/UploadArquivoSimples";
 import { EnderecosEntregaEditor, PontosFocaisEditor } from "@/components/EditoresOrgao";
 import type { ItemInicial } from "@/components/ItensEditor";
 import { criarEmpenhoAction, editarEmpenhoAction } from "@/app/actions/contratacoes";
@@ -280,7 +281,8 @@ export default function NovoEmpenhoForm({
       </header>
 
       {/* IA de extração só é treinada para PDF de Nota de Empenho. Pra
-          outros instrumentos o usuário preenche manualmente. */}
+          outros instrumentos o usuário preenche manualmente — mas todos
+          podem anexar o documento (sem IA) via UploadArquivoSimples. */}
       {modo !== "editar" && instrumento === "NOTA_EMPENHO" && (
         <div className="mt-6">
           <UploadPdfPanel
@@ -293,6 +295,18 @@ export default function NovoEmpenhoForm({
               setArquivoPdfNome(info.nome);
             }}
             badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchido(s)`}
+          />
+        </div>
+      )}
+      {modo !== "editar" && instrumento !== "NOTA_EMPENHO" && (
+        <div className="mt-6">
+          <UploadArquivoSimples
+            titulo={`Anexar documento da ${nomeInstr}`}
+            descricao="Opcional. PDF ou imagem do documento (Autorização, Ordem, Carta-Contrato etc.). Será salvo como anexo do registro."
+            onArquivoSalvo={(info) => {
+              setArquivoPdfUrl(info.url);
+              setArquivoPdfNome(info.nome);
+            }}
           />
         </div>
       )}
