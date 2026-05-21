@@ -93,8 +93,27 @@ export function MapaPinsBrasil({
   pinsEntregas?: PinEntregaMapa[];
   cnpjDestaque?: string | null;
 }) {
-  const [tileSet, setTileSet] = useState<"mapa" | "satelite">("mapa");
+  // Default = satélite (decisão Regina). Persiste preferência por usuário
+  // pra não regredir a cada navegação. Leitura do localStorage só ocorre
+  // no client (depois do mount) pra evitar mismatch de SSR.
+  const [tileSet, setTileSet] = useState<"mapa" | "satelite">("satelite");
   const [vista, setVista] = useState<"SEDES" | "ENTREGAS">("SEDES");
+  useEffect(() => {
+    try {
+      const salvo = window.localStorage.getItem("cp_mapa_tile");
+      if (salvo === "mapa" || salvo === "satelite") setTileSet(salvo);
+    } catch {
+      // localStorage indisponível (modo privado, etc.) — usa o default.
+    }
+  }, []);
+  function trocarTile(novo: "mapa" | "satelite") {
+    setTileSet(novo);
+    try {
+      window.localStorage.setItem("cp_mapa_tile", novo);
+    } catch {
+      // ignora — preferência fica só na sessão atual.
+    }
+  }
   const [LeafletIcon, setLeafletIcon] = useState<{
     icon: unknown;
     iconHover: unknown;
@@ -231,7 +250,7 @@ export function MapaPinsBrasil({
       >
         <button
           type="button"
-          onClick={() => setTileSet("mapa")}
+          onClick={() => trocarTile("mapa")}
           className="px-3 py-1.5 transition"
           style={{
             background: tileSet === "mapa" ? "var(--primary-deep)" : "transparent",
@@ -243,7 +262,7 @@ export function MapaPinsBrasil({
         </button>
         <button
           type="button"
-          onClick={() => setTileSet("satelite")}
+          onClick={() => trocarTile("satelite")}
           className="px-3 py-1.5 transition"
           style={{
             background: tileSet === "satelite" ? "var(--primary-deep)" : "transparent",
