@@ -81,11 +81,21 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
 // - case-insensitive
 // - remove pontuação no final (. , ;)
 // - colapsa whitespace múltiplo
+// - remove plural -s final de cada palavra (>3 chars) — pra "Equipamentos"
+//   bater com "Equipamento" (singular vs plural é diferença comum em
+//   empenhos digitados manualmente)
 // Necessário porque empenhos digitados manualmente acabam com micro-
-// diferenças (espaço inicial, ponto final, capitalização) que faziam o
-// match strict não bater → quantidades não eram descontadas.
+// diferenças que faziam o match strict não bater → quantidades não
+// eram descontadas.
 function normalizarDescricao(s: string): string {
-  return s.trim().toLowerCase().replace(/[.,;]+$/, "").replace(/\s+/g, " ");
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[.,;]+$/, "")
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((p) => (p.length > 3 && p.endsWith("s") ? p.slice(0, -1) : p))
+    .join(" ");
 }
 
 // Saldo de um Contrato (não-SRP ou derivado): quanto já foi empenhado/executado.
