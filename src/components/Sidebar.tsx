@@ -23,7 +23,7 @@ import {
 import { logoutAction } from "@/app/actions/auth";
 import { SeletorVisao } from "@/components/SeletorVisao";
 import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
-import { HelpButtons } from "@/components/HelpButtons";
+import { HelpButtonsInline } from "@/components/HelpButtonsInline";
 import { Logo } from "@/components/Logo";
 import type { Visao } from "@/lib/visao";
 import { Crown, Users2, Activity } from "lucide-react";
@@ -155,46 +155,56 @@ export function Sidebar({
           : [...GRUPOS_EMPRESA_OPERACAO, ...GRUPOS_EMPRESA_CONTA];
   const inicial = nomeUsuario.trim().charAt(0).toUpperCase();
 
+  const subtituloFooter =
+    tipoConta === "ANALISTA"
+      ? "Analista de licitações"
+      : empresaIdSelecionada
+        ? `Em foco: ${empresas.find((x) => x.id === empresaIdSelecionada)?.nome ?? "?"}`
+        : empresas.length > 0
+          ? `Consolidado · ${empresas.length} empresa${empresas.length > 1 ? "s" : ""}`
+          : "Sem empresa cadastrada";
+
   return (
-    <aside className="glass relative m-[18px] flex h-[calc(100vh-36px)] w-[260px] flex-col overflow-hidden">
-      {/* Logo / Brand */}
-      <div className="relative border-b border-[color:var(--hairline)] px-6 py-4">
-        <Link
-          href={
-            visao === "ADMIN_PLATAFORMA"
-              ? "/admin-plataforma"
-              : visao === "ANALISTA"
-              ? "/painel-analista"
-              : "/dashboard"
-          }
-          className="flex items-center justify-center transition hover:opacity-80"
-        >
-          <Logo variant="sm" mode="brand" onDark priority />
-        </Link>
-        <div
-          className="absolute bottom-0 left-[28%] right-[28%] h-px"
-          style={{ background: "linear-gradient(90deg, transparent, var(--primary), transparent)" }}
-        />
+    <aside className="glass sidebar-cp relative m-[18px] flex h-[calc(100vh-36px)] w-[290px] flex-col overflow-hidden">
+      {/* Header sticky — logo + seletores */}
+      <div className="shrink-0 border-b border-[color:var(--hairline)]">
+        <div className="relative px-6 py-3">
+          <Link
+            href={
+              visao === "ADMIN_PLATAFORMA"
+                ? "/admin-plataforma"
+                : visao === "ANALISTA"
+                  ? "/painel-analista"
+                  : "/dashboard"
+            }
+            className="flex items-center justify-center transition hover:opacity-80"
+          >
+            <Logo variant="sm" mode="brand" onDark priority />
+          </Link>
+          <div
+            className="absolute bottom-0 left-[28%] right-[28%] h-px"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, var(--primary), transparent)",
+            }}
+          />
+        </div>
+        {superAdmin && (
+          <div className="border-t border-[color:var(--hairline)] px-3 py-2.5">
+            <SeletorVisao visaoAtual={visao} />
+          </div>
+        )}
+        {visao === "EMPRESA" && empresas.length > 0 && (
+          <div className="border-t border-[color:var(--hairline)] px-3 py-2.5">
+            <SeletorEmpresa empresas={empresas} empresaIdAtual={empresaIdSelecionada} />
+          </div>
+        )}
       </div>
 
-      {/* Seletor de visão (super admin) */}
-      {superAdmin && (
-        <div className="border-b border-[color:var(--hairline)] px-3 py-3">
-          <SeletorVisao visaoAtual={visao} />
-        </div>
-      )}
-
-      {/* Seletor de empresa */}
-      {visao === "EMPRESA" && empresas.length > 0 && (
-        <div className="border-b border-[color:var(--hairline)] px-3 py-3">
-          <SeletorEmpresa empresas={empresas} empresaIdAtual={empresaIdSelecionada} />
-        </div>
-      )}
-
-      {/* Navegação */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3">
+      {/* Navegação central — scroll inteligente, scrollbar invisível default */}
+      <nav className="sidebar-nav flex-1 overflow-y-auto px-3 py-3">
         {grupos.map((grupo, gi) => (
-          <div key={grupo.titulo} className={gi > 0 ? "mt-3.5" : ""}>
+          <div key={grupo.titulo} className={gi > 0 ? "mt-4" : ""}>
             <h3
               className="px-3 pb-1.5 text-[10px] font-bold uppercase"
               style={{ letterSpacing: "0.26em", color: "var(--text-faint)" }}
@@ -206,25 +216,28 @@ export function Sidebar({
                 pathname === item.href ||
                 (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
               const Icon = item.icon;
-              const mostrarBadge = item.href === "/notificacoes" && qtdNotificacoesNaoLidas > 0;
+              const mostrarBadge =
+                item.href === "/notificacoes" && qtdNotificacoesNaoLidas > 0;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group relative mb-px flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium leading-tight transition"
+                  className="group relative mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium leading-tight transition hover:bg-[rgba(212,175,55,0.08)]"
                   style={
                     ativo
                       ? {
-                          background: "linear-gradient(135deg, var(--primary-bright), var(--primary))",
+                          background:
+                            "linear-gradient(135deg, var(--primary-bright), var(--primary))",
                           color: "#0A0A0A",
                           fontWeight: 700,
-                          boxShadow: "0 4px 24px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.4)",
+                          boxShadow:
+                            "0 4px 24px var(--primary-glow), inset 0 1px 0 rgba(255,255,255,0.4)",
                         }
                       : { color: "var(--text-soft)", letterSpacing: "-0.01em" }
                   }
                 >
                   <Icon
-                    className="h-[17px] w-[17px] shrink-0"
+                    className="h-[18px] w-[18px] shrink-0 transition group-hover:scale-110"
                     style={{
                       color: ativo ? "#0A0A0A" : "var(--primary)",
                       strokeWidth: 1.7,
@@ -254,14 +267,9 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* Help buttons */}
-      <div className="border-t border-[color:var(--hairline)] px-3 py-3">
-        <HelpButtons />
-      </div>
-
-      {/* Usuário + sair */}
-      <div className="border-t border-[color:var(--hairline)] p-3">
-        <div className="mb-2 flex items-center gap-3 rounded-lg p-2">
+      {/* Footer sticky compacto — avatar + nome + ícones de ação */}
+      <div className="shrink-0 border-t border-[color:var(--hairline)] px-3 py-2.5">
+        <div className="flex items-center gap-2.5">
           <div
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-extrabold"
             style={{
@@ -273,31 +281,55 @@ export function Sidebar({
           >
             {inicial}
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-semibold" style={{ color: "var(--text)", letterSpacing: "-0.01em" }}>
+          <div className="min-w-0 flex-1">
+            <p
+              className="truncate text-[13px] font-semibold leading-tight"
+              style={{ color: "var(--text)", letterSpacing: "-0.01em" }}
+            >
               {nomeUsuario}
             </p>
-            <p className="truncate text-[10px]" style={{ color: "var(--text-mute)" }}>
-              {tipoConta === "ANALISTA"
-                ? "Analista de licitações"
-                : empresaIdSelecionada
-                  ? `Em foco: ${empresas.find((x) => x.id === empresaIdSelecionada)?.nome ?? "?"}`
-                  : empresas.length > 0
-                    ? `Visão consolidada · ${empresas.length} empresa${empresas.length > 1 ? "s" : ""}`
-                    : "Sem empresa cadastrada"}
+            <p
+              className="truncate text-[10px] leading-tight"
+              style={{ color: "var(--text-mute)" }}
+            >
+              {subtituloFooter}
             </p>
           </div>
         </div>
-        <form action={logoutAction}>
-          <button
-            type="submit"
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition hover:bg-white/5"
-            style={{ color: "var(--text-mute)" }}
-          >
-            <LogOut className="h-4 w-4" /> Sair
-          </button>
-        </form>
+        <div className="mt-2 flex items-center gap-1 border-t border-[color:var(--hairline)] pt-2">
+          <HelpButtonsInline />
+          <form action={logoutAction} className="ml-auto">
+            <button
+              type="submit"
+              title="Sair"
+              aria-label="Sair"
+              className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-700"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
       </div>
+
+      {/* Scrollbar custom: invisível padrão, fina e elegante no hover */}
+      <style jsx>{`
+        .sidebar-nav::-webkit-scrollbar {
+          width: 6px;
+        }
+        .sidebar-nav::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb {
+          background: transparent;
+          border-radius: 999px;
+        }
+        .sidebar-cp:hover .sidebar-nav::-webkit-scrollbar-thumb {
+          background: rgba(15, 14, 12, 0.15);
+        }
+        .sidebar-cp:hover .sidebar-nav::-webkit-scrollbar-thumb:hover {
+          background: rgba(15, 14, 12, 0.3);
+        }
+      `}</style>
     </aside>
   );
 }
