@@ -89,12 +89,27 @@ model Usuario {
   sessoes              Sessao[]
   logsAuditoria        LogAuditoria[]
   notificacoesSistema  NotificacaoSistema[]
+  mensagensIAsystem    MensagemIAsystem[]
   // Quem criou cada documento — base da regra "só edita criador + admin"
   atasCriadas      Ata[]      @relation("AtasCriadas")
   contratosCriados Contrato[] @relation("ContratosCriados")
   empenhosCriados  Empenho[]  @relation("EmpenhosCriados")
 
   @@index([contaId])
+}
+
+// Histórico do chat com o IAsystem — uma linha por mensagem, isolada por
+// usuário (cada login tem seu próprio histórico, não compartilha mesmo no
+// mesmo navegador). Onde role = "user" (pergunta) ou "assistant" (resposta).
+model MensagemIAsystem {
+  id        String   @id @default(cuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  role      String   // "user" | "assistant"
+  content   String   @db.Text
+  criadoEm  DateTime @default(now())
+
+  @@index([usuarioId, criadoEm])
 }
 
 model Sessao {

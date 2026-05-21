@@ -47,9 +47,8 @@ const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
       { href: "/atas", label: "Atas de Registro de Preços", icon: FileText },
       { href: "/contratos", label: "Contratos", icon: ClipboardList },
       { href: "/execucao", label: "Fornecimento/Execução", icon: Truck },
-      { href: "/juridico", label: "Consultoria", icon: Scale },
+      { href: "/juridico", label: "Consultoria jurídica", icon: Scale },
       { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
-      { href: "/iasystem", label: "IAsystem (jurídico)", icon: Sparkles },
     ],
   },
 ];
@@ -76,13 +75,8 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
       { href: "/termos", label: "Termos / LGPD", icon: ScrollText },
     ],
   },
-  {
-    titulo: "Admin",
-    itens: [
-      { href: "/admin", label: "Painel do PO", icon: Settings },
-      { href: "/admin/gateway", label: "Gateway de pagamento", icon: CreditCard },
-    ],
-  },
+  // Grupo "Admin" (Painel do PO + Gateway) movido para fora — essas rotas
+  // exigem superAdmin, então só fazem sentido em GRUPOS_ADMIN_PLATAFORMA.
 ];
 
 const GRUPOS_ANALISTA: Grupo[] = [
@@ -92,7 +86,6 @@ const GRUPOS_ANALISTA: Grupo[] = [
       { href: "/painel-analista", label: "Dashboard", icon: LayoutDashboard },
       { href: "/painel-analista?tab=empresas", label: "Empresas vinculadas", icon: Wallet },
       { href: "/honorarios", label: "Comissões SaaS", icon: Sparkles },
-      { href: "/iasystem", label: "IAsystem (jurídico)", icon: Sparkles },
       { href: "/notificacoes", label: "Notificações", icon: Bell },
     ],
   },
@@ -165,7 +158,7 @@ export function Sidebar({
   return (
     <aside className="glass relative m-[18px] flex h-[calc(100vh-36px)] w-[260px] flex-col overflow-hidden">
       {/* Logo / Brand */}
-      <div className="relative border-b border-[color:var(--hairline)] px-6 py-6">
+      <div className="relative border-b border-[color:var(--hairline)] px-6 py-4">
         <Link
           href={
             visao === "ADMIN_PLATAFORMA"
@@ -199,11 +192,11 @@ export function Sidebar({
       )}
 
       {/* Navegação */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 overflow-y-auto px-3 py-3">
         {grupos.map((grupo, gi) => (
-          <div key={grupo.titulo} className={gi > 0 ? "mt-5" : ""}>
+          <div key={grupo.titulo} className={gi > 0 ? "mt-3.5" : ""}>
             <h3
-              className="px-3 pb-2 text-[10px] font-bold uppercase"
+              className="px-3 pb-1.5 text-[10px] font-bold uppercase"
               style={{ letterSpacing: "0.26em", color: "var(--text-faint)" }}
             >
               {grupo.titulo}
@@ -218,7 +211,7 @@ export function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="group relative mb-0.5 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium leading-tight transition"
+                  className="group relative mb-px flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium leading-tight transition"
                   style={
                     ativo
                       ? {
