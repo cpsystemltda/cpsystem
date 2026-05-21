@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Upload, Check, X, Loader2 } from "lucide-react";
 import { salvarAnexoAdicionalAction } from "@/app/actions/uploads";
 
@@ -9,24 +9,25 @@ import { salvarAnexoAdicionalAction } from "@/app/actions/uploads";
 // como Anexo do recurso (Empenho/AE/OS/AC/Carta-Contrato).
 //
 // Diferença do UploadPdfPanel: aquele extrai dados via IA pra preencher
-// campos; este só anexa o documento. Usado nos instrumentos que não têm
-// IA treinada (tudo exceto Nota de Empenho).
+// campos; este só anexa o documento. Suporta drag-and-drop e clique.
 export function UploadArquivoSimples({
   titulo,
   descricao,
   onArquivoSalvo,
+  accept = "application/pdf,image/jpeg,image/png,image/webp",
 }: {
   titulo: string;
   descricao?: string;
   onArquivoSalvo?: (info: { url: string; nome: string }) => void;
+  accept?: string;
 }) {
   const [arquivo, setArquivo] = useState<{ url: string; nome: string } | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, startTransition] = useTransition();
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  function handleFile(ev: React.ChangeEvent<HTMLInputElement>) {
-    const file = ev.target.files?.[0];
-    if (!file) return;
+  function processarArquivo(file: File) {
     setErro(null);
     const formData = new FormData();
     formData.append("file", file);
@@ -42,13 +43,54 @@ export function UploadArquivoSimples({
     });
   }
 
+  function handleFile(ev: React.ChangeEvent<HTMLInputElement>) {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    processarArquivo(file);
+  }
+
+  function onDragOver(ev: React.DragEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (!enviando && !arquivo) setDragOver(true);
+  }
+  function onDragLeave(ev: React.DragEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragOver(false);
+  }
+  function onDrop(ev: React.DragEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragOver(false);
+    if (enviando || arquivo) return;
+    const file = ev.dataTransfer.files?.[0];
+    if (!file) return;
+    processarArquivo(file);
+  }
+
   function remover() {
     setArquivo(null);
     setErro(null);
+    onArquivoSalvo?.({ url: "", nome: "" });
   }
 
   return (
-    <div className="glass-tile rounded-2xl px-5 py-4">
+    <div
+      onDragOver={onDragOver}
+      onDragEnter={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      className={`glass-tile rounded-2xl px-5 py-4 transition ${
+        dragOver ? "ring-2 ring-offset-2" : ""
+      }`}
+      style={{
+        background: dragOver
+          ? "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(184,197,214,0.04)), var(--glass-2)"
+          : undefined,
+        ...(dragOver ? { boxShadow: "0 0 0 2px var(--amber, #d97706)" } : {}),
+      }}
+    >
       <div className="flex items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-700">
           <Upload className="h-5 w-5" />
@@ -62,17 +104,26 @@ export function UploadArquivoSimples({
               {descricao}
             </p>
           )}
+          <p className="mt-1 text-[11px]" style={{ color: "var(--text-mute)" }}>
+            {dragOver ? "Solte o arquivo aqui…" : "Arraste o arquivo aqui ou clique no botão abaixo."}
+          </p>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={accept}
+            onChange={handleFile}
+            className="hidden"
+          />
 
           {!arquivo && !enviando && (
-            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="mt-3 inline-flex items-center gap-2 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+            >
               <Upload className="h-3.5 w-3.5" /> Selecionar arquivo
-              <input
-                type="file"
-                accept="application/pdf,image/jpeg,image/png,image/webp"
-                onChange={handleFile}
-                className="hidden"
-              />
-            </label>
+            </button>
           )}
           {enviando && (
             <p className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-amber-700">
