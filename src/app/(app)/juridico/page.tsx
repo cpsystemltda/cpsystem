@@ -2,6 +2,8 @@ import { Scale, Sparkles, Check, MessageSquare, FileSignature, Lock } from "luci
 import { exigirUsuario } from "@/lib/auth";
 import { UpgradeForm, DowngradeForm } from "./UpgradeForm";
 import { PageHeader } from "@/components/ui/SecaoGlass";
+import { AnaliseJuridicaPanel } from "@/components/AnaliseJuridicaPanel";
+import { listarDocumentosParaAnalise } from "@/app/actions/iaJuridica";
 
 export default async function JuridicoPage() {
   const usuario = await exigirUsuario();
@@ -12,9 +14,9 @@ export default async function JuridicoPage() {
       <div className="mx-auto max-w-4xl px-8 py-8">
         <PageHeader
           eyebrow="Módulo · Premium"
-          titulo="Suporte"
-          destaque="Jurídico"
-          subtitulo="Inteligência jurídica nativa do Grupo Contratos Públicos diretamente no sistema."
+          titulo="Consultoria"
+          destaque="Jurídica"
+          subtitulo="Análise de documentos via IA + franquia de consultoria humana com o Grupo Contratos Públicos."
         />
 
         <div className="mt-8 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-blue-50 p-8">
@@ -28,22 +30,39 @@ export default async function JuridicoPage() {
             Tenha um time jurídico de licitações ao seu lado
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-slate-700">
-            Vai além do software: você passa a contar com a equipe especialista do Grupo Contratos Públicos para
-            sustentar suas operações. Defesas, reajustes, recursos administrativos — tudo dentro de uma franquia anual
-            previsível.
+            Análise de documentos via IA com parecer estruturado + equipe especialista do Grupo
+            Contratos Públicos para defesas, reajustes e recursos administrativos.
           </p>
 
           <div className="mt-6 grid gap-3 md:grid-cols-2">
-            <Beneficio icone={MessageSquare} titulo="12 consultas escritas/ano" texto="Tire dúvidas sobre execução contratual com SLA de 4h úteis." />
-            <Beneficio icone={FileSignature} titulo="2 peças administrativas/ano" texto="Pedidos de reajuste, defesas prévias e respostas a notificações." />
-            <Beneficio icone={Check} titulo="Canal VIP no WhatsApp" texto="Atendimento prioritário triado por IA + escalação humana." />
-            <Beneficio icone={Sparkles} titulo="Desconto em peças avulsas" texto="Demandas extras (ex.: mandados de segurança) com preço especial." />
+            <Beneficio
+              icone={Sparkles}
+              titulo="Parecer IA de cada documento"
+              texto="Atas, Contratos e Empenhos analisados em segundos — pontos críticos, checklist, janelas de prazo."
+            />
+            <Beneficio
+              icone={MessageSquare}
+              titulo="12 consultas escritas/ano"
+              texto="Tire dúvidas sobre execução contratual com SLA de 4h úteis."
+            />
+            <Beneficio
+              icone={FileSignature}
+              titulo="2 peças administrativas/ano"
+              texto="Pedidos de reajuste, defesas prévias e respostas a notificações."
+            />
+            <Beneficio
+              icone={Check}
+              titulo="Canal VIP no WhatsApp"
+              texto="Atendimento prioritário triado por IA + escalação humana."
+            />
           </div>
 
           <div className="glass-tile mt-6 flex items-center justify-between rounded-[18px] px-5 py-5">
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Investimento mensal</p>
-              <p className="mt-1 text-3xl font-bold text-slate-900">R$ 997<span className="text-base font-normal text-slate-500">/mês</span></p>
+              <p className="mt-1 text-3xl font-bold text-slate-900">
+                R$ 997<span className="text-base font-normal text-slate-500">/mês</span>
+              </p>
               <p className="text-xs text-slate-500">vs R$ 397/mês do Básico (+R$ 600/mês)</p>
             </div>
             <UpgradeForm />
@@ -57,14 +76,16 @@ export default async function JuridicoPage() {
     );
   }
 
-  // PREMIUM
+  // PREMIUM — painel rico de análise jurídica
+  const { atas, contratos, empenhos } = await listarDocumentosParaAnalise();
+
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
       <PageHeader
         eyebrow="Módulo · Premium ativo"
-        titulo="Painel"
-        destaque="Jurídico"
-        subtitulo="Sua franquia anual de consultoria com o Grupo Contratos Públicos."
+        titulo="Consultoria"
+        destaque="Jurídica"
+        subtitulo="Análise de documentos via IA + franquia de consultoria humana."
         cta={
           <span
             className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold uppercase"
@@ -80,25 +101,38 @@ export default async function JuridicoPage() {
         }
       />
 
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
-        <Franquia titulo="Consultas escritas" usado={0} total={12} />
-        <Franquia titulo="Peças administrativas" usado={0} total={2} />
-        <Franquia titulo="SLA primeiro atendimento" usado={"4h"} total={"úteis"} percentual={null} />
+      {/* Análise jurídica por IA */}
+      <div className="mt-8">
+        <AnaliseJuridicaPanel atas={atas} contratos={contratos} empenhos={empenhos} />
       </div>
 
-      <section className="glass mt-6 rounded-[20px] px-6 py-5">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Solicitar atendimento</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Em breve você poderá abrir solicitações jurídicas diretamente daqui. Hoje, contate a equipe pelo WhatsApp comercial:
-        </p>
-        <a
-          href="https://wa.me/5561999999999"
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+      {/* Franquia humana */}
+      <section className="mt-10">
+        <h2
+          className="mb-3 text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
         >
-          <MessageSquare className="h-4 w-4" /> Abrir WhatsApp Premium
-        </a>
+          <Scale className="mr-1 inline-block h-3.5 w-3.5" /> Consultoria humana — franquia anual
+        </h2>
+        <div className="grid gap-4 md:grid-cols-3">
+          <Franquia titulo="Consultas escritas" usado={0} total={12} />
+          <Franquia titulo="Peças administrativas" usado={0} total={2} />
+          <Franquia titulo="SLA primeiro atendimento" usado={"4h"} total={"úteis"} percentual={null} />
+        </div>
+
+        <div className="glass mt-4 rounded-[20px] px-6 py-5">
+          <p className="text-sm text-slate-600">
+            Para abrir uma consulta humana com o Grupo Contratos Públicos, use o canal VIP:
+          </p>
+          <a
+            href="https://wa.me/5561999999999"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          >
+            <MessageSquare className="h-4 w-4" /> Abrir WhatsApp Premium
+          </a>
+        </div>
       </section>
 
       <DowngradeForm />
@@ -137,13 +171,17 @@ function Franquia({
   total: number | string;
   percentual?: number | null;
 }) {
-  const pct = percentual !== undefined ? percentual : typeof usado === "number" && typeof total === "number" ? (usado / total) * 100 : 0;
+  const pct =
+    percentual !== undefined
+      ? percentual
+      : typeof usado === "number" && typeof total === "number"
+        ? (usado / total) * 100
+        : 0;
   return (
     <div className="glass-tile rounded-[18px] px-5 py-5">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
       <p className="mt-2 text-2xl font-bold text-slate-900">
-        {usado}{" "}
-        <span className="text-base font-normal text-slate-400">/ {total}</span>
+        {usado} <span className="text-base font-normal text-slate-400">/ {total}</span>
       </p>
       {pct !== null && (
         <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
