@@ -1264,6 +1264,21 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     }
   }
 
+  // Calcula vigência automaticamente — empenho/NE/AE/OS não tem vigência
+  // própria (decisão Igor). Herda da Ata/Contrato pai; se livre, usa
+  // dataEmissao + 1 ano como sentinela.
+  const ataPai = v.ataId
+    ? await prisma.ata.findFirst({ where: { id: v.ataId }, select: { vigenciaInicio: true, vigenciaFim: true } })
+    : null;
+  const contratoPai = v.contratoId
+    ? await prisma.contrato.findFirst({ where: { id: v.contratoId }, select: { vigenciaInicio: true, vigenciaFim: true } })
+    : null;
+  const vigenciaInicio = contratoPai?.vigenciaInicio ?? ataPai?.vigenciaInicio ?? v.dataEmissao;
+  const vigenciaFim =
+    contratoPai?.vigenciaFim ??
+    ataPai?.vigenciaFim ??
+    new Date(v.dataEmissao.getTime() + 365 * 24 * 60 * 60 * 1000);
+
   try {
     const empenho = await prisma.empenho.create({
       data: {
@@ -1284,8 +1299,8 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
         orgaoTelefone: v.orgaoTelefone || null,
         objeto: v.objeto,
         dataEmissao: v.dataEmissao,
-        vigenciaInicio: v.vigenciaInicio,
-        vigenciaFim: v.vigenciaFim,
+        vigenciaInicio,
+        vigenciaFim,
         prazoEntregaDias: v.prazoEntregaDias || null,
         prazoEntregaUnidade: v.prazoEntregaUnidade,
         prazoEntregaModo: v.prazoEntregaModo,
@@ -1524,6 +1539,20 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
     v.itens.map((i) => i.id).filter((id): id is string => Boolean(id)),
   );
 
+  // Vigência: herdada da Ata/Contrato pai; livre cai em dataEmissao + 1 ano.
+  // Mesma lógica do criarEmpenhoAction.
+  const ataPaiEdit = v.ataId
+    ? await prisma.ata.findFirst({ where: { id: v.ataId }, select: { vigenciaInicio: true, vigenciaFim: true } })
+    : null;
+  const contratoPaiEdit = v.contratoId
+    ? await prisma.contrato.findFirst({ where: { id: v.contratoId }, select: { vigenciaInicio: true, vigenciaFim: true } })
+    : null;
+  const novaVigenciaInicio = contratoPaiEdit?.vigenciaInicio ?? ataPaiEdit?.vigenciaInicio ?? v.dataEmissao;
+  const novaVigenciaFim =
+    contratoPaiEdit?.vigenciaFim ??
+    ataPaiEdit?.vigenciaFim ??
+    new Date(v.dataEmissao.getTime() + 365 * 24 * 60 * 60 * 1000);
+
   try {
     await prisma.$transaction(async (tx) => {
       await tx.empenho.update({
@@ -1545,8 +1574,8 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
           orgaoTelefone: v.orgaoTelefone || null,
           objeto: v.objeto,
           dataEmissao: v.dataEmissao,
-          vigenciaInicio: v.vigenciaInicio,
-          vigenciaFim: v.vigenciaFim,
+          vigenciaInicio: novaVigenciaInicio,
+          vigenciaFim: novaVigenciaFim,
           prazoEntregaDias: v.prazoEntregaDias || null,
           prazoEntregaUnidade: v.prazoEntregaUnidade,
           prazoEntregaModo: v.prazoEntregaModo,

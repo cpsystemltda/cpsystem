@@ -391,7 +391,12 @@ export const instrumentosContratuais = [
 ] as const;
 export type InstrumentoContratualValor = (typeof instrumentosContratuais)[number];
 
+// Empenho/NE/AE/OS não tem vigência própria nem bloco "Detalhes" no form
+// (decisão Igor). Vigência é calculada na action a partir da Ata/Contrato
+// pai (ou data de emissão + 1 ano quando livre). Campos de "Detalhes" são
+// todos opcionais e continuam no schema (mas o form não os exibe).
 export const novoEmpenhoSchema = contratacaoBase
+  .omit({ vigenciaInicio: true, vigenciaFim: true })
   .extend({
     instrumento: z.enum(instrumentosContratuais).default("NOTA_EMPENHO"),
     ataId: z.string().optional(),
@@ -410,13 +415,10 @@ export const novoEmpenhoSchema = contratacaoBase
     enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
     pontosFocais: z.array(pontoFocalSchema).optional(),
     itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
-    // Campos específicos por instrumento. Validação cruzada abaixo garante
-    // que os campos obrigatórios de cada instrumento estejam preenchidos.
+    // Campos específicos por instrumento, todos opcionais (bloco "Detalhes"
+    // foi removido da UI; persistir como null quando não enviados).
     classificacaoOrcamentaria: z.string().optional(),
     signatario: z.string().optional(),
-    // preprocess: input type=date vazio chega como "" — `new Date("")` é
-    // Invalid Date e o Zod rejeita antes do superRefine rodar (mensagem
-    // "Invalid date" feia). Normaliza "" → undefined pra cair em .optional().
     dataAssinatura: z.preprocess(
       (v) => (v === "" || v == null ? undefined : v),
       z.coerce.date().optional(),
@@ -425,26 +427,6 @@ export const novoEmpenhoSchema = contratacaoBase
     pontoColeta: z.string().optional(),
     contatoRecebedor: z.string().optional(),
     fiscalResponsavel: z.string().optional(),
-  })
-  .superRefine((v, ctx) => {
-    if (v.instrumento === "CARTA_CONTRATO") {
-      if (!v.signatario?.trim())
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["signatario"], message: "Informe o signatário" });
-      if (!v.dataAssinatura)
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dataAssinatura"], message: "Informe a data de assinatura" });
-    }
-    if (v.instrumento === "AUTORIZACAO_COMPRA" && !v.departamentoEmissor?.trim()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["departamentoEmissor"], message: "Informe o departamento emissor" });
-    }
-    if (v.instrumento === "AUTORIZACAO_ENTREGA") {
-      if (!v.pontoColeta?.trim())
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["pontoColeta"], message: "Informe o ponto de coleta/entrega" });
-      if (!v.contatoRecebedor?.trim())
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["contatoRecebedor"], message: "Informe o contato do recebedor" });
-    }
-    if (v.instrumento === "ORDEM_SERVICO" && !v.fiscalResponsavel?.trim()) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["fiscalResponsavel"], message: "Informe o fiscal responsável" });
-    }
   });
 
 export type SignupInput = z.infer<typeof signupSchema>;

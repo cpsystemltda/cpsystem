@@ -153,18 +153,9 @@ export default function NovoEmpenhoForm({
     : undefined;
   const heranca = contratoSelecionado?.dados;
 
-  // Vigência calc (Ajuste 4) — Início + Prazo + Fim calculado
-  const [vigenciaInicio, setVigenciaInicio] = useState<string>(vi?.vigenciaInicio ?? "");
-  const prazoDetectado = detectarPrazoVigencia(
-    vi?.vigenciaInicio ?? "",
-    vi?.vigenciaFim ?? "",
-  );
-  const [prazoVigQtd, setPrazoVigQtd] = useState<number>(prazoDetectado?.qtd ?? 1);
-  const [prazoVigUnidade, setPrazoVigUnidade] = useState<"DIAS" | "MESES" | "ANOS">(
-    prazoDetectado?.unidade ??
-      (instrumentoProp === "AUTORIZACAO_ENTREGA" ? "DIAS" : "ANOS"),
-  );
-  const vigenciaFim = calcularVigenciaFim(vigenciaInicio, prazoVigQtd, prazoVigUnidade);
+  // Vigência foi retirada do form (decisão Igor) — calculada na server
+  // action a partir da Ata/Contrato pai. Mantemos os imports só pra evitar
+  // warning lint até decidir se removemos do helper compartilhado.
 
   // Prazo entrega 2 modos (Ajuste 5)
   const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA">(
@@ -187,14 +178,8 @@ export default function NovoEmpenhoForm({
 
   useEffect(() => {
     if (!dados) return;
-    if (dados.vigenciaInicio) setVigenciaInicio(dados.vigenciaInicio);
-    if (dados.vigenciaInicio && dados.vigenciaFim) {
-      const det = detectarPrazoVigencia(dados.vigenciaInicio, dados.vigenciaFim);
-      if (det) {
-        setPrazoVigQtd(det.qtd);
-        setPrazoVigUnidade(det.unidade);
-      }
-    }
+    // Vigência não é mais campo do form; ignoramos `dados.vigenciaInicio/Fim`
+    // mesmo que a IA tenha extraído — a action calcula a partir da Ata/Contrato.
     const auto = new Set<string>();
     const d = dados as unknown as Record<string, unknown>;
     for (const k of Object.keys(d)) {
@@ -357,9 +342,8 @@ export default function NovoEmpenhoForm({
             <input type="hidden" name={`anexosAdicionais[${i}][categoria]`} value={a.categoria} />
           </div>
         ))}
-        {/* Hidden inputs dos campos controlados */}
-        <input type="hidden" name="vigenciaInicio" value={vigenciaInicio} />
-        <input type="hidden" name="vigenciaFim" value={vigenciaFim} />
+        {/* Hidden inputs dos campos controlados. Vigência não é mais enviada
+            pelo form — a server action calcula a partir da Ata/Contrato pai. */}
         <input type="hidden" name="prazoEntregaModo" value={prazoEntregaModo} />
         <input type="hidden" name="prazoEntregaUnidade" value={prazoEntregaUnidade} />
         <Secao titulo="Origem">
@@ -522,84 +506,9 @@ export default function NovoEmpenhoForm({
               span={1}
               defaultValue={dados?.dataEmissao ?? vi?.dataEmissao}
             />
-            {/* Ajuste 4 — Bloco Vigência (Início + Prazo + Fim calculado) */}
-            <div className="col-span-1">
-              <span
-                className="mb-1.5 block text-[11px] font-bold uppercase"
-                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
-              >
-                Vigência — início *
-              </span>
-              <input
-                type="date"
-                value={vigenciaInicio}
-                onChange={(ev) => setVigenciaInicio(ev.target.value)}
-                required
-                className="w-full rounded-xl px-4 py-3 text-sm font-medium"
-              />
-            </div>
-            <div className="col-span-1">
-              <span
-                className="mb-1.5 block text-[11px] font-bold uppercase"
-                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
-              >
-                Vigência — prazo
-              </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  value={prazoVigQtd}
-                  onChange={(ev) => setPrazoVigQtd(Number(ev.target.value) || 0)}
-                  className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
-                />
-                <select
-                  value={prazoVigUnidade}
-                  onChange={(ev) =>
-                    setPrazoVigUnidade(ev.target.value as "DIAS" | "MESES" | "ANOS")
-                  }
-                  className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
-                  style={{
-                    border: "0.5px solid var(--hairline)",
-                    background: "rgba(255,255,255,0.7)",
-                    color: "var(--text)",
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  <option value="DIAS">Dias</option>
-                  <option value="MESES">Meses</option>
-                  <option value="ANOS">Anos</option>
-                </select>
-              </div>
-            </div>
-            <div className="col-span-1">
-              <span
-                className="mb-1.5 block text-[11px] font-bold uppercase"
-                style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
-              >
-                Vigência — fim (calc.)
-              </span>
-              <input
-                type="text"
-                readOnly
-                value={
-                  vigenciaFim
-                    ? new Date(vigenciaFim + "T12:00:00").toLocaleDateString("pt-BR")
-                    : "—"
-                }
-                className="w-full rounded-xl px-4 py-3 text-sm font-bold tabular"
-                style={{
-                  border: "0.5px solid var(--hairline)",
-                  background: "rgba(15,14,12,0.04)",
-                  color: vigenciaFim ? "var(--text)" : "var(--text-mute)",
-                }}
-              />
-              {e.vigenciaFim && (
-                <span className="mt-1 block text-[11px]" style={{ color: "var(--coral-deep)" }}>
-                  {e.vigenciaFim}
-                </span>
-              )}
-            </div>
+            {/* Vigência (início/prazo/fim) foi retirada da UI a pedido do Igor:
+                empenho/AE/OS não tem vigência própria — herda da Ata/Contrato
+                pai. A server action preenche automaticamente. */}
 
             {/* Ajuste 5 — Prazo de entrega com 2 modos (RELATIVO ou DATA_CERTA) */}
             <div className="col-span-2">
@@ -708,83 +617,11 @@ export default function NovoEmpenhoForm({
           </Secao>
         )}
 
-        {instrumento !== "NOTA_EMPENHO" || vi?.classificacaoOrcamentaria ? (
-          <Secao titulo={`Detalhes — ${nomeInstr}`}>
-            <div className="grid grid-cols-4 gap-4">
-              {instrumento === "NOTA_EMPENHO" && (
-                <Field
-                  label="Classificação orçamentária (opcional)"
-                  name="classificacaoOrcamentaria"
-                  placeholder="Programa/ação/elemento"
-                  span={4}
-                  defaultValue={vi?.classificacaoOrcamentaria ?? ""}
-                />
-              )}
-              {instrumento === "CARTA_CONTRATO" && (
-                <>
-                  <Field
-                    label="Signatário"
-                    name="signatario"
-                    required
-                    erro={e.signatario}
-                    span={2}
-                    defaultValue={vi?.signatario ?? ""}
-                  />
-                  <Field
-                    label="Data de assinatura"
-                    name="dataAssinatura"
-                    type="date"
-                    required
-                    erro={e.dataAssinatura}
-                    span={1}
-                    defaultValue={vi?.dataAssinatura ?? ""}
-                  />
-                </>
-              )}
-              {instrumento === "AUTORIZACAO_COMPRA" && (
-                <Field
-                  label="Departamento emissor"
-                  name="departamentoEmissor"
-                  required
-                  erro={e.departamentoEmissor}
-                  span={2}
-                  defaultValue={vi?.departamentoEmissor ?? ""}
-                />
-              )}
-              {instrumento === "AUTORIZACAO_ENTREGA" && (
-                <>
-                  <Field
-                    label="Ponto de coleta/entrega"
-                    name="pontoColeta"
-                    required
-                    erro={e.pontoColeta}
-                    span={2}
-                    defaultValue={vi?.pontoColeta ?? ""}
-                  />
-                  <Field
-                    label="Contato do recebedor"
-                    name="contatoRecebedor"
-                    placeholder="Nome · telefone/e-mail"
-                    required
-                    erro={e.contatoRecebedor}
-                    span={2}
-                    defaultValue={vi?.contatoRecebedor ?? ""}
-                  />
-                </>
-              )}
-              {instrumento === "ORDEM_SERVICO" && (
-                <Field
-                  label="Fiscal responsável"
-                  name="fiscalResponsavel"
-                  required
-                  erro={e.fiscalResponsavel}
-                  span={2}
-                  defaultValue={vi?.fiscalResponsavel ?? ""}
-                />
-              )}
-            </div>
-          </Secao>
-        ) : null}
+        {/* Bloco "Detalhes — <instrumento>" foi removido (decisão Igor).
+            Campos específicos por instrumento (classificacaoOrcamentaria,
+            signatario, dataAssinatura, departamentoEmissor, pontoColeta,
+            contatoRecebedor, fiscalResponsavel) continuam no schema como
+            opcionais — backend aceita criar sem eles. */}
 
         <Secao titulo="Endereços de entrega/execução">
           <p className="mb-3 text-xs text-slate-600">

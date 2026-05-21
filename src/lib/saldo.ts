@@ -26,6 +26,10 @@ export type SaldoAta = {
 
 // Saldo de uma Ata = soma dos itens, descontando ContratoItem (todos)
 // e EmpenhoItem que NÃO estão dentro de um Contrato (pra não contar duas vezes).
+//
+// Inclui fallback: empenhoItens diretos da Ata (empenho.ataId === this.ataId,
+// contratoId === null) sem ataItemId são associados por descrição tolerante
+// — cobre empenhos legados/seeded e empenhos digitados sem selecionar item.
 export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
   const itens = await prisma.ataItem.findMany({
     where: { ataId },
@@ -38,12 +42,27 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
     orderBy: { id: "asc" },
   });
 
+  // Empenho itens diretos da Ata (sem contrato) com ataItemId NULL — match
+  // por descrição como fallback.
+  const empenhoItensOrfaos = await prisma.empenhoItem.findMany({
+    where: {
+      ataItemId: null,
+      empenho: { ataId, contratoId: null },
+    },
+    select: { quantidade: true, descricao: true },
+  });
+
   const out: SaldoItem[] = itens.map((it) => {
     const usadoContrato = it.contratoItens.reduce((s, c) => s + c.quantidade, 0);
     const usadoEmpenhoSolto = it.empenhoItens
       .filter((e) => e.empenho.contratoId === null)
       .reduce((s, e) => s + e.quantidade, 0);
-    const usado = usadoContrato + usadoEmpenhoSolto;
+    // Fallback por descrição pra empenhoItens sem ataItemId
+    const descItemNorm = normalizarDescricao(it.descricao);
+    const usadoOrfaos = empenhoItensOrfaos
+      .filter((e) => normalizarDescricao(e.descricao) === descItemNorm)
+      .reduce((s, e) => s + e.quantidade, 0);
+    const usado = usadoContrato + usadoEmpenhoSolto + usadoOrfaos;
     const disponivel = Math.max(0, it.quantidade - usado);
 
     return {

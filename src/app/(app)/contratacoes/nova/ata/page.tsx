@@ -1,5 +1,6 @@
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { formatarCnpj } from "@/lib/validators";
 import NovaAtaForm from "./NovaAtaForm";
 
 /**
@@ -9,20 +10,23 @@ import NovaAtaForm from "./NovaAtaForm";
  *   da razão social E não for igual ao nome do responsável (heurística pra
  *   evitar o bug do MEI: a Receita Federal devolve `nome_fantasia` = nome da
  *   pessoa física, e o autopreenchimento via BrasilAPI grava isso no banco).
+ * - Sempre sufixa com CNPJ formatado pra desambiguar de vez (Igor pediu).
  */
 function montarLabelEmpresa(e: {
   razaoSocial: string;
   nomeFantasia: string | null;
   responsavel: string;
+  cnpj: string;
 }): string {
   const razao = e.razaoSocial.trim();
   const fantasia = (e.nomeFantasia ?? "").trim();
   const respNorm = e.responsavel.trim().toLowerCase();
 
-  if (!fantasia) return razao;
-  if (fantasia.toLowerCase() === razao.toLowerCase()) return razao;
-  if (fantasia.toLowerCase() === respNorm) return razao;
-  return `${razao} (${fantasia})`;
+  let nome = razao;
+  if (fantasia && fantasia.toLowerCase() !== razao.toLowerCase() && fantasia.toLowerCase() !== respNorm) {
+    nome = `${razao} (${fantasia})`;
+  }
+  return `${nome} · CNPJ ${formatarCnpj(e.cnpj)}`;
 }
 
 export default async function Page() {
@@ -32,7 +36,7 @@ export default async function Page() {
   // - EMPRESA: empresas da própria conta (via contaId).
   // - ANALISTA: empresas das contas com VinculoAnalista ATIVO em que o
   //   analista é responsável.
-  let empresas: { id: string; razaoSocial: string; nomeFantasia: string | null; responsavel: string }[] = [];
+  let empresas: { id: string; razaoSocial: string; nomeFantasia: string | null; responsavel: string; cnpj: string }[] = [];
 
   if (usuario.conta.tipo === "ANALISTA") {
     const analista = await prisma.analista.findUnique({
@@ -49,7 +53,7 @@ export default async function Page() {
         empresas = await prisma.empresa.findMany({
           where: { contaId: { in: contaIds } },
           orderBy: { criadoEm: "asc" },
-          select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true },
+          select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true, cnpj: true },
         });
       }
     }
@@ -57,7 +61,7 @@ export default async function Page() {
     empresas = await prisma.empresa.findMany({
       where: { contaId: usuario.contaId },
       orderBy: { criadoEm: "asc" },
-      select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true },
+      select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true, cnpj: true },
     });
   }
 
