@@ -52,6 +52,9 @@ export type ItemInicial = {
   valorUnitario: number;
   lote?: string | null;
   numero?: string | null;
+  // Quando o item já vem vinculado a um item da Ata pai (ex: empenho
+  // derivado de Ata), o select "Item da Ata" aparece pré-selecionado.
+  ataItemId?: string;
 };
 
 /**
@@ -105,15 +108,19 @@ export function ItensEditor({
     itensIniciais && itensIniciais.length > 0
       ? itensIniciais.map((i, idx) => {
           const sug = sugestoesPorIndex.get(idx);
+          // Prioridade pro ataItemId: explícito > sugestão IA com confiança alta
+          const ataItemIdLinha =
+            i.ataItemId ||
+            (sug && sug.ataItemId && sug.confidence >= 0.6 ? sug.ataItemId : "");
           return {
             id: i.id ?? "",
             descricao: i.descricao,
             unidade: i.unidade,
-            quantidade: String(i.quantidade),
+            // qtd=0 vira input vazio pra usuário digitar (auto-populado da Ata/Contrato)
+            quantidade: i.quantidade === 0 ? "" : String(i.quantidade),
             marca: i.marca ?? "",
             valorUnitario: String(i.valorUnitario),
-            // Pré-popula a partir da sugestão IA se confidence >= 0.6
-            ataItemId: sug && sug.ataItemId && sug.confidence >= 0.6 ? sug.ataItemId : "",
+            ataItemId: ataItemIdLinha,
             lote: i.lote ?? "",
             numero: i.numero ?? "",
           };

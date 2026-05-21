@@ -58,6 +58,15 @@ type ContratoDados = {
     funcao: string;
     funcaoDescricao: string | null;
   }[];
+  // Itens do contrato pai — auto-populam a tabela de itens do empenho.
+  // Usuário só ajusta quantidade (resto vem preenchido).
+  itens: {
+    descricao: string;
+    unidade: string;
+    quantidade: number;
+    marca: string | null;
+    valorUnitario: number;
+  }[];
 };
 type ContratoOpt = { value: string; label: string; ataId: string | null; dados?: ContratoDados };
 
@@ -198,6 +207,33 @@ export default function NovoEmpenhoForm({
   }, [heranca]);
 
   const ataSelecionada = origem === "ata" ? atas.find((a) => a.value === ataId) : undefined;
+
+  // Quando deriva de Ata ou Contrato, pré-popula a tabela de itens com
+  // descrição/unidade/valor unitário do pai — usuário só ajusta quantidade.
+  // (Decisão UX da Regina: cadastrar execução fica muito mais rápido.)
+  const itensDerivadosDoPai: ItemInicial[] | undefined =
+    modo === "criar"
+      ? ataSelecionada && ataSelecionada.itens.length > 0
+        ? ataSelecionada.itens.map((it) => ({
+            descricao: it.descricao,
+            unidade: it.unidade,
+            quantidade: 0, // usuário preenche
+            marca: null,
+            valorUnitario: it.valorUnitario,
+            // Vincula automaticamente ao item da Ata (saldo é validado na action)
+            ataItemId: it.id,
+          }))
+        : contratoSelecionado?.dados?.itens && contratoSelecionado.dados.itens.length > 0
+          ? contratoSelecionado.dados.itens.map((it) => ({
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: 0, // usuário preenche
+              marca: it.marca ?? null,
+              valorUnitario: it.valorUnitario,
+            }))
+          : undefined
+      : undefined;
+
   // Quando troca de contrato (ou volta pra origem "livre"), remonta o form
   // pra que defaultValue/iniciais sejam reaplicados com os dados do contrato.
   const formKey = dados
@@ -205,6 +241,17 @@ export default function NovoEmpenhoForm({
     : heranca
       ? `contrato-${contratoId}`
       : "manual";
+
+  // Key específica do ItensEditor — remonta quando muda o pai (Ata/Contrato)
+  // ou quando a IA gera novos itens. Sem isso, o useState do editor não
+  // pegaria as novas linhas pré-populadas.
+  const itensEditorKey = dados
+    ? `ia-${dados.itens.length}`
+    : ataSelecionada
+      ? `ata-${ataSelecionada.value}`
+      : contratoSelecionado
+        ? `contrato-${contratoSelecionado.value}`
+        : "manual";
 
   // M9 IA — matching dos itens extraídos contra a Ata vinculada
   const [sugestoesItens, setSugestoesItens] = useState<SugestaoIa[]>([]);
@@ -650,8 +697,9 @@ export default function NovoEmpenhoForm({
             </p>
           )}
           <ItensEditor
+            key={itensEditorKey}
             ataItens={ataSelecionada?.itens}
-            itensIniciais={vi?.itens ?? dados?.itens}
+            itensIniciais={vi?.itens ?? dados?.itens ?? itensDerivadosDoPai}
             permitirLotes={false}
             sugestoesIa={sugestoesItens}
           />

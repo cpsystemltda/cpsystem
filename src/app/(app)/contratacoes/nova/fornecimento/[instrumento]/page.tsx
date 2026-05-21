@@ -56,6 +56,16 @@ export default async function Page({
       pontosFocais: {
         select: { id: true, nome: true, email: true, telefone: true, funcao: true, funcaoDescricao: true },
       },
+      // Itens do contrato — pra auto-popular a tabela de itens do empenho.
+      itens: {
+        select: {
+          descricao: true,
+          unidade: true,
+          quantidade: true,
+          marca: true,
+          valorUnitario: true,
+        },
+      },
     },
   });
 
@@ -98,6 +108,7 @@ export default async function Page({
             funcao: p.funcao,
             funcaoDescricao: p.funcaoDescricao,
           })),
+          itens: c.itens,
         },
       }))}
     />
