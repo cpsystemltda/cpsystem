@@ -67,6 +67,139 @@ async function registrarAnexo(opts: {
   }
 }
 
+/**
+ * Cria nova Vigência (ordem N+1) quando um Termo Aditivo prorroga prazo.
+ * Phase 3 da refatoração de saldo por vigência.
+ *
+ * Política:
+ *  - Aplica APENAS quando aditivo está vinculado a Contrato OU Ata (não Empenho).
+ *  - Itens da nova vigência: cópia dos itens da vigência anterior. Se
+ *    aditivo aplicou reajuste, valores unitários e totais são reajustados
+ *    no momento da cópia (snapshot — itens da vigência anterior ficam
+ *    com os valores antigos congelados).
+ *  - Empenhos futuros (criados após este aditivo) caem na nova vigência
+ *    automaticamente via Empenho.vigenciaId resolvido por dataEmissao —
+ *    isso é responsabilidade de quem cria o empenho, não desta função.
+ *  - Falha silenciosa (log warn) — não derruba o save do aditivo.
+ */
+async function criarVigenciaProrrogada(opts: {
+  aditivoId: string;
+  contratoId?: string | null;
+  ataId?: string | null;
+  dataInicio: Date | null;
+  dataFim: Date | null;
+  aplicaReajuste: boolean;
+  reajustePercentual: number | null;
+  novoValorAditivo: number | null;
+  tipoAlteracaoValor: TipoAlteracaoValor | null;
+}) {
+  if (!opts.contratoId && !opts.ataId) return;
+  if (!opts.dataInicio || !opts.dataFim) {
+    console.warn("[criarVigenciaProrrogada] aditivo sem datas de nova vigência — pulando.");
+    return;
+  }
+
+  try {
+    // 1) Pega a vigência atual (maior ordem) do contrato OU ata
+    const vigAtual = await prisma.vigencia.findFirst({
+      where: opts.contratoId
+        ? { contratoId: opts.contratoId }
+        : { ataId: opts.ataId! },
+      orderBy: { ordem: "desc" },
+      include: {
+        contratoItens: true,
+        ataItens: true,
+      },
+    });
+
+    if (!vigAtual) {
+      console.warn("[criarVigenciaProrrogada] vigência anterior não encontrada — backfill incompleto?");
+      return;
+    }
+
+    // 2) Calcula valor total da nova vigência:
+    //    - Default = valor da vigência anterior
+    //    - Se aditivo tem ACRÉSCIMO/SUPRESSÃO → soma/subtrai delta
+    //    - Se aditivo tem REEQUILIBRIO → soma delta
+    //    - Reajuste não muda valor unitário aqui (reajustePercentual será
+    //      aplicado no momento da cópia dos itens)
+    let valorTotalNovo = vigAtual.valorTotal;
+    if (opts.novoValorAditivo) {
+      if (opts.tipoAlteracaoValor === "SUPRESSAO") {
+        valorTotalNovo = Math.max(0, valorTotalNovo - Math.abs(opts.novoValorAditivo));
+      } else {
+        valorTotalNovo = valorTotalNovo + Math.abs(opts.novoValorAditivo);
+      }
+    }
+
+    // 3) Cria a nova Vigência
+    const novaVig = await prisma.vigencia.create({
+      data: {
+        ordem: vigAtual.ordem + 1,
+        dataInicio: opts.dataInicio,
+        dataFim: opts.dataFim,
+        valorTotal: valorTotalNovo,
+        termoAditivoId: opts.aditivoId,
+        contratoId: opts.contratoId ?? null,
+        ataId: opts.ataId ?? null,
+        observacao: "Prorrogação via Termo Aditivo",
+      },
+      select: { id: true, ordem: true },
+    });
+
+    // 4) Copia itens da vigência anterior, aplicando reajuste se houver
+    const fatorReajuste =
+      opts.aplicaReajuste && opts.reajustePercentual
+        ? 1 + opts.reajustePercentual / 100
+        : 1;
+
+    if (opts.contratoId) {
+      for (const it of vigAtual.contratoItens) {
+        const novoValorUnit = it.valorUnitario * fatorReajuste;
+        await prisma.contratoItem.create({
+          data: {
+            descricao: it.descricao,
+            unidade: it.unidade,
+            quantidade: it.quantidade,
+            marca: it.marca,
+            valorUnitario: novoValorUnit,
+            valorTotal: novoValorUnit * it.quantidade,
+            moeda: it.moeda,
+            contratoId: opts.contratoId,
+            ataItemId: it.ataItemId,
+            vigenciaId: novaVig.id,
+          },
+        });
+      }
+    } else if (opts.ataId) {
+      for (const it of vigAtual.ataItens) {
+        const novoValorUnit = it.valorUnitario * fatorReajuste;
+        await prisma.ataItem.create({
+          data: {
+            descricao: it.descricao,
+            unidade: it.unidade,
+            quantidade: it.quantidade,
+            marca: it.marca,
+            valorUnitario: novoValorUnit,
+            valorTotal: novoValorUnit * it.quantidade,
+            moeda: it.moeda,
+            lote: it.lote,
+            numero: it.numero,
+            ataId: opts.ataId,
+            vigenciaId: novaVig.id,
+          },
+        });
+      }
+    }
+
+    console.log(
+      `[criarVigenciaProrrogada] Vigência ${novaVig.ordem} criada (R$ ${valorTotalNovo.toFixed(2)})${fatorReajuste !== 1 ? ` com reajuste ${((fatorReajuste - 1) * 100).toFixed(2)}%` : ""}`,
+    );
+  } catch (err) {
+    console.warn("[criarVigenciaProrrogada] falhou:", err);
+  }
+}
+
 async function validarVinculo(usuario: { contaId: string }, v: Vinculo): Promise<LinkValido> {
   if (v.contratoId) {
     const c = await prisma.contrato.findFirst({
@@ -446,6 +579,24 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
     });
 
     await aplicarSideEffects(link, input);
+
+    // Phase 3 — aditivo prorrogando vigência cria nova Vigência (ordem N+1)
+    // automaticamente. Itens são copiados da vigência anterior (com reajuste
+    // aplicado quando houver). Empenhos antigos ficam atrelados à vigência
+    // anterior; novos empenhos caem na nova vigência via dataEmissao.
+    if (input.alteraPrazoVigencia && (link.contratoId || link.ataId)) {
+      await criarVigenciaProrrogada({
+        aditivoId: aditivo.id,
+        contratoId: link.contratoId ?? null,
+        ataId: link.ataId ?? null,
+        dataInicio: input.novaVigenciaInicio,
+        dataFim: input.novaVigenciaFim,
+        aplicaReajuste: input.aplicaReajuste,
+        reajustePercentual: input.reajustePercentual,
+        novoValorAditivo: input.alteraValor ? input.novoValor : null,
+        tipoAlteracaoValor: input.tipoAlteracaoValor,
+      });
+    }
 
     // Coleta o PDF na aba Anexos (se houver)
     await registrarAnexo({

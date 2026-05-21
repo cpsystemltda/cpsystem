@@ -392,6 +392,32 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
       },
     });
 
+    // Cria Vigência 1 da Ata e atribui aos itens recém-criados.
+    // Phase 3 — saldo por vigência. Atas novas já nascem com Vigência 1.
+    try {
+      const valorTotalAta = v.itens.reduce(
+        (s, i) => s + i.quantidade * i.valorUnitario,
+        0,
+      );
+      const vig1 = await prisma.vigencia.create({
+        data: {
+          ordem: 1,
+          dataInicio: v.vigenciaInicio,
+          dataFim: v.vigenciaFim,
+          valorTotal: valorTotalAta,
+          ataId: ata.id,
+          observacao: "Vigência original",
+        },
+        select: { id: true },
+      });
+      await prisma.ataItem.updateMany({
+        where: { ataId: ata.id, vigenciaId: null },
+        data: { vigenciaId: vig1.id },
+      });
+    } catch (errVig) {
+      console.warn("[criarAtaAction] falha ao criar Vigência 1:", errVig);
+    }
+
     // PDF da IA: se o form tinha hidden inputs `arquivoPdfUrl`/`arquivoPdfNome`,
     // cria registro Anexo vinculado à Ata recém-criada.
     const arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
@@ -827,6 +853,32 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
         }),
       },
     });
+
+    // Cria Vigência 1 do Contrato e atribui aos itens recém-criados.
+    // Phase 3 — saldo por vigência. Contratos novos já nascem com Vigência 1.
+    try {
+      const valorTotalContrato = v.itens.reduce(
+        (s, i) => s + i.quantidade * i.valorUnitario,
+        0,
+      );
+      const vig1 = await prisma.vigencia.create({
+        data: {
+          ordem: 1,
+          dataInicio: v.vigenciaInicio,
+          dataFim: v.vigenciaFim,
+          valorTotal: valorTotalContrato,
+          contratoId: contrato.id,
+          observacao: "Vigência original",
+        },
+        select: { id: true },
+      });
+      await prisma.contratoItem.updateMany({
+        where: { contratoId: contrato.id, vigenciaId: null },
+        data: { vigenciaId: vig1.id },
+      });
+    } catch (errVig) {
+      console.warn("[criarContratoAction] falha ao criar Vigência 1:", errVig);
+    }
 
     // PDF da IA — cria registro Anexo vinculado ao Contrato (Ajuste 6)
     const arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
@@ -1280,6 +1332,26 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     ataPai?.vigenciaFim ??
     new Date(v.dataEmissao.getTime() + 365 * 24 * 60 * 60 * 1000);
 
+  // Resolve vigenciaId do empenho — aponta pra Vigência do contrato/ata
+  // pai cujo intervalo de datas contém dataEmissao. Phase 3 do saldo por
+  // vigência. Empenhos sem pai não recebem vigenciaId.
+  const vigenciaIdResolvida = await (async () => {
+    if (!v.contratoId && !v.ataId) return null;
+    const vigs = await prisma.vigencia.findMany({
+      where: v.contratoId ? { contratoId: v.contratoId } : { ataId: v.ataId },
+      orderBy: { ordem: "asc" },
+      select: { id: true, ordem: true, dataInicio: true, dataFim: true },
+    });
+    if (vigs.length === 0) return null;
+    const dentro = vigs.find(
+      (vig) => vig.dataInicio <= v.dataEmissao && vig.dataFim >= v.dataEmissao,
+    );
+    if (dentro) return dentro.id;
+    // Sem match exato: usa a última vigência (caso comum: contrato vencido
+    // recebendo empenho atrasado).
+    return vigs[vigs.length - 1].id;
+  })();
+
   try {
     const empenho = await prisma.empenho.create({
       data: {
@@ -1287,6 +1359,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
         criadoPorId: usuario.id,
         ataId: v.ataId || null,
         contratoId: v.contratoId || null,
+        vigenciaId: vigenciaIdResolvida,
         instrumento: v.instrumento,
         tipo: v.tipo,
         numero: v.numero,
