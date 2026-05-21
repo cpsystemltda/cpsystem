@@ -47,3 +47,4 @@ export function FlutuanteIAsystem() {
     </Link>
   );
 }
+// teste link git-vercel 1779375230
