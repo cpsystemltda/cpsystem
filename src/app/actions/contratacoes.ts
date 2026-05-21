@@ -24,6 +24,7 @@ import {
   CAMPOS_ATA,
   CAMPOS_CONTRATO,
   CAMPOS_EMPENHO,
+  type Mudanca,
 } from "@/lib/diff";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
@@ -1935,4 +1936,93 @@ export async function avancarStatusAction(empenhoId: string, marco: string, data
   revalidatePath("/execucao");
   revalidatePath("/dashboard");
   revalidatePath("/painel-analista");
+}
+
+// ============================================================
+// EDIÇÃO PARCIAL — número, identificador, objeto
+// ============================================================
+// Pra UX de edição inline na tela de detalhe da execução. Atualiza
+// somente os 3 campos básicos sem precisar abrir o form completo
+// (Lei 14.133 não tem objeção a corrigir digitação). Bloqueia PAGO,
+// valida tenancy/permissão, registra na auditoria.
+
+export type AtualizarBasicoEmpenhoResult =
+  | { ok: true }
+  | { ok: false; erro: string };
+
+export async function atualizarBasicoEmpenhoAction(
+  empenhoId: string,
+  campos: { numero?: string; identificador?: string; objeto?: string },
+): Promise<AtualizarBasicoEmpenhoResult> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+
+  const empenho = await prisma.empenho.findFirst({
+    where: { id: empenhoId, empresa: { contaId: usuario.contaId } },
+    select: {
+      id: true,
+      status: true,
+      criadoPorId: true,
+      numero: true,
+      identificador: true,
+      objeto: true,
+    },
+  });
+  if (!empenho) return { ok: false, erro: "Execução não encontrada." };
+  if (!podeEditarDocumento(usuario, empenho)) {
+    return { ok: false, erro: mensagemSemPermissao(empenho) };
+  }
+  if (empenho.status === "PAGO") {
+    return { ok: false, erro: "Execução já paga não pode ser editada." };
+  }
+
+  const data: { numero?: string; identificador?: string | null; objeto?: string } = {};
+  const mudancas: Mudanca[] = [];
+
+  if (campos.numero !== undefined) {
+    const v = campos.numero.trim();
+    if (v.length < 1) return { ok: false, erro: "Número não pode ficar em branco." };
+    if (v !== empenho.numero) {
+      data.numero = v;
+      mudancas.push({ campo: "numero", rotulo: "Número", antes: empenho.numero, depois: v });
+    }
+  }
+  if (campos.identificador !== undefined) {
+    const v = campos.identificador.trim();
+    const novo = v || null;
+    if (novo !== empenho.identificador) {
+      data.identificador = novo;
+      mudancas.push({
+        campo: "identificador",
+        rotulo: "Identificador",
+        antes: empenho.identificador ?? "",
+        depois: novo ?? "",
+      });
+    }
+  }
+  if (campos.objeto !== undefined) {
+    const v = campos.objeto.trim();
+    if (v.length < 2) return { ok: false, erro: "Descrição/objeto não pode ficar em branco." };
+    if (v !== empenho.objeto) {
+      data.objeto = v;
+      mudancas.push({ campo: "objeto", rotulo: "Descrição/objeto", antes: empenho.objeto, depois: v });
+    }
+  }
+
+  if (mudancas.length === 0) return { ok: true }; // nada mudou
+
+  await prisma.empenho.update({ where: { id: empenhoId }, data });
+
+  await registrarAuditoria({
+    contaId: usuario.contaId,
+    usuarioId: usuario.id,
+    acao: "ATUALIZAR",
+    recurso: "Empenho",
+    recursoId: empenhoId,
+    mudancas,
+  });
+
+  revalidatePath(`/execucao/${empenhoId}`);
+  revalidatePath("/execucao");
+  return { ok: true };
 }

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Receipt, AlertTriangle, Pencil } from "lucide-react";
+import { EditavelInline } from "@/components/EditarInlineExecucao";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, formatarCnpj, ROTULO_PROCEDIMENTO, ROTULO_TIPO } from "@/lib/validators";
@@ -114,8 +115,26 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
           <Receipt className="h-6 w-6 text-amber-700" />
         </div>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold text-slate-900">{labelInstrumento(e.instrumento)} {e.numero}</h1>
-          <p className="mt-1 text-sm text-slate-600">{e.objeto}</p>
+          <h1 className="text-3xl font-bold text-slate-900">
+            {labelInstrumento(e.instrumento)}{" "}
+            <EditavelInline
+              empenhoId={e.id}
+              campo="numero"
+              valor={e.numero}
+              podeEditar={podeEditar && e.status !== "PAGO"}
+              placeholder="Número/ano"
+            />
+          </h1>
+          <div className="mt-1 text-sm text-slate-600">
+            <EditavelInline
+              empenhoId={e.id}
+              campo="objeto"
+              valor={e.objeto}
+              podeEditar={podeEditar && e.status !== "PAGO"}
+              multiline
+              placeholder="Descrição do objeto"
+            />
+          </div>
           <p className="mt-2 text-xs text-slate-500">
             {e.empresa.nomeFantasia || e.empresa.razaoSocial} · {e.orgaoNome}
             {e.contrato && (
