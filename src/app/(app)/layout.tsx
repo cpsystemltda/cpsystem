@@ -10,6 +10,7 @@ import { lerVisao, type Visao } from "@/lib/visao";
 import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
 import { lerEspionagemAtual } from "@/lib/espionagem";
 import { BannerEspionagem } from "@/components/BannerEspionagem";
+import { FlutuanteIAsystem } from "@/components/FlutuanteIAsystem";
 
 // Rotas que SÓ a empresa acessa (analista é redirecionado pro painel dele)
 const ROTAS_SO_EMPRESA = [
@@ -129,6 +130,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <NavigationProgress />
       {espionagem && <BannerEspionagem contaNome={espionagem.contaNome} />}
+      <FlutuanteIAsystem />
       <div className="app-content flex flex-1 w-full overflow-hidden">
         <Sidebar
           nomeUsuario={usuario.nome}
