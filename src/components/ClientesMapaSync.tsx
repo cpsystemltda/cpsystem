@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { MapaBrasil, type DadosUf } from "@/components/MapaBrasil";
+import { type DadosUf } from "@/components/MapaBrasil";
 import { MapaPinsBrasil, type PinMapa, type PinEntregaMapa } from "@/components/MapaPinsBrasil";
 import { brl } from "@/lib/validators";
 
@@ -40,7 +40,10 @@ export function ClientesMapaSync({
 }) {
   const [ufDestaque, setUfDestaque] = useState<string | null>(null);
   const [cnpjDestaque, setCnpjDestaque] = useState<string | null>(null);
-  const usarPins = (pins?.length ?? 0) > 0;
+  // dadosUf vem como prop por compat com chamadores existentes, mas não
+  // alimenta mais o choropleth (que foi removido). Mantemos só pra não
+  // quebrar callsite — ufDestaque continua sendo usado pra hover sync.
+  void dadosUf;
 
   return (
     <>
@@ -127,24 +130,22 @@ export function ClientesMapaSync({
               className="text-[12px] font-bold uppercase"
               style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
             >
-              {mapaTitle ?? (usarPins ? "Órgãos atendidos no mapa" : "Mapa de operações por estado")}
+              {mapaTitle ?? "Órgãos atendidos no mapa"}
             </h3>
             <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
               {mapaSubtitle ??
-                (usarPins
-                  ? "Cada pin é um órgão. Passe o mouse sobre uma linha da lista para destacar o pin correspondente; clique nos clusters para expandir."
-                  : "Passe o mouse sobre uma linha da lista para destacar o estado no mapa.")}
+                "Cada pin é um órgão. Passe o mouse sobre uma linha da lista para destacar o pin correspondente; clique nos clusters para expandir."}
             </p>
           </header>
-          {usarPins ? (
-            <MapaPinsBrasil
-              pins={pins ?? []}
-              pinsEntregas={pinsEntregas}
-              cnpjDestaque={cnpjDestaque}
-            />
-          ) : (
-            <MapaBrasil dados={dadosUf} ufDestaque={ufDestaque} />
-          )}
+          {/* Sempre usa o MapaPinsBrasil (Leaflet com satélite). Quando
+              ainda não há pins geocodificados, o componente mostra o mapa
+              do Brasil vazio com mensagem informativa — nunca cai no
+              choropleth SVG (decisão Regina: o choropleth é feio). */}
+          <MapaPinsBrasil
+            pins={pins ?? []}
+            pinsEntregas={pinsEntregas}
+            cnpjDestaque={cnpjDestaque}
+          />
         </section>
       </div>
     </>

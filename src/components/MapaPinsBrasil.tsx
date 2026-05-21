@@ -173,20 +173,10 @@ export function MapaPinsBrasil({
     };
   }, [pinsAtivos]);
 
-  if (pins.length === 0 && (pinsEntregas?.length ?? 0) === 0) {
-    return (
-      <div
-        className="grid h-[360px] place-items-center rounded-2xl text-sm"
-        style={{
-          color: "var(--text-mute)",
-          background: "rgba(15,14,12,0.03)",
-          border: "0.5px solid var(--hairline)",
-        }}
-      >
-        Carregando geolocalizações…
-      </div>
-    );
-  }
+  // Sem pins: ainda mostra o mapa do Brasil em satélite (vazio) — usuário
+  // vê o tile real e não cai num fallback feio. Bounds padrão enquadram
+  // o país inteiro. Mensagem opcional flutua no topo informando estado.
+  const semPinsAtivos = pinsAtivos.length === 0;
 
   if (!LeafletIcon) {
     return (
@@ -210,6 +200,20 @@ export function MapaPinsBrasil({
       className="relative rounded-2xl overflow-hidden"
       style={{ border: "0.5px solid var(--hairline)" }}
     >
+      {/* Mensagem flutuante quando ainda não há pins (órgãos não
+          geocodificados ainda). Mapa abaixo continua interativo. */}
+      {semPinsAtivos && (
+        <div
+          className="absolute bottom-3 left-1/2 z-[500] -translate-x-1/2 rounded-full px-4 py-1.5 text-xs font-semibold shadow-md"
+          style={{
+            background: "rgba(255,255,255,0.95)",
+            color: "var(--text)",
+            border: "0.5px solid var(--hairline)",
+          }}
+        >
+          Sem pins ainda — geocodificando endereços dos órgãos…
+        </div>
+      )}
       {/* Controles flutuantes — Sedes/Entregas à esquerda, Mapa/Satélite à direita */}
       {pinsEntregas && pinsEntregas.length > 0 && (
         <div
