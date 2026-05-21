@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useActionState, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
-  Sparkles,
-  Upload,
-  Check,
   AlertCircle,
-  Loader2,
   Plus,
   Trash2,
   MapPin,
@@ -21,6 +17,7 @@ import {
 import { SubmitButton } from "@/components/SubmitButton";
 import { TooltipAjuda } from "@/components/TooltipAjuda";
 import { AJUDA } from "@/lib/textosAjuda";
+import { UploadPdfPanel } from "@/components/UploadPdfPanel";
 import { ItensEditor } from "@/components/ItensEditor";
 import type { ItemInicial } from "@/components/ItensEditor";
 import { criarAtaAction, editarAtaAction } from "@/app/actions/contratacoes";
@@ -215,11 +212,7 @@ export default function NovaAtaForm({
   const v = (state?.valores ?? {}) as Record<string, string>;
   const errosResumo = Object.entries(e);
   const resumoRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [extraindo, setExtraindo] = useState(false);
-  const [extracaoErro, setExtracaoErro] = useState<string | null>(null);
   const [dados, setDados] = useState<AtaExtraida | null>(null);
-  const [pdfNome, setPdfNome] = useState<string | null>(null);
   // URL persistida do PDF (Vercel Blob) e nome original — preenchidos quando
   // o usuário sobe o PDF pra IA. Vão como hidden inputs e criam o Anexo no save.
   const [arquivoPdfUrl, setArquivoPdfUrl] = useState<string | null>(null);
@@ -231,7 +224,6 @@ export default function NovaAtaForm({
     if (!prefill) return;
     if (prefill.dados) {
       setDados(prefill.dados);
-      setPdfNome(prefill.arquivoNome ?? null);
     }
     if (prefill.arquivoUrl) setArquivoPdfUrl(prefill.arquivoUrl);
     if (prefill.arquivoNome) setArquivoPdfNome(prefill.arquivoNome);
@@ -314,32 +306,20 @@ export default function NovaAtaForm({
     }
   }, [dados]);
 
-  async function handleArquivo(file: File) {
-    setExtraindo(true);
-    setExtracaoErro(null);
-    setPdfNome(file.name);
-    const fd = new FormData();
-    fd.append("pdf", file);
-    const res = await extrairAtaPdfAction(fd);
-    setExtraindo(false);
-    if (!res.ok) {
-      setExtracaoErro(res.erro);
-      return;
-    }
-    setDados(res.dados);
-    if (res.arquivoUrl) setArquivoPdfUrl(res.arquivoUrl);
-    if (res.nomeArquivo) setArquivoPdfNome(res.nomeArquivo);
-    // Marca cada campo não-vazio do retorno da IA como "Auto"
+  // Marca cada campo não-vazio do retorno da IA como "Auto" — dispara
+  // sempre que `dados` muda (via UploadPdfPanel onSuccess).
+  useEffect(() => {
+    if (!dados) return;
     const auto = new Set<string>();
-    const d = res.dados as Record<string, unknown>;
+    const d = dados as unknown as Record<string, unknown>;
     for (const k of Object.keys(d)) {
       const v = d[k];
       if (v != null && v !== "" && !(Array.isArray(v) && v.length === 0)) auto.add(k);
     }
     setCamposAuto(auto);
-  }
+  }, [dados]);
 
-  const formKey = dados ? `auto-${pdfNome}` : "manual";
+  const formKey = dados ? `auto-${arquivoPdfNome ?? "ata"}` : "manual";
 
   return (
     <div className="mx-auto max-w-[1200px] px-8 py-8">
@@ -388,98 +368,22 @@ export default function NovaAtaForm({
         </div>
       </header>
 
-      {/* Upload PDF — IA extrai automático (escondido em modo edição) */}
+      {/* Upload PDF — IA extrai automático. Usa o UploadPdfPanel padrão
+          (drag-and-drop + layout consistente com Contrato/Empenho/Garantia). */}
       {modo !== "editar" && (
-      <section
-        className="glass-tile mt-5 overflow-hidden rounded-[20px] px-7 py-6"
-        style={{
-          background:
-            "linear-gradient(135deg, rgba(197,180,255,0.12), rgba(184,197,214,0.04)), var(--glass-2)",
-        }}
-      >
-        <div className="relative z-[1] flex items-start gap-4">
-          <div
-            className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
-            style={{
-              background: "linear-gradient(135deg, var(--lavender), var(--sky))",
-              boxShadow: "0 4px 16px rgba(197,180,255,0.4)",
+        <div className="mt-5">
+          <UploadPdfPanel
+            titulo="Preencher automaticamente a partir do PDF da Ata"
+            descricao="Anexe o PDF original. A IA extrai número, processo, órgão, vigência, prazos e itens. Você confere e edita antes de salvar."
+            action={extrairAtaPdfAction}
+            onSuccess={setDados}
+            onArquivoSalvo={(info) => {
+              setArquivoPdfUrl(info.url);
+              setArquivoPdfNome(info.nome);
             }}
-          >
-            <Sparkles className="h-5 w-5" style={{ color: "#0A0A0A" }} />
-          </div>
-          <div className="flex-1">
-            <h2
-              className="text-[18px] font-extrabold"
-              style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
-            >
-              Preencher automaticamente a partir do PDF
-            </h2>
-            <p className="mt-1 text-[13px]" style={{ color: "var(--text-soft)" }}>
-              Anexe o PDF original. A IA extrai número, processo, órgão, vigência, prazos e itens.
-              Você confere e edita antes de salvar.
-            </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(ev) => {
-                const f = ev.target.files?.[0];
-                if (f) handleArquivo(f);
-              }}
-            />
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={extraindo}
-                className="btn-primary inline-flex"
-              >
-                {extraindo ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Extraindo dados…
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    {pdfNome ? "Outro PDF" : "Anexar PDF da Ata"}
-                  </>
-                )}
-              </button>
-              {pdfNome && !extraindo && (
-                <span className="truncate max-w-md text-xs" style={{ color: "var(--text-mute)" }}>
-                  {pdfNome}
-                </span>
-              )}
-              {dados && (
-                <span
-                  className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold"
-                  style={{
-                    background: "rgba(93,216,182,0.18)",
-                    color: "var(--mint)",
-                    border: "0.5px solid rgba(93,216,182,0.3)",
-                  }}
-                >
-                  <Check className="h-3 w-3" /> {dados.itens.length} item(ns) preenchidos
-                </span>
-              )}
-            </div>
-            {extracaoErro && (
-              <div
-                className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-sm"
-                style={{
-                  background: "rgba(232,138,152,0.10)",
-                  border: "0.5px solid rgba(232,138,152,0.3)",
-                  color: "var(--coral)",
-                }}
-              >
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{extracaoErro}</span>
-              </div>
-            )}
-          </div>
+            badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchidos`}
+          />
         </div>
-      </section>
       )}
 
       <form
