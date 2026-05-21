@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, Plus } from "lucide-react";
+import { Plus, Coins, TrendingUp, ArrowRight, AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ContratosBrowser, type ContratoCard } from "@/components/ContratosBrowser";
@@ -7,6 +7,9 @@ import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { KpiVencimentos } from "@/components/KpiVencimentos";
 import { PageHeader } from "@/components/ui/SecaoGlass";
+import { KPI } from "@/components/ui/KPI";
+import { TimelineVencimentos } from "@/components/TimelineVencimentos";
+import { brl } from "@/lib/validators";
 
 function classifica(vigenciaFim: Date): ContratoCard["status"] {
   const hoje = new Date();
@@ -49,7 +52,7 @@ export default async function ContratosPage({
   const d120 = new Date(hojeDate.getTime() + 120 * 86400000);
 
   // Tudo em paralelo — sem N+1
-  const [todos, orgaosDistintos, qtdContratosVigentes, qtdContratosFinalizados, venc30c, venc60c, venc90c, venc120c] =
+  const [todos, orgaosDistintos, qtdContratosVigentes, qtdContratosFinalizados, venc30c, venc60c, venc90c, venc120c, contratosVigentesFin] =
     await Promise.all([
       prisma.contrato.findMany({
         where: whereQuery,
@@ -68,7 +71,68 @@ export default async function ContratosPage({
       prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate, lte: d60 } } }),
       prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate, lte: d90 } } }),
       prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate, lte: d120 } } }),
+      // Contratos vigentes detalhados pra bloco financeiro + reajuste (ignora filtros de busca/status)
+      prisma.contrato.findMany({
+        where: { ...whereBase, vigenciaFim: { gte: hojeDate } },
+        select: {
+          id: true,
+          numero: true,
+          orgaoNome: true,
+          vigenciaFim: true,
+          marcoOrcamentoEstimado: true,
+          valorInicial: true,
+          itens: { select: { valorTotal: true } },
+          empenhos: {
+            select: {
+              status: true,
+              itens: { select: { valorTotal: true } },
+            },
+          },
+        },
+      }),
     ]);
+
+  // ============================================================
+  // Bloco Financeiro de Contratos (espelha o /atas)
+  // ============================================================
+  const valoresContratadosContr = contratosVigentesFin.reduce(
+    (s, c) => s + (c.valorInicial ?? c.itens.reduce((ss, it) => ss + it.valorTotal, 0)),
+    0,
+  );
+  const valoresExecutadosContr = contratosVigentesFin.reduce(
+    (s, c) => s + c.empenhos.reduce((ss, e) => ss + e.itens.reduce((sss, it) => sss + it.valorTotal, 0), 0),
+    0,
+  );
+  const valoresAExecutarContr = Math.max(0, valoresContratadosContr - valoresExecutadosContr);
+  const valoresRecebidosContr = contratosVigentesFin
+    .flatMap((c) => c.empenhos)
+    .filter((e) => e.status === "PAGO")
+    .reduce((s, e) => s + e.itens.reduce((ss, it) => ss + it.valorTotal, 0), 0);
+  const valoresAReceberContr = contratosVigentesFin
+    .flatMap((c) => c.empenhos)
+    .filter((e) => e.status === "NF_ENCAMINHADA" || e.status === "NF_EMITIDA")
+    .reduce((s, e) => s + e.itens.reduce((ss, it) => ss + it.valorTotal, 0), 0);
+
+  // Contratos com janela de reajuste próxima (≤90 dias até marco+12 meses)
+  const contratosComReajuste = contratosVigentesFin
+    .filter((c) => c.marcoOrcamentoEstimado)
+    .map((c) => {
+      const janela = new Date(c.marcoOrcamentoEstimado!);
+      janela.setFullYear(janela.getFullYear() + 1);
+      const dias = Math.ceil((janela.getTime() - hojeDate.getTime()) / 86400000);
+      return { id: c.id, numero: c.numero, dias };
+    })
+    .filter((c) => c.dias >= 0 && c.dias <= 90);
+
+  // Itens da timeline — só Contratos vigentes; janela de 120 dias é filtrada
+  // internamente pelo componente.
+  const itensTimeline = contratosVigentesFin.map((c) => ({
+    id: c.id,
+    tipo: "contrato" as const,
+    numero: c.numero,
+    orgaoNome: c.orgaoNome,
+    vigenciaFim: c.vigenciaFim,
+  }));
 
   // Saldo calculado em memória — zero queries extras
   const contratosCard: ContratoCard[] = todos.map((c) => {
@@ -136,6 +200,61 @@ export default async function ContratosPage({
           hrefFinalizados="/contratos?status=vencidas"
           hrefBaseAlerta="/contratos?alerta="
         />
+      </div>
+
+      {/* Bloco Financeiro de Contratos — espelha o /atas */}
+      <div className="mt-4 grid gap-3.5 lg:grid-cols-3">
+        <KPI
+          tone="lavender"
+          icon={Coins}
+          label="Contratados em Contratos"
+          value={brl(valoresContratadosContr)}
+          meta="Soma do valor total dos Contratos vigentes"
+        />
+        <KPI
+          tone="primary"
+          icon={TrendingUp}
+          label="Executados em Contratos"
+          value={brl(valoresExecutadosContr)}
+          meta="Consumido via Empenhos vinculados"
+        />
+        <KPI
+          tone="mint"
+          icon={ArrowRight}
+          label="A executar em Contratos"
+          value={brl(valoresAExecutarContr)}
+          meta="Contratados − Executados"
+        />
+        <KPI
+          tone="mint"
+          icon={Coins}
+          label="Valores recebidos"
+          value={brl(valoresRecebidosContr)}
+          meta="Empenhos PAGOS vinculados aos Contratos"
+          href="/execucao?status=PAGO"
+        />
+        <KPI
+          tone="primary"
+          icon={Coins}
+          label="Valores a receber"
+          value={brl(valoresAReceberContr)}
+          meta="NF emitida/encaminhada, aguardando pagamento"
+          href="/execucao?status=NF_ENCAMINHADA"
+        />
+        <KPI
+          tone="rose"
+          icon={AlertTriangle}
+          label="Contratos em janela de reajuste"
+          value={contratosComReajuste.length}
+          meta="Marco + 12 meses dentro de 90 dias"
+          pulse={contratosComReajuste.length > 0}
+          href="/reajustes"
+        />
+      </div>
+
+      {/* Timeline de vencimentos — janela de 120 dias, só Contratos vigentes */}
+      <div className="mt-4">
+        <TimelineVencimentos itens={itensTimeline} />
       </div>
 
       {alertaDias > 0 && (
