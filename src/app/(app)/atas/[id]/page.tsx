@@ -12,7 +12,6 @@ import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { OrgaosTab, EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
-import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
 import { SaldoVigenciasPanel } from "@/components/SaldoVigenciasPanel";
 import { KpisSaldoVigencia } from "@/components/KpisSaldoVigencia";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
@@ -191,13 +190,9 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
               content: (
                 <SaldoVigenciasPanel
                   saldo={saldo}
+                  tipoItens="ATA"
                   ataId={ata.id}
                   podeIniciarManual={podeEditar}
-                  renderTabela={(itens) => (
-                    <ItensAtaTab
-                      saldo={{ itens: itens as Parameters<typeof ItensAtaTab>[0]["saldo"]["itens"] }}
-                    />
-                  )}
                 />
               ),
             },

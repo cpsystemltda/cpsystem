@@ -28,7 +28,6 @@ import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
-import { ItensContratoTab } from "@/components/abas/ItensContratoTab";
 import { SaldoVigenciasPanel } from "@/components/SaldoVigenciasPanel";
 import { KpisSaldoVigencia } from "@/components/KpisSaldoVigencia";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
@@ -154,13 +153,9 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               content: (
                 <SaldoVigenciasPanel
                   saldo={saldo}
+                  tipoItens="CONTRATO"
                   contratoId={contrato.id}
                   podeIniciarManual={podeEditar && !isContratoNaoContinuado(contrato.tipo)}
-                  renderTabela={(itens) => (
-                    <ItensContratoTab
-                      saldo={{ itens: itens as Parameters<typeof ItensContratoTab>[0]["saldo"]["itens"] }}
-                    />
-                  )}
                 />
               ),
             },

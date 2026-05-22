@@ -8,6 +8,8 @@ import type {
   SaldoVigenciaContrato,
 } from "@/lib/saldo";
 import { IniciarNovaVigenciaModal } from "@/components/IniciarNovaVigenciaModal";
+import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
+import { ItensContratoTab } from "@/components/abas/ItensContratoTab";
 
 // Painel da aba "Saldo de itens" — mostra UMA tabela por vigência, em
 // sequência (uma embaixo da outra), além do bloco "Histórico de
@@ -23,16 +25,15 @@ import { IniciarNovaVigenciaModal } from "@/components/IniciarNovaVigenciaModal"
 
 export function SaldoVigenciasPanel({
   saldo,
-  renderTabela,
+  tipoItens,
   contratoId,
   ataId,
   podeIniciarManual,
 }: {
   saldo: SaldoAta | SaldoContrato;
-  // Callback pra renderizar a tabela de itens — chamado com os itens da
-  // vigência. Permite que ItensContratoTab / ItensAtaTab continuem sendo
-  // usados sem mudança.
-  renderTabela: (itens: unknown[]) => React.ReactNode;
+  // Decide qual tabela renderizar internamente (em vez de receber função
+  // do server component — Next 16 rejeita functions cruzando o boundary).
+  tipoItens: "ATA" | "CONTRATO";
   contratoId?: string;
   ataId?: string;
   podeIniciarManual?: boolean;
@@ -74,13 +75,13 @@ export function SaldoVigenciasPanel({
           key={v.vigenciaId}
           vigencia={v}
           temMultiplas={temMultiplasVigencias}
-          renderTabela={renderTabela}
+          tipoItens={tipoItens}
         />
       ))}
 
       {/* Fallback pra documentos sem vigência (não deveria acontecer
           pós-backfill — mostra a tabela do saldo legado) */}
-      {saldo.vigencias.length === 0 && renderTabela(saldo.itens)}
+      {saldo.vigencias.length === 0 && <TabelaItens tipoItens={tipoItens} itens={saldo.itens} />}
 
       {/* Histórico de vigências (só quando >1) */}
       {temMultiplasVigencias && (
@@ -132,16 +133,40 @@ export function SaldoVigenciasPanel({
   );
 }
 
+// Helper: renderiza a tabela certa baseado no tipo (Ata ou Contrato).
+// Ambas são client components — importadas no topo do arquivo, sem
+// problema de cruzar Server↔Client boundary.
+function TabelaItens({
+  tipoItens,
+  itens,
+}: {
+  tipoItens: "ATA" | "CONTRATO";
+  itens: unknown[];
+}) {
+  if (tipoItens === "ATA") {
+    return (
+      <ItensAtaTab
+        saldo={{ itens: itens as Parameters<typeof ItensAtaTab>[0]["saldo"]["itens"] }}
+      />
+    );
+  }
+  return (
+    <ItensContratoTab
+      saldo={{ itens: itens as Parameters<typeof ItensContratoTab>[0]["saldo"]["itens"] }}
+    />
+  );
+}
+
 // Bloco de uma vigência: header com ordem/período/status + valores
-// específicos da vigência + tabela de itens delegada ao callsite.
+// específicos da vigência + tabela de itens correspondente ao tipo.
 function BlocoVigencia({
   vigencia,
   temMultiplas,
-  renderTabela,
+  tipoItens,
 }: {
   vigencia: SaldoVigencia | SaldoVigenciaContrato;
   temMultiplas: boolean;
-  renderTabela: (itens: unknown[]) => React.ReactNode;
+  tipoItens: "ATA" | "CONTRATO";
 }) {
   return (
     <section
@@ -197,7 +222,9 @@ function BlocoVigencia({
         </header>
       )}
 
-      <div className="p-3">{renderTabela(vigencia.itens)}</div>
+      <div className="p-3">
+        <TabelaItens tipoItens={tipoItens} itens={vigencia.itens} />
+      </div>
     </section>
   );
 }
