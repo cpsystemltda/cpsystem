@@ -9,6 +9,10 @@ import { podeEditarDocumento } from "@/lib/permissoes";
 import { AvancarStatus } from "@/components/AvancarStatus";
 import { Tabs } from "@/components/Tabs";
 import { TimelineExecucao } from "@/components/TimelineExecucao";
+import {
+  BlocoReajusteRetroativo,
+  type ReajusteRetroativoData,
+} from "@/components/BlocoReajusteRetroativo";
 import { RelatorioContratacao } from "@/components/RelatorioContratacao";
 import { AlertaReajuste } from "@/components/AlertaReajuste";
 import { AditivosTab } from "@/components/abas/AditivosTab";
@@ -67,6 +71,7 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
       garantias: { include: { endossos: { orderBy: { dataInicio: "asc" } } }, orderBy: { criadoEm: "desc" } },
       anexos: { orderBy: { criadoEm: "desc" } },
       anotacoes: { orderBy: { criadoEm: "desc" } },
+      reajusteRetroativo: true,
     },
   });
 
@@ -225,6 +230,16 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
               NF_ENCAMINHADA: e.dataNfEncaminhada,
               PAGO: e.dataPagamento,
             }}
+            comReajuste={
+              e.reajusteRetroativo
+                ? {
+                    aplicadoEm: e.reajusteRetroativo.dataAplicacao,
+                    nfEmitida: e.reajusteRetroativo.dataNfEmitida,
+                    nfEncaminhada: e.reajusteRetroativo.dataNfEncaminhada,
+                    pagamento: e.reajusteRetroativo.dataPagamento,
+                  }
+                : undefined
+            }
           />
         </div>
       </div>
@@ -239,6 +254,7 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
                 <Timeline
                   empenho={{
                     id: e.id,
+                    status: e.status,
                     prazoEntregaDias: e.prazoEntregaDias,
                     prazoEntregaUnidade: e.prazoEntregaUnidade,
                     prazoEntregaModo: e.prazoEntregaModo,
@@ -257,6 +273,8 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
                     dataPagamento: e.dataPagamento,
                     arquivoPagamento: e.arquivoPagamento,
                   }}
+                  reajusteRetroativo={e.reajusteRetroativo}
+                  podeEditar={podeEditar}
                 />
               ),
             },
@@ -431,9 +449,12 @@ const CAMPO_ARQUIVO_ETAPA: Record<string, string> = {
 
 function Timeline({
   empenho,
+  reajusteRetroativo,
+  podeEditar,
 }: {
   empenho: {
     id: string;
+    status: string;
     prazoEntregaDias: number | null;
     prazoEntregaUnidade?: "DIAS" | "MESES";
     prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA";
@@ -452,6 +473,8 @@ function Timeline({
     dataPagamento: Date | null;
     arquivoPagamento: string | null;
   };
+  reajusteRetroativo: ReajusteRetroativoData | null;
+  podeEditar: boolean;
 }) {
   // Prazo-limite — duas formas:
   //  - DATA_CERTA: a data já é o limite tempestivo (vale pra Locação,
@@ -627,6 +650,17 @@ function Timeline({
             </>
           );
         })}
+
+        {/* Reajuste retroativo — só aparece quando empenho está pago.
+            Mostra pergunta SIM/NÃO; ao aplicar, expande timeline com
+            3 novos passos da NF complementar. */}
+        {empenho.status === "PAGO" && (
+          <BlocoReajusteRetroativo
+            empenhoId={empenho.id}
+            reajuste={reajusteRetroativo}
+            podeAplicar={podeEditar}
+          />
+        )}
       </ol>
 
       {/* Info prazo de pagamento */}

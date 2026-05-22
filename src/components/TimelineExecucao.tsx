@@ -1,4 +1,4 @@
-const ETAPAS = [
+const ETAPAS_BASE = [
   { key: "EMPENHADO", label: "Empenhado" },
   { key: "PEDIDO_RECEBIDO", label: "Pedido recebido" },
   { key: "EM_TRANSITO", label: "Em trânsito/Em execução" },
@@ -8,7 +8,22 @@ const ETAPAS = [
   { key: "PAGO", label: "Pago" },
 ] as const;
 
-export type MarcosTimeline = Partial<Record<(typeof ETAPAS)[number]["key"], Date | null>>;
+// Etapas extras quando há reajuste retroativo aplicado nesta execução.
+// Aparecem ENCADEADAS após "Pago", estendendo a timeline.
+const ETAPAS_REAJUSTE = [
+  { key: "REAJUSTE_APLICADO", label: "Reajuste aplicado" },
+  { key: "REAJUSTE_NF_EMITIDA", label: "NF complementar emitida" },
+  { key: "REAJUSTE_NF_ENCAMINHADA", label: "NF complementar enviada" },
+  { key: "REAJUSTE_PAGO", label: "NF complementar paga" },
+] as const;
+
+type EtapaKey =
+  | (typeof ETAPAS_BASE)[number]["key"]
+  | (typeof ETAPAS_REAJUSTE)[number]["key"];
+
+// Mantido pra compat com callsites antigos. Apenas as etapas base.
+const ETAPAS = ETAPAS_BASE;
+export type MarcosTimeline = Partial<Record<EtapaKey, Date | null>>;
 
 const fmtData = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
@@ -54,27 +69,80 @@ export function TimelineExecucao({
   marcos,
   compacta = false,
   comDatas = false,
+  comReajuste,
 }: {
   status: string;
   marcos?: MarcosTimeline;
   compacta?: boolean;
   comDatas?: boolean;
+  // Quando setado, estende a timeline com os 4 passos do reajuste
+  // retroativo (já aplicado). Cada campo é a data do marco respectivo;
+  // null pra marcos ainda pendentes.
+  comReajuste?: {
+    aplicadoEm: Date;
+    nfEmitida: Date | null;
+    nfEncaminhada: Date | null;
+    pagamento: Date | null;
+  };
 }) {
-  const idxAtual = ETAPAS.findIndex((e) => e.key === status);
-  const ultimaEtapa = ETAPAS.length - 1;
-  // Quando o pedido chegou na etapa final (PAGO), todas as etapas (inclusive a última)
-  // ficam como concluídas — não há mais "atual em andamento".
-  const finalizado = idxAtual === ultimaEtapa;
+  // Monta lista de etapas dinâmica: base + reajuste se aplicável
+  const etapasUsadas = comReajuste
+    ? [...ETAPAS_BASE, ...ETAPAS_REAJUSTE]
+    : ETAPAS_BASE;
+
+  // Quando há reajuste, "concluído" é determinado pelas datas (não pelo
+  // status do empenho — que fica em PAGO). Pra etapas base, usa o
+  // idxAtual do status. Pra etapas de reajuste, usa as datas.
+  const idxAtual = ETAPAS_BASE.findIndex((e) => e.key === status);
+  const ultimaEtapaBase = ETAPAS_BASE.length - 1;
+
+  // Marcos de reajuste em mapa pra lookup
+  const marcosReajuste: Record<string, Date | null> = comReajuste
+    ? {
+        REAJUSTE_APLICADO: comReajuste.aplicadoEm,
+        REAJUSTE_NF_EMITIDA: comReajuste.nfEmitida,
+        REAJUSTE_NF_ENCAMINHADA: comReajuste.nfEncaminhada,
+        REAJUSTE_PAGO: comReajuste.pagamento,
+      }
+    : {};
+
   const tamCirculo = compacta ? "h-7 w-7" : "h-9 w-9";
   const tamLogo = compacta ? "h-3.5 w-3.5" : "h-4 w-4";
   const tamFonte = compacta ? "text-[10px]" : "text-xs";
 
+  function statusEtapa(
+    etapaKey: string,
+    i: number,
+  ): { concluido: boolean; atual: boolean } {
+    if (i < ETAPAS_BASE.length) {
+      // Etapa base
+      const finalizadoBase = idxAtual === ultimaEtapaBase;
+      // Quando há reajuste, "PAGO" não é mais o final — apenas concluído
+      const concluido = comReajuste
+        ? i <= idxAtual
+        : finalizadoBase
+          ? i <= idxAtual
+          : i < idxAtual;
+      const atual = !comReajuste && !finalizadoBase && i === idxAtual;
+      return { concluido, atual };
+    }
+    // Etapa de reajuste — concluída se a data correspondente existe
+    const dataMarco = marcosReajuste[etapaKey];
+    const concluido = !!dataMarco;
+    // Atual = primeira etapa de reajuste sem data
+    const indicesReajuste = ETAPAS_REAJUSTE.findIndex((e) => e.key === etapaKey);
+    const todasAnterioresConcluidas = ETAPAS_REAJUSTE.slice(0, indicesReajuste).every(
+      (e) => !!marcosReajuste[e.key],
+    );
+    const atual = !concluido && todasAnterioresConcluidas;
+    return { concluido, atual };
+  }
+
   return (
     <div className={comDatas ? "space-y-2" : ""}>
       <div className="flex items-center">
-        {ETAPAS.map((etapa, i) => {
-          const concluido = finalizado ? i <= idxAtual : i < idxAtual;
-          const atual = !finalizado && i === idxAtual;
+        {etapasUsadas.map((etapa, i) => {
+          const { concluido, atual } = statusEtapa(etapa.key, i);
           // Pendente: i > idxAtual
 
           return (
@@ -95,7 +163,7 @@ export function TimelineExecucao({
                   <span>{i + 1}</span>
                 )}
               </div>
-              {i < ETAPAS.length - 1 && (
+              {i < etapasUsadas.length - 1 && (
                 <div
                   className={`h-px flex-1 ${
                     concluido ? "bg-emerald-600" : "bg-slate-200"
@@ -108,11 +176,17 @@ export function TimelineExecucao({
       </div>
 
       {comDatas && (
-        <div className="grid grid-cols-7 gap-1 pt-1 text-center text-[10px] leading-tight">
-          {ETAPAS.map((etapa, i) => {
-            const data = marcos?.[etapa.key];
-            const concluido = finalizado ? i <= idxAtual : i < idxAtual;
-            const atual = !finalizado && i === idxAtual;
+        <div
+          className="grid gap-1 pt-1 text-center text-[10px] leading-tight"
+          style={{ gridTemplateColumns: `repeat(${etapasUsadas.length}, minmax(0, 1fr))` }}
+        >
+          {etapasUsadas.map((etapa, i) => {
+            // Pra etapas base usa `marcos`; pra etapas de reajuste usa `marcosReajuste`
+            const data =
+              i < ETAPAS_BASE.length
+                ? (marcos as Record<string, Date | null | undefined> | undefined)?.[etapa.key] ?? null
+                : marcosReajuste[etapa.key];
+            const { concluido, atual } = statusEtapa(etapa.key, i);
             return (
               <div key={etapa.key} className="flex flex-col items-center">
                 <span

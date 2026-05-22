@@ -95,6 +95,7 @@ model Usuario {
   contratosCriados Contrato[] @relation("ContratosCriados")
   empenhosCriados  Empenho[]  @relation("EmpenhosCriados")
   pareceresCriados ParecerJuridico[] @relation("ParecresCriados")
+  reajustesRetroativosCriados ReajusteRetroativo[] @relation("ReajustesRetroativosCriados")
 
   @@index([contaId])
 }
@@ -871,6 +872,7 @@ model Empenho {
   anotacoes         Anotacao[]
   comissoes         ComissaoExecucao[]
   pareceres         ParecerJuridico[]
+  reajusteRetroativo ReajusteRetroativo?
 
   @@index([empresaId])
   @@index([ataId])
@@ -1037,6 +1039,50 @@ model ParecerJuridico {
   @@index([ataId, criadoEm])
   @@index([contratoId, criadoEm])
   @@index([empenhoId, criadoEm])
+  @@index([criadoPorId])
+}
+
+// Reajuste retroativo aplicado em UMA execução específica (Empenho).
+// Caso de uso: o órgão deferiu o reajuste após a execução E o pagamento
+// já terem ocorrido. A empresa precisa emitir NF complementar da
+// diferença e acompanhar o pagamento dela. Ciclo de vida estende a
+// timeline da execução com 3 marcos novos (NF complementar emitida,
+// encaminhada, paga).
+//
+// Diferença de Reajuste contratual: o Reajuste contratual (model Reajuste)
+// é em nível de Contrato/Ata; o ReajusteRetroativo é em nível de Empenho
+// individual e é a "aplicação" do reajuste contratual numa execução que
+// já estava paga. Usuário marca um por vez, por execução.
+model ReajusteRetroativo {
+  id                String   @id @default(cuid())
+
+  // Snapshot dos valores no momento da aplicação:
+  valorOriginal     Float    // soma dos itens do empenho ANTES (congelado)
+  valorReajustado   Float    // soma com valorUnitario atual do contrato/ata
+  diferenca         Float    // valorReajustado - valorOriginal (NF complementar)
+  observacao        String?
+
+  dataAplicacao     DateTime @default(now())
+
+  // Marcos da NF complementar (timeline estendida)
+  dataNfEmitida           DateTime?
+  arquivoNfEmitida        String?
+  dataNfEncaminhada       DateTime?
+  arquivoNfEncaminhada    String?
+  dataPagamento           DateTime?
+  arquivoPagamento        String?
+
+  // 1:1 com Empenho — cada execução tem no máximo um reajuste retroativo
+  empenhoId         String   @unique
+  empenho           Empenho  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  criadoPorId       String?
+  criadoPor         Usuario? @relation("ReajustesRetroativosCriados", fields: [criadoPorId], references: [id])
+
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @default(now()) @updatedAt
+
+  @@index([empenhoId])
   @@index([criadoPorId])
 }
 
