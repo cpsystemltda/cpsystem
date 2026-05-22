@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Sparkles,
   FileText,
@@ -11,10 +11,15 @@ import {
   Clock,
   Scale,
   Loader2,
+  History,
+  RotateCw,
 } from "lucide-react";
 import {
   analisarDocumentoJuridicoAction,
+  listarPareceresAction,
+  lerParecerAction,
   type AnalisarDocumentoResult,
+  type ParecerListItem,
 } from "@/app/actions/iaJuridica";
 import type { AnaliseJuridica, TipoDocJuridico } from "@/lib/iaJuridica";
 
@@ -44,7 +49,11 @@ export function AnaliseJuridicaPanel({
   const [tipo, setTipo] = useState<TipoDocJuridico>("CONTRATO");
   const [documentoId, setDocumentoId] = useState("");
   const [resultado, setResultado] = useState<AnalisarDocumentoResult | null>(null);
+  const [parecerSelecionadoId, setParecerSelecionadoId] = useState<string | null>(null);
+  const [pareceres, setPareceres] = useState<ParecerListItem[]>([]);
+  const [carregandoHistorico, startCarregarHistorico] = useTransition();
   const [analisando, startTransition] = useTransition();
+  const [carregandoParecer, startCarregarParecer] = useTransition();
 
   const opcoes = useMemo(() => {
     if (tipo === "ATA") return atas;
@@ -52,12 +61,55 @@ export function AnaliseJuridicaPanel({
     return empenhos;
   }, [tipo, atas, contratos, empenhos]);
 
+  // Quando o documento muda, carrega histórico de pareceres salvos e
+  // automaticamente exibe o mais recente (se houver). Evita re-análise.
+  useEffect(() => {
+    if (!documentoId) {
+      setPareceres([]);
+      setResultado(null);
+      setParecerSelecionadoId(null);
+      return;
+    }
+    startCarregarHistorico(async () => {
+      const lista = await listarPareceresAction(tipo, documentoId);
+      setPareceres(lista);
+      if (lista.length > 0) {
+        const maisRecente = lista[0];
+        setParecerSelecionadoId(maisRecente.id);
+        const r = await lerParecerAction(maisRecente.id);
+        if (r.ok) {
+          setResultado({ ok: true, analise: r.analise, demo: r.demo });
+        } else {
+          setResultado(null);
+        }
+      } else {
+        setParecerSelecionadoId(null);
+        setResultado(null);
+      }
+    });
+  }, [tipo, documentoId]);
+
+  function selecionarParecer(parecerId: string) {
+    setParecerSelecionadoId(parecerId);
+    startCarregarParecer(async () => {
+      const r = await lerParecerAction(parecerId);
+      if (r.ok) {
+        setResultado({ ok: true, analise: r.analise, demo: r.demo });
+      } else {
+        setResultado({ ok: false, erro: r.erro });
+      }
+    });
+  }
+
   function analisar() {
     if (!documentoId) return;
-    setResultado(null);
     startTransition(async () => {
       const r = await analisarDocumentoJuridicoAction(tipo, documentoId);
       setResultado(r);
+      // Após nova análise, recarrega histórico pra incluir o parecer recém-gerado
+      const lista = await listarPareceresAction(tipo, documentoId);
+      setPareceres(lista);
+      if (lista.length > 0) setParecerSelecionadoId(lista[0].id);
     });
   }
 
@@ -103,10 +155,7 @@ export function AnaliseJuridicaPanel({
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
           <select
             value={documentoId}
-            onChange={(ev) => {
-              setDocumentoId(ev.target.value);
-              setResultado(null);
-            }}
+            onChange={(ev) => setDocumentoId(ev.target.value)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
           >
             <option value="">— Escolha o documento —</option>
@@ -121,10 +170,19 @@ export function AnaliseJuridicaPanel({
             onClick={analisar}
             disabled={!documentoId || analisando}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700 disabled:opacity-40"
+            title={
+              pareceres.length > 0
+                ? "Gera novo parecer com a IA (consome tokens). Pareceres antigos ficam no histórico."
+                : "Gera o primeiro parecer deste documento"
+            }
           >
             {analisando ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> Analisando…
+              </>
+            ) : pareceres.length > 0 ? (
+              <>
+                <RotateCw className="h-4 w-4" /> Re-analisar
               </>
             ) : (
               <>
@@ -137,6 +195,64 @@ export function AnaliseJuridicaPanel({
         {opcoes.length === 0 && (
           <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
             Nenhum documento desse tipo cadastrado ainda. Cadastre primeiro em Atas / Contratos / Fornecimento.
+          </p>
+        )}
+
+        {/* Histórico de pareceres salvos pra este documento */}
+        {documentoId && pareceres.length > 0 && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-600">
+              <History className="h-3.5 w-3.5" />
+              Histórico ({pareceres.length}) — clique pra ver parecer anterior
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {pareceres.map((p, i) => {
+                const sel = parecerSelecionadoId === p.id;
+                const eMaisRecente = i === 0;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => selecionarParecer(p.id)}
+                    disabled={carregandoParecer && sel}
+                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition disabled:opacity-50"
+                    style={{
+                      background: sel ? "var(--primary-deep, #4338ca)" : "white",
+                      color: sel ? "white" : "var(--text)",
+                      border: sel
+                        ? "1px solid var(--primary-deep, #4338ca)"
+                        : "1px solid var(--hairline, #e2e8f0)",
+                    }}
+                    title={
+                      p.criadoPorNome
+                        ? `Por ${p.criadoPorNome} · ${p.modelo}${p.demo ? " · DEMO" : ""}`
+                        : `${p.modelo}${p.demo ? " · DEMO" : ""}`
+                    }
+                  >
+                    {formatarDataHora(p.criadoEm)}
+                    {eMaisRecente && <span className="text-[9px] opacity-80">(atual)</span>}
+                    {p.demo && (
+                      <span
+                        className="rounded-full px-1.5 py-0 text-[8px] uppercase"
+                        style={{
+                          background: "rgba(212,175,55,0.25)",
+                          color: sel ? "white" : "#92400e",
+                        }}
+                      >
+                        demo
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Estado de loading: carregando histórico ou parecer */}
+        {(carregandoHistorico || carregandoParecer) && !analisando && (
+          <p className="mt-3 inline-flex items-center gap-2 text-xs text-slate-500">
+            <Loader2 className="h-3 w-3 animate-spin" /> Carregando…
           </p>
         )}
       </div>
@@ -152,6 +268,16 @@ export function AnaliseJuridicaPanel({
       )}
     </div>
   );
+}
+
+function formatarDataHora(d: Date): string {
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function ResultadoAnalise({ analise }: { analise: AnaliseJuridica }) {

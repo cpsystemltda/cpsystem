@@ -94,6 +94,7 @@ model Usuario {
   atasCriadas      Ata[]      @relation("AtasCriadas")
   contratosCriados Contrato[] @relation("ContratosCriados")
   empenhosCriados  Empenho[]  @relation("EmpenhosCriados")
+  pareceresCriados ParecerJuridico[] @relation("ParecresCriados")
 
   @@index([contaId])
 }
@@ -462,6 +463,7 @@ model Ata {
   termosAditivos        TermoAditivo[]
   apostilamentos        Apostilamento[]
   vigencias             Vigencia[]
+  pareceres             ParecerJuridico[]
 
   @@index([empresaId])
   @@index([criadoPorId])
@@ -637,6 +639,7 @@ model Contrato {
   anexos            Anexo[]
   anotacoes         Anotacao[]
   vigencias         Vigencia[]
+  pareceres         ParecerJuridico[]
 
   @@index([empresaId])
   @@index([ataId])
@@ -867,6 +870,7 @@ model Empenho {
   anexos            Anexo[]
   anotacoes         Anotacao[]
   comissoes         ComissaoExecucao[]
+  pareceres         ParecerJuridico[]
 
   @@index([empresaId])
   @@index([ataId])
@@ -1004,6 +1008,36 @@ model Vigencia {
   @@unique([ataId, ordem])
   @@index([contratoId])
   @@index([ataId])
+}
+
+// Parecer jurídico gerado pela IA (claude-sonnet-4-6) sobre um documento
+// (Ata, Contrato ou Empenho). Persiste o resultado pra evitar re-análise
+// (gastando tokens) e dar histórico — usuário pode comparar pareceres
+// gerados em datas diferentes (útil quando o contexto do documento muda:
+// novo aditivo, mudança de vigência, etc.).
+model ParecerJuridico {
+  id              String          @id @default(cuid())
+  tipo            String          // "ATA" | "CONTRATO" | "EMPENHO" — TipoDocJuridico
+  analise         Json            // payload AnaliseJuridica completo
+  modelo          String          // ex: "claude-sonnet-4-6"
+  demo            Boolean         @default(false) // true se análise mockada (sem API key)
+
+  ataId           String?
+  ata             Ata?            @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId      String?
+  contrato        Contrato?       @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId       String?
+  empenho         Empenho?        @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+
+  criadoPorId     String?
+  criadoPor       Usuario?        @relation("ParecresCriados", fields: [criadoPorId], references: [id])
+
+  criadoEm        DateTime        @default(now())
+
+  @@index([ataId, criadoEm])
+  @@index([contratoId, criadoEm])
+  @@index([empenhoId, criadoEm])
+  @@index([criadoPorId])
 }
 
 model Apostilamento {
