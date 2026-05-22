@@ -14,6 +14,7 @@ import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { OrgaosTab, EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
 import { SaldoVigenciasPanel } from "@/components/SaldoVigenciasPanel";
+import { KpisSaldoVigencia } from "@/components/KpisSaldoVigencia";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
@@ -179,11 +180,7 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
         </div>
       )}
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Stat titulo="Valor total" valor={brl(saldo.valorTotal)} />
-        <Stat titulo="Valor utilizado" valor={brl(saldo.valorUsado)} sub={`${saldo.percentualUsado.toFixed(1)}%`} />
-        <Stat titulo="Valor disponível" valor={brl(saldo.valorDisponivel)} cor="emerald" />
-      </div>
+      <KpisSaldoVigencia saldo={saldo} />
 
       <div className="mt-8">
         <Tabs

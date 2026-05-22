@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarClock, TrendingUp, TrendingDown, Wallet, FileCheck } from "lucide-react";
 import { brl } from "@/lib/validators";
 import type {
   SaldoAta,
@@ -11,20 +9,18 @@ import type {
 } from "@/lib/saldo";
 import { IniciarNovaVigenciaModal } from "@/components/IniciarNovaVigenciaModal";
 
-// Painel da aba "Saldo de itens" reescrito pra mostrar saldo por vigência.
-// Mesma estrutura pra Contrato e Ata — o callsite passa o tipo certo de
-// itens via prop `renderTabela`.
+// Painel da aba "Saldo de itens" — mostra UMA tabela por vigência, em
+// sequência (uma embaixo da outra), além do bloco "Histórico de
+// vigências" no final quando há mais de uma. KPIs financeiros ficam no
+// header da página (componente KpisSaldoVigencia), não aqui.
 //
-// Layout:
-//   1. 5 KPIs no topo (3 vigência atual + 2 acumulado, esses só quando >1 vig)
-//   2. Seletor de vigências em chips (só quando >1 vig)
-//   3. Tabela de itens da vigência selecionada (callsite renderiza)
-//   4. Histórico de vigências em tabela cronológica (só quando >1 vig)
+// Layout (decisão Regina):
+//   [Botão "Iniciar nova vigência" — se podeIniciarManual]
+//   Bloco da Vigência 1ª — header + tabela de itens
+//   Bloco da Vigência 2ª — header + tabela de itens
+//   ...
+//   Tabela resumo "Histórico de vigências" (só quando >1 vig)
 
-// Renderer recebe `unknown[]` pra evitar conflito entre os tipos de
-// SaldoItem (Ata, com ataItemId) e SaldoItemContrato (com contratoItemId).
-// O callsite faz cast pro tipo certo (ItensAtaTab espera ataItemId,
-// ItensContratoTab espera contratoItemId).
 export function SaldoVigenciasPanel({
   saldo,
   renderTabela,
@@ -33,34 +29,21 @@ export function SaldoVigenciasPanel({
   podeIniciarManual,
 }: {
   saldo: SaldoAta | SaldoContrato;
+  // Callback pra renderizar a tabela de itens — chamado com os itens da
+  // vigência. Permite que ItensContratoTab / ItensAtaTab continuem sendo
+  // usados sem mudança.
   renderTabela: (itens: unknown[]) => React.ReactNode;
-  // IDs do contrato/ata pai pra wire-up do botão "Iniciar nova vigência".
-  // Só um dos dois é setado dependendo do callsite.
   contratoId?: string;
   ataId?: string;
-  // Disponibilidade do botão manual: bloqueado em contratos não-continuados
-  // (Lei 14.133) e quando o usuário não pode editar o documento.
   podeIniciarManual?: boolean;
 }) {
-  const [vigenciaSelecionadaId, setVigenciaSelecionadaId] = useState<string | null>(
-    saldo.vigenciaAtual?.vigenciaId ?? null,
-  );
-
-  const vigViewing =
-    saldo.vigencias.find((v) => v.vigenciaId === vigenciaSelecionadaId) ??
-    saldo.vigenciaAtual ??
-    saldo.vigencias[0] ??
-    null;
-
   const temMultiplasVigencias = saldo.vigencias.length > 1;
 
   // Sugestão de datas pra modal: começa onde a última vigência acabou +1d,
   // termina +1 ano depois.
-  const ultimaVigencia =
-    saldo.vigencias.reduce<typeof saldo.vigencias[0] | null>(
-      (a, b) => (!a || b.ordem > a.ordem ? b : a),
-      null,
-    );
+  const ultimaVigencia = saldo.vigencias.reduce<
+    SaldoVigencia | SaldoVigenciaContrato | null
+  >((a, b) => (!a || b.ordem > a.ordem ? b : a), null);
   const dataInicioSugerida = ultimaVigencia
     ? toIsoDate(addDays(ultimaVigencia.dataFim, 1))
     : toIsoDate(new Date());
@@ -70,115 +53,34 @@ export function SaldoVigenciasPanel({
   const proximaOrdem = (ultimaVigencia?.ordem ?? 0) + 1;
 
   return (
-    <div className="space-y-5">
-      {/* KPI cards */}
-      {saldo.vigenciaAtual && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <KpiCard
-            tone="violet"
-            icon={CalendarClock}
-            label={`Valor contratado (Vigência ${saldo.vigenciaAtual.ordem}ª)`}
-            value={brl(saldo.vigenciaAtual.valorTotal)}
-            sub={`${formatarData(saldo.vigenciaAtual.dataInicio)} → ${formatarData(saldo.vigenciaAtual.dataFim)}`}
-          />
-          <KpiCard
-            tone="rose"
-            icon={TrendingUp}
-            label="Já executado (vigência atual)"
-            value={brl(saldo.vigenciaAtual.valorUsado)}
-            sub={`${saldo.vigenciaAtual.percentualUsado.toFixed(1)}% executado`}
-          />
-          <KpiCard
-            tone="emerald"
-            icon={TrendingDown}
-            label="A executar (vigência atual)"
-            value={brl(saldo.vigenciaAtual.valorDisponivel)}
-            sub={
-              saldo.vigenciaAtual.status === "ENCERRADA"
-                ? "Vigência encerrada"
-                : "Saldo disponível"
-            }
+    <div className="space-y-6">
+      {/* Botão "Iniciar nova vigência" — sempre que houver permissão */}
+      {podeIniciarManual && (contratoId || ataId) && (
+        <div className="flex justify-end">
+          <IniciarNovaVigenciaModal
+            contratoId={contratoId}
+            ataId={ataId}
+            proximaOrdem={proximaOrdem}
+            dataInicioSugerida={dataInicioSugerida}
+            dataFimSugerida={dataFimSugerida}
+            valorAtual={saldo.vigenciaAtual?.valorTotal ?? 0}
           />
         </div>
       )}
 
-      {/* 2 cards adicionais quando há >1 vigência */}
-      {temMultiplasVigencias && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <KpiCard
-            tone="indigo"
-            icon={Wallet}
-            label={`Valor total (todas as ${saldo.vigencias.length} vigências)`}
-            value={brl(saldo.acumulado.valorTotal)}
-            sub="Soma cumulativa entre vigências"
-          />
-          <KpiCard
-            tone="amber"
-            icon={FileCheck}
-            label="Já executado (todas as vigências)"
-            value={brl(saldo.acumulado.valorUsado)}
-            sub={`R$ ${saldo.acumulado.valorDisponivel.toFixed(2)} restante`}
-          />
-        </div>
-      )}
+      {/* Tabelas empilhadas — uma por vigência */}
+      {saldo.vigencias.map((v) => (
+        <BlocoVigencia
+          key={v.vigenciaId}
+          vigencia={v}
+          temMultiplas={temMultiplasVigencias}
+          renderTabela={renderTabela}
+        />
+      ))}
 
-      {/* Seletor de vigências (chips) — só quando >1.
-          Botão "Iniciar nova vigência" sempre aparece quando podeIniciarManual. */}
-      {(temMultiplasVigencias || podeIniciarManual) && (
-        <div className="flex flex-wrap items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-          {temMultiplasVigencias && (
-            <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-500">
-              Vigência:
-            </span>
-          )}
-          <div className="flex flex-1 flex-wrap gap-1.5">
-            {saldo.vigencias.map((v) => {
-              const sel = v.vigenciaId === vigenciaSelecionadaId;
-              return (
-                <button
-                  key={v.vigenciaId}
-                  type="button"
-                  onClick={() => setVigenciaSelecionadaId(v.vigenciaId)}
-                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition"
-                  style={{
-                    background: sel ? "var(--primary-deep)" : "white",
-                    color: sel ? "white" : "var(--text)",
-                    border: sel
-                      ? "1px solid var(--primary-deep)"
-                      : "1px solid var(--hairline)",
-                  }}
-                  title={`${formatarData(v.dataInicio)} → ${formatarData(v.dataFim)}`}
-                >
-                  {v.ordem}ª
-                  <StatusBadge status={v.status} />
-                </button>
-              );
-            })}
-          </div>
-          {podeIniciarManual && (contratoId || ataId) && (
-            <IniciarNovaVigenciaModal
-              contratoId={contratoId}
-              ataId={ataId}
-              proximaOrdem={proximaOrdem}
-              dataInicioSugerida={dataInicioSugerida}
-              dataFimSugerida={dataFimSugerida}
-              valorAtual={saldo.vigenciaAtual?.valorTotal ?? 0}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Tabela de itens da vigência selecionada */}
-      <div>
-        {temMultiplasVigencias && vigViewing && (
-          <p className="mb-2 text-xs text-slate-500">
-            Mostrando itens da <strong>{vigViewing.ordem}ª vigência</strong> (
-            {formatarData(vigViewing.dataInicio)} →{" "}
-            {formatarData(vigViewing.dataFim)})
-          </p>
-        )}
-        {renderTabela(vigViewing?.itens ?? [])}
-      </div>
+      {/* Fallback pra documentos sem vigência (não deveria acontecer
+          pós-backfill — mostra a tabela do saldo legado) */}
+      {saldo.vigencias.length === 0 && renderTabela(saldo.itens)}
 
       {/* Histórico de vigências (só quando >1) */}
       {temMultiplasVigencias && (
@@ -230,70 +132,73 @@ export function SaldoVigenciasPanel({
   );
 }
 
-function KpiCard({
-  tone,
-  icon: Icon,
-  label,
-  value,
-  sub,
+// Bloco de uma vigência: header com ordem/período/status + valores
+// específicos da vigência + tabela de itens delegada ao callsite.
+function BlocoVigencia({
+  vigencia,
+  temMultiplas,
+  renderTabela,
 }: {
-  tone: "violet" | "rose" | "emerald" | "indigo" | "amber";
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  sub: string;
+  vigencia: SaldoVigencia | SaldoVigenciaContrato;
+  temMultiplas: boolean;
+  renderTabela: (itens: unknown[]) => React.ReactNode;
 }) {
-  const cores = {
-    violet: {
-      bg: "rgba(124,58,237,0.08)",
-      border: "rgba(124,58,237,0.18)",
-      ico: "#7c3aed",
-    },
-    rose: {
-      bg: "rgba(244,63,94,0.08)",
-      border: "rgba(244,63,94,0.18)",
-      ico: "#f43f5e",
-    },
-    emerald: {
-      bg: "rgba(16,185,129,0.08)",
-      border: "rgba(16,185,129,0.18)",
-      ico: "#10b981",
-    },
-    indigo: {
-      bg: "rgba(99,102,241,0.08)",
-      border: "rgba(99,102,241,0.18)",
-      ico: "#6366f1",
-    },
-    amber: {
-      bg: "rgba(245,158,11,0.08)",
-      border: "rgba(245,158,11,0.18)",
-      ico: "#f59e0b",
-    },
-  }[tone];
-
   return (
-    <div
-      className="rounded-2xl px-4 py-3"
-      style={{ background: cores.bg, border: `1px solid ${cores.border}` }}
+    <section
+      className="rounded-2xl border border-slate-200"
+      style={{ background: "white" }}
     >
-      <div className="flex items-start gap-3">
-        <div
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-          style={{ background: "white" }}
+      {/* Header da vigência — só destaca quando há mais de uma. Com 1 só,
+          o cabeçalho enxuto evita ruído visual em quem não usa prorrogação. */}
+      {temMultiplas && (
+        <header
+          className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3"
+          style={{
+            background:
+              vigencia.status === "ATIVA"
+                ? "rgba(16,185,129,0.04)"
+                : vigencia.status === "ENCERRADA"
+                  ? "rgba(100,116,139,0.03)"
+                  : "rgba(245,158,11,0.04)",
+            borderTopLeftRadius: "1rem",
+            borderTopRightRadius: "1rem",
+          }}
         >
-          <Icon className="h-4 w-4" style={{ color: cores.ico }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            {label}
-          </p>
-          <p className="mt-0.5 text-lg font-extrabold leading-tight" style={{ color: "var(--text)" }}>
-            {value}
-          </p>
-          <p className="mt-0.5 text-xs text-slate-500">{sub}</p>
-        </div>
-      </div>
-    </div>
+          <div className="flex items-center gap-3">
+            <span
+              className="rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider"
+              style={{ background: "white", color: "var(--text)", border: "1px solid var(--hairline)" }}
+            >
+              {vigencia.ordem}ª vigência
+            </span>
+            <span className="text-xs text-slate-600">
+              {formatarData(vigencia.dataInicio)} → {formatarData(vigencia.dataFim)}
+            </span>
+            <StatusBadge status={vigencia.status} grande />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+            <span>
+              Contratado <strong className="text-slate-900">{brl(vigencia.valorTotal)}</strong>
+            </span>
+            <span>
+              Executado <strong className="text-slate-900">{brl(vigencia.valorUsado)}</strong> ·{" "}
+              {vigencia.percentualUsado.toFixed(1)}%
+            </span>
+            <span>
+              A executar{" "}
+              <strong style={{ color: "#047857" }}>{brl(vigencia.valorDisponivel)}</strong>
+            </span>
+            {vigencia.termoAditivoId && (
+              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700">
+                via Aditivo
+              </span>
+            )}
+          </div>
+        </header>
+      )}
+
+      <div className="p-3">{renderTabela(vigencia.itens)}</div>
+    </section>
   );
 }
 

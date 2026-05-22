@@ -30,6 +30,7 @@ import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { ItensContratoTab } from "@/components/abas/ItensContratoTab";
 import { SaldoVigenciasPanel } from "@/components/SaldoVigenciasPanel";
+import { KpisSaldoVigencia } from "@/components/KpisSaldoVigencia";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
@@ -142,11 +143,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
         contratoId={contrato.id}
       />
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Stat titulo="Valor total contratado" valor={brl(saldo.valorTotal)} />
-        <Stat titulo="Já executado" valor={brl(saldo.valorUsado)} sub={`${saldo.percentualUsado.toFixed(1)}%`} />
-        <Stat titulo="A executar" valor={brl(saldo.valorDisponivel)} cor="emerald" />
-      </div>
+      <KpisSaldoVigencia saldo={saldo} />
 
       <div className="mt-8">
         <Tabs
