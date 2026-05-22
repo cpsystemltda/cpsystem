@@ -194,6 +194,8 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
               content: (
                 <SaldoVigenciasPanel
                   saldo={saldo}
+                  ataId={ata.id}
+                  podeIniciarManual={podeEditar}
                   renderTabela={(itens) => (
                     <ItensAtaTab
                       saldo={{ itens: itens as Parameters<typeof ItensAtaTab>[0]["saldo"]["itens"] }}

@@ -9,6 +9,7 @@ import type {
   SaldoVigencia,
   SaldoVigenciaContrato,
 } from "@/lib/saldo";
+import { IniciarNovaVigenciaModal } from "@/components/IniciarNovaVigenciaModal";
 
 // Painel da aba "Saldo de itens" reescrito pra mostrar saldo por vigência.
 // Mesma estrutura pra Contrato e Ata — o callsite passa o tipo certo de
@@ -27,9 +28,19 @@ import type {
 export function SaldoVigenciasPanel({
   saldo,
   renderTabela,
+  contratoId,
+  ataId,
+  podeIniciarManual,
 }: {
   saldo: SaldoAta | SaldoContrato;
   renderTabela: (itens: unknown[]) => React.ReactNode;
+  // IDs do contrato/ata pai pra wire-up do botão "Iniciar nova vigência".
+  // Só um dos dois é setado dependendo do callsite.
+  contratoId?: string;
+  ataId?: string;
+  // Disponibilidade do botão manual: bloqueado em contratos não-continuados
+  // (Lei 14.133) e quando o usuário não pode editar o documento.
+  podeIniciarManual?: boolean;
 }) {
   const [vigenciaSelecionadaId, setVigenciaSelecionadaId] = useState<string | null>(
     saldo.vigenciaAtual?.vigenciaId ?? null,
@@ -42,6 +53,21 @@ export function SaldoVigenciasPanel({
     null;
 
   const temMultiplasVigencias = saldo.vigencias.length > 1;
+
+  // Sugestão de datas pra modal: começa onde a última vigência acabou +1d,
+  // termina +1 ano depois.
+  const ultimaVigencia =
+    saldo.vigencias.reduce<typeof saldo.vigencias[0] | null>(
+      (a, b) => (!a || b.ordem > a.ordem ? b : a),
+      null,
+    );
+  const dataInicioSugerida = ultimaVigencia
+    ? toIsoDate(addDays(ultimaVigencia.dataFim, 1))
+    : toIsoDate(new Date());
+  const dataFimSugerida = ultimaVigencia
+    ? toIsoDate(addDays(addDays(ultimaVigencia.dataFim, 1), 365))
+    : toIsoDate(addDays(new Date(), 365));
+  const proximaOrdem = (ultimaVigencia?.ordem ?? 0) + 1;
 
   return (
     <div className="space-y-5">
@@ -96,13 +122,16 @@ export function SaldoVigenciasPanel({
         </div>
       )}
 
-      {/* Seletor de vigências (chips) — só quando >1 */}
-      {temMultiplasVigencias && (
-        <div className="flex items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-500">
-            Vigência:
-          </span>
-          <div className="flex gap-1.5">
+      {/* Seletor de vigências (chips) — só quando >1.
+          Botão "Iniciar nova vigência" sempre aparece quando podeIniciarManual. */}
+      {(temMultiplasVigencias || podeIniciarManual) && (
+        <div className="flex flex-wrap items-center gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          {temMultiplasVigencias && (
+            <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Vigência:
+            </span>
+          )}
+          <div className="flex flex-1 flex-wrap gap-1.5">
             {saldo.vigencias.map((v) => {
               const sel = v.vigenciaId === vigenciaSelecionadaId;
               return (
@@ -126,6 +155,16 @@ export function SaldoVigenciasPanel({
               );
             })}
           </div>
+          {podeIniciarManual && (contratoId || ataId) && (
+            <IniciarNovaVigenciaModal
+              contratoId={contratoId}
+              ataId={ataId}
+              proximaOrdem={proximaOrdem}
+              dataInicioSugerida={dataInicioSugerida}
+              dataFimSugerida={dataFimSugerida}
+              valorAtual={saldo.vigenciaAtual?.valorTotal ?? 0}
+            />
+          )}
         </div>
       )}
 
@@ -282,4 +321,14 @@ function StatusBadge({
 
 function formatarData(d: Date): string {
   return d.toLocaleDateString("pt-BR");
+}
+
+function addDays(d: Date, dias: number): Date {
+  const nova = new Date(d);
+  nova.setDate(nova.getDate() + dias);
+  return nova;
+}
+
+function toIsoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }

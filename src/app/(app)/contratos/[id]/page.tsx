@@ -157,6 +157,8 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               content: (
                 <SaldoVigenciasPanel
                   saldo={saldo}
+                  contratoId={contrato.id}
+                  podeIniciarManual={podeEditar && !isContratoNaoContinuado(contrato.tipo)}
                   renderTabela={(itens) => (
                     <ItensContratoTab
                       saldo={{ itens: itens as Parameters<typeof ItensContratoTab>[0]["saldo"]["itens"] }}
