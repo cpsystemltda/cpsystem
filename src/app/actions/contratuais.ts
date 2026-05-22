@@ -82,6 +82,14 @@ async function registrarAnexo(opts: {
  *    isso é responsabilidade de quem cria o empenho, não desta função.
  *  - Falha silenciosa (log warn) — não derruba o save do aditivo.
  */
+type ItemNovaVigencia = {
+  descricao: string;
+  unidade: string;
+  quantidade: number;
+  marca: string | null;
+  valorUnitario: number;
+};
+
 async function criarVigenciaProrrogada(opts: {
   aditivoId: string;
   contratoId?: string | null;
@@ -92,6 +100,10 @@ async function criarVigenciaProrrogada(opts: {
   reajustePercentual: number | null;
   novoValorAditivo: number | null;
   tipoAlteracaoValor: TipoAlteracaoValor | null;
+  // Itens explícitos da nova vigência (extraídos da IA do PDF do aditivo).
+  // Quando fornecidos, substituem a cópia automática dos itens da vigência
+  // anterior. Útil quando o aditivo renova SLA/escopo com tabela própria.
+  itensExplicitos?: ItemNovaVigencia[] | null;
 }) {
   if (!opts.contratoId && !opts.ataId) return;
   if (!opts.dataInicio || !opts.dataFim) {
@@ -118,17 +130,27 @@ async function criarVigenciaProrrogada(opts: {
     }
 
     // 2) Calcula valor total da nova vigência:
-    //    - Default = valor da vigência anterior
-    //    - Se aditivo tem ACRÉSCIMO/SUPRESSÃO → soma/subtrai delta
-    //    - Se aditivo tem REEQUILIBRIO → soma delta
-    //    - Reajuste não muda valor unitário aqui (reajustePercentual será
-    //      aplicado no momento da cópia dos itens)
-    let valorTotalNovo = vigAtual.valorTotal;
-    if (opts.novoValorAditivo) {
-      if (opts.tipoAlteracaoValor === "SUPRESSAO") {
-        valorTotalNovo = Math.max(0, valorTotalNovo - Math.abs(opts.novoValorAditivo));
-      } else {
-        valorTotalNovo = valorTotalNovo + Math.abs(opts.novoValorAditivo);
+    //    - Se vieram itens explícitos da IA → soma deles (autoritativo)
+    //    - Senão default = valor da vigência anterior, ajustado por
+    //      ACRÉSCIMO/SUPRESSÃO/REEQUILIBRIO do aditivo
+    //    - Reajuste só muda valor unitário no momento da cópia (caso sem
+    //      itensExplicitos); valor total absorve via fatorReajuste abaixo
+    const temItensExplicitos =
+      (opts.itensExplicitos?.length ?? 0) > 0;
+    let valorTotalNovo: number;
+    if (temItensExplicitos) {
+      valorTotalNovo = opts.itensExplicitos!.reduce(
+        (s, it) => s + it.quantidade * it.valorUnitario,
+        0,
+      );
+    } else {
+      valorTotalNovo = vigAtual.valorTotal;
+      if (opts.novoValorAditivo) {
+        if (opts.tipoAlteracaoValor === "SUPRESSAO") {
+          valorTotalNovo = Math.max(0, valorTotalNovo - Math.abs(opts.novoValorAditivo));
+        } else {
+          valorTotalNovo = valorTotalNovo + Math.abs(opts.novoValorAditivo);
+        }
       }
     }
 
@@ -147,13 +169,52 @@ async function criarVigenciaProrrogada(opts: {
       select: { id: true, ordem: true },
     });
 
-    // 4) Copia itens da vigência anterior, aplicando reajuste se houver
+    // 4) Cria os itens da nova vigência. Duas estratégias:
+    //    A) itensExplicitos (IA) — cria 1:1, sem reajuste aplicado (a IA
+    //       já leu valores finais do PDF). Em contrato vinculado a ata,
+    //       perde-se o vínculo ataItemId — não é catastrófico mas pode
+    //       afetar match de saldo (descrição-fallback resolve).
+    //    B) Cópia da vigência anterior — itens replicados com fatorReajuste
+    //       aplicado quando aditivo tem aplicaReajuste=true.
     const fatorReajuste =
       opts.aplicaReajuste && opts.reajustePercentual
         ? 1 + opts.reajustePercentual / 100
         : 1;
 
-    if (opts.contratoId) {
+    if (temItensExplicitos) {
+      const itensIa = opts.itensExplicitos!;
+      if (opts.contratoId) {
+        for (const it of itensIa) {
+          await prisma.contratoItem.create({
+            data: {
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: it.quantidade,
+              marca: it.marca,
+              valorUnitario: it.valorUnitario,
+              valorTotal: it.quantidade * it.valorUnitario,
+              contratoId: opts.contratoId,
+              vigenciaId: novaVig.id,
+            },
+          });
+        }
+      } else if (opts.ataId) {
+        for (const it of itensIa) {
+          await prisma.ataItem.create({
+            data: {
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidade: it.quantidade,
+              marca: it.marca,
+              valorUnitario: it.valorUnitario,
+              valorTotal: it.quantidade * it.valorUnitario,
+              ataId: opts.ataId,
+              vigenciaId: novaVig.id,
+            },
+          });
+        }
+      }
+    } else if (opts.contratoId) {
       for (const it of vigAtual.contratoItens) {
         const novoValorUnit = it.valorUnitario * fatorReajuste;
         await prisma.contratoItem.create({
@@ -193,7 +254,7 @@ async function criarVigenciaProrrogada(opts: {
     }
 
     console.log(
-      `[criarVigenciaProrrogada] Vigência ${novaVig.ordem} criada (R$ ${valorTotalNovo.toFixed(2)})${fatorReajuste !== 1 ? ` com reajuste ${((fatorReajuste - 1) * 100).toFixed(2)}%` : ""}`,
+      `[criarVigenciaProrrogada] Vigência ${novaVig.ordem} criada (R$ ${valorTotalNovo.toFixed(2)})${temItensExplicitos ? " — itens da IA" : fatorReajuste !== 1 ? ` com reajuste ${((fatorReajuste - 1) * 100).toFixed(2)}%` : ""}`,
     );
   } catch (err) {
     console.warn("[criarVigenciaProrrogada] falhou:", err);
@@ -585,6 +646,38 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
     // aplicado quando houver). Empenhos antigos ficam atrelados à vigência
     // anterior; novos empenhos caem na nova vigência via dataEmissao.
     if (input.alteraPrazoVigencia && (link.contratoId || link.ataId)) {
+      // Itens da IA: PainelIaAditivo grava itensNovaVigencia em hidden
+      // input após extração. Parse defensivo — JSON inválido vira null
+      // (cai no fallback de copiar itens da vigência anterior).
+      const itensJsonRaw = String(formData.get("itensNovaVigenciaJson") || "").trim();
+      let itensExplicitos: ItemNovaVigencia[] | null = null;
+      if (itensJsonRaw) {
+        try {
+          const parsed = JSON.parse(itensJsonRaw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            itensExplicitos = parsed
+              .filter(
+                (it) =>
+                  it &&
+                  typeof it.descricao === "string" &&
+                  typeof it.unidade === "string" &&
+                  typeof it.quantidade === "number" &&
+                  typeof it.valorUnitario === "number",
+              )
+              .map((it) => ({
+                descricao: String(it.descricao),
+                unidade: String(it.unidade),
+                quantidade: Number(it.quantidade),
+                marca: it.marca ? String(it.marca) : null,
+                valorUnitario: Number(it.valorUnitario),
+              }));
+            if (itensExplicitos.length === 0) itensExplicitos = null;
+          }
+        } catch {
+          itensExplicitos = null;
+        }
+      }
+
       await criarVigenciaProrrogada({
         aditivoId: aditivo.id,
         contratoId: link.contratoId ?? null,
@@ -595,6 +688,7 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
         reajustePercentual: input.reajustePercentual,
         novoValorAditivo: input.alteraValor ? input.novoValor : null,
         tipoAlteracaoValor: input.tipoAlteracaoValor,
+        itensExplicitos,
       });
     }
 

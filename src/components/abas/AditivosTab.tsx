@@ -462,6 +462,13 @@ function FormularioAditivo({
   const [arquivoUrlIa, setArquivoUrlIa] = useState<string | null>(null);
   const [arquivoNomeIa, setArquivoNomeIa] = useState<string | null>(null);
   const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set());
+  // Itens da nova vigência extraídos pela IA do PDF do aditivo (quando o
+  // aditivo prorroga vigência E traz tabela explícita de itens novos).
+  // Quando preenchido, será enviado via hidden input pra criar a nova
+  // Vigência com esses itens (em vez de copiar os da vigência anterior).
+  const [itensNovaVigenciaIa, setItensNovaVigenciaIa] = useState<
+    AditivoExtraido["itensNovaVigencia"]
+  >(null);
 
   const [numero, setNumero] = useState(aditivo?.numero ?? "");
   const [objeto, setObjeto] = useState(aditivo?.objeto ?? "");
@@ -551,6 +558,13 @@ function FormularioAditivo({
       setObservacoes(d.observacoes);
       auto.add("observacoes");
     }
+    // Itens da nova vigência (quando aditivo prorroga + lista explícita).
+    if (d.itensNovaVigencia && d.itensNovaVigencia.length > 0) {
+      setItensNovaVigenciaIa(d.itensNovaVigencia);
+      auto.add("itensNovaVigencia");
+    } else {
+      setItensNovaVigenciaIa(null);
+    }
     setCamposAuto(auto);
   }
 
@@ -594,6 +608,13 @@ function FormularioAditivo({
             <input type="hidden" name="arquivoPdfUrl" value={arquivoUrlIa} />
             <input type="hidden" name="arquivoPdfNome" value={arquivoNomeIa ?? ""} />
           </>
+        )}
+        {itensNovaVigenciaIa && itensNovaVigenciaIa.length > 0 && (
+          <input
+            type="hidden"
+            name="itensNovaVigenciaJson"
+            value={JSON.stringify(itensNovaVigenciaIa)}
+          />
         )}
 
         {/* Identificação */}
@@ -875,6 +896,83 @@ function FormularioAditivo({
             </CampoLabel>
           </div>
         </BlocoToggle>
+
+        {/* Itens da nova vigência (extraídos pela IA) — só aparece quando
+            o aditivo prorroga vigência E o PDF trazia tabela explícita. */}
+        {itensNovaVigenciaIa && itensNovaVigenciaIa.length > 0 && (
+          <section>
+            <Titulo>
+              Itens da nova vigência
+              <span
+                className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                style={{
+                  background: "rgba(124,58,237,0.14)",
+                  color: "#6d28d9",
+                  border: "0.5px solid rgba(124,58,237,0.24)",
+                }}
+              >
+                IA extraiu
+              </span>
+            </Titulo>
+            <p className="mb-2 text-[12px]" style={{ color: "var(--text-soft)" }}>
+              Estes itens serão criados na nova vigência (Vigência N+1) ao salvar.
+              Se a tabela estiver errada, ignore esta seção — você pode editar
+              os itens depois na aba Saldo do contrato.
+            </p>
+            <div
+              className="overflow-x-auto rounded-xl"
+              style={{ border: "0.5px solid var(--hairline)" }}
+            >
+              <table className="w-full text-[12px]">
+                <thead style={{ background: "rgba(15,14,12,0.03)" }}>
+                  <tr>
+                    <th className="px-3 py-1.5 text-left font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                      Descrição
+                    </th>
+                    <th className="px-3 py-1.5 text-left font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                      Un.
+                    </th>
+                    <th className="px-3 py-1.5 text-right font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                      Qtd.
+                    </th>
+                    <th className="px-3 py-1.5 text-left font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                      Marca
+                    </th>
+                    <th className="px-3 py-1.5 text-right font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                      Valor unit.
+                    </th>
+                    <th className="px-3 py-1.5 text-right font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itensNovaVigenciaIa.map((it, i) => (
+                    <tr key={i} style={{ borderTop: "0.5px solid var(--hairline)" }}>
+                      <td className="px-3 py-1.5">{it.descricao}</td>
+                      <td className="px-3 py-1.5">{it.unidade}</td>
+                      <td className="px-3 py-1.5 text-right">{it.quantidade}</td>
+                      <td className="px-3 py-1.5">{it.marca ?? "—"}</td>
+                      <td className="px-3 py-1.5 text-right">{brl(it.valorUnitario)}</td>
+                      <td className="px-3 py-1.5 text-right font-bold">
+                        {brl(it.quantidade * it.valorUnitario)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button
+              type="button"
+              onClick={() => setItensNovaVigenciaIa(null)}
+              className="mt-2 text-[11px] font-semibold underline"
+              style={{ color: "var(--text-mute)" }}
+              title="Remove os itens da IA. A nova vigência vai copiar itens da vigência anterior automaticamente."
+            >
+              Descartar itens da IA (usar cópia da vigência anterior)
+            </button>
+          </section>
+        )}
 
         {/* BLOCO 5: OUTRO (observações) */}
         <section>

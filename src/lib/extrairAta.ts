@@ -162,6 +162,14 @@ export type ApostilamentoExtraido = {
   observacoes: string | null;
 };
 
+export type ItemAditivoExtraido = {
+  descricao: string;
+  unidade: string;
+  quantidade: number;
+  marca: string | null;
+  valorUnitario: number;
+};
+
 export type AditivoExtraido = {
   numero: string;
   objeto: string;
@@ -187,6 +195,13 @@ export type AditivoExtraido = {
   reajustePeriodoInicio: string | null;
   reajustePeriodoFim: string | null;
   reajustePercentual: number | null;
+
+  // Itens da nova vigência. Quando o aditivo prorroga vigência E lista
+  // explicitamente os quantitativos/valores da nova vigência (caso comum
+  // em prorrogações com renovação de SLA/escopo), a IA extrai aqui.
+  // null quando o aditivo não traz lista explícita — nesse caso, a nova
+  // vigência é criada copiando os itens da vigência anterior.
+  itensNovaVigencia: ItemAditivoExtraido[] | null;
 
   observacoes: string | null;
 };
@@ -586,6 +601,22 @@ export async function extrairAditivoDoPdf(file: File): Promise<AditivoExtraido> 
       reajustePeriodoFim: { type: ["string", "null"], format: "date" },
       reajustePercentual: { type: ["number", "null"] },
 
+      itensNovaVigencia: {
+        type: ["array", "null"],
+        items: {
+          type: "object",
+          properties: {
+            descricao: { type: "string" },
+            unidade: { type: "string" },
+            quantidade: { type: "number" },
+            marca: { type: ["string", "null"] },
+            valorUnitario: { type: "number" },
+          },
+          required: ["descricao", "unidade", "quantidade", "marca", "valorUnitario"],
+          additionalProperties: false,
+        },
+      },
+
       observacoes: { type: ["string", "null"] },
     },
     required: [
@@ -596,6 +627,7 @@ export async function extrairAditivoDoPdf(file: File): Promise<AditivoExtraido> 
       "alteraPrazoEntrega", "novoPrazoEntregaDias", "novoPrazoEntregaUnidade",
       "aplicaReajuste", "reajusteIndice", "reajusteIndiceOutro",
       "reajustePeriodoInicio", "reajustePeriodoFim", "reajustePercentual",
+      "itensNovaVigencia",
       "observacoes",
     ],
     additionalProperties: false,
@@ -619,6 +651,8 @@ export async function extrairAditivoDoPdf(file: File): Promise<AditivoExtraido> 
 3) **alteraPrazoEntrega**: true se altera prazo de entrega/execução. Preencha novoPrazoEntregaDias + novoPrazoEntregaUnidade.
 
 4) **aplicaReajuste** (subset de alteraValor): true APENAS se o aditivo aplica índice de reajuste sobre itens. Identifique o índice (IPCA, IPCA-E, IPCA-15, INCC, IST...) e preencha período de apuração e percentual.
+
+5) **itensNovaVigencia**: lista de itens da nova vigência APENAS quando o aditivo prorroga vigência E lista explicitamente os quantitativos/valores da nova vigência (comum em prorrogações de contratos contínuos com renovação de SLA/escopo, ou em supressões/acréscimos com nova tabela). Extraia descrição completa, unidade, quantidade, marca (se especificada) e valorUnitario em reais. Se o aditivo só prorroga prazo SEM trazer tabela nova, retorne null — o sistema replicará os itens da vigência anterior automaticamente.
 
 Campos não aplicáveis vêm como null. Não invente dados — se não está no PDF, retorne null.`,
       ) as Promise<AditivoExtraido>,
@@ -1051,6 +1085,7 @@ function mockAditivo(filename: string): AditivoExtraido {
       reajustePeriodoInicio: dataIso(-365),
       reajustePeriodoFim: dataIso(0),
       reajustePercentual: 4.85,
+      itensNovaVigencia: null,
       observacoes: "Reajuste calculado pela variação acumulada do IPCA-IBGE no período de 12 meses.",
     };
   }
@@ -1076,6 +1111,7 @@ function mockAditivo(filename: string): AditivoExtraido {
       reajustePeriodoInicio: null,
       reajustePeriodoFim: null,
       reajustePercentual: null,
+      itensNovaVigencia: null,
       observacoes: "Prorrogação por interesse da administração.",
     };
   }
@@ -1101,6 +1137,7 @@ function mockAditivo(filename: string): AditivoExtraido {
     reajustePeriodoInicio: null,
     reajustePeriodoFim: null,
     reajustePercentual: null,
+    itensNovaVigencia: null,
     observacoes: "Acréscimo dentro do limite de 25% previsto em lei.",
   };
 }
