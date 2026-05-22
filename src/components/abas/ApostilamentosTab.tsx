@@ -11,8 +11,8 @@
  * Estrutura espelha AditivosTab mas adiciona `Finalidade` + `Motivo`.
  */
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { Pencil, Trash2, FileText, Loader2, Upload, Sparkles, Check, AlertCircle, Beaker } from "lucide-react";
+import { useActionState, useEffect, useMemo, useState } from "react";
+import { Pencil, Trash2, FileText, Check, AlertCircle } from "lucide-react";
 import { brl } from "@/lib/validators";
 import {
   criarApostilamentoAction,
@@ -21,6 +21,8 @@ import {
 } from "@/app/actions/contratuais";
 import { extrairApostilamentoPdfAction } from "@/app/actions/iaExtracao";
 import { BadgeAuto } from "@/components/forms/glass";
+import { UploadPdfPanel } from "@/components/UploadPdfPanel";
+import type { ApostilamentoExtraido } from "@/lib/extrairAta";
 
 type TipoAlteracaoValor = "ACRESCIMO" | "SUPRESSAO" | "REAJUSTE_REPACTUACAO" | "REEQUILIBRIO";
 type IndiceReajuste =
@@ -1033,168 +1035,24 @@ function ReadonlyValor({
 }
 
 // ============================================================
-// PAINEL IA
+// PAINEL IA (extrair PDF do apostilamento) — usa UploadPdfPanel padrão
+// (mesmo layout + drag-and-drop dos demais instrumentos).
 // ============================================================
 function PainelIaApostilamento({
   onDados,
   onArquivo,
 }: {
-  onDados: (dados: {
-    numero: string;
-    objeto: string;
-    dataAssinatura: string;
-    finalidade: Finalidade | null;
-    motivo: string | null;
-    alteraValor: boolean;
-    tipoAlteracaoValor: TipoAlteracaoValor | null;
-    novoValor: number | null;
-    alteraPrazoVigencia: boolean;
-    novaVigenciaInicio: string | null;
-    novaVigenciaPrazo: number | null;
-    novaVigenciaUnidade: Unidade | null;
-    alteraPrazoEntrega: boolean;
-    novoPrazoEntregaDias: number | null;
-    novoPrazoEntregaUnidade: Unidade | null;
-    aplicaReajuste: boolean;
-    reajusteIndice: IndiceReajuste | null;
-    reajustePercentual: number | null;
-    observacoes: string | null;
-  }) => void;
+  onDados: (dados: ApostilamentoExtraido) => void;
   onArquivo: (url: string, nome: string) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [extraindo, setExtraindo] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [nome, setNome] = useState<string | null>(null);
-  const [demo, setDemo] = useState(false);
-  const [ok, setOk] = useState(false);
-
-  async function handle(file: File) {
-    setExtraindo(true);
-    setErro(null);
-    setNome(file.name);
-    setOk(false);
-
-    const fd = new FormData();
-    fd.append("pdf", file);
-    const res = await extrairApostilamentoPdfAction(fd);
-    setExtraindo(false);
-
-    if (!res.ok) {
-      setErro(res.erro);
-      return;
-    }
-    onDados(res.dados);
-    if (res.arquivoUrl) onArquivo(res.arquivoUrl, res.nomeArquivo ?? file.name);
-    setDemo(res.demo);
-    setOk(true);
-  }
-
   return (
-    <section
-      className="glass-tile overflow-hidden rounded-[20px] px-6 py-5"
-      style={{
-        background:
-          "linear-gradient(135deg, rgba(197,180,255,0.12), rgba(184,197,214,0.04)), var(--glass-2)",
-      }}
-    >
-      <div className="flex items-start gap-4">
-        <div
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl"
-          style={{
-            background: "linear-gradient(135deg, var(--lavender), var(--sky))",
-            boxShadow: "0 4px 16px rgba(197,180,255,0.4)",
-          }}
-        >
-          <Sparkles className="h-5 w-5" style={{ color: "#0A0A0A" }} />
-        </div>
-        <div className="flex-1">
-          <h3 className="text-[15px] font-extrabold" style={{ color: "var(--text)" }}>
-            Preencher a partir do PDF do apostilamento
-          </h3>
-          <p className="mt-1 text-[12px]" style={{ color: "var(--text-soft)" }}>
-            Anexe o PDF — a IA identifica finalidade, motivo, alterações de prazo/valor e (quando
-            reajuste) índice + percentual.
-          </p>
-
-          <input
-            ref={inputRef}
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(ev) => {
-              const f = ev.target.files?.[0];
-              if (f) handle(f);
-            }}
-          />
-
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              disabled={extraindo}
-              className="btn-primary inline-flex disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {extraindo ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> Extraindo dados…
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4" /> {nome ? "Outro PDF" : "Anexar PDF"}
-                </>
-              )}
-            </button>
-            {nome && !extraindo && (
-              <span className="max-w-md truncate text-[11px]" style={{ color: "var(--text-mute)" }}>
-                {nome}
-              </span>
-            )}
-            {ok && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold"
-                style={{
-                  background: "rgba(93,216,182,0.18)",
-                  color: "var(--mint)",
-                  border: "0.5px solid rgba(93,216,182,0.3)",
-                }}
-              >
-                <Check className="h-3 w-3" /> Campos preenchidos
-              </span>
-            )}
-          </div>
-
-          {erro && (
-            <div
-              className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-[12px]"
-              style={{
-                background: "rgba(232,138,152,0.10)",
-                border: "0.5px solid rgba(232,138,152,0.3)",
-                color: "var(--coral)",
-              }}
-            >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{erro}</span>
-            </div>
-          )}
-          {demo && (
-            <div
-              className="mt-3 flex items-start gap-2 rounded-xl px-3 py-2 text-[11px]"
-              style={{
-                background: "rgba(212,175,55,0.10)",
-                border: "0.5px solid rgba(212,175,55,0.3)",
-                color: "var(--primary-deep)",
-              }}
-            >
-              <Beaker className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                <strong>Modo demonstração</strong> — dados de exemplo. Configure{" "}
-                <code>ANTHROPIC_API_KEY</code> pra extração real.
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
+    <UploadPdfPanel<ApostilamentoExtraido>
+      titulo="Preencher a partir do PDF do apostilamento"
+      descricao="Anexe o PDF — a IA identifica finalidade, motivo, alterações de prazo/valor e (quando reajuste) índice + percentual."
+      action={extrairApostilamentoPdfAction}
+      onSuccess={onDados}
+      onArquivoSalvo={(info) => onArquivo(info.url, info.nome)}
+      badgeAposExtracao={() => "Campos preenchidos · revisar"}
+    />
   );
 }

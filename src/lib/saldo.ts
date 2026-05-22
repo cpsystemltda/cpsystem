@@ -149,11 +149,12 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
     where: { ataId },
     include: {
       contratoItens: {
-        select: { quantidade: true, vigenciaId: true, contrato: { select: { vigencias: { select: { id: true } } } } },
+        select: { quantidade: true, valorTotal: true, vigenciaId: true, contrato: { select: { vigencias: { select: { id: true } } } } },
       },
       empenhoItens: {
         select: {
           quantidade: true,
+          valorTotal: true,
           empenho: { select: { contratoId: true, vigenciaId: true } },
         },
       },
@@ -170,6 +171,7 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
     },
     select: {
       quantidade: true,
+      valorTotal: true,
       descricao: true,
       empenho: { select: { vigenciaId: true } },
     },
@@ -179,6 +181,7 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
     const itensDaVig = itensTodos.filter((it) => it.vigenciaId === vig.id);
 
     const itensSaldo: SaldoItem[] = itensDaVig.map((it) => {
+      // Quantidades (consumo via contrato derivado + empenho direto + órfão)
       const usadoContrato = it.contratoItens
         .filter((c) => c.vigenciaId === vig.id)
         .reduce((s, c) => s + c.quantidade, 0);
@@ -198,6 +201,27 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
       const usado = usadoContrato + usadoEmpenhoSolto + usadoOrfaos;
       const disponivel = Math.max(0, it.quantidade - usado);
 
+      // Valores: valorUsado é a soma dos VALORES CONGELADOS (snapshot do
+      // momento da execução) — não recalcula com valorUnitario atual.
+      // Decisão Regina: reajuste retroativo não infla o "já executado".
+      // Usuário aplica reajuste à execução manualmente quando devido.
+      const valorUsadoContrato = it.contratoItens
+        .filter((c) => c.vigenciaId === vig.id)
+        .reduce((s, c) => s + c.valorTotal, 0);
+      const valorUsadoEmpenhoSolto = it.empenhoItens
+        .filter(
+          (e) => e.empenho.contratoId === null && e.empenho.vigenciaId === vig.id,
+        )
+        .reduce((s, e) => s + e.valorTotal, 0);
+      const valorUsadoOrfaos = empenhoItensOrfaosPorVig
+        .filter(
+          (e) =>
+            e.empenho.vigenciaId === vig.id &&
+            normalizarDescricao(e.descricao) === descItemNorm,
+        )
+        .reduce((s, e) => s + e.valorTotal, 0);
+      const valorUsado = valorUsadoContrato + valorUsadoEmpenhoSolto + valorUsadoOrfaos;
+
       return {
         ataItemId: it.id,
         descricao: it.descricao,
@@ -210,7 +234,7 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
         quantidadeDisponivel: disponivel,
         valorUnitario: it.valorUnitario,
         valorTotal: it.valorTotal,
-        valorUsado: usado * it.valorUnitario,
+        valorUsado,
         valorDisponivel: disponivel * it.valorUnitario,
       };
     });
@@ -258,9 +282,9 @@ async function calcularSaldoAtaLegacy(ataId: string): Promise<SaldoAta> {
   const itens = await prisma.ataItem.findMany({
     where: { ataId },
     include: {
-      contratoItens: { select: { quantidade: true } },
+      contratoItens: { select: { quantidade: true, valorTotal: true } },
       empenhoItens: {
-        select: { quantidade: true, empenho: { select: { contratoId: true } } },
+        select: { quantidade: true, valorTotal: true, empenho: { select: { contratoId: true } } },
       },
     },
     orderBy: { id: "asc" },
@@ -271,7 +295,7 @@ async function calcularSaldoAtaLegacy(ataId: string): Promise<SaldoAta> {
       ataItemId: null,
       empenho: { ataId, contratoId: null },
     },
-    select: { quantidade: true, descricao: true },
+    select: { quantidade: true, valorTotal: true, descricao: true },
   });
 
   const out: SaldoItem[] = itens.map((it) => {
@@ -285,6 +309,17 @@ async function calcularSaldoAtaLegacy(ataId: string): Promise<SaldoAta> {
       .reduce((s, e) => s + e.quantidade, 0);
     const usado = usadoContrato + usadoEmpenhoSolto + usadoOrfaos;
     const disponivel = Math.max(0, it.quantidade - usado);
+
+    // Valor congelado (snapshot — vide nota em calcularSaldoAta)
+    const valorUsadoContrato = it.contratoItens.reduce((s, c) => s + c.valorTotal, 0);
+    const valorUsadoEmpenhoSolto = it.empenhoItens
+      .filter((e) => e.empenho.contratoId === null)
+      .reduce((s, e) => s + e.valorTotal, 0);
+    const valorUsadoOrfaos = empenhoItensOrfaos
+      .filter((e) => normalizarDescricao(e.descricao) === descItemNorm)
+      .reduce((s, e) => s + e.valorTotal, 0);
+    const valorUsado = valorUsadoContrato + valorUsadoEmpenhoSolto + valorUsadoOrfaos;
+
     return {
       ataItemId: it.id,
       descricao: it.descricao,
@@ -297,7 +332,7 @@ async function calcularSaldoAtaLegacy(ataId: string): Promise<SaldoAta> {
       quantidadeDisponivel: disponivel,
       valorUnitario: it.valorUnitario,
       valorTotal: it.valorTotal,
-      valorUsado: usado * it.valorUnitario,
+      valorUsado,
       valorDisponivel: disponivel * it.valorUnitario,
     };
   });
@@ -368,6 +403,7 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
     where: { empenho: { contratoId } },
     select: {
       quantidade: true,
+      valorTotal: true,
       ataItemId: true,
       descricao: true,
       empenho: { select: { vigenciaId: true } },
@@ -379,14 +415,17 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
 
     const itensSaldo: SaldoItemContrato[] = itensDaVig.map((it) => {
       const descContratoNorm = normalizarDescricao(it.descricao);
-      const usado = empenhoItens
+      const empenhosCasados = empenhoItens
         .filter((e) => e.empenho.vigenciaId === vig.id)
         .filter(
           (e) =>
             (it.ataItemId && e.ataItemId === it.ataItemId) ||
             normalizarDescricao(e.descricao) === descContratoNorm,
-        )
-        .reduce((s, e) => s + e.quantidade, 0);
+        );
+      const usado = empenhosCasados.reduce((s, e) => s + e.quantidade, 0);
+      // valorUsado: snapshot — soma dos valores congelados nos empenhos.
+      // Reajuste retroativo via apostilamento não afeta "Já executado".
+      const valorUsado = empenhosCasados.reduce((s, e) => s + e.valorTotal, 0);
       const disponivel = Math.max(0, it.quantidade - usado);
       return {
         contratoItemId: it.id,
@@ -397,7 +436,7 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
         quantidadeDisponivel: disponivel,
         valorUnitario: it.valorUnitario,
         valorTotal: it.valorTotal,
-        valorUsado: usado * it.valorUnitario,
+        valorUsado,
         valorDisponivel: disponivel * it.valorUnitario,
       };
     });
@@ -446,18 +485,18 @@ async function calcularSaldoContratoLegacy(contratoId: string): Promise<SaldoCon
   });
   const empenhoItens = await prisma.empenhoItem.findMany({
     where: { empenho: { contratoId } },
-    select: { quantidade: true, ataItemId: true, descricao: true },
+    select: { quantidade: true, valorTotal: true, ataItemId: true, descricao: true },
   });
 
   const linhas: SaldoItemContrato[] = itens.map((it) => {
     const descContratoNorm = normalizarDescricao(it.descricao);
-    const usado = empenhoItens
-      .filter(
-        (e) =>
-          (it.ataItemId && e.ataItemId === it.ataItemId) ||
-          normalizarDescricao(e.descricao) === descContratoNorm,
-      )
-      .reduce((s, e) => s + e.quantidade, 0);
+    const casados = empenhoItens.filter(
+      (e) =>
+        (it.ataItemId && e.ataItemId === it.ataItemId) ||
+        normalizarDescricao(e.descricao) === descContratoNorm,
+    );
+    const usado = casados.reduce((s, e) => s + e.quantidade, 0);
+    const valorUsado = casados.reduce((s, e) => s + e.valorTotal, 0);
     const disponivel = Math.max(0, it.quantidade - usado);
     return {
       contratoItemId: it.id,
@@ -468,7 +507,7 @@ async function calcularSaldoContratoLegacy(contratoId: string): Promise<SaldoCon
       quantidadeDisponivel: disponivel,
       valorUnitario: it.valorUnitario,
       valorTotal: it.valorTotal,
-      valorUsado: usado * it.valorUnitario,
+      valorUsado,
       valorDisponivel: disponivel * it.valorUnitario,
     };
   });
