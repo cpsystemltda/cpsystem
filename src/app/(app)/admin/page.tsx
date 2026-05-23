@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { Users, TrendingUp, DollarSign, AlertTriangle, UserCheck, Building2 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +17,18 @@ export default async function AdminPage() {
   const usuario = await exigirUsuario();
   // Restrito a super admin da plataforma (Regina/Igor). Tela mostra dados
   // agregados de TODAS as contas — não pode ser acessível a cliente comum.
-  if (!usuario.superAdmin) redirect("/dashboard");
+  // Mostra tela explícita "Acesso restrito" em vez de redirect silencioso,
+  // pra ficar claro caso usuário cole URL direto (regressão Regina).
+  if (!usuario.superAdmin) {
+    return (
+      <div className="mx-auto max-w-2xl px-8 py-20 text-center">
+        <h1 className="text-2xl font-bold text-slate-900">Acesso restrito</h1>
+        <p className="mt-3 text-sm text-slate-600">
+          Esta área é exclusiva para gestores da plataforma (Adm CP System).
+        </p>
+      </div>
+    );
+  }
 
   // Filtro: ignora super admins (Igor/Regina) — não são clientes pagantes
   const semSuperAdmin = { usuarios: { none: { superAdmin: true } } };
@@ -28,7 +38,7 @@ export default async function AdminPage() {
       where: semSuperAdmin,
       include: {
         usuarios: { select: { nome: true, email: true } },
-        empresas: { select: { id: true } },
+        empresas: { select: { id: true, nomeFantasia: true, razaoSocial: true, cnpj: true } },
       },
       orderBy: { criadoEm: "desc" },
     }),
@@ -229,7 +239,7 @@ type ContaResumo = {
   statusAssinatura: string;
   criadoEm: Date;
   usuarios: { nome: string; email: string }[];
-  empresas: { id: string }[];
+  empresas: { id: string; nomeFantasia: string | null; razaoSocial: string; cnpj: string }[];
 };
 
 function TabelaEmpresas({ contas }: { contas: ContaResumo[] }) {
@@ -246,7 +256,7 @@ function TabelaEmpresas({ contas }: { contas: ContaResumo[] }) {
       <table className="w-full text-sm">
         <thead className="text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            <th className="px-5 py-2 text-left">Usuário principal</th>
+            <th className="px-5 py-2 text-left">Empresa</th>
             <th className="px-5 py-2 text-left">Plano</th>
             <th className="px-5 py-2 text-left">Status</th>
             <th className="px-5 py-2 text-right">CNPJs</th>
@@ -254,11 +264,27 @@ function TabelaEmpresas({ contas }: { contas: ContaResumo[] }) {
           </tr>
         </thead>
         <tbody>
-          {contas.map((c) => (
+          {contas.map((c) => {
+            const empresaPrincipal = c.empresas[0];
+            const nomeEmpresa =
+              empresaPrincipal?.nomeFantasia ||
+              empresaPrincipal?.razaoSocial ||
+              "Sem empresa cadastrada";
+            const usuarioResp = c.usuarios[0];
+            return (
             <tr key={c.id} className="border-t border-slate-100">
               <td className="px-5 py-3">
-                <div className="font-medium text-slate-900">{c.usuarios[0]?.nome || "—"}</div>
-                <div className="text-xs text-slate-500">{c.usuarios[0]?.email || "—"}</div>
+                <div className="font-medium text-slate-900">{nomeEmpresa}</div>
+                <div className="text-xs text-slate-500">
+                  {empresaPrincipal?.cnpj
+                    ? `CNPJ ${empresaPrincipal.cnpj}`
+                    : "Sem CNPJ"}
+                  {usuarioResp && (
+                    <>
+                      {" · "}responsável: {usuarioResp.nome}
+                    </>
+                  )}
+                </div>
               </td>
               <td className="px-5 py-3">
                 <span
@@ -289,7 +315,8 @@ function TabelaEmpresas({ contas }: { contas: ContaResumo[] }) {
                 {c.criadoEm.toLocaleDateString("pt-BR")}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
