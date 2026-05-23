@@ -10,11 +10,13 @@
  */
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { Pencil, FileText, Plus, AlertCircle, Check, Upload, Clock } from "lucide-react";
+import { Pencil, FileText, Plus, AlertCircle, Check, Upload, Clock, Trash2, X, Paperclip } from "lucide-react";
 import {
   criarNotificacaoAction,
   editarNotificacaoAction,
   avancarNotificacaoAction,
+  editarAndamentoNotificacaoAction,
+  excluirAndamentoNotificacaoAction,
 } from "@/app/actions/contratuais";
 
 type Andamento = {
@@ -218,48 +220,16 @@ function CardNotificacao({
         </div>
       </div>
 
-      {/* Timeline de andamentos */}
+      {/* Timeline de andamentos — cada um editável/excluível (Regina:
+          "cada etapa de lançamento da notificação deve permitir a edição") */}
       {n.andamentos.length > 0 && (
         <ol
           className="mt-4 space-y-2 border-l-2 pl-4"
           style={{ borderColor: "var(--border-soft)" }}
         >
-          {n.andamentos.map((a) => {
-            const corA = COR_STATUS[a.status] ?? COR_STATUS.RECEBIDA;
-            return (
-              <li key={a.id} className="relative">
-                <span
-                  className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full"
-                  style={{ background: corA.fg, boxShadow: "0 0 0 3px var(--bg)" }}
-                />
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span
-                    className="text-[11px] font-bold"
-                    style={{ color: corA.fg, letterSpacing: "0.06em" }}
-                  >
-                    {ROTULO_STATUS[a.status] ?? a.status}
-                  </span>
-                  <span className="text-[11px]" style={{ color: "var(--text-mute)" }}>
-                    {a.dataEvento.toLocaleDateString("pt-BR")}
-                  </span>
-                  {a.arquivoPdfUrl && (
-                    <a
-                      href={a.arquivoPdfUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-[10px] font-semibold underline"
-                      style={{ color: "var(--sky-deep, #3F638F)" }}
-                    >
-                      <FileText className="h-2.5 w-2.5" /> PDF
-                    </a>
-                  )}
-                </div>
-                <p className="text-[12px]" style={{ color: "var(--text-soft)" }}>
-                  {a.descricao}
-                </p>
-              </li>
-            );
-          })}
+          {n.andamentos.map((a) => (
+            <AndamentoItem key={a.id} a={a} />
+          ))}
         </ol>
       )}
 
@@ -617,3 +587,139 @@ function BotoesForm({
     </>
   );
 }
+
+
+// ============================================================
+// Andamento — item da timeline com edição inline e exclusão
+// ============================================================
+function AndamentoItem({ a }: { a: Andamento }) {
+  const [editando, setEditando] = useState(false);
+  const corA = COR_STATUS[a.status] ?? COR_STATUS.RECEBIDA;
+  const [stateEditar, formEditar] = useActionState(editarAndamentoNotificacaoAction, null);
+
+  useEffect(() => {
+    if (stateEditar?.ok) setEditando(false);
+  }, [stateEditar]);
+
+  function isoDate(d: Date): string {
+    return d.toISOString().slice(0, 10);
+  }
+
+  return (
+    <li className="relative group">
+      <span
+        className="absolute -left-[22px] top-1.5 h-3 w-3 rounded-full"
+        style={{ background: corA.fg, boxShadow: "0 0 0 3px var(--bg)" }}
+      />
+
+      {editando ? (
+        <form action={formEditar} className="rounded-xl p-3 space-y-2" style={{ background: "rgba(212,175,55,0.08)", border: "0.5px solid var(--border-soft)" }}>
+          <input type="hidden" name="andamentoId" value={a.id} />
+          <div className="flex flex-wrap items-baseline gap-2">
+            <span className="text-[11px] font-bold" style={{ color: corA.fg, letterSpacing: "0.06em" }}>
+              {ROTULO_STATUS[a.status] ?? a.status}
+            </span>
+            <label className="text-[11px]" style={{ color: "var(--text-mute)" }}>Data do evento</label>
+            <input
+              type="date"
+              name="dataEvento"
+              defaultValue={isoDate(a.dataEvento)}
+              required
+              className="rounded-md px-2 py-1 text-[11px] outline-none focus:ring-2 focus:ring-blue-100"
+              style={{ background: "white", border: "0.5px solid var(--border-soft)" }}
+            />
+          </div>
+          <textarea
+            name="descricao"
+            defaultValue={a.descricao}
+            rows={2}
+            required
+            className="w-full rounded-md px-2 py-1.5 text-[12px] outline-none focus:ring-2 focus:ring-blue-100"
+            style={{ background: "white", border: "0.5px solid var(--border-soft)" }}
+          />
+          <label className="flex items-center gap-1.5 cursor-pointer text-[11px]" style={{ color: "var(--text-soft)" }}>
+            <Paperclip className="h-3 w-3" />
+            <span>{a.arquivoPdfUrl ? "Substituir arquivo (opcional)" : "Anexar arquivo (opcional)"}</span>
+            <input
+              type="file"
+              name="arquivo"
+              accept="application/pdf,image/jpeg,image/png"
+              className="hidden"
+              onChange={(e) => {
+                const label = e.target.parentElement?.querySelector("span");
+                if (label) label.textContent = e.target.files?.[0]?.name ?? (a.arquivoPdfUrl ? "Substituir arquivo (opcional)" : "Anexar arquivo (opcional)");
+              }}
+            />
+          </label>
+          {stateEditar?.erro && (
+            <p className="text-[11px] font-semibold text-red-700">{stateEditar.erro}</p>
+          )}
+          <div className="flex items-center gap-2">
+            <button type="submit" className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-700">
+              <Check className="h-3 w-3" /> Salvar
+            </button>
+            <button type="button" onClick={() => setEditando(false)} className="text-[11px] text-slate-400 hover:text-slate-600">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="text-[11px] font-bold"
+              style={{ color: corA.fg, letterSpacing: "0.06em" }}
+            >
+              {ROTULO_STATUS[a.status] ?? a.status}
+            </span>
+            <span className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+              {a.dataEvento.toLocaleDateString("pt-BR")}
+            </span>
+            {a.arquivoPdfUrl && (
+              <a
+                href={a.arquivoPdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold underline"
+                style={{ color: "var(--sky-deep, #3F638F)" }}
+              >
+                <FileText className="h-2.5 w-2.5" /> PDF
+              </a>
+            )}
+            <div className="ml-auto inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                type="button"
+                onClick={() => setEditando(true)}
+                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition hover:opacity-80"
+                style={{ background: "var(--glass-1)", color: "var(--text-soft)", border: "0.5px solid var(--border-soft)" }}
+                title="Editar este andamento"
+              >
+                <Pencil className="h-2.5 w-2.5" /> Editar
+              </button>
+              <form action={excluirAndamentoNotificacaoAction}>
+                <input type="hidden" name="andamentoId" value={a.id} />
+                <button
+                  type="submit"
+                  onClick={(ev) => {
+                    if (!window.confirm(`Excluir o andamento \"${ROTULO_STATUS[a.status] ?? a.status}\" de ${a.dataEvento.toLocaleDateString("pt-BR")}? Esta ação será registrada no histórico.`)) {
+                      ev.preventDefault();
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition hover:opacity-80 hover:text-red-700"
+                  style={{ background: "var(--glass-1)", color: "var(--text-soft)", border: "0.5px solid var(--border-soft)" }}
+                  title="Excluir este andamento"
+                >
+                  <Trash2 className="h-2.5 w-2.5" /> Excluir
+                </button>
+              </form>
+            </div>
+          </div>
+          <p className="text-[12px]" style={{ color: "var(--text-soft)" }}>
+            {a.descricao}
+          </p>
+        </>
+      )}
+    </li>
+  );
+}
+

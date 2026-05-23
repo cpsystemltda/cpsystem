@@ -1399,6 +1399,142 @@ export async function editarNotificacaoAction(_p: Result | null, formData: FormD
   }
 }
 
+/**
+ * Edita um andamento específico de uma notificação — Regina:
+ * "cada etapa de lançamento da notificação deve permitir a edição".
+ * Permite corrigir data, descrição e/ou anexar/trocar arquivo.
+ * NÃO altera o status do andamento (pra mudar status, exclua + crie novo).
+ */
+export async function editarAndamentoNotificacaoAction(
+  _p: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  const id = String(formData.get("andamentoId") || "");
+  if (!id) return { erro: "Andamento inválido." };
+
+  const andamento = await prisma.andamentoNotificacao.findFirst({
+    where: {
+      id,
+      notificacao: {
+        OR: [
+          { ata: { empresa: { contaId: usuario.contaId } } },
+          { contrato: { empresa: { contaId: usuario.contaId } } },
+          { empenho: { empresa: { contaId: usuario.contaId } } },
+        ],
+      },
+    },
+    include: {
+      notificacao: { select: { ataId: true, contratoId: true, empenhoId: true } },
+    },
+  });
+  if (!andamento) return { erro: "Andamento não encontrado." };
+
+  try {
+    let arquivoPdfUrl: string | null = andamento.arquivoPdfUrl;
+    const file = formData.get("arquivo") as File | null;
+    if (file && file.size > 0) {
+      arquivoPdfUrl = (await salvarArquivo(file)).url;
+    }
+
+    const dataEventoStr = String(formData.get("dataEvento") || "");
+    const dataEvento = dataEventoStr
+      ? parseDataInputBr(dataEventoStr) ?? andamento.dataEvento
+      : andamento.dataEvento;
+
+    await prisma.andamentoNotificacao.update({
+      where: { id },
+      data: {
+        descricao: String(formData.get("descricao") || andamento.descricao),
+        dataEvento,
+        arquivoPdfUrl,
+      },
+    });
+
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "ATUALIZAR",
+      recurso: "AndamentoNotificacao",
+      recursoId: id,
+      resumo: `Andamento ${andamento.status} editado`,
+    });
+
+    if (andamento.notificacao.ataId) revalidatePath(`/atas/${andamento.notificacao.ataId}`);
+    if (andamento.notificacao.contratoId) revalidatePath(`/contratos/${andamento.notificacao.contratoId}`);
+    if (andamento.notificacao.empenhoId) revalidatePath(`/execucao/${andamento.notificacao.empenhoId}`);
+    return { ok: true };
+  } catch (err) {
+    return { erro: err instanceof Error ? err.message : "Erro ao editar andamento." };
+  }
+}
+
+/**
+ * Exclui um andamento — útil quando lançado por engano. Caso seja o
+ * último andamento, a notificação volta ao status do andamento anterior
+ * (ou RECEBIDA se não houver mais andamentos).
+ */
+export async function excluirAndamentoNotificacaoAction(formData: FormData): Promise<void> {
+  await _excluirAndamentoInterno(formData);
+}
+
+async function _excluirAndamentoInterno(formData: FormData): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  const id = String(formData.get("andamentoId") || "");
+  if (!id) return { erro: "Andamento inválido." };
+
+  const andamento = await prisma.andamentoNotificacao.findFirst({
+    where: {
+      id,
+      notificacao: {
+        OR: [
+          { ata: { empresa: { contaId: usuario.contaId } } },
+          { contrato: { empresa: { contaId: usuario.contaId } } },
+          { empenho: { empresa: { contaId: usuario.contaId } } },
+        ],
+      },
+    },
+    include: {
+      notificacao: {
+        include: { andamentos: { orderBy: { dataEvento: "asc" } } },
+      },
+    },
+  });
+  if (!andamento) return { erro: "Andamento não encontrado." };
+
+  try {
+    await prisma.andamentoNotificacao.delete({ where: { id } });
+
+    // Atualiza status da notificação pra refletir o último andamento restante
+    const restantes = andamento.notificacao.andamentos.filter((a) => a.id !== id);
+    const novoStatus = restantes.length > 0
+      ? restantes[restantes.length - 1].status
+      : "RECEBIDA";
+    await prisma.notificacao.update({
+      where: { id: andamento.notificacaoId },
+      data: { status: novoStatus },
+    });
+
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "EXCLUIR",
+      recurso: "AndamentoNotificacao",
+      recursoId: id,
+      resumo: `Andamento ${andamento.status} excluído`,
+    });
+
+    if (andamento.notificacao.ataId) revalidatePath(`/atas/${andamento.notificacao.ataId}`);
+    if (andamento.notificacao.contratoId) revalidatePath(`/contratos/${andamento.notificacao.contratoId}`);
+    if (andamento.notificacao.empenhoId) revalidatePath(`/execucao/${andamento.notificacao.empenhoId}`);
+    return { ok: true };
+  } catch (err) {
+    return { erro: err instanceof Error ? err.message : "Erro ao excluir andamento." };
+  }
+}
+
 // ============================================================
 // PROCEDIMENTO APURATÓRIO (Lei 14.133/2021 art. 157+)
 // ============================================================
