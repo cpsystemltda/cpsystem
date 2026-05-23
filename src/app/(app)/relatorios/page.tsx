@@ -38,10 +38,23 @@ export default async function RelatoriosPage() {
     (s, e) => s + e.itens.reduce((s2, i) => s2 + i.valorTotal, 0),
     0,
   );
-  const valorPago = empenhos
-    .filter((e) => e.status === "PAGO")
-    .reduce((s, e) => s + e.itens.reduce((s2, i) => s2 + i.valorTotal, 0), 0);
-  const valorReceber = valorTotalEmpenhos - valorPago;
+  // "A receber" granular por estágio do funil financeiro (Regina pediu):
+  //   - Empenhado: orçamento alocado mas execução ainda nem começou
+  //   - Em execução: pedido recebido / trânsito / entregue (sem NF ainda)
+  //   - Faturado: NF emitida ou encaminhada (já cobrado, esperando $)
+  //   - Recebido: empenho PAGO pelo órgão
+  // Antes era apenas total − pago = "a receber" — englobava até empenhos
+  // sem execução iniciada e inflava artificialmente a expectativa de caixa.
+  function somar(estados: readonly string[]): number {
+    return empenhos
+      .filter((e) => estados.includes(e.status))
+      .reduce((s, e) => s + e.itens.reduce((s2, i) => s2 + i.valorTotal, 0), 0);
+  }
+  const valorEmpenhado = somar(["EMPENHADO"]);
+  const valorEmExecucao = somar(["PEDIDO_RECEBIDO", "EM_TRANSITO", "ENTREGUE"]);
+  const valorFaturado = somar(["NF_EMITIDA", "NF_ENCAMINHADA"]);
+  const valorPago = somar(["PAGO"]);
+  const valorReceber = valorEmpenhado + valorEmExecucao + valorFaturado; // total ainda não recebido
 
   const saldosAtas = await Promise.all(atas.map((a) => calcularSaldoAta(a.id)));
   const valorTotalAtas = saldosAtas.reduce((s, sa) => s + sa.valorTotal, 0);
@@ -105,7 +118,50 @@ export default async function RelatoriosPage() {
         <Card icone={Building2} cor="blue" titulo="Atas — valor registrado" valor={brl(valorTotalAtas)} sub={`${atas.length} atas`} />
         <Card icone={TrendingUp} cor="emerald" titulo="Contratos — valor total" valor={brl(valorTotalContratos)} sub={`${contratos.length} contratos`} />
         <Card icone={TrendingUp} cor="amber" titulo="Valor empenhado" valor={brl(valorTotalEmpenhos)} sub={`${empenhos.length} empenhos`} />
-        <Card icone={TrendingUp} cor="violet" titulo="Já recebido" valor={brl(valorPago)} sub={`${brl(valorReceber)} a receber`} />
+        <Card
+          icone={TrendingUp}
+          cor="violet"
+          titulo="Já recebido"
+          valor={brl(valorPago)}
+          sub={
+            valorReceber > 0
+              ? `${brl(valorReceber)} ainda a receber (ver funil abaixo)`
+              : `tudo recebido · 0 a receber`
+          }
+        />
+      </div>
+
+      {/* Funil financeiro — quebra o "a receber" por estágio para evitar
+          inflar a expectativa de caixa com empenhos sem execução iniciada. */}
+      <div className="mt-6 grid gap-3 md:grid-cols-4">
+        <Card
+          icone={TrendingUp}
+          cor="amber"
+          titulo="Empenhado"
+          valor={brl(valorEmpenhado)}
+          sub="Orçamento alocado · execução não iniciada"
+        />
+        <Card
+          icone={TrendingUp}
+          cor="blue"
+          titulo="Em execução"
+          valor={brl(valorEmExecucao)}
+          sub="Pedido recebido até entregue · sem NF"
+        />
+        <Card
+          icone={TrendingUp}
+          cor="rose"
+          titulo="Faturado · aguardando pagamento"
+          valor={brl(valorFaturado)}
+          sub="NF emitida ou encaminhada · curto prazo"
+        />
+        <Card
+          icone={TrendingUp}
+          cor="emerald"
+          titulo="Recebido"
+          valor={brl(valorPago)}
+          sub="Empenho pago pelo órgão"
+        />
       </div>
 
       <div className="mt-8 grid gap-6 md:grid-cols-2">
@@ -275,7 +331,7 @@ function Card({
   sub,
 }: {
   icone: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  cor: "blue" | "emerald" | "amber" | "violet";
+  cor: "blue" | "emerald" | "amber" | "violet" | "rose";
   titulo: string;
   valor: string;
   sub: string;
@@ -285,11 +341,13 @@ function Card({
     cor === "blue" ? "t-sky" :
     cor === "emerald" ? "t-mint" :
     cor === "amber" ? "t-primary" :
+    cor === "rose" ? "t-coral" :
     "t-lavender";
   const tint =
     cor === "blue" ? { bg: "rgba(184,197,214,0.20)", color: "#365175" } :
     cor === "emerald" ? { bg: "rgba(93,216,182,0.20)", color: "var(--mint-deep)" } :
     cor === "amber" ? { bg: "rgba(212,175,55,0.20)", color: "var(--primary-deep)" } :
+    cor === "rose" ? { bg: "rgba(232,138,152,0.20)", color: "var(--coral)" } :
     { bg: "rgba(197,180,255,0.22)", color: "#8E73E0" };
 
   return (
