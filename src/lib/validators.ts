@@ -310,7 +310,10 @@ const orgaoNaAtaSchema = z.object({
 export const novaAtaSchema = contratacaoBase.extend({
   numeroAta: z.string().optional(),
   dataAssinatura: z.coerce.date(),
-  dataPublicacao: z.coerce.date().optional(),
+  dataPublicacao: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.date().optional(),
+  ),
   aceitaCarona: z.coerce.boolean().optional(),
   idAtaPncp: z.string().optional(),
   // 2.4 — toggle "não se aplica" no prazo de entrega
@@ -338,7 +341,10 @@ export const novoContratoSchema = contratacaoBase
     numeroNotaEmpenho: z.string().optional(),
     numeroOrdemFornecimento: z.string().optional(),
     dataAssinatura: z.coerce.date(),
-    dataPublicacao: z.coerce.date().optional(),
+    dataPublicacao: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.date().optional(),
+    ),
     modalidadeEntrega: z.enum(modalidadesEntrega).default("INTEGRAL"),
     marcoInicialPrazo: z.enum(marcosIniciaisPrazo).optional(),
     marcoInicialDescricao: z.string().optional(),
