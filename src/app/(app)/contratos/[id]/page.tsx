@@ -256,7 +256,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               key: "empenhos",
               label: "Execuções",
               badge: contrato.empenhos.length,
-              content: <EmpenhosVinculados empenhos={contrato.empenhos} />,
+              content: <EmpenhosVinculados contratoId={contrato.id} empenhos={contrato.empenhos} />,
             },
             {
               key: "notificacoes",
@@ -402,7 +402,7 @@ type EmpenhoVinculado = {
   dataPagamento: Date | null;
 };
 
-function EmpenhosVinculados({ empenhos }: { empenhos: EmpenhoVinculado[] }) {
+function EmpenhosVinculados({ contratoId, empenhos }: { contratoId: string; empenhos: EmpenhoVinculado[] }) {
   if (empenhos.length === 0)
     return <p className="rounded-lg border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">Nenhum empenho vinculado.</p>;
   return (
@@ -410,7 +410,7 @@ function EmpenhosVinculados({ empenhos }: { empenhos: EmpenhoVinculado[] }) {
       {empenhos.map((e) => (
         <Link
           key={e.id}
-          href={`/execucao/${e.id}`}
+          href={`/execucao/${e.id}?from=contrato-${contratoId}`}
           className="block rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm"
         >
           <div className="flex items-start gap-3">

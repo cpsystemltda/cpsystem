@@ -115,6 +115,7 @@ export function ItensAtaTab({
                 </span>
               </div>
             </header>
+            <div style={{ overflowX: "auto" }}>
             <table
               className="table-glass"
               style={{ minWidth: "1240px", tableLayout: "fixed" }}
@@ -149,6 +150,7 @@ export function ItensAtaTab({
                 ))}
               </tbody>
             </table>
+            </div>
           </section>
         );
       })}

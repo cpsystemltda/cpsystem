@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Receipt, AlertTriangle, Pencil } from "lucide-react";
 import { EditavelInline } from "@/components/EditarInlineExecucao";
+import { BotaoExcluirEmpenho } from "@/components/BotaoExcluirEmpenho";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, formatarCnpj, ROTULO_PROCEDIMENTO, ROTULO_TIPO } from "@/lib/validators";
@@ -37,8 +38,15 @@ const PASSOS = [
   { marco: "PAGO", label: "Pago", campo: "dataPagamento" },
 ] as const;
 
-export default async function EmpenhoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EmpenhoDetalhePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { id } = await params;
+  const { from } = await searchParams;
   const usuario = await exigirUsuario();
 
   const e = await prisma.empenho.findFirst({
@@ -109,10 +117,25 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
       ? new Date(e.dataNfEncaminhada.getTime() + e.prazoPagamentoDias * 86400000)
       : null;
 
+  // "Voltar" leva pra origem real: se o usuario abriu este empenho de
+  // dentro de uma Ata ou Contrato, retorna pra esses detalhes (via
+  // `?from=ata-XXX` ou `?from=contrato-YYY`). Sem from, default /execucao.
+  const voltar = (() => {
+    if (from?.startsWith("ata-")) {
+      const ataId = from.slice("ata-".length);
+      return { href: `/atas/${ataId}`, label: "Voltar para Ata" };
+    }
+    if (from?.startsWith("contrato-")) {
+      const contratoId = from.slice("contrato-".length);
+      return { href: `/contratos/${contratoId}`, label: "Voltar para Contrato" };
+    }
+    return { href: "/execucao", label: "Voltar" };
+  })();
+
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
-      <Link href="/execucao" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
-        <ChevronLeft className="h-4 w-4" /> Voltar
+      <Link href={voltar.href} className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
+        <ChevronLeft className="h-4 w-4" /> {voltar.label}
       </Link>
 
       <div className="mt-4 flex items-start gap-4">
@@ -153,14 +176,19 @@ export default async function EmpenhoDetalhePage({ params }: { params: Promise<{
             )}
           </p>
         </div>
-        {e.status !== "PAGO" && podeEditar && (
-          <Link
-            href={`/execucao/${e.id}/editar`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            title={`Editar dados da ${labelInstrumento(e.instrumento).toLowerCase()}`}
-          >
-            <Pencil className="h-3.5 w-3.5" /> Editar
-          </Link>
+        {podeEditar && (
+          <div className="flex shrink-0 items-center gap-2">
+            {e.status !== "PAGO" && (
+              <Link
+                href={`/execucao/${e.id}/editar`}
+                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                title={`Editar dados da ${labelInstrumento(e.instrumento).toLowerCase()}`}
+              >
+                <Pencil className="h-3.5 w-3.5" /> Editar
+              </Link>
+            )}
+            {e.status !== "PAGO" && <BotaoExcluirEmpenho empenhoId={e.id} />}
+          </div>
         )}
       </div>
 

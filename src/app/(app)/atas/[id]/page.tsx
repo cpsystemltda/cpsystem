@@ -223,9 +223,9 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
             },
             {
               key: "derivados",
-              label: "Derivados",
+              label: "Fornecimento/Execução",
               badge: ata.contratos.length + ata.empenhos.length,
-              content: <DerivadosLista contratos={ata.contratos} empenhos={ata.empenhos} />,
+              content: <DerivadosLista ataId={ata.id} contratos={ata.contratos} empenhos={ata.empenhos} />,
             },
             {
               key: "aditivos",
@@ -468,9 +468,11 @@ function TabelaSaldoItens({
 }
 
 function DerivadosLista({
+  ataId,
   contratos,
   empenhos,
 }: {
+  ataId: string;
   contratos: { id: string; numero: string; objeto: string }[];
   empenhos: { id: string; numero: string; status: string; instrumento: InstrumentoContratual }[];
 }) {
@@ -504,7 +506,7 @@ function DerivadosLista({
           <ul className="space-y-2">
             {empenhos.map((e) => (
               <li key={e.id}>
-                <Link href={`/execucao/${e.id}`} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 hover:border-blue-300">
+                <Link href={`/execucao/${e.id}?from=ata-${ataId}`} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-3 hover:border-blue-300">
                   <Receipt className="h-4 w-4 text-amber-600" />
                   <div>
                     <div className="text-sm font-medium">{labelInstrumento(e.instrumento)} {e.numero}</div>
