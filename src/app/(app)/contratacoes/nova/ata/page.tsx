@@ -1,33 +1,7 @@
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { formatarCnpj } from "@/lib/validators";
+import { montarLabelEmpresa } from "@/lib/empresaLabel";
 import NovaAtaForm from "./NovaAtaForm";
-
-/**
- * Monta o label da empresa exibido no <select>:
- * - Sempre prefere razaoSocial (formal, único, não confunde com nome de pessoa).
- * - Adiciona nomeFantasia como sufixo "(...)" QUANDO existir, for diferente
- *   da razão social E não for igual ao nome do responsável (heurística pra
- *   evitar o bug do MEI: a Receita Federal devolve `nome_fantasia` = nome da
- *   pessoa física, e o autopreenchimento via BrasilAPI grava isso no banco).
- * - Sempre sufixa com CNPJ formatado pra desambiguar de vez (Igor pediu).
- */
-function montarLabelEmpresa(e: {
-  razaoSocial: string;
-  nomeFantasia: string | null;
-  responsavel: string;
-  cnpj: string;
-}): string {
-  const razao = e.razaoSocial.trim();
-  const fantasia = (e.nomeFantasia ?? "").trim();
-  const respNorm = e.responsavel.trim().toLowerCase();
-
-  let nome = razao;
-  if (fantasia && fantasia.toLowerCase() !== razao.toLowerCase() && fantasia.toLowerCase() !== respNorm) {
-    nome = `${razao} (${fantasia})`;
-  }
-  return `${nome} · CNPJ ${formatarCnpj(e.cnpj)}`;
-}
 
 export default async function Page() {
   const usuario = await exigirUsuario();

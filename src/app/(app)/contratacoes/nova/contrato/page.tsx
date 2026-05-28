@@ -1,7 +1,7 @@
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularSaldoAta } from "@/lib/saldo";
-import { formatarCnpj } from "@/lib/validators";
+import { montarLabelEmpresa } from "@/lib/empresaLabel";
 import NovoContratoForm from "./NovoContratoForm";
 
 export default async function Page() {
@@ -9,7 +9,7 @@ export default async function Page() {
   const empresas = await prisma.empresa.findMany({
     where: { contaId: usuario.contaId },
     orderBy: { criadoEm: "asc" },
-    select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true },
+    select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true, cnpj: true },
   });
 
   const atas = await prisma.ata.findMany({
@@ -37,10 +37,7 @@ export default async function Page() {
 
   return (
     <NovoContratoForm
-      empresas={empresas.map((e) => ({
-        value: e.id,
-        label: `${e.nomeFantasia || e.razaoSocial} · CNPJ ${formatarCnpj(e.cnpj)}`,
-      }))}
+      empresas={empresas.map((e) => ({ value: e.id, label: montarLabelEmpresa(e) }))}
       atas={atasComItens}
     />
   );
