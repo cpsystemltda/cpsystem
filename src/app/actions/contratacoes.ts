@@ -296,21 +296,26 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
     };
   }
 
-  // Bloqueia cadastro duplicado: mesma empresa + mesmo número + mesmo órgão.
-  // Evita erro humano (cadastrar a mesma Ata duas vezes).
+  // Bloqueia cadastro duplicado: mesmo número + mesmo órgão, considerando
+  // QUALQUER empresa da conta (Regina 28/05: precisa pegar duplicidade mesmo
+  // quando o usuário tem múltiplas empresas cadastradas). Número é
+  // comparado com trim pra evitar diferença por espaço acidental.
   const orgaoCnpjNormalizado = normalizarCnpj(v.orgaoCnpj);
+  const numeroNormalizado = v.numero.trim();
   const ataExistente = await prisma.ata.findFirst({
     where: {
-      empresaId: v.empresaId,
-      numero: v.numero,
+      empresa: { contaId: usuario.contaId },
+      numero: numeroNormalizado,
       orgaoCnpj: orgaoCnpjNormalizado,
     },
-    select: { id: true },
+    select: { id: true, empresa: { select: { nomeFantasia: true, razaoSocial: true } } },
   });
   if (ataExistente) {
+    const nomeEmp =
+      ataExistente.empresa.nomeFantasia || ataExistente.empresa.razaoSocial;
     return {
-      erro: `Já existe uma Ata nº ${v.numero} cadastrada para esse órgão nessa empresa. Edite a existente em vez de duplicar.`,
-      campos: { numero: "Ata duplicada (mesmo número + órgão + empresa)." },
+      erro: `Já existe uma Ata nº ${v.numero} cadastrada para esse órgão (na empresa "${nomeEmp}"). Edite a existente em vez de duplicar.`,
+      campos: { numero: "Ata duplicada (mesmo número + órgão na sua conta)." },
       valores: dados,
     };
   }
@@ -738,19 +743,22 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
   const v = parsed.data;
   await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
 
-  // Bloqueia cadastro duplicado: mesma empresa + mesmo número + mesmo órgão.
+  // Bloqueia cadastro duplicado: mesmo número + mesmo órgão na conta
+  // inteira (Regina 28/05). Trim do número evita diferença por espaço.
   const contratoExistente = await prisma.contrato.findFirst({
     where: {
-      empresaId: v.empresaId,
-      numero: v.numero,
+      empresa: { contaId: usuario.contaId },
+      numero: v.numero.trim(),
       orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
     },
-    select: { id: true },
+    select: { id: true, empresa: { select: { nomeFantasia: true, razaoSocial: true } } },
   });
   if (contratoExistente) {
+    const nomeEmp =
+      contratoExistente.empresa.nomeFantasia || contratoExistente.empresa.razaoSocial;
     return {
-      erro: `Já existe um Contrato nº ${v.numero} cadastrado para esse órgão nessa empresa. Edite o existente em vez de duplicar.`,
-      campos: { numero: "Contrato duplicado (mesmo número + órgão + empresa)." },
+      erro: `Já existe um Contrato nº ${v.numero} cadastrado para esse órgão (na empresa "${nomeEmp}"). Edite o existente em vez de duplicar.`,
+      campos: { numero: "Contrato duplicado (mesmo número + órgão na sua conta)." },
     };
   }
 
@@ -1271,22 +1279,23 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
   const v = parsed.data;
   await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
 
-  // Bloqueia cadastro duplicado: mesma empresa + mesmo número + mesmo órgão.
-  // Empenho ainda admite mesmo número em órgãos diferentes (cada órgão usa
-  // sua própria numeração de NE/OC/OS/AC), mas dentro do mesmo órgão e
-  // empresa é duplicação por erro humano.
+  // Bloqueia cadastro duplicado: mesmo número + mesmo órgão na conta
+  // inteira (Regina 28/05). Empenho ainda admite mesmo número em
+  // órgãos diferentes (cada órgão usa sua própria numeração de NE/OC/OS/AC).
   const empenhoExistente = await prisma.empenho.findFirst({
     where: {
-      empresaId: v.empresaId,
-      numero: v.numero,
+      empresa: { contaId: usuario.contaId },
+      numero: v.numero.trim(),
       orgaoCnpj: normalizarCnpj(v.orgaoCnpj),
     },
-    select: { id: true },
+    select: { id: true, empresa: { select: { nomeFantasia: true, razaoSocial: true } } },
   });
   if (empenhoExistente) {
+    const nomeEmp =
+      empenhoExistente.empresa.nomeFantasia || empenhoExistente.empresa.razaoSocial;
     return {
-      erro: `Já existe uma execução nº ${v.numero} cadastrada para esse órgão nessa empresa. Edite a existente em vez de duplicar.`,
-      campos: { numero: "Execução duplicada (mesmo número + órgão + empresa)." },
+      erro: `Já existe uma execução nº ${v.numero} cadastrada para esse órgão (na empresa "${nomeEmp}"). Edite a existente em vez de duplicar.`,
+      campos: { numero: "Execução duplicada (mesmo número + órgão na sua conta)." },
     };
   }
 

@@ -358,60 +358,29 @@ function Card({
         </div>
       </div>
 
-      {confirmando ? (
-        <div className="border-t border-red-200 bg-red-50/60 px-5 py-3">
-          <p className="text-xs text-red-800">
-            <strong>Confirma a exclusão?</strong> Essa ação não pode ser desfeita. Empenhos vinculados impedem a exclusão.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <form action={excluirContratoAction}>
-              <input type="hidden" name="id" value={c.id} />
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-              >
-                <Trash2 className="h-3 w-3" /> Excluir definitivamente
-              </button>
-            </form>
-            <button
-              type="button"
-              onClick={onCancelar}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/30 px-5 py-3">
-          <Link
-            href={`/contratos/${c.id}/imprimir`}
-            target="_blank"
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            <Printer className="h-3.5 w-3.5" /> Imprimir
-          </Link>
-          <Link
-            href={`/contratos/${c.id}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-          >
-            <Pencil className="h-3.5 w-3.5" /> Alterar
-          </Link>
-          <button
-            type="button"
-            onClick={onConfirmar}
-            className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-700 transition hover:border-red-300 hover:bg-red-50"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Excluir
-          </button>
-          <Link
-            href={`/contratos/${c.id}`}
-            className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
-          >
-            Abrir <ChevronRight className="h-3 w-3" />
-          </Link>
-        </div>
-      )}
+      {/* Padronização (Regina 28/05): exclusão só no "lado de dentro"
+          (página de detalhe). Card só tem ações de navegação. */}
+      <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/30 px-5 py-3">
+        <Link
+          href={`/contratos/${c.id}/imprimir`}
+          target="_blank"
+          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          <Printer className="h-3.5 w-3.5" /> Imprimir
+        </Link>
+        <Link
+          href={`/contratos/${c.id}`}
+          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          <Pencil className="h-3.5 w-3.5" /> Alterar
+        </Link>
+        <Link
+          href={`/contratos/${c.id}`}
+          className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
+        >
+          Abrir <ChevronRight className="h-3 w-3" />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -463,59 +432,32 @@ function Linha({
         <p className="text-[11px] text-slate-500">{new Date(c.vigenciaFim).toLocaleDateString("pt-BR")}</p>
       </td>
       <td className="px-4 py-3">
-        {confirmando ? (
-          <div className="flex items-center justify-end gap-1.5">
-            <form action={excluirContratoAction}>
-              <input type="hidden" name="id" value={c.id} />
-              <button
-                type="submit"
-                className="rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-red-700"
-              >
-                Confirmar exclusão
-              </button>
-            </form>
-            <button
-              type="button"
-              onClick={onCancelar}
-              className="rounded-md border border-slate-200 px-2.5 py-1 text-[11px] text-slate-600 hover:bg-slate-50"
-            >
-              Cancelar
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-end gap-1">
-            <Link
-              href={`/contratos/${c.id}/imprimir`}
-              target="_blank"
-              className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
-              title="Imprimir extrato"
-            >
-              <Printer className="h-3.5 w-3.5" />
-            </Link>
-            <Link
-              href={`/contratos/${c.id}`}
-              className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
-              title="Alterar"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Link>
-            <button
-              type="button"
-              onClick={onConfirmar}
-              className="grid h-7 w-7 place-items-center rounded-md border border-red-200 text-red-700 hover:bg-red-50"
-              title="Excluir"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-            <Link
-              href={`/contratos/${c.id}`}
-              className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50"
-              title="Abrir"
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        )}
+        {/* Padronização Regina (28/05): exclusão só no detalhe ("lado de
+            dentro"). Linha da tabela só tem ações de navegação. */}
+        <div className="flex items-center justify-end gap-1">
+          <Link
+            href={`/contratos/${c.id}/imprimir`}
+            target="_blank"
+            className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+            title="Imprimir extrato"
+          >
+            <Printer className="h-3.5 w-3.5" />
+          </Link>
+          <Link
+            href={`/contratos/${c.id}`}
+            className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+            title="Alterar"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Link>
+          <Link
+            href={`/contratos/${c.id}`}
+            className="grid h-7 w-7 place-items-center rounded-md border border-slate-200 text-blue-700 hover:bg-blue-50"
+            title="Abrir"
+          >
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </td>
     </tr>
   );

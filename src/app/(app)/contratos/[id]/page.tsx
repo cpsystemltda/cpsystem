@@ -30,6 +30,7 @@ import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { SaldoVigenciasPanel } from "@/components/SaldoVigenciasPanel";
 import { KpisSaldoVigencia } from "@/components/KpisSaldoVigencia";
+import { BotaoExcluirContrato } from "@/components/BotaoExcluirContrato";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
@@ -133,6 +134,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
           >
             + Execução
           </Link>
+          {podeEditar && <BotaoExcluirContrato contratoId={contrato.id} />}
         </div>
       </div>
 
