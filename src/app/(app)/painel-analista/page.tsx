@@ -359,30 +359,16 @@ export default async function PainelAnalistaPage({
         subtitulo={`${consolidado.totalEmpresas} empresa(s) vinculada(s) — comissões, carteira e atividade consolidada.`}
       />
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <KPI
-          tone="mint"
-          icon={Wallet}
-          label="Recebido (comissão variável)"
-          value={brlCompacto(consolidado.totalComissaoRecebida)}
-          meta="empresa já repassou a comissão"
-        />
-        <KPI
-          tone="primary"
-          icon={Coins}
-          label="A receber"
-          value={brlCompacto(consolidado.totalComissaoAReceber)}
-          meta="órgão pagou a empresa; comissão pendente"
-        />
-        <KPI
-          tone="sky"
-          icon={Receipt}
-          label="Aguardando órgão"
-          value={brlCompacto(consolidado.totalComissaoAguardandoOrgao)}
-          meta="empenhos ainda não pagos pelo órgão (potencial)"
-        />
-      </div>
-      <div className="mt-3 grid gap-4 md:grid-cols-2">
+      {/* KPIs do painel do analista — ordem definida pela Regina (24/05):
+          1. Carteira contratada
+          2. Fixo mensal ativo
+          3. Recebidos · TOTAL (fixo + variável)
+          4. Recebidos · Comissões Fixas
+          5. Recebidos · Comissões Variáveis
+          6. A Receber · Comissões Variáveis (órgão pendente + cliente pendente)
+          7. Comissões · CP System (programa embaixador — placeholder por enquanto)
+      */}
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
         <KPI
           tone="lavender"
           icon={Briefcase}
@@ -396,6 +382,45 @@ export default async function PainelAnalistaPage({
           label="Fixo mensal ativo"
           value={brlCompacto(consolidado.totalFixoMensalAtivo)}
           meta={`${consolidado.empresas.filter((e) => e.status === "ATIVO").length} vínculos ativos`}
+        />
+      </div>
+      <div className="mt-3 grid gap-4 md:grid-cols-3">
+        <KPI
+          tone="mint"
+          icon={Wallet}
+          label="Recebidos · TOTAL"
+          value={brlCompacto(consolidado.totalFixoRecebido + consolidado.totalComissaoRecebida)}
+          meta="fixos + variáveis pagos pelos clientes"
+        />
+        <KPI
+          tone="mint"
+          icon={Receipt}
+          label="Recebidos · Comissões Fixas"
+          value={brlCompacto(consolidado.totalFixoRecebido)}
+          meta="todos os fixos mensais já pagos"
+        />
+        <KPI
+          tone="mint"
+          icon={Coins}
+          label="Recebidos · Comissões Variáveis"
+          value={brlCompacto(consolidado.totalComissaoRecebida)}
+          meta="todas as comissões variáveis já pagas"
+        />
+      </div>
+      <div className="mt-3 grid gap-4 md:grid-cols-2">
+        <KPI
+          tone="primary"
+          icon={Coins}
+          label="A Receber · Comissões Variáveis"
+          value={brlCompacto(consolidado.totalComissaoAReceber + consolidado.totalComissaoAguardandoOrgao)}
+          meta={`Cliente: ${brlCompacto(consolidado.totalComissaoAReceber)} · Órgão: ${brlCompacto(consolidado.totalComissaoAguardandoOrgao)}`}
+        />
+        <KPI
+          tone="primary"
+          icon={Wallet}
+          label="Comissões · CP System"
+          value={brlCompacto(consolidado.totalComissaoCpSystem)}
+          meta="programa de embaixador (em breve)"
         />
       </div>
 

@@ -164,13 +164,19 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
 
   // Cria o vínculo + notifica o analista
   if (analistaValido) {
+    // % e fixo são opcionais no signup. Se preenchidos, já entram com
+    // o valor — economiza uma ida posterior em /vinculos.
+    const pctRaw = Number(formData.get("vinculoPercentual") || 0);
+    const fixoRaw = Number(formData.get("vinculoFixo") || 0);
+    const pct = isNaN(pctRaw) || pctRaw < 0 || pctRaw > 100 ? 0 : pctRaw;
+    const fixo = isNaN(fixoRaw) || fixoRaw < 0 ? 0 : fixoRaw;
     await prisma.vinculoAnalista.create({
       data: {
         contaId: conta.id,
         analistaId: analistaValido.id,
         dataInicio: new Date(),
-        percentualComissao: 0,
-        fixoMensal: 0,
+        percentualComissao: pct,
+        fixoMensal: fixo,
         diaVencimentoFixo: 5,
         status: "ATIVO",
       },

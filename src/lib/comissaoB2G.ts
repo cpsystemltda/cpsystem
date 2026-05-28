@@ -21,11 +21,15 @@ export type ResumoComissaoEmpresa = {
 };
 
 export type ResumoComissaoConsolidado = {
-  totalComissaoRecebida: number;
-  totalComissaoAReceber: number;
-  totalComissaoAguardandoOrgao: number;
+  totalComissaoRecebida: number;             // soma Linha B variável já paga
+  totalComissaoAReceber: number;             // Linha B variável devida (órgão pagou)
+  totalComissaoAguardandoOrgao: number;      // Linha B variável potencial (órgão ainda não pagou)
   totalCarteiraContratada: number;
-  totalFixoMensalAtivo: number;
+  totalFixoMensalAtivo: number;              // Soma fixoMensal dos vínculos ATIVO
+  // Novos (Regina 24/05): KPIs do painel individual do analista
+  totalFixoRecebido: number;                 // soma PagamentoFixoMensal.valorRecebido (status PAGO/PAGO_PARCIAL)
+  totalFixoAReceber: number;                 // PagamentoFixoMensal A_RECEBER/ATRASADO
+  totalComissaoCpSystem: number;             // pagamentos da plataforma ao analista (programa embaixador) — TODO: model dedicado, hoje sempre 0
   totalEmpresas: number;
   empresas: ResumoComissaoEmpresa[];
 };
@@ -134,12 +138,36 @@ export async function calcularComissaoAnalista(analistaId: string): Promise<Resu
     });
   }
 
+  // Comissões fixas pagas (todos os PagamentoFixoMensal dos vínculos)
+  const vinculoIds = vinculos.map((v) => v.id);
+  const pagamentosFixos = vinculoIds.length > 0
+    ? await prisma.pagamentoFixoMensal.findMany({
+        where: { vinculoId: { in: vinculoIds } },
+        select: { status: true, valor: true, valorRecebido: true },
+      })
+    : [];
+  let totalFixoRecebido = 0;
+  let totalFixoAReceber = 0;
+  for (const p of pagamentosFixos) {
+    if (p.status === "PAGO" || p.status === "PAGO_PARCIAL") {
+      totalFixoRecebido += p.valorRecebido || 0;
+    }
+    if (p.status === "PAGO_PARCIAL") {
+      totalFixoAReceber += Math.max(0, p.valor - p.valorRecebido);
+    } else if (p.status === "A_RECEBER" || p.status === "ATRASADO") {
+      totalFixoAReceber += p.valor;
+    }
+  }
+
   return {
     totalComissaoRecebida: empresas.reduce((s, e) => s + e.comissaoRecebida, 0),
     totalComissaoAReceber: empresas.reduce((s, e) => s + e.comissaoAReceber, 0),
     totalComissaoAguardandoOrgao: empresas.reduce((s, e) => s + e.comissaoAguardandoOrgao, 0),
     totalCarteiraContratada: empresas.reduce((s, e) => s + e.carteiraContratada, 0),
     totalFixoMensalAtivo: empresas.filter((e) => e.status === "ATIVO").reduce((s, e) => s + e.fixoMensal, 0),
+    totalFixoRecebido,
+    totalFixoAReceber,
+    totalComissaoCpSystem: 0, // TODO: programa de embaixador (model dedicado) — sempre 0 por enquanto
     totalEmpresas: empresas.length,
     empresas,
   };

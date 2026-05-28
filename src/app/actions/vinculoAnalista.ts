@@ -31,7 +31,20 @@ export async function criarVinculoAnalistaAction(_p: Result | null, formData: Fo
   const analista = await prisma.analista.findUnique({ where: { id: analistaId } });
   if (!analista || !analista.ativo) return { erro: "Analista não encontrado ou inativo." };
 
-  // Encerra vínculo anterior ATIVO entre a mesma conta e analista (substituição)
+  // Regra Regina: 1 empresa = 1 analista. Se já houver QUALQUER vínculo
+  // ATIVO com outro analista, bloqueia. O fluxo correto é encerrar o
+  // vínculo anterior antes de criar um novo.
+  const outroAtivo = await prisma.vinculoAnalista.findFirst({
+    where: { contaId: usuario.contaId, status: "ATIVO", analistaId: { not: analistaId } },
+    include: { analista: { select: { nomeCompleto: true } } },
+  });
+  if (outroAtivo) {
+    return {
+      erro: `Esta empresa já tem um analista ativo: ${outroAtivo.analista.nomeCompleto}. Encerre esse vínculo antes de cadastrar outro.`,
+    };
+  }
+
+  // Encerra vínculo anterior ATIVO com o MESMO analista (substituição de termos: %, fixo)
   await prisma.vinculoAnalista.updateMany({
     where: { contaId: usuario.contaId, analistaId, status: "ATIVO" },
     data: { status: "ENCERRADO", encerradoEm: new Date() },

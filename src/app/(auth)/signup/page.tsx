@@ -458,23 +458,59 @@ function SeletorAnalista() {
 
   if (escolhido) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
-        <div>
-          <p className="text-sm font-semibold text-slate-900">{escolhido.nome}</p>
-          <p className="text-xs text-slate-600">CPF {escolhido.cpfMascarado} · {escolhido.email}</p>
+      <div className="space-y-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">{escolhido.nome}</p>
+            <p className="text-xs text-slate-600">CPF {escolhido.cpfMascarado} · {escolhido.email}</p>
+          </div>
+          <input type="hidden" name="analistaId" value={escolhido.id} />
+          <button
+            type="button"
+            onClick={() => {
+              setEscolhido(null);
+              setBusca("");
+            }}
+            className="rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-slate-700"
+            title="Remover vínculo"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-        <input type="hidden" name="analistaId" value={escolhido.id} />
-        <button
-          type="button"
-          onClick={() => {
-            setEscolhido(null);
-            setBusca("");
-          }}
-          className="rounded-md p-1.5 text-slate-500 hover:bg-white hover:text-slate-700"
-          title="Remover vínculo"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {/* Condições da comissão (opcional). Se vazios, ficam 0 e voce ajusta
+            depois em /vinculos. Se preenchidos, ja entram com o valor. */}
+        <div className="grid grid-cols-2 gap-3 border-t border-emerald-200 pt-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">
+              Comissão variável (%) <span className="text-slate-400">— opcional</span>
+            </span>
+            <input
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              name="vinculoPercentual"
+              placeholder="Ex: 5"
+              className="rounded border border-slate-300 px-2 py-1.5 text-sm"
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">
+              Fixo mensal (R$) <span className="text-slate-400">— opcional</span>
+            </span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              name="vinculoFixo"
+              placeholder="Ex: 1500"
+              className="rounded border border-slate-300 px-2 py-1.5 text-sm"
+            />
+          </label>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          Pode deixar em branco e ajustar depois em comum acordo com o analista.
+        </p>
       </div>
     );
   }
