@@ -165,10 +165,16 @@ export default async function ContratosPage({
     finalizados: contratosCard.filter((c) => c.status === "finalizados").length,
   };
 
-  const filtrados = contratosCard.filter((c) => {
-    if (abaSelecionada === "finalizados") return c.pctExecutado >= 100;
-    return c.status === abaSelecionada;
-  });
+  // Quando há filtro por alerta de vencimento (?alerta=30/60/90/120),
+  // mostramos TUDO que voltou do whereQuery — o whereQuery já fez o corte
+  // por janela de vencimento. Aplicar o filtro de aba em cima descartaria
+  // os "vencimento_proximo" quando a aba default é "vigentes".
+  const filtrados = alertaDias > 0
+    ? contratosCard
+    : contratosCard.filter((c) => {
+        if (abaSelecionada === "finalizados") return c.pctExecutado >= 100;
+        return c.status === abaSelecionada;
+      });
 
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">

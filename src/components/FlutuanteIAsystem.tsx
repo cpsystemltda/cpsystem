@@ -29,13 +29,16 @@ const SUGESTOES_INICIAIS = [
 // Botão flutuante (FAB) + drawer com o chat IAsystem embutido.
 // Toda conversa acontece no drawer — não navega pra outra rota.
 // Histórico vem do banco (isolado por usuarioId), não localStorage.
-export function FlutuanteIAsystem() {
+// Plano Básico vê o chat mas envio é bloqueado com modal de upgrade
+// (decisão Regina: análise jurídica IA é feature Premium).
+export function FlutuanteIAsystem({ plano }: { plano: string }) {
   const [aberto, setAberto] = useState(false);
+  const isPremium = plano === "PREMIUM";
 
   return (
     <>
       {!aberto && <BotaoFAB onAbrir={() => setAberto(true)} />}
-      {aberto && <Drawer onFechar={() => setAberto(false)} />}
+      {aberto && <Drawer onFechar={() => setAberto(false)} isPremium={isPremium} />}
     </>
   );
 }
@@ -73,11 +76,12 @@ function BotaoFAB({ onAbrir }: { onAbrir: () => void }) {
   );
 }
 
-function Drawer({ onFechar }: { onFechar: () => void }) {
+function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: boolean }) {
   const [mensagens, setMensagens] = useState<MensagemIAsystem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [rascunho, setRascunho] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const [paywallAberto, setPaywallAberto] = useState(false);
   const [enviando, startTransition] = useTransition();
   const fimRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -118,6 +122,12 @@ function Drawer({ onFechar }: { onFechar: () => void }) {
   function enviar(texto: string) {
     const pergunta = texto.trim();
     if (!pergunta || enviando) return;
+    // Plano Básico: bloqueia envio e mostra paywall. Mensagens já existentes
+    // (do tempo do trial / quando era Premium) continuam visíveis em read-only.
+    if (!isPremium) {
+      setPaywallAberto(true);
+      return;
+    }
     setErro(null);
     setMensagens((prev) => [...prev, { role: "user", content: pergunta }]);
     setRascunho("");
@@ -226,6 +236,25 @@ function Drawer({ onFechar }: { onFechar: () => void }) {
           </div>
         )}
 
+        {/* Banner Premium quando plano Básico */}
+        {!isPremium && (
+          <div
+            className="mx-3 mb-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[11px]"
+            style={{
+              background: "linear-gradient(135deg, rgba(142,115,224,0.10), rgba(107,79,201,0.05))",
+              border: "0.5px solid rgba(107,79,201,0.25)",
+              color: "#6B4FC9",
+            }}
+          >
+            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              <strong>Recurso Premium.</strong> O envio de novas mensagens está
+              disponível apenas no plano Premium. Suas conversas antigas continuam
+              visíveis.
+            </span>
+          </div>
+        )}
+
         {/* Input */}
         <form
           className="flex items-end gap-2 border-t border-slate-100 px-3 py-3"
@@ -244,7 +273,7 @@ function Drawer({ onFechar }: { onFechar: () => void }) {
                 enviar(rascunho);
               }
             }}
-            placeholder="Sua dúvida em Lei 14.133…"
+            placeholder={isPremium ? "Sua dúvida em Lei 14.133…" : "Faça upgrade pro Premium para usar o IAsystem…"}
             rows={2}
             className="flex-1 resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
             disabled={enviando}
@@ -253,13 +282,87 @@ function Drawer({ onFechar }: { onFechar: () => void }) {
             type="submit"
             disabled={!rascunho.trim() || enviando}
             className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-violet-700 disabled:opacity-40"
-            title="Enviar (Enter)"
+            title={isPremium ? "Enviar (Enter)" : "Recurso Premium — clique pra ver o plano"}
           >
             {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
         </form>
       </div>
+
+      {/* Modal paywall — aparece quando usuário Básico tenta enviar */}
+      {paywallAberto && <PaywallModal onFechar={() => setPaywallAberto(false)} />}
     </>
+  );
+}
+
+function PaywallModal({ onFechar }: { onFechar: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[70] grid place-items-center bg-black/50 backdrop-blur-sm px-4"
+      onClick={onFechar}
+    >
+      <div
+        className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onFechar}
+          className="absolute right-3 top-3 rounded-md p-1 text-slate-400 hover:bg-slate-100"
+          aria-label="Fechar"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <div
+          className="grid h-14 w-14 place-items-center rounded-2xl text-white"
+          style={{ background: "linear-gradient(135deg, #8E73E0 0%, #6B4FC9 100%)" }}
+        >
+          <Sparkles className="h-6 w-6" />
+        </div>
+        <h3 className="mt-4 text-lg font-extrabold text-slate-900">
+          Esta função faz parte do pacote Premium
+        </h3>
+        <p className="mt-2 text-sm text-slate-600">
+          O <strong>IAsystem</strong> — assistente jurídico especializado em Lei
+          14.133/2021 — é exclusivo do plano <strong>Premium</strong>. Faça o
+          upgrade pra desbloquear chat ilimitado + análise de Atas, Contratos e
+          Empenhos + parecer estruturado.
+        </p>
+        <ul className="mt-4 space-y-2 text-xs text-slate-700">
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 text-violet-600">✓</span>
+            <span>Chat ilimitado com IAsystem</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 text-violet-600">✓</span>
+            <span>Análise de Ata, Contrato e Empenho com parecer estruturado</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 text-violet-600">✓</span>
+            <span>12 consultas humanas/ano com especialistas do Grupo Contratos Públicos</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="mt-0.5 text-violet-600">✓</span>
+            <span>Canal VIP de atendimento</span>
+          </li>
+        </ul>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+          <a
+            href="/conta/assinatura"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700"
+          >
+            <Sparkles className="h-4 w-4" /> Fazer upgrade pro Premium
+          </a>
+          <button
+            type="button"
+            onClick={onFechar}
+            className="rounded-md border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Agora não
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -462,7 +462,7 @@ export default async function PainelAnalistaPage({
               return (
                 <div
                   key={e.vinculoId}
-                  className={`glass-tile rounded-[18px] px-5 py-5 ${ativo ? "t-primary" : ""}`}
+                  className={`glass-tile rounded-[18px] px-5 py-5 transition hover:-translate-y-0.5 ${ativo ? "t-primary" : ""}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
@@ -471,7 +471,13 @@ export default async function PainelAnalistaPage({
                           className="text-[17px] font-extrabold"
                           style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
                         >
-                          {e.empresaPrincipalNome}
+                          <Link
+                            href={`/painel-analista/empresa/${e.vinculoId}`}
+                            className="hover:underline"
+                            title="Ver todas as informações desta empresa"
+                          >
+                            {e.empresaPrincipalNome}
+                          </Link>
                         </h3>
                         <span className={`badge ${e.status === "ATIVO" ? "b-entregue" : "b-empenhado"}`}>
                           {e.status}

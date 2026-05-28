@@ -21,6 +21,17 @@ export async function enviarMensagemIAsystemAction(
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
 
+  // IAsystem é feature Premium (decisão Regina 28/05). Guard server-side
+  // de defesa em profundidade — UI já bloqueia, mas se alguém burlar via
+  // POST direto, ainda barra aqui. Super admin (Regina/Igor) tem acesso
+  // pra testar e demonstrar a feature.
+  if (!usuario.superAdmin && usuario.conta.plano !== "PREMIUM") {
+    return {
+      ok: false,
+      erro: "O IAsystem é uma feature exclusiva do plano Premium. Faça o upgrade em /conta/assinatura.",
+    };
+  }
+
   const pergunta = novaMensagem.trim();
   if (!pergunta) return { ok: false, erro: "Mensagem vazia." };
   if (pergunta.length > 4000) {
