@@ -146,11 +146,11 @@ export type ApostilamentoExtraido = {
   novaVigenciaInicio: string | null;
   novaVigenciaFim: string | null;
   novaVigenciaPrazo: number | null;
-  novaVigenciaUnidade: "DIAS" | "MESES" | null;
+  novaVigenciaUnidade: "DIAS" | "MESES" | "ANOS" | null;
 
   alteraPrazoEntrega: boolean;
   novoPrazoEntregaDias: number | null;
-  novoPrazoEntregaUnidade: "DIAS" | "MESES" | null;
+  novoPrazoEntregaUnidade: "DIAS" | "MESES" | "ANOS" | null;
 
   aplicaReajuste: boolean;
   reajusteIndice: IndiceReajusteExtraido | null;
@@ -183,11 +183,11 @@ export type AditivoExtraido = {
   novaVigenciaInicio: string | null;
   novaVigenciaFim: string | null;
   novaVigenciaPrazo: number | null;
-  novaVigenciaUnidade: "DIAS" | "MESES" | null;
+  novaVigenciaUnidade: "DIAS" | "MESES" | "ANOS" | null;
 
   alteraPrazoEntrega: boolean;
   novoPrazoEntregaDias: number | null;
-  novoPrazoEntregaUnidade: "DIAS" | "MESES" | null;
+  novoPrazoEntregaUnidade: "DIAS" | "MESES" | "ANOS" | null;
 
   aplicaReajuste: boolean;
   reajusteIndice: IndiceReajusteExtraido | null;

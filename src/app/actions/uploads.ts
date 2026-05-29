@@ -19,6 +19,14 @@ export async function salvarAnexoAdicionalAction(
     const salvo = await salvarArquivo(file);
     return { ok: true, url: salvo.url, nome: salvo.nome };
   } catch (err) {
+    // Loga o erro completo nos Vercel logs pra diagnostico (a mensagem
+    // resumida vai pro UI). Antes a stack trace sumia.
+    console.error("[salvarAnexoAdicionalAction] falha ao salvar arquivo:", {
+      nome: file.name,
+      tipo: file.type,
+      tamanhoBytes: file.size,
+      erro: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+    });
     return {
       ok: false,
       erro: err instanceof Error ? err.message : "Erro ao salvar arquivo.",

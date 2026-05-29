@@ -484,7 +484,7 @@ function Timeline({
     id: string;
     status: string;
     prazoEntregaDias: number | null;
-    prazoEntregaUnidade?: "DIAS" | "MESES";
+    prazoEntregaUnidade?: "DIAS" | "MESES" | "ANOS";
     prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA" | "PRAZO_CERTO";
     dataEntregaCerta?: Date | null;
     dataEntregaInicio?: Date | null;
@@ -757,7 +757,7 @@ function DadosEmpenho({
     numeroLicitacao: string | null; orgaoNome: string; orgaoCnpj: string;
     dataEmissao: Date; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null;
-    prazoEntregaUnidade: "DIAS" | "MESES";
+    prazoEntregaUnidade: "DIAS" | "MESES" | "ANOS";
     prazoEntregaModo: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA" | "PRAZO_CERTO";
     dataEntregaCerta: Date | null;
     dataEntregaInicio: Date | null;

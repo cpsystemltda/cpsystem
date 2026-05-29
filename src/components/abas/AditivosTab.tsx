@@ -31,7 +31,13 @@ import type { AditivoExtraido } from "@/lib/extrairAta";
 type TipoAlteracaoValor = "ACRESCIMO" | "SUPRESSAO" | "REAJUSTE_REPACTUACAO" | "REEQUILIBRIO";
 type IndiceReajuste =
   | "IPCA" | "IPCA_E" | "IPCA_15" | "IGPM" | "INCC" | "INPC" | "IST" | "CONTRATUAL" | "OUTRO";
-type Unidade = "DIAS" | "MESES";
+type Unidade = "DIAS" | "MESES" | "ANOS";
+
+const ROTULO_UNIDADE: Record<Unidade, string> = {
+  DIAS: "Dia(s)",
+  MESES: "Mes(es)",
+  ANOS: "Ano(s)",
+};
 
 type Aditivo = {
   id: string;
@@ -93,7 +99,8 @@ function toIsoDate(d: Date | null | undefined): string {
 function calcularDataFim(inicio: string, prazo: number, unidade: Unidade): string {
   if (!inicio || !prazo) return "";
   const d = new Date(`${inicio}T12:00:00.000Z`);
-  if (unidade === "MESES") d.setUTCMonth(d.getUTCMonth() + prazo);
+  if (unidade === "ANOS") d.setUTCFullYear(d.getUTCFullYear() + prazo);
+  else if (unidade === "MESES") d.setUTCMonth(d.getUTCMonth() + prazo);
   else d.setUTCDate(d.getUTCDate() + prazo);
   return d.toISOString().slice(0, 10);
 }
@@ -753,8 +760,8 @@ function FormularioAditivo({
               />
             </CampoLabel>
             <CampoLabel label="Unidade" required={alteraVig}>
-              <div className="flex gap-3 pt-2">
-                {(["DIAS", "MESES"] as Unidade[]).map((u) => (
+              <div className="flex flex-wrap gap-3 pt-2">
+                {(["DIAS", "MESES", "ANOS"] as Unidade[]).map((u) => (
                   <label
                     key={u}
                     className="inline-flex items-center gap-2 text-[13px] font-semibold cursor-pointer"
@@ -768,7 +775,7 @@ function FormularioAditivo({
                       onChange={() => setVigUnidade(u)}
                       className="h-4 w-4"
                     />
-                    {u === "DIAS" ? "Dia(s)" : "Mes(es)"}
+                    {ROTULO_UNIDADE[u]}
                   </label>
                 ))}
               </div>

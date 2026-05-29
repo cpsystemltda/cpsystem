@@ -5,7 +5,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   experimental: {
     serverActions: {
-      bodySizeLimit: "10mb",
+      // Alinhado com MAX_BYTES de src/lib/uploads.ts (25 MB). Antes era 10 MB
+      // e cortava PDFs grandes de aditivos antes de chegar na action — usuario
+      // via "deu erro" sem mensagem util.
+      bodySizeLimit: "25mb",
     },
   },
   async headers() {

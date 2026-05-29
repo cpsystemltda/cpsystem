@@ -531,7 +531,7 @@ function DadosAta({
     idAtaPncp: string | null; dataAssinatura: Date; dataPublicacao: Date | null;
     vigenciaInicio: Date; vigenciaFim: Date; aceitaCarona: boolean;
     prazoEntregaDias: number | null;
-    prazoEntregaUnidade: "DIAS" | "MESES";
+    prazoEntregaUnidade: "DIAS" | "MESES" | "ANOS";
     prazoPagamentoDias: number | null;
   };
 }) {

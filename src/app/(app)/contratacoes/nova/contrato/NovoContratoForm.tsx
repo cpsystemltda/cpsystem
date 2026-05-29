@@ -56,7 +56,7 @@ export type ContratoValoresIniciais = {
   vigenciaInicio: string;
   vigenciaFim: string;
   prazoEntregaDias: number | null;
-  prazoEntregaUnidade?: "DIAS" | "MESES";
+  prazoEntregaUnidade?: "DIAS" | "MESES" | "ANOS";
   prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA";
   dataEntregaCerta?: string | null;
   prazoPagamentoDias: number | null;
@@ -122,7 +122,7 @@ export default function NovoContratoForm({
   const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA">(
     vi?.prazoEntregaModo ?? "RELATIVO",
   );
-  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES">(
+  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES" | "ANOS">(
     vi?.prazoEntregaUnidade ?? "DIAS",
   );
 
@@ -615,7 +615,7 @@ export default function NovoContratoForm({
                   <select
                     value={prazoEntregaUnidade}
                     onChange={(ev) =>
-                      setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES")
+                      setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES" | "ANOS")
                     }
                     className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
                     style={{

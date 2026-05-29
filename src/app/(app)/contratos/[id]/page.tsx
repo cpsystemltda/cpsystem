@@ -464,7 +464,7 @@ function DadosContrato({
     orgaoNome: string; orgaoCnpj: string; dataAssinatura: Date;
     dataPublicacao: Date | null; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null;
-    prazoEntregaUnidade: "DIAS" | "MESES";
+    prazoEntregaUnidade: "DIAS" | "MESES" | "ANOS";
     prazoEntregaModo: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA" | "PRAZO_CERTO";
     dataEntregaCerta: Date | null;
     prazoPagamentoDias: number | null;

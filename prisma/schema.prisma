@@ -345,6 +345,7 @@ enum ModalidadeEntrega {
 enum PrazoEntregaUnidade {
   DIAS
   MESES
+  ANOS
 }
 
 // Modo de inclusão do prazo de entrega. RELATIVO = qtd+unidade contada a

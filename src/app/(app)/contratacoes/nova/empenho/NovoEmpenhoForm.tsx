@@ -45,7 +45,7 @@ type ContratoDados = {
   orgaoEmail: string | null;
   orgaoTelefone: string | null;
   prazoEntregaDias: number | null;
-  prazoEntregaUnidade: "DIAS" | "MESES";
+  prazoEntregaUnidade: "DIAS" | "MESES" | "ANOS";
   prazoEntregaModo: "RELATIVO" | "DATA_CERTA" | "PRAZO_CERTO";
   dataEntregaCerta: string | null;
   dataEntregaInicio?: string | null;
@@ -93,7 +93,7 @@ export type EmpenhoValoresIniciais = {
   vigenciaInicio: string;
   vigenciaFim: string;
   prazoEntregaDias: number | null;
-  prazoEntregaUnidade?: "DIAS" | "MESES";
+  prazoEntregaUnidade?: "DIAS" | "MESES" | "ANOS";
   prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "PRAZO_CERTO";
   dataEntregaCerta?: string | null;
   dataEntregaInicio?: string | null;
@@ -174,7 +174,7 @@ export default function NovoEmpenhoForm({
   const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA" | "PRAZO_CERTO">(
     vi?.prazoEntregaModo ?? "RELATIVO",
   );
-  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES">(
+  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES" | "ANOS">(
     vi?.prazoEntregaUnidade ?? "DIAS",
   );
 
@@ -619,7 +619,7 @@ export default function NovoEmpenhoForm({
                   <select
                     value={prazoEntregaUnidade}
                     onChange={(ev) =>
-                      setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES")
+                      setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES" | "ANOS")
                     }
                     className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
                     style={{

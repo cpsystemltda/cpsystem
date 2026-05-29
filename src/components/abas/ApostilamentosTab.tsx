@@ -27,7 +27,7 @@ import type { ApostilamentoExtraido } from "@/lib/extrairAta";
 type TipoAlteracaoValor = "ACRESCIMO" | "SUPRESSAO" | "REAJUSTE_REPACTUACAO" | "REEQUILIBRIO";
 type IndiceReajuste =
   | "IPCA" | "IPCA_E" | "IPCA_15" | "IGPM" | "INCC" | "INPC" | "IST" | "CONTRATUAL" | "OUTRO";
-type Unidade = "DIAS" | "MESES";
+type Unidade = "DIAS" | "MESES" | "ANOS";
 type Finalidade = "REAJUSTE" | "APLICACAO_PENALIDADE" | "EMPENHO_CREDITO_SUPLEMENTAR" | "OUTROS";
 
 type Apostilamento = {

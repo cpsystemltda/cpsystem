@@ -66,7 +66,7 @@ export type AtaValoresIniciais = {
   vigenciaInicio: string;
   vigenciaFim: string;
   prazoEntregaDias: number | null;
-  prazoEntregaUnidade?: "DIAS" | "MESES";
+  prazoEntregaUnidade?: "DIAS" | "MESES" | "ANOS";
   prazoEntregaNaoAplica: boolean;
   prazoPagamentoDias: number | null;
   marcoReajusteOrigem: string | null;
@@ -254,8 +254,8 @@ export default function NovaAtaForm({
   const [prazoNaoAplica, setPrazoNaoAplica] = useState(vi?.prazoEntregaNaoAplica ?? false);
   // Unidade do prazo de entrega (DIAS ou MESES). Default DIAS pra retrocompat
   // — todos os registros antigos foram cadastrados em dias.
-  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES">(
-    (vi?.prazoEntregaUnidade as "DIAS" | "MESES") ?? "DIAS",
+  const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES" | "ANOS">(
+    (vi?.prazoEntregaUnidade as "DIAS" | "MESES" | "ANOS") ?? "DIAS",
   );
   const [marcoOrigem, setMarcoOrigem] = useState<string>(vi?.marcoReajusteOrigem ?? "");
   const [temParticipantes, setTemParticipantes] = useState(
@@ -790,7 +790,7 @@ export default function NovaAtaForm({
                 <select
                   name="prazoEntregaUnidade"
                   value={prazoEntregaUnidade}
-                  onChange={(ev) => setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES")}
+                  onChange={(ev) => setPrazoEntregaUnidade(ev.target.value as "DIAS" | "MESES" | "ANOS")}
                   disabled={prazoNaoAplica}
                   className="rounded-xl px-3 py-3 text-sm font-bold uppercase"
                   style={{
