@@ -149,7 +149,7 @@ export default async function EmpenhoDetalhePage({
               empenhoId={e.id}
               campo="numero"
               valor={e.numero}
-              podeEditar={podeEditar && e.status !== "PAGO"}
+              podeEditar={podeEditar}
               placeholder="Número/ano"
             />
           </h1>
@@ -158,7 +158,7 @@ export default async function EmpenhoDetalhePage({
               empenhoId={e.id}
               campo="objeto"
               valor={e.objeto}
-              podeEditar={podeEditar && e.status !== "PAGO"}
+              podeEditar={podeEditar}
               multiline
               placeholder="Descrição do objeto"
             />
@@ -178,16 +178,14 @@ export default async function EmpenhoDetalhePage({
         </div>
         {podeEditar && (
           <div className="flex shrink-0 items-center gap-2">
-            {e.status !== "PAGO" && (
-              <Link
-                href={`/execucao/${e.id}/editar`}
-                className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                title={`Editar dados da ${labelInstrumento(e.instrumento).toLowerCase()}`}
-              >
-                <Pencil className="h-3.5 w-3.5" /> Editar
-              </Link>
-            )}
-            {e.status !== "PAGO" && <BotaoExcluirEmpenho empenhoId={e.id} />}
+            <Link
+              href={`/execucao/${e.id}/editar`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              title={`Editar dados da ${labelInstrumento(e.instrumento).toLowerCase()}`}
+            >
+              <Pencil className="h-3.5 w-3.5" /> Editar
+            </Link>
+            <BotaoExcluirEmpenho empenhoId={e.id} />
           </div>
         )}
       </div>

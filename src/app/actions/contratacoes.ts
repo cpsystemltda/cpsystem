@@ -1255,9 +1255,10 @@ export async function excluirEmpenhoAction(formData: FormData) {
     where: { id, empresa: { contaId: usuario.contaId } },
   });
   if (!empenho) throw new Error("Empenho não encontrado.");
-  if (empenho.status === "PAGO") {
-    throw new Error("Não é possível excluir empenho já pago. Use o histórico ou notificação.");
-  }
+  // Regina 29/05: permitir excluir mesmo se PAGO — todas as relacoes
+  // (ComissaoExecucao, ReajusteRetroativo, EmpenhoItem, etc.) tem
+  // onDelete: Cascade no schema, entao a remocao limpa o historico
+  // financeiro junto. Confirmacao inline ja existe no botao.
   await prisma.empenho.delete({ where: { id } });
   revalidatePath("/execucao");
   revalidatePath("/dashboard");
