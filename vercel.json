@@ -1,6 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["gru1"],
+  "functions": {
+    "src/app/actions/iaExtracao.ts": {
+      "maxDuration": 60
+    },
+    "src/app/actions/iaMinutas.ts": {
+      "maxDuration": 60
+    },
+    "src/app/actions/iaJuridica.ts": {
+      "maxDuration": 60
+    },
+    "src/app/actions/iaClassificar.ts": {
+      "maxDuration": 60
+    },
+    "src/app/actions/iaMatchItens.ts": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/regua-cobranca",
