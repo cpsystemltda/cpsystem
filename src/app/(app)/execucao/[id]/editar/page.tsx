@@ -121,6 +121,8 @@ export default async function EditarEmpenhoPage({ params }: { params: Promise<{ 
     prazoEntregaUnidade: empenho.prazoEntregaUnidade,
     prazoEntregaModo: empenho.prazoEntregaModo === "SOB_DEMANDA" ? "RELATIVO" : empenho.prazoEntregaModo,
     dataEntregaCerta: toDateInput(empenho.dataEntregaCerta),
+    dataEntregaInicio: toDateInput(empenho.dataEntregaInicio),
+    dataEntregaFim: toDateInput(empenho.dataEntregaFim),
     prazoPagamentoDias: empenho.prazoPagamentoDias,
     classificacaoOrcamentaria: empenho.classificacaoOrcamentaria,
     signatario: empenho.signatario,

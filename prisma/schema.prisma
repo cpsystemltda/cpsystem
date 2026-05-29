@@ -351,11 +351,13 @@ enum PrazoEntregaUnidade {
 // partir do pedido (típico de Fornecimento). DATA_CERTA = data fixa de
 // execução (típico de Locação para evento). SOB_DEMANDA = data definida
 // posteriormente pelo cliente — prazo/data ficam vazios no Contrato.
-// Por enquanto só Contrato usa SOB_DEMANDA — Empenho segue só RELATIVO/DATA_CERTA.
+// PRAZO_CERTO = janela com inicio e fim (típico de obra/servico com periodo
+// fechado — começa em X, encerra em Y).
 enum PrazoEntregaModo {
   RELATIVO
   DATA_CERTA
   SOB_DEMANDA
+  PRAZO_CERTO
 }
 
 // Marco a partir do qual conta o prazo de entrega.
@@ -822,6 +824,9 @@ model Empenho {
   // Mesmo enum compartilhado com Contrato (PrazoEntregaModo).
   prazoEntregaModo        PrazoEntregaModo    @default(RELATIVO)
   dataEntregaCerta        DateTime?
+  // Modo PRAZO_CERTO — janela com inicio e fim.
+  dataEntregaInicio       DateTime?
+  dataEntregaFim          DateTime?
   prazoPagamentoDias      Int?
 
   status StatusExecucao @default(EMPENHADO)

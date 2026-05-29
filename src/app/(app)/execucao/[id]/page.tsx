@@ -287,6 +287,8 @@ export default async function EmpenhoDetalhePage({
                     prazoEntregaUnidade: e.prazoEntregaUnidade,
                     prazoEntregaModo: e.prazoEntregaModo,
                     dataEntregaCerta: e.dataEntregaCerta,
+                    dataEntregaInicio: e.dataEntregaInicio,
+                    dataEntregaFim: e.dataEntregaFim,
                     prazoPagamentoDias: e.prazoPagamentoDias,
                     dataPedidoRecebido: e.dataPedidoRecebido,
                     arquivoPedidoRecebido: e.arquivoPedidoRecebido,
@@ -485,8 +487,10 @@ function Timeline({
     status: string;
     prazoEntregaDias: number | null;
     prazoEntregaUnidade?: "DIAS" | "MESES";
-    prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA";
+    prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA" | "PRAZO_CERTO";
     dataEntregaCerta?: Date | null;
+    dataEntregaInicio?: Date | null;
+    dataEntregaFim?: Date | null;
     prazoPagamentoDias: number | null;
     dataPedidoRecebido: Date | null;
     arquivoPedidoRecebido: string | null;
@@ -504,14 +508,19 @@ function Timeline({
   reajusteRetroativo: ReajusteRetroativoData | null;
   podeEditar: boolean;
 }) {
-  // Prazo-limite — duas formas:
-  //  - DATA_CERTA: a data já é o limite tempestivo (vale pra Locação,
-  //    eventos com data fixa, etc.). Não depende de pedido recebido.
-  //  - RELATIVO: contado a partir do recebimento do pedido. Multiplica
-  //    pela unidade (DIAS direto, MESES = 30 dias por mês).
+  // Prazo-limite — quatro formas:
+  //  - DATA_CERTA:  a data ja eh o limite tempestivo (vale pra Locacao,
+  //    eventos com data fixa, etc.). Nao depende de pedido recebido.
+  //  - PRAZO_CERTO: janela com inicio e fim — usa o fim como prazo-limite.
+  //  - RELATIVO:    contado a partir do recebimento do pedido. Multiplica
+  //    pela unidade (DIAS direto, MESES = 30 dias por mes).
+  //  - SOB_DEMANDA: sem data fixa.
   const prazoLimiteEntrega: Date | null = (() => {
     if (empenho.prazoEntregaModo === "DATA_CERTA") {
       return empenho.dataEntregaCerta ?? null;
+    }
+    if (empenho.prazoEntregaModo === "PRAZO_CERTO") {
+      return empenho.dataEntregaFim ?? null;
     }
     if (!empenho.dataPedidoRecebido || !empenho.prazoEntregaDias) return null;
     const fatorDias =
@@ -668,7 +677,9 @@ function Timeline({
                       {prazoLimiteEntrega.toLocaleDateString("pt-BR")}{" "}
                       {empenho.prazoEntregaModo === "DATA_CERTA"
                         ? "(data certa cadastrada)"
-                        : `(${empenho.prazoEntregaDias} ${empenho.prazoEntregaUnidade === "MESES" ? "meses" : "dias"} após recebimento do pedido)`}
+                        : empenho.prazoEntregaModo === "PRAZO_CERTO"
+                          ? `(janela ${empenho.dataEntregaInicio?.toLocaleDateString("pt-BR") ?? "—"} a ${empenho.dataEntregaFim?.toLocaleDateString("pt-BR") ?? "—"})`
+                          : `(${empenho.prazoEntregaDias} ${empenho.prazoEntregaUnidade === "MESES" ? "meses" : "dias"} após recebimento do pedido)`}
                       {entregaAtrasada && " — vencido"}
                       {entregaComAtraso && " — entregue com atraso"}
                     </p>
@@ -749,8 +760,10 @@ function DadosEmpenho({
     dataEmissao: Date; vigenciaInicio: Date; vigenciaFim: Date;
     prazoEntregaDias: number | null;
     prazoEntregaUnidade: "DIAS" | "MESES";
-    prazoEntregaModo: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA";
+    prazoEntregaModo: "RELATIVO" | "DATA_CERTA" | "SOB_DEMANDA" | "PRAZO_CERTO";
     dataEntregaCerta: Date | null;
+    dataEntregaInicio: Date | null;
+    dataEntregaFim: Date | null;
     prazoPagamentoDias: number | null;
     classificacaoOrcamentaria: string | null;
     signatario: string | null;
@@ -779,15 +792,21 @@ function DadosEmpenho({
       <Info label="Vigência" valor={`${e.vigenciaInicio.toLocaleDateString("pt-BR")} → ${e.vigenciaFim.toLocaleDateString("pt-BR")}`} />
       <Info
         label="Prazo de entrega"
-        valor={
-          e.prazoEntregaModo === "DATA_CERTA"
-            ? e.dataEntregaCerta
+        valor={(() => {
+          if (e.prazoEntregaModo === "DATA_CERTA") {
+            return e.dataEntregaCerta
               ? `Data certa: ${e.dataEntregaCerta.toLocaleDateString("pt-BR")}`
-              : "Data certa não informada"
-            : e.prazoEntregaDias
-              ? `${e.prazoEntregaDias} ${e.prazoEntregaUnidade === "MESES" ? (e.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
-              : "—"
-        }
+              : "Data certa não informada";
+          }
+          if (e.prazoEntregaModo === "PRAZO_CERTO") {
+            const ini = e.dataEntregaInicio?.toLocaleDateString("pt-BR");
+            const fim = e.dataEntregaFim?.toLocaleDateString("pt-BR");
+            return ini && fim ? `Prazo certo: ${ini} a ${fim}` : "Prazo certo não informado";
+          }
+          return e.prazoEntregaDias
+            ? `${e.prazoEntregaDias} ${e.prazoEntregaUnidade === "MESES" ? (e.prazoEntregaDias === 1 ? "mês" : "meses") : "dias"}`
+            : "—";
+        })()}
       />
       <Info label="Prazo de pagamento" valor={e.prazoPagamentoDias ? `${e.prazoPagamentoDias} dias` : "—"} />
       {e.classificacaoOrcamentaria && (

@@ -95,7 +95,9 @@ export default async function EditarContratoPage({ params }: { params: Promise<{
     vigenciaFim: toDateInput(contrato.vigenciaFim) ?? "",
     prazoEntregaDias: contrato.prazoEntregaDias,
     prazoEntregaUnidade: contrato.prazoEntregaUnidade,
-    prazoEntregaModo: contrato.prazoEntregaModo,
+    // PRAZO_CERTO so existe no Empenho hoje; Contrato cai pra RELATIVO se vier.
+    prazoEntregaModo:
+      contrato.prazoEntregaModo === "PRAZO_CERTO" ? "RELATIVO" : contrato.prazoEntregaModo,
     dataEntregaCerta: toDateInput(contrato.dataEntregaCerta),
     prazoPagamentoDias: contrato.prazoPagamentoDias,
     marcoReajusteOrigem: contrato.marcoReajusteOrigem,

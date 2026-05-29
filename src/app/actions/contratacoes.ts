@@ -1285,6 +1285,13 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
   const v = parsed.data;
   await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
 
+  // Itens com quantidade=0 sao herdados da Ata/Contrato mas o usuario nao
+  // vai executar nesta NE/OS/AC — silenciosamente removidos antes de
+  // validar saldo e persistir. Evita exigir delete manual no UI (Regina
+  // 29/05: "no bloco Itens o sistema entende que quantidade nao preenchida
+  // é zero"). O schema ja garantiu que sobra pelo menos 1 com qty>0.
+  const itensEfetivos = v.itens.filter((i) => i.quantidade > 0);
+
   // Bloqueia cadastro duplicado: mesmo número + mesmo órgão na conta
   // inteira (Regina 28/05). Empenho ainda admite mesmo número em
   // órgãos diferentes (cada órgão usa sua própria numeração de NE/OC/OS/AC).
@@ -1308,7 +1315,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
   // Trava de saldo
   if (v.contratoId) {
     const saldo = await calcularSaldoContrato(v.contratoId);
-    for (const item of v.itens) {
+    for (const item of itensEfetivos) {
       const linha = saldo.itens.find((s) => s.descricao === item.descricao);
       if (linha && item.quantidade > linha.quantidadeDisponivel) {
         return {
@@ -1318,7 +1325,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     }
   } else if (v.ataId) {
     const saldo = await calcularSaldoAta(v.ataId);
-    for (const item of v.itens) {
+    for (const item of itensEfetivos) {
       if (!item.ataItemId) {
         return { erro: "Itens de Empenho derivado de Ata precisam selecionar o item da Ata." };
       }
@@ -1394,6 +1401,8 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
         prazoEntregaUnidade: v.prazoEntregaUnidade,
         prazoEntregaModo: v.prazoEntregaModo,
         dataEntregaCerta: v.dataEntregaCerta ?? null,
+        dataEntregaInicio: v.dataEntregaInicio ?? null,
+        dataEntregaFim: v.dataEntregaFim ?? null,
         prazoPagamentoDias: v.prazoPagamentoDias || null,
         numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
         classificacaoOrcamentaria: v.classificacaoOrcamentaria || null,
@@ -1405,7 +1414,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
         fiscalResponsavel: v.fiscalResponsavel || null,
         status: "EMPENHADO",
         itens: {
-          create: v.itens.map((i) => ({
+          create: itensEfetivos.map((i) => ({
             descricao: i.descricao,
             unidade: i.unidade,
             quantidade: i.quantidade,
@@ -1437,7 +1446,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
       },
     });
 
-    const valorTotalEmpenho = v.itens.reduce((s, i) => s + i.quantidade * i.valorUnitario, 0);
+    const valorTotalEmpenho = itensEfetivos.reduce((s, i) => s + i.quantidade * i.valorUnitario, 0);
 
     // Cria Linha B (comissão da empresa→analista) para cada vínculo ativo.
     // Começa em AGUARDANDO_ORGAO — só libera quando empenho for pago.
@@ -1572,6 +1581,11 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
     };
   }
 
+  // Filtra itens com qty=0 — mesma regra do criarEmpenhoAction: itens
+  // herdados de Ata/Contrato que nao vao ser executados nesta NE/OS/AC
+  // sao silenciosamente removidos. O schema ja garantiu pelo menos 1 com qty>0.
+  const itensEfetivos = v.itens.filter((i) => i.quantidade > 0);
+
   // Ajuste 7 — validação de saldo na edição (ARP ou Contrato pai),
   // considerando que os itens antigos deste empenho vão ser substituídos.
   if (v.contratoId) {
@@ -1583,7 +1597,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
         (qtyAntigaPorDescricao.get(item.descricao) ?? 0) + item.quantidade,
       );
     }
-    for (const itemNovo of v.itens) {
+    for (const itemNovo of itensEfetivos) {
       const linha = saldo.itens.find((s) => s.descricao === itemNovo.descricao);
       if (linha) {
         const qtyAntiga = qtyAntigaPorDescricao.get(itemNovo.descricao) ?? 0;
@@ -1607,7 +1621,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
         );
       }
     }
-    for (const itemNovo of v.itens) {
+    for (const itemNovo of itensEfetivos) {
       if (!itemNovo.ataItemId) continue;
       const linha = saldo.itens.find((s) => s.ataItemId === itemNovo.ataItemId);
       if (!linha) {
@@ -1625,7 +1639,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
   }
 
   const idsNovos = new Set(
-    v.itens.map((i) => i.id).filter((id): id is string => Boolean(id)),
+    itensEfetivos.map((i) => i.id).filter((id): id is string => Boolean(id)),
   );
 
   // Vigência: herdada da Ata/Contrato pai; livre cai em dataEmissao + 1 ano.
@@ -1669,6 +1683,8 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
           prazoEntregaUnidade: v.prazoEntregaUnidade,
           prazoEntregaModo: v.prazoEntregaModo,
           dataEntregaCerta: v.dataEntregaCerta ?? null,
+          dataEntregaInicio: v.dataEntregaInicio ?? null,
+          dataEntregaFim: v.dataEntregaFim ?? null,
           prazoPagamentoDias: v.prazoPagamentoDias || null,
           numeroOrdemFornecimento: v.numeroOrdemFornecimento || null,
           classificacaoOrcamentaria: v.classificacaoOrcamentaria || null,
@@ -1692,7 +1708,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
           where: { id: { in: itensParaRemover.map((i) => i.id) } },
         });
       }
-      for (const it of v.itens) {
+      for (const it of itensEfetivos) {
         const valorTotal = it.quantidade * it.valorUnitario;
         if (it.id) {
           await tx.empenhoItem.update({

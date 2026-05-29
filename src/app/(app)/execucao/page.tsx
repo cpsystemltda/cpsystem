@@ -196,23 +196,27 @@ export default async function ExecucaoPage({
               <Link
                 key={e.id}
                 href={`/execucao/${e.id}`}
-                className="glass-tile group block rounded-[18px] px-5 py-5 transition hover:-translate-y-0.5"
+                className="glass-tile group block overflow-hidden rounded-[18px] px-5 py-5 transition hover:-translate-y-0.5"
               >
                 <div className="flex items-start justify-between gap-6">
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <div className="grid h-10 w-10 place-items-center rounded-md bg-amber-50">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-amber-50">
                       <Receipt className="h-5 w-5 text-amber-700" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-slate-900 truncate">
-                        {labelInstrumento(e.instrumento)} {e.numero}
-                        <span className={`ml-2 rounded px-2 py-0.5 text-xs font-medium ${COR_STATUS[e.status]}`}>{ROTULO_STATUS[e.status]}</span>
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-600 truncate">{e.objeto}</p>
-                      <p className="mt-2 text-xs text-slate-500">{e.orgaoNome} · {e.empresa.nomeFantasia || e.empresa.razaoSocial}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate font-semibold text-slate-900">
+                          {labelInstrumento(e.instrumento)} {e.numero}
+                        </h3>
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${COR_STATUS[e.status]}`}>
+                          {ROTULO_STATUS[e.status]}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-sm text-slate-600">{e.objeto}</p>
+                      <p className="mt-2 truncate text-xs text-slate-500">{e.orgaoNome} · {e.empresa.nomeFantasia || e.empresa.razaoSocial}</p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="shrink-0 text-right">
                     <div className="text-xs text-slate-500">Valor empenhado</div>
                     <div className="mt-0.5 text-base font-bold text-slate-900">{brl(valor)}</div>
                     {atrasoDias > 0 && <div className="mt-1 text-xs font-medium text-red-600">⚠ Atraso de {atrasoDias}d</div>}

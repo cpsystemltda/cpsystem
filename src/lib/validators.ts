@@ -218,6 +218,14 @@ const itemSchema = z.object({
   numero: z.string().optional(), // número do item dentro do lote
 });
 
+// Variante usada pelo Empenho: permite quantidade=0 nos itens herdados de
+// Ata/Contrato que o usuario nao vai executar nesta NE/OS/AC. A action
+// filtra esses itens antes de persistir — em vez de o usuario ter que
+// deletar manualmente, basta deixar a quantidade zerada.
+const itemEmpenhoSchema = itemSchema.extend({
+  quantidade: z.coerce.number().nonnegative("Quantidade nao pode ser negativa"),
+});
+
 const contratacaoBase = z.object({
   empresaId: z.string().min(1, "Selecione a empresa"),
   tipo: z.enum(tiposObjeto),
@@ -412,15 +420,32 @@ export const novoEmpenhoSchema = contratacaoBase
     // Procedimento de seleção: opcional pro Empenho (decisão Igor M3.3).
     // Quando há vínculo com Ata/Contrato, o procedimento é herdado.
     procedimentoSelecao: z.enum(procedimentosSelecao).optional(),
-    // Prazo de entrega com 2 modos (igual ao Contrato)
-    prazoEntregaModo: z.enum(["RELATIVO", "DATA_CERTA"]).default("RELATIVO"),
+    // Prazo de entrega — 3 modos no Empenho:
+    //   RELATIVO    → qtd + unidade contada do pedido recebido
+    //   DATA_CERTA  → 1 data fixa de execucao
+    //   PRAZO_CERTO → janela (dataEntregaInicio -> dataEntregaFim)
+    prazoEntregaModo: z.enum(["RELATIVO", "DATA_CERTA", "PRAZO_CERTO"]).default("RELATIVO"),
     dataEntregaCerta: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.date().optional(),
+    ),
+    dataEntregaInicio: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.date().optional(),
+    ),
+    dataEntregaFim: z.preprocess(
       (v) => (v === "" || v == null ? undefined : v),
       z.coerce.date().optional(),
     ),
     enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
     pontosFocais: z.array(pontoFocalSchema).optional(),
-    itens: z.array(itemSchema).min(1, "Inclua pelo menos um item"),
+    itens: z
+      .array(itemEmpenhoSchema)
+      .min(1, "Inclua pelo menos um item")
+      .refine(
+        (arr) => arr.some((i) => i.quantidade > 0),
+        "Inclua pelo menos um item com quantidade maior que zero",
+      ),
     // Campos específicos por instrumento, todos opcionais (bloco "Detalhes"
     // foi removido da UI; persistir como null quando não enviados).
     classificacaoOrcamentaria: z.string().optional(),

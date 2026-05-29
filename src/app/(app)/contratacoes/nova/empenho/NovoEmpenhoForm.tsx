@@ -46,8 +46,10 @@ type ContratoDados = {
   orgaoTelefone: string | null;
   prazoEntregaDias: number | null;
   prazoEntregaUnidade: "DIAS" | "MESES";
-  prazoEntregaModo: "RELATIVO" | "DATA_CERTA";
+  prazoEntregaModo: "RELATIVO" | "DATA_CERTA" | "PRAZO_CERTO";
   dataEntregaCerta: string | null;
+  dataEntregaInicio?: string | null;
+  dataEntregaFim?: string | null;
   prazoPagamentoDias: number | null;
   enderecosEntrega: { id: string; rotulo: string | null; endereco: string }[];
   pontosFocais: {
@@ -92,8 +94,10 @@ export type EmpenhoValoresIniciais = {
   vigenciaFim: string;
   prazoEntregaDias: number | null;
   prazoEntregaUnidade?: "DIAS" | "MESES";
-  prazoEntregaModo?: "RELATIVO" | "DATA_CERTA";
+  prazoEntregaModo?: "RELATIVO" | "DATA_CERTA" | "PRAZO_CERTO";
   dataEntregaCerta?: string | null;
+  dataEntregaInicio?: string | null;
+  dataEntregaFim?: string | null;
   prazoPagamentoDias: number | null;
   // Campos específicos por instrumento (todos opcionais; só aparecem no
   // form quando o instrumento correspondente está selecionado).
@@ -167,7 +171,7 @@ export default function NovoEmpenhoForm({
   // warning lint até decidir se removemos do helper compartilhado.
 
   // Prazo entrega 2 modos (Ajuste 5)
-  const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA">(
+  const [prazoEntregaModo, setPrazoEntregaModo] = useState<"RELATIVO" | "DATA_CERTA" | "PRAZO_CERTO">(
     vi?.prazoEntregaModo ?? "RELATIVO",
   );
   const [prazoEntregaUnidade, setPrazoEntregaUnidade] = useState<"DIAS" | "MESES">(
@@ -581,6 +585,7 @@ export default function NovoEmpenhoForm({
                 {([
                   { v: "RELATIVO" as const, label: "Prazo (dias/meses)" },
                   { v: "DATA_CERTA" as const, label: "Data certa" },
+                  { v: "PRAZO_CERTO" as const, label: "Prazo certo (intervalo)" },
                 ]).map((opt) => {
                   const ativo = prazoEntregaModo === opt.v;
                   return (
@@ -599,7 +604,7 @@ export default function NovoEmpenhoForm({
                   );
                 })}
               </div>
-              {prazoEntregaModo === "RELATIVO" ? (
+              {prazoEntregaModo === "RELATIVO" && (
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -628,13 +633,33 @@ export default function NovoEmpenhoForm({
                     <option value="MESES">Meses</option>
                   </select>
                 </div>
-              ) : (
+              )}
+              {prazoEntregaModo === "DATA_CERTA" && (
                 <input
                   type="date"
                   name="dataEntregaCerta"
                   defaultValue={heranca?.dataEntregaCerta ?? vi?.dataEntregaCerta ?? ""}
                   className="w-full rounded-xl px-4 py-3 text-sm font-medium"
                 />
+              )}
+              {prazoEntregaModo === "PRAZO_CERTO" && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    name="dataEntregaInicio"
+                    defaultValue={vi?.dataEntregaInicio ?? ""}
+                    className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
+                  />
+                  <span className="text-xs font-semibold" style={{ color: "var(--text-soft)" }}>
+                    a
+                  </span>
+                  <input
+                    type="date"
+                    name="dataEntregaFim"
+                    defaultValue={vi?.dataEntregaFim ?? ""}
+                    className="flex-1 rounded-xl px-4 py-3 text-sm font-medium"
+                  />
+                </div>
               )}
             </div>
             <Field
