@@ -1,5 +1,11 @@
 "use server";
 
+// Limite estendido pra Vercel matar a function so depois de 60s — Claude
+// processando PDF base64 com schema grande (aditivo/apostilamento) pode
+// levar 30-40s. Default da Vercel eh 10s (Hobby) ou 15s (Pro), o que
+// cortava as chamadas e o usuario via "deu erro" sem mensagem.
+export const maxDuration = 60;
+
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import {

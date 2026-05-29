@@ -405,32 +405,60 @@ async function chamarClaudeComPdf(file: File, schema: any, prompt: string) {
     throw new Error("__MOCK_REQUIRED__"); // sinal pra função externa retornar mock
   }
 
+  const inicio = Date.now();
+  const tag = `[chamarClaudeComPdf ${file.name} ${(file.size / 1024).toFixed(0)}KB]`;
+  console.log(`${tag} iniciando extracao`);
+
   const client = new Anthropic({ apiKey });
   const buffer = await file.arrayBuffer();
   const base64 = Buffer.from(buffer).toString("base64");
 
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5",
-    max_tokens: 8192,
-    system: [{ type: "text", text: SYSTEM_PROMPT_BASE, cache_control: { type: "ephemeral" } }],
-    output_config: { format: { type: "json_schema", schema } },
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-          { type: "text", text: prompt },
-        ],
-      },
-    ],
-  });
-
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") throw new Error("Modelo não retornou conteúdo textual.");
   try {
-    return JSON.parse(textBlock.text);
-  } catch {
-    throw new Error("Resposta do modelo não é JSON válido.");
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 8192,
+      system: [{ type: "text", text: SYSTEM_PROMPT_BASE, cache_control: { type: "ephemeral" } }],
+      output_config: { format: { type: "json_schema", schema } },
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+            { type: "text", text: prompt },
+          ],
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    if (!textBlock || textBlock.type !== "text") throw new Error("Modelo não retornou conteúdo textual.");
+    try {
+      const parsed = JSON.parse(textBlock.text);
+      console.log(`${tag} sucesso em ${Date.now() - inicio}ms`);
+      return parsed;
+    } catch {
+      throw new Error("Resposta do modelo não é JSON válido.");
+    }
+  } catch (err) {
+    // Loga stack + status code do SDK pra diagnosticar nos Vercel logs.
+    const erroInfo: Record<string, unknown> = {
+      duracaoMs: Date.now() - inicio,
+      pdfSizeKB: (file.size / 1024).toFixed(0),
+    };
+    if (err instanceof Error) {
+      erroInfo.message = err.message;
+      erroInfo.stack = err.stack;
+    } else {
+      erroInfo.err = String(err);
+    }
+    // SDK do Anthropic anexa status code e body em propriedades nao-padronizadas
+    if (err && typeof err === "object") {
+      const anyErr = err as Record<string, unknown>;
+      if ("status" in anyErr) erroInfo.status = anyErr.status;
+      if ("error" in anyErr) erroInfo.bodyError = anyErr.error;
+    }
+    console.error(`${tag} FALHOU:`, erroInfo);
+    throw err;
   }
 }
 
