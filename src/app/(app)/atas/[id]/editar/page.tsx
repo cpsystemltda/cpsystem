@@ -65,7 +65,7 @@ export default async function EditarAtaPage({ params }: { params: Promise<{ id: 
     empresas = await prisma.empresa.findMany({
       where: { contaId: usuario.contaId },
       orderBy: { criadoEm: "asc" },
-      select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true },
+      select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true, cnpj: true },
     });
   }
 
