@@ -3,6 +3,7 @@ import Link from "next/link";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularSaldoAta } from "@/lib/saldo";
+import { montarLabelEmpresa } from "@/lib/empresaLabel";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
 import NovoContratoForm, {
   type ContratoValoresIniciais,
@@ -46,7 +47,7 @@ export default async function EditarContratoPage({ params }: { params: Promise<{
   const empresas = await prisma.empresa.findMany({
     where: { contaId: usuario.contaId },
     orderBy: { criadoEm: "asc" },
-    select: { id: true, razaoSocial: true, nomeFantasia: true },
+    select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true, cnpj: true },
   });
 
   const atas = await prisma.ata.findMany({
@@ -136,10 +137,7 @@ export default async function EditarContratoPage({ params }: { params: Promise<{
 
   return (
     <NovoContratoForm
-      empresas={empresas.map((e) => ({
-        value: e.id,
-        label: e.nomeFantasia || e.razaoSocial,
-      }))}
+      empresas={empresas.map((e) => ({ value: e.id, label: montarLabelEmpresa(e) }))}
       atas={atasComItens}
       modo="editar"
       contratoId={contrato.id}

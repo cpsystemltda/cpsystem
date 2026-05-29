@@ -3,21 +3,8 @@ import Link from "next/link";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
+import { montarLabelEmpresa } from "@/lib/empresaLabel";
 import NovaAtaForm, { type AtaValoresIniciais } from "../../../contratacoes/nova/ata/NovaAtaForm";
-
-function montarLabelEmpresa(e: {
-  razaoSocial: string;
-  nomeFantasia: string | null;
-  responsavel: string;
-}): string {
-  const razao = e.razaoSocial.trim();
-  const fantasia = (e.nomeFantasia ?? "").trim();
-  const respNorm = e.responsavel.trim().toLowerCase();
-  if (!fantasia) return razao;
-  if (fantasia.toLowerCase() === razao.toLowerCase()) return razao;
-  if (fantasia.toLowerCase() === respNorm) return razao;
-  return `${razao} (${fantasia})`;
-}
 
 function toDateInput(d: Date | null): string | null {
   if (!d) return null;
@@ -54,7 +41,7 @@ export default async function EditarAtaPage({ params }: { params: Promise<{ id: 
     );
   }
 
-  let empresas: { id: string; razaoSocial: string; nomeFantasia: string | null; responsavel: string }[] = [];
+  let empresas: { id: string; razaoSocial: string; nomeFantasia: string | null; responsavel: string; cnpj: string }[] = [];
   if (usuario.conta.tipo === "ANALISTA") {
     const analista = await prisma.analista.findUnique({
       where: { contaId: usuario.contaId },
@@ -70,7 +57,7 @@ export default async function EditarAtaPage({ params }: { params: Promise<{ id: 
         empresas = await prisma.empresa.findMany({
           where: { contaId: { in: contaIds } },
           orderBy: { criadoEm: "asc" },
-          select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true },
+          select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true, cnpj: true },
         });
       }
     }
