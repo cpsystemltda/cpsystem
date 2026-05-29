@@ -25,7 +25,6 @@ import {
 import { extrairAditivoPdfAction } from "@/app/actions/iaExtracao";
 import { BadgeAuto } from "@/components/forms/glass";
 import { UploadPdfPanel } from "@/components/UploadPdfPanel";
-import { UploadArquivoSimples } from "@/components/UploadArquivoSimples";
 import type { AditivoExtraido } from "@/lib/extrairAta";
 
 type TipoAlteracaoValor = "ACRESCIMO" | "SUPRESSAO" | "REAJUSTE_REPACTUACAO" | "REEQUILIBRIO";
@@ -995,24 +994,17 @@ function FormularioAditivo({
           </CampoLabel>
         </section>
 
-        {/* PDF manual (fallback caso IA não tenha sido usada) */}
+        {/* PDF manual (fallback caso IA não tenha sido usada). Usa input file
+            nativo dentro do form — vai junto no FormData pra
+            criar/editarTermoAditivoAction. Mesmo padrao do ApostilamentosTab
+            (que funciona). Antes usava UploadArquivoSimples + server action
+            intermediaria, que falhava silenciosamente. */}
         {!arquivoUrlIa && (
           <section>
             <Titulo>Anexo do termo aditivo (PDF)</Titulo>
-            <UploadArquivoSimples
-              titulo="Anexar PDF do termo aditivo"
-              descricao="Sem extração de IA — apenas anexa o documento ao aditivo."
-              accept="application/pdf"
-              onArquivoSalvo={(info) => {
-                if (info.url) {
-                  setArquivoUrlIa(info.url);
-                  setArquivoNomeIa(info.nome);
-                } else {
-                  setArquivoUrlIa(null);
-                  setArquivoNomeIa(null);
-                }
-              }}
-            />
+            <CampoLabel label="Arquivo" span={3}>
+              <input type="file" name="arquivo" accept="application/pdf" className="text-[12px]" />
+            </CampoLabel>
             {aditivo?.arquivoPdfUrl && (
               <p className="mt-1 text-[11px]" style={{ color: "var(--text-mute)" }}>
                 Anexo atual:{" "}
