@@ -837,6 +837,8 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
             valorUnitario: i.valorUnitario,
             valorTotal: i.quantidade * i.valorUnitario,
             ataItemId: i.ataItemId || null,
+            lote: i.lote || null,
+            numero: i.numero || null,
           })),
         },
         ...(parcelasParaCriar.length > 0 && { parcelas: { create: parcelasParaCriar } }),
@@ -1092,6 +1094,8 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
               valorUnitario: it.valorUnitario,
               valorTotal,
               ataItemId: it.ataItemId || null,
+              lote: it.lote || null,
+              numero: it.numero || null,
             },
           });
         } else {
@@ -1105,6 +1109,8 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
               valorUnitario: it.valorUnitario,
               valorTotal,
               ataItemId: it.ataItemId || null,
+              lote: it.lote || null,
+              numero: it.numero || null,
             },
           });
         }

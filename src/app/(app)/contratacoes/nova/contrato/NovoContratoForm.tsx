@@ -815,7 +815,7 @@ export default function NovoContratoForm({
           <ItensEditor
             ataItens={ataSelecionada?.itens}
             itensIniciais={vi?.itens ?? dados?.itens}
-            permitirLotes={false}
+            permitirLotes={true}
             sugestoesIa={sugestoesItens}
           />
         </Secao>

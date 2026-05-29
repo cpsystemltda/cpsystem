@@ -83,22 +83,30 @@ export default async function AtasPage({
   // ============================================================
   // Bloco Financeiro de ARPs (Ampliação 1 do M3 Painel de Atas)
   // ============================================================
-  // Universo: apenas Atas vigentes da empresa (não inclui contratos avulsos).
-  // - Contratados = soma valorTotal das Atas vigentes
-  // - Executados  = soma do consumo via ContratoItem + EmpenhoItem solto
-  // - A executar  = Contratados − Executados (não-negativo)
-  // - Recebidos   = soma de Empenhos PAGOS vinculados à Atas (linha A
-  //   concluída pelo órgão à empresa)
-  // - A receber   = soma de Empenhos NF_ENCAMINHADA vinculados à Atas
-  //   (faturados, esperando pagamento do órgão)
-  // - Reajuste    = nº de Atas com marco + 12 meses dentro de 90 dias
+  // Dois blocos lado a lado pra evitar a inconsistência de comparar
+  // contratado (vigente) com executado/recebido (histórico):
+  //
+  //   Série histórica → todas as ARPs (vigentes + expiradas)
+  //   Vigentes        → só ARPs com vigenciaFim >= hoje
+  //
+  // Cada bloco tem as mesmas 6 caixinhas (Contratado, Executado, A
+  // executar, Recebido, A receber, Reajuste). Recebido/A receber
+  // particionam os empenhos da empresa pela vigência da Ata-mãe (direta
+  // ou via contrato): vigente quando essa vigenciaFim >= hoje.
   const atasVigentesFin = atasComSaldo.filter((a) => a.vigenciaFim >= hoje);
-  const valoresContratadosARPs = atasVigentesFin.reduce((s, a) => s + a.saldo.valorTotal, 0);
-  const valoresExecutadosARPs = atasVigentesFin.reduce((s, a) => s + a.saldo.valorUsado, 0);
-  const valoresAExecutarARPs = Math.max(0, valoresContratadosARPs - valoresExecutadosARPs);
 
-  // Empenhos vinculados a Atas (direto OU via Contrato) — calcula recebido /
-  // a receber em uma única query
+  // Histórico (todas)
+  const valoresContratadosARPsHist = atasComSaldo.reduce((s, a) => s + a.saldo.valorTotal, 0);
+  const valoresExecutadosARPsHist = atasComSaldo.reduce((s, a) => s + a.saldo.valorUsado, 0);
+  const valoresAExecutarARPsHist = Math.max(0, valoresContratadosARPsHist - valoresExecutadosARPsHist);
+
+  // Vigentes
+  const valoresContratadosARPsVig = atasVigentesFin.reduce((s, a) => s + a.saldo.valorTotal, 0);
+  const valoresExecutadosARPsVig = atasVigentesFin.reduce((s, a) => s + a.saldo.valorUsado, 0);
+  const valoresAExecutarARPsVig = Math.max(0, valoresContratadosARPsVig - valoresExecutadosARPsVig);
+
+  // Empenhos vinculados a Atas (direto OU via Contrato) — traz a
+  // vigência da Ata-mãe pra particionar histórico × vigente em memória.
   const empenhosDeArps = await prisma.empenho.findMany({
     where: {
       empresa: filtroEmpresa,
@@ -107,14 +115,34 @@ export default async function AtasPage({
         { contrato: { ataId: { not: null } } },
       ],
     },
-    select: { status: true, itens: { select: { valorTotal: true } } },
+    select: {
+      status: true,
+      itens: { select: { valorTotal: true } },
+      ata: { select: { vigenciaFim: true } },
+      contrato: { select: { ata: { select: { vigenciaFim: true } } } },
+    },
   });
   const valorEmpenho = (e: { itens: { valorTotal: number }[] }) =>
     e.itens.reduce((ss, it) => ss + it.valorTotal, 0);
-  const valoresRecebidosARPs = empenhosDeArps
+  const ataVencDoEmpenho = (e: {
+    ata: { vigenciaFim: Date } | null;
+    contrato: { ata: { vigenciaFim: Date } | null } | null;
+  }) => e.ata?.vigenciaFim ?? e.contrato?.ata?.vigenciaFim ?? null;
+  const empenhosDeArpsVig = empenhosDeArps.filter((e) => {
+    const v = ataVencDoEmpenho(e);
+    return v !== null && v >= hoje;
+  });
+
+  const valoresRecebidosARPsHist = empenhosDeArps
     .filter((e) => e.status === "PAGO")
     .reduce((s, e) => s + valorEmpenho(e), 0);
-  const valoresAReceberARPs = empenhosDeArps
+  const valoresAReceberARPsHist = empenhosDeArps
+    .filter((e) => e.status === "NF_ENCAMINHADA" || e.status === "NF_EMITIDA")
+    .reduce((s, e) => s + valorEmpenho(e), 0);
+  const valoresRecebidosARPsVig = empenhosDeArpsVig
+    .filter((e) => e.status === "PAGO")
+    .reduce((s, e) => s + valorEmpenho(e), 0);
+  const valoresAReceberARPsVig = empenhosDeArpsVig
     .filter((e) => e.status === "NF_ENCAMINHADA" || e.status === "NF_EMITIDA")
     .reduce((s, e) => s + valorEmpenho(e), 0);
 
@@ -171,53 +199,28 @@ export default async function AtasPage({
         />
       </div>
 
-      {/* Bloco Financeiro de ARPs — Ampliação 1 do M3 */}
-      <div className="mt-4 grid gap-3.5 lg:grid-cols-3">
-        <KPI
-          tone="lavender"
-          icon={Coins}
-          label="Contratados em ARPs"
-          value={brl(valoresContratadosARPs)}
-          meta="Soma do valor total das ARPs vigentes"
+      {/* Bloco Financeiro de ARPs — Ampliação 1 do M3
+          Dois grupos: Série histórica (todas) × Vigentes (atuais).
+          Reajuste só aparece em "Vigentes" — é sobre janela futura. */}
+      <div className="mt-6 space-y-6">
+        <FinanceiroArpsGrupo
+          titulo="Série histórica"
+          subtitulo="Todas as ARPs da empresa (vigentes + expiradas)"
+          contratados={valoresContratadosARPsHist}
+          executados={valoresExecutadosARPsHist}
+          aExecutar={valoresAExecutarARPsHist}
+          recebidos={valoresRecebidosARPsHist}
+          aReceber={valoresAReceberARPsHist}
         />
-        <KPI
-          tone="primary"
-          icon={TrendingUp}
-          label="Executados em ARPs"
-          value={brl(valoresExecutadosARPs)}
-          meta="Consumido via Contratos + Empenhos diretos"
-        />
-        <KPI
-          tone="mint"
-          icon={ArrowRight}
-          label="A executar em ARPs"
-          value={brl(valoresAExecutarARPs)}
-          meta="Contratados − Executados"
-        />
-        <KPI
-          tone="mint"
-          icon={Coins}
-          label="Valores recebidos"
-          value={brl(valoresRecebidosARPs)}
-          meta="Empenhos PAGOS vinculados a ARPs"
-          href="/execucao?status=PAGO"
-        />
-        <KPI
-          tone="primary"
-          icon={Coins}
-          label="Valores a receber"
-          value={brl(valoresAReceberARPs)}
-          meta="NF emitida/encaminhada, aguardando pagamento"
-          href="/execucao?status=NF_ENCAMINHADA"
-        />
-        <KPI
-          tone="rose"
-          icon={AlertTriangle}
-          label="ARPs em janela de reajuste"
-          value={atasComReajuste.length}
-          meta="Marco + 12 meses dentro de 90 dias"
-          pulse={atasComReajuste.length > 0}
-          href="/reajustes"
+        <FinanceiroArpsGrupo
+          titulo="Vigentes"
+          subtitulo="Apenas ARPs atualmente vigentes"
+          contratados={valoresContratadosARPsVig}
+          executados={valoresExecutadosARPsVig}
+          aExecutar={valoresAExecutarARPsVig}
+          recebidos={valoresRecebidosARPsVig}
+          aReceber={valoresAReceberARPsVig}
+          reajusteQtd={atasComReajuste.length}
         />
       </div>
 
@@ -357,6 +360,62 @@ export default async function AtasPage({
         </div>
       )}
     </div>
+  );
+}
+
+function FinanceiroArpsGrupo({
+  titulo,
+  subtitulo,
+  contratados,
+  executados,
+  aExecutar,
+  recebidos,
+  aReceber,
+  reajusteQtd,
+}: {
+  titulo: string;
+  subtitulo: string;
+  contratados: number;
+  executados: number;
+  aExecutar: number;
+  recebidos: number;
+  aReceber: number;
+  reajusteQtd?: number;
+}) {
+  return (
+    <section>
+      <header className="mb-2 flex items-baseline gap-3">
+        <h3
+          className="text-[13px] font-extrabold uppercase"
+          style={{ letterSpacing: "0.15em", color: "var(--primary-deep)" }}
+        >
+          {titulo}
+        </h3>
+        <span className="text-xs" style={{ color: "var(--text-soft)" }}>
+          {subtitulo}
+        </span>
+      </header>
+      <div className="grid gap-3.5 lg:grid-cols-3">
+        <KPI tone="lavender" icon={Coins} label="Contratado em ARPs" value={brl(contratados)} meta="Valor total das ARPs" />
+        <KPI tone="primary" icon={TrendingUp} label="Executado em ARPs" value={brl(executados)} meta="Consumido via Contratos + Empenhos diretos" />
+        <KPI tone="mint" icon={ArrowRight} label="A executar em ARPs" value={brl(aExecutar)} meta="Contratado − Executado" />
+        <KPI tone="mint" icon={Coins} label="Recebido" value={brl(recebidos)} meta="Empenhos PAGOS vinculados a ARPs" href="/execucao?status=PAGO" />
+        <KPI tone="primary" icon={Coins} label="A receber" value={brl(aReceber)} meta="NF emitida/encaminhada, aguardando pagamento" href="/execucao?status=NF_ENCAMINHADA" />
+        {reajusteQtd !== undefined ? (
+          <KPI
+            tone="rose"
+            icon={AlertTriangle}
+            label="ARPs em janela de reajuste"
+            value={reajusteQtd}
+            meta="Marco + 12 meses dentro de 90 dias"
+            pulse={reajusteQtd > 0}
+            href="/reajustes"
+          />
+        ) : (
+          <div />
+        )}
+      </div>
+    </section>
   );
 }
 

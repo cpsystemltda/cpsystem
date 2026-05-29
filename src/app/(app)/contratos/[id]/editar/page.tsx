@@ -109,6 +109,8 @@ export default async function EditarContratoPage({ params }: { params: Promise<{
       quantidade: i.quantidade,
       marca: i.marca,
       valorUnitario: i.valorUnitario,
+      lote: i.lote,
+      numero: i.numero,
     })),
     parcelas: contrato.parcelas.map((p) => ({
       id: p.id,

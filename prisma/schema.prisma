@@ -674,6 +674,13 @@ model ContratoItem {
   valorTotal    Float
   moeda         Moeda   @default(BRL)
 
+  // Mesmo esquema do AtaItem: contratos podem ser estruturados em
+  // Lotes (cada item carrega o rotulo do lote e o numero/posicao
+  // dentro do contrato), espelhando a ARP de origem ou um contrato
+  // avulso que tenha lotes proprios.
+  lote   String?
+  numero String?
+
   contratoId String
   contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
 
