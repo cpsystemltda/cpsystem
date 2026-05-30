@@ -686,7 +686,7 @@ function AndamentoItem({ a }: { a: Andamento }) {
                 <FileText className="h-2.5 w-2.5" /> PDF
               </a>
             )}
-            <div className="ml-auto inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="ml-auto inline-flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setEditando(true)}
