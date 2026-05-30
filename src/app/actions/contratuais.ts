@@ -341,6 +341,9 @@ type AditivoInput = {
   reajustePeriodoInicio: Date | null;
   reajustePeriodoFim: Date | null;
   reajustePercentual: number | null;
+  // Data a partir da qual o reajuste tem efeitos financeiros — empenhos
+  // emitidos antes dela ficam com valor original; a partir dela, valor reajustado.
+  reajusteEfeitosFinanceiros: Date | null;
 
   observacoes: string | null;
   arquivoPdfUrl: string | null;
@@ -387,6 +390,7 @@ function lerInput(fd: FormData): AditivoInput {
     reajustePeriodoInicio: parseDataInputBr(String(fd.get("reajustePeriodoInicio") || "")),
     reajustePeriodoFim: parseDataInputBr(String(fd.get("reajustePeriodoFim") || "")),
     reajustePercentual: fd.get("reajustePercentual") ? Number(fd.get("reajustePercentual")) : null,
+    reajusteEfeitosFinanceiros: parseDataInputBr(String(fd.get("reajusteEfeitosFinanceiros") || "")),
 
     observacoes: String(fd.get("observacoes") || "") || null,
     arquivoPdfUrl: String(fd.get("arquivoPdfUrl") || "") || null,
@@ -441,19 +445,62 @@ async function capturarSnapshot(
   throw new Error("Vínculo inválido.");
 }
 
+/**
+ * Calcula o fator efetivo de reajuste a partir da data de efeitos
+ * financeiros. Sem data, retorna o fator integral (1+pct/100). Com data,
+ * rateia o reajuste proporcionalmente aos dias restantes da vigencia:
+ *
+ *   fatorEfetivo = 1 + pct * (diasRestantes / diasTotaisVigencia)
+ *
+ * Exemplo Regina: contrato 12 meses (120k = 10k/mes), reajuste 10% com
+ * efeitos no 7o mes → 6/12 * 10% = 5% efetivo → 120k * 1.05 = 126k.
+ *
+ * Casos limite:
+ *   - efeitos antes da vigencia → reajuste integral
+ *   - efeitos depois da vigencia → reajuste nao aplica (fator=1)
+ */
+function calcularFatorEfetivoReajuste(
+  percentual: number,
+  vigenciaInicio: Date,
+  vigenciaFim: Date,
+  efeitosFinanceiros: Date | null,
+): number {
+  const pct = percentual / 100;
+  if (!efeitosFinanceiros) return 1 + pct;
+  const efeitosMs = efeitosFinanceiros.getTime();
+  if (efeitosMs <= vigenciaInicio.getTime()) return 1 + pct;
+  if (efeitosMs >= vigenciaFim.getTime()) return 1;
+  const totalMs = Math.max(1, vigenciaFim.getTime() - vigenciaInicio.getTime());
+  const restanteMs = vigenciaFim.getTime() - efeitosMs;
+  return 1 + pct * (restanteMs / totalMs);
+}
+
 /** Aplica side-effects do aditivo no pai (contrato/ata/empenho). */
 async function aplicarSideEffects(
   link: { contratoId?: string; ataId?: string; empenhoId?: string },
   input: AditivoInput,
 ) {
-  // Reajuste percentual em itens (item.valorUnitario * (1+pct/100)).
+  // Reajuste percentual em itens (item.valorUnitario * fator).
   // Aplica em Contrato OU Ata (Empenho não tem item próprio no escopo M3).
+  // Quando o aditivo tem `reajusteEfeitosFinanceiros` definido, o reajuste
+  // é rateado proporcionalmente ao tempo restante da vigencia (ver
+  // calcularFatorEfetivoReajuste). Sem essa data, comportamento legado:
+  // reajuste integral (1+pct) aplicado em todos os itens.
   if (input.aplicaReajuste && input.reajustePercentual && input.reajustePercentual !== 0) {
-    const pct = input.reajustePercentual / 100;
     if (link.contratoId) {
+      const contrato = await prisma.contrato.findUniqueOrThrow({
+        where: { id: link.contratoId },
+        select: { vigenciaInicio: true, vigenciaFim: true },
+      });
+      const fator = calcularFatorEfetivoReajuste(
+        input.reajustePercentual,
+        contrato.vigenciaInicio,
+        contrato.vigenciaFim,
+        input.reajusteEfeitosFinanceiros,
+      );
       const itens = await prisma.contratoItem.findMany({ where: { contratoId: link.contratoId } });
       for (const it of itens) {
-        const novoUnit = it.valorUnitario * (1 + pct);
+        const novoUnit = it.valorUnitario * fator;
         const novoTotal = novoUnit * it.quantidade;
         await prisma.contratoItem.update({
           where: { id: it.id },
@@ -468,9 +515,19 @@ async function aplicarSideEffects(
       });
     }
     if (link.ataId) {
+      const ata = await prisma.ata.findUniqueOrThrow({
+        where: { id: link.ataId },
+        select: { vigenciaInicio: true, vigenciaFim: true },
+      });
+      const fator = calcularFatorEfetivoReajuste(
+        input.reajustePercentual,
+        ata.vigenciaInicio,
+        ata.vigenciaFim,
+        input.reajusteEfeitosFinanceiros,
+      );
       const itens = await prisma.ataItem.findMany({ where: { ataId: link.ataId } });
       for (const it of itens) {
-        const novoUnit = it.valorUnitario * (1 + pct);
+        const novoUnit = it.valorUnitario * fator;
         const novoTotal = novoUnit * it.quantidade;
         await prisma.ataItem.update({
           where: { id: it.id },
@@ -628,6 +685,7 @@ export async function criarTermoAditivoAction(_p: Result | null, formData: FormD
         reajustePeriodoInicio: input.reajustePeriodoInicio,
         reajustePeriodoFim: input.reajustePeriodoFim,
         reajustePercentual: input.reajustePercentual,
+        reajusteEfeitosFinanceiros: input.reajusteEfeitosFinanceiros,
 
         observacoes: input.observacoes,
         arquivoPdfUrl: arquivoPdfUrl,
@@ -794,6 +852,7 @@ export async function editarTermoAditivoAction(_p: Result | null, formData: Form
         reajustePeriodoInicio: input.reajustePeriodoInicio,
         reajustePeriodoFim: input.reajustePeriodoFim,
         reajustePercentual: input.reajustePercentual,
+        reajusteEfeitosFinanceiros: input.reajusteEfeitosFinanceiros,
 
         observacoes: input.observacoes,
         arquivoPdfUrl,
@@ -953,6 +1012,7 @@ export async function criarApostilamentoAction(_p: Result | null, formData: Form
         reajustePeriodoInicio: input.reajustePeriodoInicio,
         reajustePeriodoFim: input.reajustePeriodoFim,
         reajustePercentual: input.reajustePercentual,
+        reajusteEfeitosFinanceiros: input.reajusteEfeitosFinanceiros,
 
         observacoes: input.observacoes,
         arquivoPdfUrl,
@@ -1066,6 +1126,7 @@ export async function editarApostilamentoAction(_p: Result | null, formData: For
         reajustePeriodoInicio: input.reajustePeriodoInicio,
         reajustePeriodoFim: input.reajustePeriodoFim,
         reajustePercentual: input.reajustePercentual,
+        reajusteEfeitosFinanceiros: input.reajusteEfeitosFinanceiros,
 
         observacoes: input.observacoes,
         arquivoPdfUrl,

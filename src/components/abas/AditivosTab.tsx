@@ -61,6 +61,7 @@ type Aditivo = {
   reajustePeriodoInicio: Date | null;
   reajustePeriodoFim: Date | null;
   reajustePercentual: number | null;
+  reajusteEfeitosFinanceiros: Date | null;
   observacoes: string | null;
   arquivoPdfUrl: string | null;
 };
@@ -899,6 +900,22 @@ function FormularioAditivo({
                 className="w-full rounded-xl px-4 py-3 text-sm font-medium"
                 placeholder="ex: 4,85"
               />
+            </CampoLabel>
+            <CampoLabel
+              label="Efeitos financeiros (a partir de)"
+              required={aplicaReaj}
+              span={2}
+            >
+              <input
+                type="date"
+                name="reajusteEfeitosFinanceiros"
+                defaultValue={toIsoDate(aditivo?.reajusteEfeitosFinanceiros)}
+                className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+              />
+              <p className="mt-1 text-[11px]" style={{ color: "var(--text-mute)" }}>
+                Empenhos emitidos a partir desta data usam o valor reajustado.
+                Anteriores ficam com o valor original.
+              </p>
             </CampoLabel>
           </div>
         </BlocoToggle>

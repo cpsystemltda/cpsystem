@@ -959,6 +959,11 @@ model TermoAditivo {
   reajustePeriodoInicio DateTime?
   reajustePeriodoFim    DateTime?
   reajustePercentual    Float?
+  // Data a partir da qual o reajuste tem efeitos financeiros no contrato.
+  // Execucoes (Empenhos) com dataEmissao >= esta data usam valor reajustado;
+  // anteriores ficam com valor original. Default = data de assinatura do
+  // aditivo quando nao informado (comportamento legado).
+  reajusteEfeitosFinanceiros DateTime?
 
   observacoes     String?
   arquivoPdfUrl   String?
@@ -1134,6 +1139,9 @@ model Apostilamento {
   reajustePeriodoInicio DateTime?
   reajustePeriodoFim    DateTime?
   reajustePercentual    Float?
+  // Data a partir da qual o reajuste tem efeitos financeiros no contrato
+  // (mesmo significado do campo em TermoAditivo).
+  reajusteEfeitosFinanceiros DateTime?
 
   observacoes         String?
   arquivoPdfUrl       String?
