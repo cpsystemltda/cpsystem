@@ -1,6 +1,7 @@
 import { TrendingUp, Wallet, Truck, FileSignature, Clock, AlertTriangle, Download } from "lucide-react";
 import Link from "next/link";
 import { brl } from "@/lib/validators";
+import { BotaoImprimirRelatorio } from "@/components/BotaoImprimirRelatorio";
 
 /**
  * Relatório consolidado de uma contratação (Contrato ou Empenho).
@@ -102,15 +103,18 @@ export function RelatorioContratacao({
             Resumo financeiro, físico, prazos e movimentos contratuais.
           </p>
         </div>
-        {pdfLink?.tipo === "contrato" && (
-          <Link
-            href={`/contratos/${pdfLink.id}/imprimir`}
-            target="_blank"
-            className="btn-primary inline-flex"
-          >
-            <Download className="h-4 w-4" /> Baixar PDF
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <BotaoImprimirRelatorio />
+          {pdfLink?.tipo === "contrato" && (
+            <Link
+              href={`/contratos/${pdfLink.id}/imprimir`}
+              target="_blank"
+              className="btn-primary inline-flex"
+            >
+              <Download className="h-4 w-4" /> Baixar PDF formatado
+            </Link>
+          )}
+        </div>
       </header>
 
       {/* Cards financeiros */}
