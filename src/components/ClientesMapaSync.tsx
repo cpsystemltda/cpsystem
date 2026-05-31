@@ -2,7 +2,12 @@
 
 import { useState, type ReactNode } from "react";
 import { type DadosUf } from "@/components/MapaBrasil";
-import { MapaPinsBrasil, type PinMapa, type PinEntregaMapa } from "@/components/MapaPinsBrasil";
+import {
+  MapaPinsBrasil,
+  type PinMapa,
+  type PinEntregaMapa,
+  type PinEmpresaMapa,
+} from "@/components/MapaPinsBrasil";
 import { brl } from "@/lib/validators";
 
 type Cliente = {
@@ -22,6 +27,7 @@ export function ClientesMapaSync({
   dadosUf,
   pins,
   pinsEntregas,
+  pinsEmpresas,
   kpiSlot,
   mapaTitle,
   mapaSubtitle,
@@ -34,6 +40,8 @@ export function ClientesMapaSync({
   // Pins adicionais de locais de entrega — habilita toggle "Sedes/Entregas"
   // no canto do mapa quando fornecidos.
   pinsEntregas?: PinEntregaMapa[];
+  // Sedes das EMPRESAS da fornecedora (CNPJs cadastrados na conta).
+  pinsEmpresas?: PinEmpresaMapa[];
   kpiSlot: ReactNode;
   mapaTitle?: string;
   mapaSubtitle?: string;
@@ -144,6 +152,7 @@ export function ClientesMapaSync({
           <MapaPinsBrasil
             pins={pins ?? []}
             pinsEntregas={pinsEntregas}
+            pinsEmpresas={pinsEmpresas}
             cnpjDestaque={cnpjDestaque}
           />
         </section>

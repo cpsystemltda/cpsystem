@@ -31,6 +31,19 @@ export type PinEntregaMapa = {
   orgaos: string[];
 };
 
+// Sede de uma EMPRESA da fornecedora (CNPJ cadastrado na conta). Usado
+// no toggle "Sua empresa" do mapa pra distinguir das sedes dos orgaos
+// publicos atendidos (PinMapa) e dos locais de entrega (PinEntregaMapa).
+export type PinEmpresaMapa = {
+  id: string;
+  cnpj: string;
+  nome: string;
+  endereco: string;
+  latitude: number;
+  longitude: number;
+  precisao: string | null;
+};
+
 // Leaflet quebra em SSR (acessa window). Importa só no client.
 const MapContainer = dynamic(() => import("react-leaflet").then((m) => m.MapContainer), {
   ssr: false,
@@ -86,18 +99,21 @@ const TILES = {
 export function MapaPinsBrasil({
   pins,
   pinsEntregas,
+  pinsEmpresas,
   cnpjDestaque,
 }: {
   pins: PinMapa[];
   // Quando fornecido, habilita o toggle Sedes/Entregas no canto do mapa.
   pinsEntregas?: PinEntregaMapa[];
+  // Sedes da fornecedora (CNPJs da propria conta). Habilita 3a aba "Sua empresa".
+  pinsEmpresas?: PinEmpresaMapa[];
   cnpjDestaque?: string | null;
 }) {
   // Default = satélite (decisão Regina). Persiste preferência por usuário
   // pra não regredir a cada navegação. Leitura do localStorage só ocorre
   // no client (depois do mount) pra evitar mismatch de SSR.
   const [tileSet, setTileSet] = useState<"mapa" | "satelite">("satelite");
-  const [vista, setVista] = useState<"SEDES" | "ENTREGAS">("SEDES");
+  const [vista, setVista] = useState<"SEDES" | "ENTREGAS" | "EMPRESAS">("SEDES");
   useEffect(() => {
     try {
       const salvo = window.localStorage.getItem("cp_mapa_tile");
@@ -151,7 +167,12 @@ export function MapaPinsBrasil({
 
   // Bounds iniciais: depende da vista atual. Cada conjunto de pins tem seu
   // próprio enquadramento — útil quando entregas estão em DF e sedes em GO.
-  const pinsAtivos = vista === "ENTREGAS" ? (pinsEntregas ?? []) : pins;
+  const pinsAtivos =
+    vista === "ENTREGAS"
+      ? (pinsEntregas ?? [])
+      : vista === "EMPRESAS"
+        ? (pinsEmpresas ?? [])
+        : pins;
   const bounds = useMemo(() => {
     if (pinsAtivos.length === 0) return null;
     let minLat = pinsAtivos[0].latitude;
@@ -214,8 +235,11 @@ export function MapaPinsBrasil({
           Sem pins ainda — geocodificando endereços dos órgãos…
         </div>
       )}
-      {/* Controles flutuantes — Sedes/Entregas à esquerda, Mapa/Satélite à direita */}
-      {pinsEntregas && pinsEntregas.length > 0 && (
+      {/* Controles flutuantes — Órgãos/Entregas/Sua empresa à esquerda,
+          Mapa/Satélite à direita. Renomeado/expandido (Regina 31/05) pra
+          distinguir os 3 conjuntos de pins (antes 'Sedes' confundia sede
+          da fornecedora com sede de orgao publico). */}
+      {((pinsEntregas && pinsEntregas.length > 0) || (pinsEmpresas && pinsEmpresas.length > 0)) && (
         <div
           className="absolute left-3 top-3 z-[500] flex rounded-md text-xs font-bold shadow-md"
           style={{ background: "white", border: "0.5px solid var(--hairline)" }}
@@ -229,23 +253,39 @@ export function MapaPinsBrasil({
               color: vista === "SEDES" ? "white" : "var(--text)",
               borderRadius: "6px 0 0 6px",
             }}
-            title="Sedes dos órgãos atendidos"
+            title="Órgãos públicos atendidos (com endereço geocodificado)"
           >
-            Sedes ({pins.length})
+            Órgãos ({pins.length})
           </button>
-          <button
-            type="button"
-            onClick={() => setVista("ENTREGAS")}
-            className="px-3 py-1.5 transition"
-            style={{
-              background: vista === "ENTREGAS" ? "var(--mint-deep)" : "transparent",
-              color: vista === "ENTREGAS" ? "white" : "var(--text)",
-              borderRadius: "0 6px 6px 0",
-            }}
-            title="Locais de entrega cadastrados"
-          >
-            Entregas ({pinsEntregas.length})
-          </button>
+          {pinsEntregas && pinsEntregas.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setVista("ENTREGAS")}
+              className="px-3 py-1.5 transition"
+              style={{
+                background: vista === "ENTREGAS" ? "var(--mint-deep)" : "transparent",
+                color: vista === "ENTREGAS" ? "white" : "var(--text)",
+              }}
+              title="Locais de entrega cadastrados"
+            >
+              Entregas ({pinsEntregas.length})
+            </button>
+          )}
+          {pinsEmpresas && pinsEmpresas.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setVista("EMPRESAS")}
+              className="px-3 py-1.5 transition"
+              style={{
+                background: vista === "EMPRESAS" ? "var(--sky-deep, #3F638F)" : "transparent",
+                color: vista === "EMPRESAS" ? "white" : "var(--text)",
+                borderRadius: "0 6px 6px 0",
+              }}
+              title="Sedes das suas empresas (CNPJs cadastrados)"
+            >
+              Sua empresa ({pinsEmpresas.length})
+            </button>
+          )}
         </div>
       )}
       <div
@@ -407,6 +447,34 @@ export function MapaPinsBrasil({
                         </div>
                       )}
                     </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+          {vista === "EMPRESAS" && pinsEmpresas?.map((p) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const icone = LeafletIcon.iconDestaque as any;
+            return (
+              <Marker key={p.id} position={[p.latitude, p.longitude]} icon={icone}>
+                <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+                  <div style={{ minWidth: 220 }}>
+                    <p style={{ fontWeight: 800, marginBottom: 4 }}>{p.nome}</p>
+                    <p style={{ fontSize: 11, color: "#666" }}>CNPJ {p.cnpj}</p>
+                  </div>
+                </Tooltip>
+                <Popup>
+                  <div style={{ minWidth: 240 }}>
+                    <p style={{ fontWeight: 800, marginBottom: 4 }}>{p.nome}</p>
+                    <p style={{ fontSize: 11, color: "#666", marginBottom: 8 }}>
+                      CNPJ {p.cnpj}
+                    </p>
+                    <p style={{ fontSize: 11, color: "#666" }}>{p.endereco}</p>
+                    {p.precisao && p.precisao !== "exact" && (
+                      <p style={{ fontSize: 10, color: "#999", marginTop: 4 }}>
+                        Localização aproximada ({p.precisao})
+                      </p>
+                    )}
                   </div>
                 </Popup>
               </Marker>

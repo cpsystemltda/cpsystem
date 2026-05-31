@@ -24,6 +24,7 @@ import { prisma } from "@/lib/prisma";
 import { dadosPorUf, extrairUf } from "@/lib/agregacaoUf";
 import { coletarPinsOrgaos } from "@/lib/pinsOrgaos";
 import { coletarPinsEntregas } from "@/lib/pinsEntregas";
+import { coletarPinsEmpresas } from "@/lib/pinsEmpresas";
 import { MapaBrasil } from "@/components/MapaBrasil";
 import { ClientesMapaSync } from "@/components/ClientesMapaSync";
 import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
@@ -201,6 +202,12 @@ export default async function DashboardPage() {
   // Pins de endereços de entrega cadastrados (toggle "Entregas" no mapa).
   // Falha silenciosa pelo mesmo motivo do pinsOrgaos.
   const pinsEntregas = await coletarPinsEntregas(contaId, empresaIdSelecionada ?? undefined).catch(
+    () => [],
+  );
+  // Pins das sedes das empresas da conta (toggle "Sua empresa" no mapa).
+  // Permite a Regina ver o numero de empresas cadastradas no mapa
+  // separado dos orgaos publicos atendidos.
+  const pinsEmpresas = await coletarPinsEmpresas(contaId, empresaIdSelecionada ?? undefined).catch(
     () => [],
   );
 
@@ -859,6 +866,7 @@ export default async function DashboardPage() {
             dadosUf={dadosUf}
             pins={pinsOrgaos}
             pinsEntregas={pinsEntregas}
+            pinsEmpresas={pinsEmpresas}
             kpiSlot={
               <KPI
                 tone="rose"
