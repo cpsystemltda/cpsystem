@@ -3,6 +3,7 @@ import { Crown, Search, ArrowUpRight, AlertTriangle, CheckCircle2, Clock, XCircl
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { entrarEspionagemAction } from "@/lib/espionagem";
+import { montarLabelEmpresa } from "@/lib/empresaLabel";
 
 const PRECO_BASICO = 397;
 const PRECO_PREMIUM = 997;
@@ -66,7 +67,7 @@ export default async function AdminClientesPage({
       }),
     },
     include: {
-      empresas: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpj: true } },
+      empresas: { select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true, cnpj: true } },
       analista: { select: { nomeCompleto: true, email: true } },
       usuarios: { select: { id: true, email: true, superAdmin: true } },
       embaixador: { select: { nomeCompleto: true } },
@@ -150,7 +151,9 @@ export default async function AdminClientesPage({
               const nome =
                 c.tipo === "ANALISTA"
                   ? c.analista?.nomeCompleto || "Analista sem nome"
-                  : c.empresas[0]?.nomeFantasia || c.empresas[0]?.razaoSocial || "Sem empresa";
+                  : c.empresas[0]
+                    ? montarLabelEmpresa(c.empresas[0])
+                    : "Sem empresa";
               const conf = STATUS_LABEL[c.statusAssinatura] || STATUS_LABEL.ATIVA;
               const Icon = conf.icone;
               const mrr = c.tipo === "ANALISTA" ? 0 : c.plano === "PREMIUM" ? PRECO_PREMIUM : PRECO_BASICO;
