@@ -64,6 +64,50 @@ export default async function AdminAnalistasPage() {
     orderBy: { criadoEm: "desc" },
   });
 
+  // ====== Comissionamento CP System (programa embaixador) ======
+  // Cada conta tem `embaixadorId` apontando pro analista que a trouxe pra
+  // plataforma. O model `Comissao` registra valores devidos/pagos pela CP
+  // System a esses analistas (linha A — diferente da comissao variavel das
+  // empresas, que eh linha B). A Regina pediu o "segundo relatorio" na area
+  // do PO: pagamentos que NOS fazemos aos analistas.
+  const comissoesCpSystem = await prisma.comissao.findMany({
+    select: {
+      analistaId: true,
+      contaId: true,
+      valor: true,
+      paga: true,
+      pagaEm: true,
+      competencia: true,
+      conta: {
+        select: {
+          empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1 },
+        },
+      },
+    },
+  });
+  const indicadasPorAnalista = new Map<
+    string,
+    { contaId: string; nome: string; pago: number; aPagar: number }[]
+  >();
+  for (const c of comissoesCpSystem) {
+    const bucket = indicadasPorAnalista.get(c.analistaId) ?? [];
+    const nome =
+      c.conta.empresas[0]?.nomeFantasia ?? c.conta.empresas[0]?.razaoSocial ?? "—";
+    const linha = bucket.find((x) => x.contaId === c.contaId);
+    if (linha) {
+      if (c.paga) linha.pago += c.valor;
+      else linha.aPagar += c.valor;
+    } else {
+      bucket.push({
+        contaId: c.contaId,
+        nome,
+        pago: c.paga ? c.valor : 0,
+        aPagar: c.paga ? 0 : c.valor,
+      });
+    }
+    indicadasPorAnalista.set(c.analistaId, bucket);
+  }
+
   // Calcula em paralelo, por vínculo, comissão variável paga vs a pagar
   // baseado em execuções (empenhos) das empresas da conta com criadoEm >= dataInicio.
   // Também calcula carteira contratada (atas + contratos vigentes).
@@ -125,6 +169,10 @@ export default async function AdminAnalistasPage() {
     comissaoVarPaga: number;
     comissaoVarAPagar: number;
     carteiraSobGestao: number;
+    // Comissionamento CP System (linha A — programa embaixador)
+    comissaoCpSystemPaga: number;
+    comissaoCpSystemAPagar: number;
+    empresasIndicadas: { nome: string; pago: number; aPagar: number }[];
   };
 
   const linhas: Linha[] = analistas.map((a) => {
@@ -152,6 +200,9 @@ export default async function AdminAnalistasPage() {
       (s, v) => s + (resumoVinculo.get(v.id)?.carteira ?? 0),
       0,
     );
+    const empresasIndicadas = indicadasPorAnalista.get(a.id) ?? [];
+    const comissaoCpSystemPaga = empresasIndicadas.reduce((s, e) => s + e.pago, 0);
+    const comissaoCpSystemAPagar = empresasIndicadas.reduce((s, e) => s + e.aPagar, 0);
     return {
       id: a.id,
       nome: a.nomeCompleto,
@@ -170,8 +221,19 @@ export default async function AdminAnalistasPage() {
       comissaoVarPaga,
       comissaoVarAPagar,
       carteiraSobGestao,
+      comissaoCpSystemPaga,
+      comissaoCpSystemAPagar,
+      empresasIndicadas,
     };
   });
+
+  // Totais do bloco CP System (programa embaixador)
+  const cpSystemPagaTotal = linhas.reduce((s, l) => s + l.comissaoCpSystemPaga, 0);
+  const cpSystemAPagarTotal = linhas.reduce((s, l) => s + l.comissaoCpSystemAPagar, 0);
+  const totalEmpresasIndicadas = linhas.reduce(
+    (s, l) => s + l.empresasIndicadas.length,
+    0,
+  );
 
   // KPIs agregados da rede
   const totalAnalistas = linhas.length;
@@ -267,6 +329,123 @@ export default async function AdminAnalistasPage() {
           </div>
         </section>
       )}
+
+      {/* Comissionamento CP System (programa embaixador) — pagamentos que
+          NOS fazemos aos analistas por cada empresa que eles trouxeram
+          pra plataforma (Regina pediu como 'segundo relatorio'). */}
+      <section className="glass mt-8 overflow-hidden rounded-[20px]">
+        <header
+          className="flex flex-wrap items-baseline justify-between gap-3 px-6 py-4"
+          style={{ borderBottom: "0.5px solid var(--hairline)" }}
+        >
+          <div>
+            <h2
+              className="text-[15px] font-extrabold"
+              style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
+            >
+              Comissionamento CP System (programa embaixador)
+            </h2>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
+              Pagamentos feitos pela CP System aos analistas por cada empresa que eles trouxeram à plataforma.
+            </p>
+          </div>
+          <span className="text-xs" style={{ color: "var(--text-soft)" }}>
+            {totalEmpresasIndicadas} indicação{totalEmpresasIndicadas !== 1 ? "ões" : ""} cadastrada{totalEmpresasIndicadas !== 1 ? "s" : ""}
+          </span>
+        </header>
+        <div className="grid gap-4 px-6 py-5 md:grid-cols-3">
+          <KPI
+            tone="mint"
+            icon={Wallet}
+            label="Já pago aos embaixadores"
+            value={brlCompacto(cpSystemPagaTotal)}
+            meta="Soma das comissões CP System quitadas"
+          />
+          <KPI
+            tone="rose"
+            icon={Coins}
+            label="A pagar (CP System)"
+            value={brlCompacto(cpSystemAPagarTotal)}
+            meta="Comissões devidas, ainda não pagas"
+          />
+          <KPI
+            tone="lavender"
+            icon={Building2}
+            label="Empresas indicadas"
+            value={totalEmpresasIndicadas}
+            meta="Total de contas geradas via embaixador"
+          />
+        </div>
+        {linhas.filter((l) => l.empresasIndicadas.length > 0).length === 0 ? (
+          <p className="px-6 pb-6 text-center text-sm" style={{ color: "var(--text-soft)" }}>
+            Nenhum analista trouxe empresas via programa de embaixador até agora.
+          </p>
+        ) : (
+          <table className="table-glass" style={{ minWidth: "1100px", tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: "auto", minWidth: "220px" }} />
+              <col style={{ width: "auto", minWidth: "360px" }} />
+              <col style={{ width: "100px" }} />
+              <col style={{ width: "150px" }} />
+              <col style={{ width: "150px" }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Analista (embaixador)</th>
+                <th>Empresas indicadas</th>
+                <th className="num">Qtd.</th>
+                <th className="num">Pago pela CP</th>
+                <th className="num">A pagar pela CP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas
+                .filter((l) => l.empresasIndicadas.length > 0)
+                .map((l) => (
+                  <tr key={l.id}>
+                    <td className="strong" style={{ verticalAlign: "top" }}>
+                      <Link
+                        href={`/painel-analista?analistaId=${l.id}`}
+                        className="font-extrabold underline-offset-2 hover:underline"
+                        style={{ color: "var(--text)" }}
+                      >
+                        {l.nome}
+                      </Link>
+                      <div className="text-[11px]" style={{ color: "var(--text-soft)" }}>
+                        {l.email}
+                      </div>
+                    </td>
+                    <td style={{ verticalAlign: "top" }}>
+                      <ul className="space-y-0.5 text-[12px]" style={{ color: "var(--text)" }}>
+                        {l.empresasIndicadas.map((e, i) => (
+                          <li key={i} className="flex flex-wrap items-baseline justify-between gap-2">
+                            <span>{e.nome}</span>
+                            <span className="text-[10px]" style={{ color: "var(--text-mute)" }}>
+                              pago {brlCompacto(e.pago)} · a pagar {brlCompacto(e.aPagar)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </td>
+                    <td className="num strong">{l.empresasIndicadas.length}</td>
+                    <td className="num" style={{ color: "var(--mint-deep)", fontWeight: 700 }}>
+                      {brlCompacto(l.comissaoCpSystemPaga)}
+                    </td>
+                    <td
+                      className="num"
+                      style={{
+                        color: l.comissaoCpSystemAPagar > 0 ? "var(--primary-deep)" : "var(--text-mute)",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {l.comissaoCpSystemAPagar > 0 ? brlCompacto(l.comissaoCpSystemAPagar) : "—"}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       {/* Tabela de analistas */}
       <section className="glass mt-8 overflow-hidden rounded-[20px]">
