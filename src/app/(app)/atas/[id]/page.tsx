@@ -17,6 +17,7 @@ import { KpisSaldoVigencia } from "@/components/KpisSaldoVigencia";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
+import { AtestadoCapacidadeTab } from "@/components/abas/AtestadoCapacidadeTab";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 import { LerMais } from "@/components/LerMais";
@@ -47,6 +48,7 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
       anotacoes: { orderBy: { criadoEm: "desc" } },
       termosAditivos: { orderBy: { dataAssinatura: "desc" } },
       apostilamentos: { orderBy: { dataAssinatura: "desc" } },
+      atestados: { orderBy: { dataEmissao: "desc" } },
     },
   });
 
@@ -250,6 +252,12 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
               label: "Procedimentos apuratórios",
               badge: ata.procedimentos.length,
               content: <ProcedimentosTab procedimentos={ata.procedimentos} ataId={ata.id} />,
+            },
+            {
+              key: "atestados",
+              label: "Atestado de Capacidade Técnica",
+              badge: ata.atestados.length,
+              content: <AtestadoCapacidadeTab atestados={ata.atestados} ataId={ata.id} />,
             },
             {
               key: "anexos",

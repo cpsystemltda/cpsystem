@@ -21,6 +21,7 @@ import { RelatorioContratacao } from "@/components/RelatorioContratacao";
 import { AlertaReajuste } from "@/components/AlertaReajuste";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
+import { AtestadoCapacidadeTab } from "@/components/abas/AtestadoCapacidadeTab";
 import { ReajustesTab } from "@/components/abas/ReajustesTab";
 import { GarantiasTab } from "@/components/abas/GarantiasTab";
 import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
@@ -51,6 +52,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
       pontosFocais: true,
       termosAditivos: { orderBy: { dataAssinatura: "desc" } },
       apostilamentos: { orderBy: { dataAssinatura: "desc" } },
+      atestados: { orderBy: { dataEmissao: "desc" } },
       reajustes: { orderBy: { dataPedido: "desc" } },
       notificacoes: { include: { andamentos: { orderBy: { dataEvento: "asc" } } }, orderBy: { criadoEm: "desc" } },
       procedimentos: {
@@ -269,6 +271,17 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
               label: "Procedimentos apuratórios",
               badge: contrato.procedimentos.length,
               content: <ProcedimentosTab procedimentos={contrato.procedimentos} contratoId={contrato.id} />,
+            },
+            {
+              key: "atestados",
+              label: "Atestado de Capacidade Técnica",
+              badge: contrato.atestados.length,
+              content: (
+                <AtestadoCapacidadeTab
+                  atestados={contrato.atestados}
+                  contratoId={contrato.id}
+                />
+              ),
             },
             {
               key: "anexos",

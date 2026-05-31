@@ -468,6 +468,7 @@ model Ata {
   apostilamentos        Apostilamento[]
   vigencias             Vigencia[]
   pareceres             ParecerJuridico[]
+  atestados             AtestadoCapacidade[]
 
   @@index([empresaId])
   @@index([criadoPorId])
@@ -644,6 +645,7 @@ model Contrato {
   anotacoes         Anotacao[]
   vigencias         Vigencia[]
   pareceres         ParecerJuridico[]
+  atestados         AtestadoCapacidade[]
 
   @@index([empresaId])
   @@index([ataId])
@@ -1454,6 +1456,31 @@ model Anexo {
   @@index([ataId])
   @@index([contratoId])
   @@index([empenhoId])
+}
+
+// Atestado de Capacidade Tecnica — emitido pelo orgao ao final do
+// Contrato/Ata como comprovacao de que a empresa executou bem. A
+// empresa anexa o PDF aqui pra ter catalogado e usar em licitacoes
+// futuras (Regina 31/05).
+model AtestadoCapacidade {
+  id             String   @id @default(cuid())
+  numero         String?  // nº do atestado (quando o orgao emite numerado)
+  dataEmissao    DateTime
+  orgaoEmissor   String   // nome do orgao que emitiu
+  objeto         String?  // descricao curta do que foi atestado
+  observacoes    String?
+  arquivoPdfUrl  String   // url do PDF anexado
+  arquivoPdfNome String?
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  ataId      String?
+  ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  @@index([ataId])
+  @@index([contratoId])
 }
 
 model Anotacao {

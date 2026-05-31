@@ -48,6 +48,7 @@ const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
       { href: "/contratos", label: "Contratos", icon: ClipboardList },
       { href: "/execucao", label: "Fornecimento/Execução", icon: Truck },
       { href: "/juridico", label: "Consultoria jurídica", icon: Scale },
+      { href: "/honorarios", label: "Honorários do analista", icon: Sparkles },
       { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
     ],
   },
