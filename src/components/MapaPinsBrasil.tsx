@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { brl } from "@/lib/validators";
 import "leaflet/dist/leaflet.css";
@@ -130,21 +130,47 @@ export function MapaPinsBrasil({
       // ignora — preferência fica só na sessão atual.
     }
   }
-  const [LeafletIcon, setLeafletIcon] = useState<{
-    icon: unknown;
-    iconHover: unknown;
-    iconDestaque: unknown;
-    iconEntrega: unknown;
-  } | null>(null);
+  // Factory de icones — em vez de pre-gerar 3-4 icones fixos, agora cada
+  // pin recebe um icone com o NUMERO bordado dentro (Regina 01/06: pediu
+  // 1,2,3 nos pins pra navegar mais rapido). Mantemos a referencia ao
+  // Leaflet global pra criar ícones inline no render dos markers.
+  type Factory = (opts: {
+    cor: string;
+    raio: number;
+    numero?: number;
+    destaque?: boolean;
+  }) => unknown;
+  const [iconFactory, setIconFactory] = useState<Factory | null>(null);
 
-  // Configura ícones Leaflet só no client (acessa window/document).
+  // Ref pra instancia do mapa Leaflet — usada pra flyTo quando o usuario
+  // clica num pin na lista (sync lista→mapa pedido pela Regina).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mapRef = useRef<any>(null);
+  useEffect(() => {
+    if (!cnpjDestaque || !mapRef.current) return;
+    const pin = pins.find((p) => p.cnpj === cnpjDestaque);
+    if (!pin) return;
+    try {
+      mapRef.current.flyTo([pin.latitude, pin.longitude], 14, { duration: 0.6 });
+    } catch {
+      // Mapa ainda nao instanciado/desmontado — ignora.
+    }
+  }, [cnpjDestaque, pins]);
+
   useEffect(() => {
     import("leaflet").then((L) => {
-      function fazerIcone(cor: string, raio: number) {
+      const factory: Factory = ({ cor, raio, numero, destaque }) => {
+        const stroke = destaque ? 3 : 2;
+        const fontSize = Math.max(11, Math.floor(raio * 0.95));
+        const yText = raio + fontSize * 0.36;
+        const conteudo =
+          numero != null
+            ? `<text x="${raio}" y="${yText}" fill="white" font-family="-apple-system,Inter,system-ui,sans-serif" font-size="${fontSize}" font-weight="800" text-anchor="middle">${numero}</text>`
+            : `<circle cx="${raio}" cy="${raio}" r="${raio / 3}" fill="white"/>`;
         const svg = `
           <svg width="${raio * 2}" height="${raio * 2 + 6}" viewBox="0 0 ${raio * 2} ${raio * 2 + 6}" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="${raio}" cy="${raio}" r="${raio - 1}" fill="${cor}" stroke="white" stroke-width="2"/>
-            <circle cx="${raio}" cy="${raio}" r="${raio / 3}" fill="white"/>
+            <circle cx="${raio}" cy="${raio}" r="${raio - 1}" fill="${cor}" stroke="white" stroke-width="${stroke}"/>
+            ${conteudo}
           </svg>
         `;
         return L.divIcon({
@@ -154,14 +180,9 @@ export function MapaPinsBrasil({
           iconAnchor: [raio, raio],
           popupAnchor: [0, -raio],
         });
-      }
-      setLeafletIcon({
-        icon: fazerIcone("#7a5c1a", 11),
-        iconHover: fazerIcone("#A88947", 13),
-        iconDestaque: fazerIcone("#A88947", 15),
-        // Verde-menta pra distinguir entregas das sedes
-        iconEntrega: fazerIcone("#1f6f55", 11),
-      });
+      };
+      // Retorna a propria funcao (nao chama) — fica disponivel pro render.
+      setIconFactory(() => factory);
     });
   }, []);
 
@@ -199,7 +220,7 @@ export function MapaPinsBrasil({
   // o país inteiro. Mensagem opcional flutua no topo informando estado.
   const semPinsAtivos = pinsAtivos.length === 0;
 
-  if (!LeafletIcon) {
+  if (!iconFactory) {
     return (
       <div
         className="grid h-[360px] place-items-center rounded-2xl text-sm"
@@ -320,6 +341,8 @@ export function MapaPinsBrasil({
 
       <MapContainer
         key={vista /* força re-fit quando troca de vista */}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ref={mapRef as any}
         bounds={bounds?.bounds ?? [[-34, -74], [6, -33]]}
         boundsOptions={{ padding: [40, 40], maxZoom: 12 }}
         // Trava a navegação ao retângulo do Brasil — usuário não pode dar
@@ -337,15 +360,24 @@ export function MapaPinsBrasil({
       >
         <TileLayer url={tile.url} attribution={tile.attribution} noWrap />
         <MarkerClusterGroup chunkedLoading>
-          {vista === "SEDES" && pins.map((p) => {
+          {vista === "SEDES" && pins.map((p, idx) => {
+            const numero = idx + 1;
             const isDestaque = cnpjDestaque === p.cnpj;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const icone = (isDestaque ? LeafletIcon.iconDestaque : LeafletIcon.icon) as any;
+            const icone = iconFactory({
+              cor: isDestaque ? "#A88947" : "#7a5c1a",
+              raio: isDestaque ? 15 : 13,
+              numero,
+              destaque: isDestaque,
+            }) as any;
             return (
               <Marker key={p.cnpj} position={[p.latitude, p.longitude]} icon={icone}>
                 <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                   <div style={{ minWidth: 200 }}>
-                    <p style={{ fontWeight: 800, marginBottom: 4 }}>{p.nome}</p>
+                    <p style={{ fontWeight: 800, marginBottom: 4 }}>
+                      <span style={{ display: "inline-block", minWidth: 18, marginRight: 6, padding: "0 6px", background: "#7a5c1a", color: "white", borderRadius: 9, fontSize: 11 }}>{numero}</span>
+                      {p.nome}
+                    </p>
                     <p style={{ fontSize: 11, color: "#666" }}>
                       {p.atas} ata{p.atas !== 1 ? "s" : ""} ·{" "}
                       {p.contratos} contrato{p.contratos !== 1 ? "s" : ""} ·{" "}
@@ -393,14 +425,20 @@ export function MapaPinsBrasil({
               </Marker>
             );
           })}
-          {vista === "ENTREGAS" && pinsEntregas?.map((p) => {
+          {vista === "ENTREGAS" && pinsEntregas?.map((p, idx) => {
+            const numero = idx + 1;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const icone = LeafletIcon.iconEntrega as any;
+            const icone = iconFactory({
+              cor: "#1f6f55",
+              raio: 13,
+              numero,
+            }) as any;
             return (
               <Marker key={p.id} position={[p.latitude, p.longitude]} icon={icone}>
                 <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                   <div style={{ minWidth: 220 }}>
                     <p style={{ fontWeight: 800, marginBottom: 4 }}>
+                      <span style={{ display: "inline-block", minWidth: 18, marginRight: 6, padding: "0 6px", background: "#1f6f55", color: "white", borderRadius: 9, fontSize: 11 }}>{numero}</span>
                       {p.rotulo || "Local de entrega"}
                     </p>
                     <p style={{ fontSize: 11, color: "#666", marginBottom: 4 }}>
@@ -452,14 +490,22 @@ export function MapaPinsBrasil({
               </Marker>
             );
           })}
-          {vista === "EMPRESAS" && pinsEmpresas?.map((p) => {
+          {vista === "EMPRESAS" && pinsEmpresas?.map((p, idx) => {
+            const numero = idx + 1;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const icone = LeafletIcon.iconDestaque as any;
+            const icone = iconFactory({
+              cor: "#3F638F",
+              raio: 14,
+              numero,
+            }) as any;
             return (
               <Marker key={p.id} position={[p.latitude, p.longitude]} icon={icone}>
                 <Tooltip direction="top" offset={[0, -10]} opacity={1}>
                   <div style={{ minWidth: 220 }}>
-                    <p style={{ fontWeight: 800, marginBottom: 4 }}>{p.nome}</p>
+                    <p style={{ fontWeight: 800, marginBottom: 4 }}>
+                      <span style={{ display: "inline-block", minWidth: 18, marginRight: 6, padding: "0 6px", background: "#3F638F", color: "white", borderRadius: 9, fontSize: 11 }}>{numero}</span>
+                      {p.nome}
+                    </p>
                     <p style={{ fontSize: 11, color: "#666" }}>CNPJ {p.cnpj}</p>
                   </div>
                 </Tooltip>

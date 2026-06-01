@@ -53,6 +53,15 @@ export function ClientesMapaSync({
   // quebrar callsite — ufDestaque continua sendo usado pra hover sync.
   void dadosUf;
 
+  // Numero do pin pra cada cnpj de pin de orgao. A ordem dos pins eh
+  // ja vinda do servidor ordenada por valor (ver coletarPinsOrgaos).
+  // Mostrar o mesmo numero do mapa na tabela ao lado pra a Regina
+  // localizar visualmente (pedido 01/06).
+  const numeroPorCnpj = new Map<string, number>();
+  pins?.forEach((p, idx) => {
+    if (p.cnpj) numeroPorCnpj.set(p.cnpj, idx + 1);
+  });
+
   return (
     <>
       <div className="grid gap-3.5" style={{ gridTemplateColumns: "1fr 2fr" }}>
@@ -61,6 +70,7 @@ export function ClientesMapaSync({
           <table className="table-glass">
             <thead>
               <tr>
+                <th style={{ width: 44 }}>#</th>
                 <th>Órgão</th>
                 <th className="num">Valor contratado</th>
               </tr>
@@ -69,59 +79,92 @@ export function ClientesMapaSync({
               {clientes.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={2}
+                    colSpan={3}
                     style={{ textAlign: "center", color: "var(--text-mute)" }}
                   >
                     Sem dados ainda.
                   </td>
                 </tr>
               ) : (
-                clientes.map((c) => (
-                  <tr
-                    key={c.nome}
-                    onMouseEnter={() => {
-                      setUfDestaque(c.uf);
-                      if (c.cnpj) setCnpjDestaque(c.cnpj);
-                    }}
-                    onMouseLeave={() => {
-                      setUfDestaque(null);
-                      setCnpjDestaque(null);
-                    }}
-                    style={{
-                      cursor: c.uf || c.cnpj ? "pointer" : "default",
-                      background:
-                        (c.uf && ufDestaque === c.uf) ||
-                        (c.cnpj && cnpjDestaque === c.cnpj)
-                          ? "rgba(212,175,55,0.10)"
-                          : undefined,
-                      transition: "background 120ms",
-                    }}
-                    title={
-                      c.cnpj
-                        ? "Passe o mouse para destacar o pin no mapa"
-                        : c.uf
-                          ? `Passe o mouse para destacar ${c.uf} no mapa`
-                          : "Sem geocode"
-                    }
-                  >
-                    <td className="strong">
-                      {c.nome}
-                      {c.uf && (
-                        <span
-                          className="ml-2 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                          style={{
-                            background: "rgba(15,14,12,0.06)",
-                            color: "var(--text-soft)",
-                            letterSpacing: "0.04em",
-                          }}
-                        >
-                          {c.uf}
-                        </span>
-                      )}
-                    </td>
-                    <td className="num strong">{brl(c.valor)}</td>
-                  </tr>
-                ))
+                clientes.map((c) => {
+                  const numero = c.cnpj ? numeroPorCnpj.get(c.cnpj) : undefined;
+                  return (
+                    <tr
+                      key={c.nome}
+                      onMouseEnter={() => {
+                        setUfDestaque(c.uf);
+                        if (c.cnpj) setCnpjDestaque(c.cnpj);
+                      }}
+                      onMouseLeave={() => {
+                        setUfDestaque(null);
+                        // Mantem cnpjDestaque ate o proximo click — assim o mapa
+                        // permanece centrado no pin escolhido depois do hover.
+                      }}
+                      onClick={() => {
+                        if (c.cnpj) setCnpjDestaque(c.cnpj);
+                      }}
+                      style={{
+                        cursor: c.uf || c.cnpj ? "pointer" : "default",
+                        background:
+                          (c.uf && ufDestaque === c.uf) ||
+                          (c.cnpj && cnpjDestaque === c.cnpj)
+                            ? "rgba(212,175,55,0.10)"
+                            : undefined,
+                        transition: "background 120ms",
+                      }}
+                      title={
+                        c.cnpj
+                          ? "Clique para centrar o mapa neste órgão"
+                          : c.uf
+                            ? `Passe o mouse para destacar ${c.uf} no mapa`
+                            : "Sem geocode"
+                      }
+                    >
+                      <td className="num">
+                        {numero != null ? (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              minWidth: 22,
+                              height: 22,
+                              padding: "0 6px",
+                              background:
+                                c.cnpj && cnpjDestaque === c.cnpj
+                                  ? "#A88947"
+                                  : "#7a5c1a",
+                              color: "white",
+                              borderRadius: 11,
+                              fontSize: 11,
+                              fontWeight: 800,
+                            }}
+                          >
+                            {numero}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--text-mute)" }}>—</span>
+                        )}
+                      </td>
+                      <td className="strong">
+                        {c.nome}
+                        {c.uf && (
+                          <span
+                            className="ml-2 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold"
+                            style={{
+                              background: "rgba(15,14,12,0.06)",
+                              color: "var(--text-soft)",
+                              letterSpacing: "0.04em",
+                            }}
+                          >
+                            {c.uf}
+                          </span>
+                        )}
+                      </td>
+                      <td className="num strong">{brl(c.valor)}</td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -142,7 +185,7 @@ export function ClientesMapaSync({
             </h3>
             <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
               {mapaSubtitle ??
-                "Cada pin é um órgão. Passe o mouse sobre uma linha da lista para destacar o pin correspondente; clique nos clusters para expandir."}
+                "Cada pin tem um número (1, 2, 3…) que aparece também na lista ao lado. Clique numa linha da lista para o mapa centrar no pin correspondente."}
             </p>
           </header>
           {/* Sempre usa o MapaPinsBrasil (Leaflet com satélite). Quando
