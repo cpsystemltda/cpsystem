@@ -21,7 +21,9 @@ const LIMITE_CONTEXTO = 30;
 const LIMITE_PERSISTENCIA = 500;
 // Plano Básico: 2 perguntas grátis vitalícias (Regina 01/06). 3ª pergunta
 // dispara paywall pro Premium. Premium e super admin sao ilimitados.
-export const LIMITE_PERGUNTAS_BASICO = 2;
+// NAO exportar — "use server" so aceita exports de async functions; o cliente
+// tem a propria copia desta constante em FlutuanteIAsystem.tsx.
+const LIMITE_PERGUNTAS_BASICO = 2;
 
 export async function enviarMensagemIAsystemAction(
   novaMensagem: string,
