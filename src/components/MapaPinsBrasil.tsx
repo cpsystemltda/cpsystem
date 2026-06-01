@@ -359,7 +359,13 @@ export function MapaPinsBrasil({
         style={{ height: 420, width: "100%" }}
       >
         <TileLayer url={tile.url} attribution={tile.attribution} noWrap />
-        <MarkerClusterGroup chunkedLoading>
+        {/* Cluster desligado por padrao: a Regina precisa ver TODOS os
+            numeros (1, 2, 3...) dos pins individuais — o cluster
+            agrupava os pins proximos num so circulo com a contagem,
+            escondendo os numeros individuais. Mantemos o
+            MarkerClusterGroup com disableClusteringAtZoom=4 pra que
+            mesmo no zoom mais distante ja apareca individual. */}
+        <MarkerClusterGroup chunkedLoading disableClusteringAtZoom={4} spiderfyOnMaxZoom={false} showCoverageOnHover={false} maxClusterRadius={0}>
           {vista === "SEDES" && pins.map((p, idx) => {
             const numero = idx + 1;
             const isDestaque = cnpjDestaque === p.cnpj;

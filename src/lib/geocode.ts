@@ -299,8 +299,12 @@ export function aplicarJitter(
   }
   const r1 = ((h >>> 0) % 10000) / 10000 - 0.5;
   const r2 = (((h * 16807) >>> 0) % 10000) / 10000 - 0.5;
+  // ~0.08 graus = ~9km no equador. Garantia que mesmo no mesmo
+  // centroide de cidade os pins fiquem visualmente separados (Regina
+  // tinha 5 orgaos no DF caindo todos no mesmo ponto; com 0.03 ainda
+  // sobrepunham apos o cluster do Leaflet).
   return {
-    latitude: lat + r1 * 0.03,
-    longitude: lng + r2 * 0.03,
+    latitude: lat + r1 * 0.08,
+    longitude: lng + r2 * 0.08,
   };
 }
