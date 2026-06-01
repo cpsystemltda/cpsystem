@@ -29,8 +29,10 @@ const SUGESTOES_INICIAIS = [
 // Botão flutuante (FAB) + drawer com o chat IAsystem embutido.
 // Toda conversa acontece no drawer — não navega pra outra rota.
 // Histórico vem do banco (isolado por usuarioId), não localStorage.
-// Plano Básico vê o chat mas envio é bloqueado com modal de upgrade
-// (decisão Regina: análise jurídica IA é feature Premium).
+// Plano Básico: 2 perguntas grátis vitalícias; 3ª dispara modal de
+// upgrade pro Premium (Regina 01/06). Premium e super admin: ilimitado.
+const LIMITE_PERGUNTAS_BASICO = 2;
+
 export function FlutuanteIAsystem({ plano }: { plano: string }) {
   const [aberto, setAberto] = useState(false);
   const isPremium = plano === "PREMIUM";
@@ -86,6 +88,12 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
   const fimRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Contador de perguntas gratuitas usadas (so importa pra Bsico). Vem
+  // do historico carregado + atualiza a cada envio bem-sucedido.
+  const perguntasUsadas = mensagens.filter((m) => m.role === "user").length;
+  const cota = LIMITE_PERGUNTAS_BASICO - perguntasUsadas;
+  const semCota = !isPremium && cota <= 0;
+
   // Carrega histórico do banco quando o drawer abre — isolado por usuarioId.
   useEffect(() => {
     let ativo = true;
@@ -122,9 +130,11 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
   function enviar(texto: string) {
     const pergunta = texto.trim();
     if (!pergunta || enviando) return;
-    // Plano Básico: bloqueia envio e mostra paywall. Mensagens já existentes
-    // (do tempo do trial / quando era Premium) continuam visíveis em read-only.
-    if (!isPremium) {
+    // Plano Básico: 2 perguntas gratuitas. Na 3a o servidor retorna
+    // `paywall: true` e abrimos o modal de upgrade. Pre-bloqueio
+    // client-side somente quando ja sabemos que zerou (defesa contra
+    // race condition de duplo clique).
+    if (semCota) {
       setPaywallAberto(true);
       return;
     }
@@ -134,7 +144,14 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
     startTransition(async () => {
       const res = await enviarMensagemIAsystemAction(pergunta);
       if (!res.ok) {
-        setErro(res.erro);
+        if (res.paywall) {
+          // Server confirma que estourou a cota — abre paywall e tira a
+          // pergunta otimista que adicionamos antes.
+          setMensagens((prev) => prev.slice(0, -1));
+          setPaywallAberto(true);
+        } else {
+          setErro(res.erro);
+        }
         return;
       }
       setMensagens((prev) => [...prev, { role: "assistant", content: res.resposta }]);
@@ -236,21 +253,37 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
           </div>
         )}
 
-        {/* Banner Premium quando plano Básico */}
+        {/* Contador de perguntas gratuitas (plano Básico) */}
         {!isPremium && (
           <div
             className="mx-3 mb-2 flex items-start gap-2 rounded-lg px-3 py-2 text-[11px]"
             style={{
-              background: "linear-gradient(135deg, rgba(142,115,224,0.10), rgba(107,79,201,0.05))",
-              border: "0.5px solid rgba(107,79,201,0.25)",
-              color: "#6B4FC9",
+              background: semCota
+                ? "linear-gradient(135deg, rgba(232,138,152,0.12), rgba(232,138,152,0.04))"
+                : "linear-gradient(135deg, rgba(142,115,224,0.10), rgba(107,79,201,0.05))",
+              border: semCota
+                ? "0.5px solid rgba(232,138,152,0.3)"
+                : "0.5px solid rgba(107,79,201,0.25)",
+              color: semCota ? "var(--coral)" : "#6B4FC9",
             }}
           >
             <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              <strong>Recurso Premium.</strong> O envio de novas mensagens está
-              disponível apenas no plano Premium. Suas conversas antigas continuam
-              visíveis.
+              {semCota ? (
+                <>
+                  <strong>Cota grátis esgotada.</strong> Você já usou suas{" "}
+                  {LIMITE_PERGUNTAS_BASICO} perguntas gratuitas. Faça o upgrade
+                  pro Premium pra continuar consultando o IAsystem.
+                </>
+              ) : (
+                <>
+                  <strong>{cota} pergunta{cota !== 1 ? "s" : ""} grátis</strong>{" "}
+                  restante{cota !== 1 ? "s" : ""} ({perguntasUsadas} de{" "}
+                  {LIMITE_PERGUNTAS_BASICO} usada
+                  {perguntasUsadas !== 1 ? "s" : ""}). Upgrade pro Premium
+                  desbloqueia chat ilimitado.
+                </>
+              )}
             </span>
           </div>
         )}
@@ -273,7 +306,11 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
                 enviar(rascunho);
               }
             }}
-            placeholder={isPremium ? "Sua dúvida em Lei 14.133…" : "Faça upgrade pro Premium para usar o IAsystem…"}
+            placeholder={
+              semCota
+                ? "Cota grátis esgotada — faça upgrade pro Premium…"
+                : "Sua dúvida em Lei 14.133…"
+            }
             rows={2}
             className="flex-1 resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
             disabled={enviando}
@@ -282,7 +319,7 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
             type="submit"
             disabled={!rascunho.trim() || enviando}
             className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-violet-700 disabled:opacity-40"
-            title={isPremium ? "Enviar (Enter)" : "Recurso Premium — clique pra ver o plano"}
+            title={semCota ? "Cota grátis esgotada — clique pra fazer upgrade" : "Enviar (Enter)"}
           >
             {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>
@@ -320,13 +357,13 @@ function PaywallModal({ onFechar }: { onFechar: () => void }) {
           <Sparkles className="h-6 w-6" />
         </div>
         <h3 className="mt-4 text-lg font-extrabold text-slate-900">
-          Esta função faz parte do pacote Premium
+          Suas {LIMITE_PERGUNTAS_BASICO} perguntas grátis acabaram
         </h3>
         <p className="mt-2 text-sm text-slate-600">
-          O <strong>IAsystem</strong> — assistente jurídico especializado em Lei
-          14.133/2021 — é exclusivo do plano <strong>Premium</strong>. Faça o
-          upgrade pra desbloquear chat ilimitado + análise de Atas, Contratos e
-          Empenhos + parecer estruturado.
+          Pra continuar conversando com o <strong>IAsystem</strong> — assistente
+          jurídico especializado em Lei 14.133/2021 — faça o upgrade pro plano{" "}
+          <strong>Premium</strong>: chat ilimitado + análise de Atas, Contratos
+          e Empenhos + parecer estruturado.
         </p>
         <ul className="mt-4 space-y-2 text-xs text-slate-700">
           <li className="flex items-start gap-2">

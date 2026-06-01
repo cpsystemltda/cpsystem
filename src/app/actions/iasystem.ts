@@ -7,13 +7,21 @@ import { bloquearEspionagem } from "@/lib/espionagem";
 import { responderIAsystem, type MensagemIAsystem } from "@/lib/iasystem";
 
 export type ResultadoIAsystem =
-  | { ok: true; resposta: string }
-  | { ok: false; erro: string };
+  | {
+      ok: true;
+      resposta: string;
+      perguntasUsadas?: number;
+      limiteGratis?: number;
+    }
+  | { ok: false; erro: string; paywall?: boolean };
 
 // Limite de mensagens enviadas pro Claude (controle de custo de tokens)
 const LIMITE_CONTEXTO = 30;
 // Limite de mensagens guardadas no banco por usuário (defesa contra abuso)
 const LIMITE_PERSISTENCIA = 500;
+// Plano Básico: 2 perguntas grátis vitalícias (Regina 01/06). 3ª pergunta
+// dispara paywall pro Premium. Premium e super admin sao ilimitados.
+export const LIMITE_PERGUNTAS_BASICO = 2;
 
 export async function enviarMensagemIAsystemAction(
   novaMensagem: string,
@@ -21,15 +29,21 @@ export async function enviarMensagemIAsystemAction(
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
 
-  // IAsystem é feature Premium (decisão Regina 28/05). Guard server-side
-  // de defesa em profundidade — UI já bloqueia, mas se alguém burlar via
-  // POST direto, ainda barra aqui. Super admin (Regina/Igor) tem acesso
-  // pra testar e demonstrar a feature.
-  if (!usuario.superAdmin && usuario.conta.plano !== "PREMIUM") {
-    return {
-      ok: false,
-      erro: "O IAsystem é uma feature exclusiva do plano Premium. Faça o upgrade em /conta/assinatura.",
-    };
+  // IAsystem em Básico libera ate LIMITE_PERGUNTAS_BASICO consultas
+  // vitalicias por usuario; a partir da proxima, exige upgrade. Premium
+  // e super admin sao ilimitados (regras Regina 01/06).
+  const ehPremium = usuario.superAdmin || usuario.conta.plano === "PREMIUM";
+  if (!ehPremium) {
+    const perguntasUsadas = await prisma.mensagemIAsystem.count({
+      where: { usuarioId: usuario.id, role: "user" },
+    });
+    if (perguntasUsadas >= LIMITE_PERGUNTAS_BASICO) {
+      return {
+        ok: false,
+        paywall: true,
+        erro: `Você já usou suas ${LIMITE_PERGUNTAS_BASICO} perguntas grátis. Faça o upgrade pro Premium em /conta/assinatura para continuar consultando o IAsystem.`,
+      };
+    }
   }
 
   const pergunta = novaMensagem.trim();
@@ -91,7 +105,18 @@ export async function enviarMensagemIAsystemAction(
   }
 
   revalidatePath("/iasystem");
-  return { ok: true, resposta };
+  // Conta perguntas usadas pra UI mostrar "X de N grátis" no Básico.
+  const perguntasUsadasFinal = ehPremium
+    ? undefined
+    : await prisma.mensagemIAsystem.count({
+        where: { usuarioId: usuario.id, role: "user" },
+      });
+  return {
+    ok: true,
+    resposta,
+    perguntasUsadas: perguntasUsadasFinal,
+    limiteGratis: ehPremium ? undefined : LIMITE_PERGUNTAS_BASICO,
+  };
 }
 
 export async function carregarHistoricoIAsystem(): Promise<MensagemIAsystem[]> {
