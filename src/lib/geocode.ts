@@ -38,11 +38,11 @@ async function aguardarRateLimit() {
   ultimaChamada = Date.now();
 }
 
-async function chamarNominatim(endereco: string): Promise<Geocode | null> {
+async function tentarNominatim(query: string): Promise<Geocode | null> {
   await aguardarRateLimit();
   try {
     const url = new URL("https://nominatim.openstreetmap.org/search");
-    url.searchParams.set("q", endereco);
+    url.searchParams.set("q", query);
     url.searchParams.set("format", "json");
     url.searchParams.set("countrycodes", "br");
     url.searchParams.set("limit", "1");
@@ -57,9 +57,6 @@ async function chamarNominatim(endereco: string): Promise<Geocode | null> {
     if (!Array.isArray(data) || data.length === 0) return null;
     const r = data[0];
     if (!r.lat || !r.lon) return null;
-    // Precisão grosseira: se tem road/house, é "exact"; se só city, "city";
-    // se só state, "state". Usado pra mostrar avisos quando o pin é
-    // aproximado.
     let precisao: string | null = null;
     if (r.address?.road || r.address?.house_number) precisao = "exact";
     else if (r.address?.city || r.address?.town) precisao = "city";
@@ -70,9 +67,57 @@ async function chamarNominatim(endereco: string): Promise<Geocode | null> {
       precisao,
     };
   } catch {
-    // Network/timeout/parsing — falha silenciosa pra não quebrar dashboard
     return null;
   }
+}
+
+// Heuristicas pra extrair fallback "Cidade-UF" quando o endereco completo
+// nao casa no Nominatim. Cobre formatos B2G comuns: "...Brasilia-DF",
+// "...Brasília/DF", "...Brasília, DF", "Rua X, São Paulo/SP".
+function extrairCidadeUf(endereco: string): string | null {
+  const upper = endereco
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+  // Padrao "Cidade-UF" ou "Cidade/UF" ou "Cidade, UF"
+  const padrao = /([A-Z][A-Z\s]+?)\s*[-/,]\s*(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)(?:\s|$|[\d\-,.])/;
+  const m = upper.match(padrao);
+  if (m) {
+    const cidade = m[1].trim();
+    if (cidade.length >= 3) return `${cidade}, ${m[2]}, Brasil`;
+  }
+  return null;
+}
+
+/**
+ * Geocodifica um endereco com 3 tentativas em cascata:
+ *   1. Endereco completo (precisao "exact" quando o Nominatim acha).
+ *   2. Fallback: "Cidade, UF" extraida do endereco (precisao "city").
+ *   3. Ultimo recurso: so a UF (precisao "state").
+ * Sem isso, enderecos B2G especificos do DF (ex: "SAISo Setor Policial
+ * Sul...") batem em null e o orgao nao aparecia no mapa.
+ */
+async function chamarNominatim(endereco: string): Promise<Geocode | null> {
+  const direto = await tentarNominatim(endereco);
+  if (direto) return direto;
+
+  const cidadeUf = extrairCidadeUf(endereco);
+  if (cidadeUf) {
+    const fallback = await tentarNominatim(cidadeUf);
+    if (fallback) {
+      return { ...fallback, precisao: fallback.precisao ?? "city" };
+    }
+  }
+
+  // Ultimo recurso: tenta so a UF. Ainda melhor que pin ausente.
+  const matchUf = endereco
+    .toUpperCase()
+    .match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/);
+  if (matchUf) {
+    const soUf = await tentarNominatim(`${matchUf[1]}, Brasil`);
+    if (soUf) return { ...soUf, precisao: "state" };
+  }
+  return null;
 }
 
 /**
@@ -167,7 +212,7 @@ export async function geocodificarOrgaosEmBatch(
   // 3. Geocodifica pendentes serialmente (rate limit). Limita a 5 por
   // renderização pra não atrasar o dashboard mais que 5-6s. Os demais
   // ficam pra próximas cargas (já têm cache parcial após cada chamada).
-  for (const p of pendentes.slice(0, 5)) {
+  for (const p of pendentes.slice(0, 10)) {
     const geo = await geocodificarOrgao(p.cnpj, p.endereco);
     if (geo) out.set(p.cnpj, geo);
   }
@@ -215,7 +260,7 @@ export async function geocodificarEnderecosEmBatch(
     }
   }
 
-  for (const p of pendentes.slice(0, 5)) {
+  for (const p of pendentes.slice(0, 10)) {
     const geo = await chamarNominatim(p.endereco);
     if (!geo) continue;
     await prisma.enderecoGeocode.upsert({
