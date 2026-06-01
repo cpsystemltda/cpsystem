@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { geocodificarOrgaosEmBatch } from "@/lib/geocode";
+import { aplicarJitter, geocodificarOrgaosEmBatch } from "@/lib/geocode";
 
 export type PinOrgao = {
   cnpj: string;
@@ -132,15 +132,18 @@ export async function coletarPinsOrgaos(
   }));
   const geoMap = await geocodificarOrgaosEmBatch(orgaosParaGeo);
 
-  // Combina com pins
+  // Combina com pins. Aplica jitter deterministico em pins aproximados
+  // (precisao 'city'/'state') pra evitar sobreposicao quando varios orgaos
+  // batem no mesmo centroide de cidade.
   const pins: PinOrgao[] = [];
   for (const a of agg.values()) {
     const geo = geoMap.get(a.cnpj);
     if (!geo) continue;
+    const ajust = aplicarJitter(geo.latitude, geo.longitude, geo.precisao, a.cnpj);
     pins.push({
       ...a,
-      latitude: geo.latitude,
-      longitude: geo.longitude,
+      latitude: ajust.latitude,
+      longitude: ajust.longitude,
       precisao: geo.precisao,
     });
   }

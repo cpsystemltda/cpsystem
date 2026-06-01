@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
+  aplicarJitter,
   geocodificarEnderecosEmBatch,
   normalizarEnderecoChave,
 } from "@/lib/geocode";
@@ -107,17 +108,18 @@ export async function coletarPinsEntregas(
   const enderecosParaGeo = Array.from(agg.values()).map((a) => a.enderecoOriginal);
   const geoMap = await geocodificarEnderecosEmBatch(enderecosParaGeo);
 
-  // Combina
+  // Combina. Jitter em coords aproximadas pra nao sobrepor pins.
   const pins: PinEntrega[] = [];
   for (const a of agg.values()) {
     const geo = geoMap.get(a.chave);
     if (!geo) continue;
+    const ajust = aplicarJitter(geo.latitude, geo.longitude, geo.precisao, a.chave);
     pins.push({
       id: a.chave,
       endereco: a.enderecoOriginal,
       rotulo: a.rotulo,
-      latitude: geo.latitude,
-      longitude: geo.longitude,
+      latitude: ajust.latitude,
+      longitude: ajust.longitude,
       precisao: geo.precisao,
       atas: a.atas,
       contratos: a.contratos,

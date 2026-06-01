@@ -275,3 +275,32 @@ export async function geocodificarEnderecosEmBatch(
 }
 
 export { normalizarEnderecoChave };
+
+/**
+ * Aplica jitter deterministico (~1.6km de raio) em coords aproximadas
+ * (precisao = 'city' ou 'state') pra evitar que multiplos pins caiam
+ * EXATAMENTE na mesma coordenada do centroide da cidade — sobrepostos,
+ * usuario via 1 so. Determinismo (seed = chave) garante que o mesmo
+ * orgao/endereco sempre aparece no mesmo deslocamento, evitando "pulo"
+ * entre renderizacoes. Pins 'exact' nao recebem jitter.
+ */
+export function aplicarJitter(
+  lat: number,
+  lng: number,
+  precisao: string | null,
+  seed: string,
+): { latitude: number; longitude: number } {
+  if (precisao === "exact") return { latitude: lat, longitude: lng };
+  // Hash simples (FNV-1a 32-bit) — basta determinismo, nao seguranca.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  const r1 = ((h >>> 0) % 10000) / 10000 - 0.5;
+  const r2 = (((h * 16807) >>> 0) % 10000) / 10000 - 0.5;
+  return {
+    latitude: lat + r1 * 0.03,
+    longitude: lng + r2 * 0.03,
+  };
+}

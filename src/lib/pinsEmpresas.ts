@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import {
+  aplicarJitter,
   geocodificarEnderecosEmBatch,
   normalizarEnderecoChave,
 } from "@/lib/geocode";
@@ -51,13 +52,14 @@ export async function coletarPinsEmpresas(
       e.nomeFantasia && e.nomeFantasia.trim() !== e.razaoSocial.trim()
         ? `${e.razaoSocial} (${e.nomeFantasia})`
         : e.razaoSocial;
+    const ajust = aplicarJitter(geo.latitude, geo.longitude, geo.precisao, e.id);
     pins.push({
       id: e.id,
       cnpj: e.cnpj,
       nome,
       endereco: e.endereco,
-      latitude: geo.latitude,
-      longitude: geo.longitude,
+      latitude: ajust.latitude,
+      longitude: ajust.longitude,
       precisao: geo.precisao,
     });
   }
