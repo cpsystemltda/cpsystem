@@ -412,20 +412,53 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
 
   const saldosPorVig: SaldoVigenciaContrato[] = vigencias.map((vig) => {
     const itensDaVig = itensTodos.filter((it) => it.vigenciaId === vig.id);
+    const empenhosDaVig = empenhoItens.filter((e) => e.empenho.vigenciaId === vig.id);
+
+    // Alocacao 1-para-1: cada EmpenhoItem consome 1 ContratoItem (nao
+    // pode contar em dobro quando ha ContratoItems com mesma descricao).
+    // Igor 02/06 reportou contrato 18/2025 com 'Espaço' e 'Buffet' em 2
+    // eventos diferentes (mesma descricao, vigenciaId, ata=null) — o
+    // empenho de 99.9k aparecia como executado 199.8k. Estrategia:
+    //   - Match por ataItemId (preferencial, caso contrato derive de ata).
+    //   - Fallback: match por descricao no primeiro ContratoItem com
+    //     saldo restante. Capacidade exata: quantidade do ContratoItem.
+    const consumoPorItem = new Map<string, { qty: number; valor: number }>();
+    for (const ei of empenhosDaVig) {
+      const descEi = normalizarDescricao(ei.descricao);
+      // 1. Prefere match por ataItemId quando o contrato deriva de ata.
+      let alvo = ei.ataItemId
+        ? itensDaVig.find((it) => it.ataItemId === ei.ataItemId)
+        : undefined;
+      // 2. Fallback: primeiro ContratoItem com mesma descricao e saldo
+      //    disponivel (qty consumida < qty total).
+      if (!alvo) {
+        alvo = itensDaVig.find((it) => {
+          if (normalizarDescricao(it.descricao) !== descEi) return false;
+          const ja = consumoPorItem.get(it.id)?.qty ?? 0;
+          return ja < it.quantidade;
+        });
+      }
+      // 3. Ultimo recurso: primeiro ContratoItem com mesma descricao
+      //    (mesmo que esteja "estourado") — pra nao perder o registro
+      //    do empenho. Aparecera como overflow no proprio item.
+      if (!alvo) {
+        alvo = itensDaVig.find(
+          (it) => normalizarDescricao(it.descricao) === descEi,
+        );
+      }
+      if (!alvo) continue;
+      const atual = consumoPorItem.get(alvo.id) ?? { qty: 0, valor: 0 };
+      atual.qty += ei.quantidade;
+      atual.valor += ei.valorTotal;
+      consumoPorItem.set(alvo.id, atual);
+    }
 
     const itensSaldo: SaldoItemContrato[] = itensDaVig.map((it) => {
-      const descContratoNorm = normalizarDescricao(it.descricao);
-      const empenhosCasados = empenhoItens
-        .filter((e) => e.empenho.vigenciaId === vig.id)
-        .filter(
-          (e) =>
-            (it.ataItemId && e.ataItemId === it.ataItemId) ||
-            normalizarDescricao(e.descricao) === descContratoNorm,
-        );
-      const usado = empenhosCasados.reduce((s, e) => s + e.quantidade, 0);
+      const consumo = consumoPorItem.get(it.id) ?? { qty: 0, valor: 0 };
+      const usado = consumo.qty;
       // valorUsado: snapshot — soma dos valores congelados nos empenhos.
       // Reajuste retroativo via apostilamento não afeta "Já executado".
-      const valorUsado = empenhosCasados.reduce((s, e) => s + e.valorTotal, 0);
+      const valorUsado = consumo.valor;
       const disponivel = Math.max(0, it.quantidade - usado);
       return {
         contratoItemId: it.id,
@@ -488,15 +521,38 @@ async function calcularSaldoContratoLegacy(contratoId: string): Promise<SaldoCon
     select: { quantidade: true, valorTotal: true, ataItemId: true, descricao: true },
   });
 
+  // Alocacao 1-para-1 (mesma logica da versao por vigencia) — cada
+  // EmpenhoItem so pode contar pra UM ContratoItem, evitando dupla
+  // contagem quando ha duplicatas de descricao no contrato.
+  const consumoPorItem = new Map<string, { qty: number; valor: number }>();
+  for (const ei of empenhoItens) {
+    const descEi = normalizarDescricao(ei.descricao);
+    let alvo = ei.ataItemId
+      ? itens.find((it) => it.ataItemId === ei.ataItemId)
+      : undefined;
+    if (!alvo) {
+      alvo = itens.find((it) => {
+        if (normalizarDescricao(it.descricao) !== descEi) return false;
+        const ja = consumoPorItem.get(it.id)?.qty ?? 0;
+        return ja < it.quantidade;
+      });
+    }
+    if (!alvo) {
+      alvo = itens.find(
+        (it) => normalizarDescricao(it.descricao) === descEi,
+      );
+    }
+    if (!alvo) continue;
+    const atual = consumoPorItem.get(alvo.id) ?? { qty: 0, valor: 0 };
+    atual.qty += ei.quantidade;
+    atual.valor += ei.valorTotal;
+    consumoPorItem.set(alvo.id, atual);
+  }
+
   const linhas: SaldoItemContrato[] = itens.map((it) => {
-    const descContratoNorm = normalizarDescricao(it.descricao);
-    const casados = empenhoItens.filter(
-      (e) =>
-        (it.ataItemId && e.ataItemId === it.ataItemId) ||
-        normalizarDescricao(e.descricao) === descContratoNorm,
-    );
-    const usado = casados.reduce((s, e) => s + e.quantidade, 0);
-    const valorUsado = casados.reduce((s, e) => s + e.valorTotal, 0);
+    const consumo = consumoPorItem.get(it.id) ?? { qty: 0, valor: 0 };
+    const usado = consumo.qty;
+    const valorUsado = consumo.valor;
     const disponivel = Math.max(0, it.quantidade - usado);
     return {
       contratoItemId: it.id,

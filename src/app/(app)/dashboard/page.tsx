@@ -142,7 +142,11 @@ export default async function DashboardPage() {
     prisma.empenho.findMany({
       where: {
         empresa: filtroEmpresa,
-        status: { not: "PAGO" },
+        // Agenda mostra so empenhos com ENTREGA pendente. Empenhos
+        // entregues, NF emitida/encaminhada ou pagos ja foram executados
+        // e nao deveriam aparecer (Igor 02/06: empenho NF_ENCAMINHADA
+        // aparecia na agenda da semana mesmo ja tendo sido executado).
+        status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] },
       },
       select: {
         id: true,
