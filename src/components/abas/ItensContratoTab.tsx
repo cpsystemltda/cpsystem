@@ -12,6 +12,8 @@ type ItemSaldo = {
   contratoItemId: string;
   descricao: string;
   unidade: string;
+  lote: string | null;
+  numero: string | null;
   quantidadeTotal: number;
   quantidadeUsada: number;
   quantidadeDisponivel: number;
@@ -19,31 +21,104 @@ type ItemSaldo = {
   valorDisponivel: number;
 };
 
+// Agrupa por lote (lote=null vira 'Itens isolados'). Mesma logica do
+// ItensAtaTab. Igor 02/06 reportou que os lotes 1 e 2 nao apareciam
+// na tela principal do contrato 18/2025.
 export function ItensContratoTab({
   saldo,
 }: {
   saldo: { itens: ItemSaldo[] };
 }) {
+  if (saldo.itens.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+        Nenhum item cadastrado neste contrato.
+      </div>
+    );
+  }
+
+  const ITENS_ISOLADOS = "__isolados__";
+  const grupos = new Map<string, ItemSaldo[]>();
+  for (const it of saldo.itens) {
+    const chave = it.lote && it.lote.trim() ? it.lote.trim() : ITENS_ISOLADOS;
+    const arr = grupos.get(chave) ?? [];
+    arr.push(it);
+    grupos.set(chave, arr);
+  }
+  const chavesOrdenadas = Array.from(grupos.keys())
+    .filter((k) => k !== ITENS_ISOLADOS)
+    .sort((a, b) => {
+      const na = Number(a);
+      const nb = Number(b);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      return a.localeCompare(b, "pt-BR", { numeric: true });
+    });
+  if (grupos.has(ITENS_ISOLADOS)) chavesOrdenadas.push(ITENS_ISOLADOS);
+
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-          <tr>
-            <th className="px-4 py-2 text-left">Descrição</th>
-            <th className="px-4 py-2 text-left">Un.</th>
-            <th className="px-4 py-2 text-right">Qtd. contratada</th>
-            <th className="px-4 py-2 text-right">Qtd. executada</th>
-            <th className="px-4 py-2 text-right">Qtd. a executar</th>
-            <th className="px-4 py-2 text-right">Valor a executar</th>
-            <th className="px-4 py-2 text-center">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {saldo.itens.map((it) => (
-            <LinhaItem key={it.contratoItemId} item={it} />
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-5">
+      {chavesOrdenadas.map((chave) => {
+        const itens = grupos.get(chave) ?? [];
+        const tituloGrupo = chave === ITENS_ISOLADOS ? "Itens isolados" : `Lote ${chave}`;
+        const subtotalQtd = itens.reduce((s, it) => s + it.quantidadeTotal, 0);
+        const subtotalDisp = itens.reduce((s, it) => s + it.valorDisponivel, 0);
+        return (
+          <section key={chave} className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            <header
+              className="flex items-center justify-between gap-3 px-4 py-3"
+              style={{ borderBottom: "0.5px solid var(--hairline)" }}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-[12px] font-extrabold"
+                  style={{
+                    background:
+                      chave === ITENS_ISOLADOS
+                        ? "rgba(15,14,12,0.06)"
+                        : "rgba(212,175,55,0.18)",
+                    border:
+                      chave === ITENS_ISOLADOS
+                        ? "0.5px solid var(--hairline)"
+                        : "0.5px solid rgba(168,137,71,0.5)",
+                    color:
+                      chave === ITENS_ISOLADOS ? "var(--text-mute)" : "var(--primary-deep)",
+                  }}
+                >
+                  {chave === ITENS_ISOLADOS ? "—" : chave}
+                </span>
+                <h3 className="text-sm font-extrabold" style={{ color: "var(--text)" }}>
+                  {tituloGrupo}
+                </h3>
+                <span className="text-xs text-slate-500">
+                  {itens.length} item{itens.length !== 1 ? "ns" : ""} · {subtotalQtd} unidade
+                  {subtotalQtd !== 1 ? "s" : ""} · {brl(subtotalDisp)} disponível
+                </span>
+              </div>
+            </header>
+            <div style={{ overflowX: "auto" }}>
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2 text-center" style={{ width: 60 }}>Item</th>
+                    <th className="px-4 py-2 text-left">Descrição</th>
+                    <th className="px-4 py-2 text-left">Un.</th>
+                    <th className="px-4 py-2 text-right">Qtd. contratada</th>
+                    <th className="px-4 py-2 text-right">Qtd. executada</th>
+                    <th className="px-4 py-2 text-right">Qtd. a executar</th>
+                    <th className="px-4 py-2 text-right">Valor a executar</th>
+                    <th className="px-4 py-2 text-center">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itens.map((it) => (
+                    <LinhaItem key={it.contratoItemId} item={it} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -59,7 +134,7 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
   if (editando) {
     return (
       <tr className="border-t border-slate-100" style={{ background: "rgba(255,205,80,0.10)" }}>
-        <td colSpan={7} className="p-3">
+        <td colSpan={8} className="p-3">
           <form action={formAction} className="grid grid-cols-6 gap-2 text-xs">
             <input type="hidden" name="id" value={it.contratoItemId} />
             <label className="col-span-3 flex flex-col gap-1">
@@ -153,6 +228,18 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
 
   return (
     <tr className="border-t border-slate-100">
+      <td className="px-3 py-2 text-center">
+        <span
+          className="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold tabular"
+          style={{
+            background: it.numero ? "rgba(15,14,12,0.06)" : "transparent",
+            color: it.numero ? "var(--text)" : "var(--text-mute)",
+            border: it.numero ? "0.5px solid var(--hairline)" : "none",
+          }}
+        >
+          {it.numero ?? "—"}
+        </span>
+      </td>
       <td className="px-4 py-2">{it.descricao}</td>
       <td className="px-4 py-2 text-slate-600">{it.unidade}</td>
       <td className="px-4 py-2 text-right">{it.quantidadeTotal}</td>

@@ -5,7 +5,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
-import { calcularSaldoAta, calcularSaldoContrato } from "@/lib/saldo";
+import {
+  calcularSaldoAta,
+  calcularSaldoContrato,
+  normalizarDescricao,
+  similaridadeDesc,
+} from "@/lib/saldo";
 import { notificarAnalistasDaEmpresa } from "@/lib/notificacoes";
 import {
   criarComissoesParaEmpenho,
@@ -1313,14 +1318,26 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     };
   }
 
-  // Trava de saldo
+  // Trava de saldo. Quando ha multiplos ContratoItems com mesma
+  // descricao (caso 18/2025 do Igor: 2 eventos repetindo 'Espaço',
+  // 'Buffet'...), soma o saldo disponivel de TODOS — antes pegava so
+  // o primeiro (zerado pelo empenho anterior) e bloqueava a 2a OS.
   if (v.contratoId) {
     const saldo = await calcularSaldoContrato(v.contratoId);
     for (const item of itensEfetivos) {
-      const linha = saldo.itens.find((s) => s.descricao === item.descricao);
-      if (linha && item.quantidade > linha.quantidadeDisponivel) {
+      const descNorm = normalizarDescricao(item.descricao);
+      const candidatos = saldo.itens.filter((s) => {
+        if (normalizarDescricao(s.descricao) === descNorm) return true;
+        return similaridadeDesc(s.descricao, item.descricao) >= 0.6;
+      });
+      const disponivelTotal = candidatos.reduce(
+        (sum, s) => sum + s.quantidadeDisponivel,
+        0,
+      );
+      if (candidatos.length > 0 && item.quantidade > disponivelTotal) {
+        const exemplo = candidatos[0];
         return {
-          erro: `Saldo insuficiente no Contrato: "${linha.descricao}" tem ${linha.quantidadeDisponivel} ${linha.unidade} disponíveis.`,
+          erro: `Saldo insuficiente no Contrato: "${exemplo.descricao}" tem ${disponivelTotal} ${exemplo.unidade} disponíveis.`,
         };
       }
     }
@@ -1589,26 +1606,30 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
 
   // Ajuste 7 — validação de saldo na edição (ARP ou Contrato pai),
   // considerando que os itens antigos deste empenho vão ser substituídos.
+  // Mesma logica de soma + fuzzy match do criar (issue 02/06 do Igor).
   if (v.contratoId) {
     const saldo = await calcularSaldoContrato(v.contratoId);
-    const qtyAntigaPorDescricao = new Map<string, number>();
+    const qtyAntigaPorDescNorm = new Map<string, number>();
     for (const item of empenhoExistente.itens) {
-      qtyAntigaPorDescricao.set(
-        item.descricao,
-        (qtyAntigaPorDescricao.get(item.descricao) ?? 0) + item.quantidade,
-      );
+      const k = normalizarDescricao(item.descricao);
+      qtyAntigaPorDescNorm.set(k, (qtyAntigaPorDescNorm.get(k) ?? 0) + item.quantidade);
     }
     for (const itemNovo of itensEfetivos) {
-      const linha = saldo.itens.find((s) => s.descricao === itemNovo.descricao);
-      if (linha) {
-        const qtyAntiga = qtyAntigaPorDescricao.get(itemNovo.descricao) ?? 0;
-        const saldoReal = linha.quantidadeDisponivel + qtyAntiga;
-        if (itemNovo.quantidade > saldoReal) {
-          return {
-            erro: `Quantidade excede o saldo disponível no Contrato. "${linha.descricao}" tem ${saldoReal} ${linha.unidade} disponíveis (incluindo este empenho). Solicitado: ${itemNovo.quantidade}.`,
-            valores: dados,
-          };
-        }
+      const descNorm = normalizarDescricao(itemNovo.descricao);
+      const candidatos = saldo.itens.filter((s) => {
+        if (normalizarDescricao(s.descricao) === descNorm) return true;
+        return similaridadeDesc(s.descricao, itemNovo.descricao) >= 0.6;
+      });
+      if (candidatos.length === 0) continue;
+      const disponivelTotal = candidatos.reduce((sum, s) => sum + s.quantidadeDisponivel, 0);
+      const qtyAntiga = qtyAntigaPorDescNorm.get(descNorm) ?? 0;
+      const saldoReal = disponivelTotal + qtyAntiga;
+      if (itemNovo.quantidade > saldoReal) {
+        const exemplo = candidatos[0];
+        return {
+          erro: `Quantidade excede o saldo disponível no Contrato. "${exemplo.descricao}" tem ${saldoReal} ${exemplo.unidade} disponíveis (incluindo este empenho). Solicitado: ${itemNovo.quantidade}.`,
+          valores: dados,
+        };
       }
     }
   } else if (v.ataId) {

@@ -24,6 +24,8 @@ export type SaldoItemContrato = {
   contratoItemId: string;
   descricao: string;
   unidade: string;
+  lote: string | null;
+  numero: string | null;
   quantidadeTotal: number;
   quantidadeUsada: number;
   quantidadeDisponivel: number;
@@ -354,7 +356,7 @@ async function calcularSaldoAtaLegacy(ataId: string): Promise<SaldoAta> {
 }
 
 // Normaliza descrição pra match tolerante (idem versão anterior).
-function normalizarDescricao(s: string): string {
+export function normalizarDescricao(s: string): string {
   return s
     .trim()
     .toLowerCase()
@@ -384,7 +386,7 @@ function tokensSignificativos(s: string): Set<string> {
 // 'Servico de sonorizacao de ate 100 pessoas' — palavras-chave
 // batem (4 de 5 = 0.8), prefixo difere. Threshold conservador pra
 // evitar falsos positivos entre itens diferentes.
-function similaridadeDesc(a: string, b: string): number {
+export function similaridadeDesc(a: string, b: string): number {
   const ta = tokensSignificativos(a);
   const tb = tokensSignificativos(b);
   if (ta.size === 0 || tb.size === 0) return 0;
@@ -452,6 +454,8 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
       id: true,
       descricao: true,
       unidade: true,
+      lote: true,
+      numero: true,
       quantidade: true,
       valorUnitario: true,
       valorTotal: true,
@@ -507,6 +511,8 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
         contratoItemId: it.id,
         descricao: it.descricao,
         unidade: it.unidade,
+        lote: it.lote,
+        numero: it.numero,
         quantidadeTotal: it.quantidade,
         quantidadeUsada: usado,
         quantidadeDisponivel: disponivel,
@@ -585,6 +591,8 @@ async function calcularSaldoContratoLegacy(contratoId: string): Promise<SaldoCon
       contratoItemId: it.id,
       descricao: it.descricao,
       unidade: it.unidade,
+      lote: it.lote,
+      numero: it.numero,
       quantidadeTotal: it.quantidade,
       quantidadeUsada: usado,
       quantidadeDisponivel: disponivel,
