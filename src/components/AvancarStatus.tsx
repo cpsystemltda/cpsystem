@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useOptimistic, useTransition } from "react";
-import { Check, FileText, Paperclip, Pencil } from "lucide-react";
-import { registrarMarcoAction } from "@/app/actions/contratacoes";
+import { Check, FileText, Paperclip, Pencil, Undo2 } from "lucide-react";
+import { registrarMarcoAction, desfazerMarcoAction } from "@/app/actions/contratacoes";
 
 type Props = {
   empenhoId: string;
@@ -35,6 +35,27 @@ export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Pr
     startTransition(async () => {
       setOptimisticData(dataOtimista);
       const result = await registrarMarcoAction(null, formData);
+      if (result?.erro) setErro(result.erro);
+    });
+  }
+
+  // Marcha-re: zera o marco (data+arquivo) e recua o status pro ultimo
+  // marco anterior preenchido. Pedido Igor (02/06): "se eu marquei errado
+  // a etapa, eu nao consigo voltar — so editar a data".
+  async function handleDesfazer() {
+    if (
+      !window.confirm(
+        "Desfazer este andamento? A data e o arquivo serao apagados e o status volta pra etapa anterior.",
+      )
+    )
+      return;
+    setErro(null);
+    const fd = new FormData();
+    fd.set("empenhoId", empenhoId);
+    fd.set("marco", marco);
+    startTransition(async () => {
+      setOptimisticData(null);
+      const result = await desfazerMarcoAction(null, fd);
       if (result?.erro) setErro(result.erro);
     });
   }
@@ -114,6 +135,14 @@ export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Pr
           title="Editar data ou arquivo desta etapa"
         >
           <Pencil className="h-3 w-3" /> Editar
+        </button>
+        <button
+          type="button"
+          onClick={handleDesfazer}
+          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-700"
+          title="Desfazer este andamento (volta etapa pro estado pendente)"
+        >
+          <Undo2 className="h-3 w-3" /> Desfazer
         </button>
         {erro && <span className="text-xs text-red-600">{erro}</span>}
       </div>

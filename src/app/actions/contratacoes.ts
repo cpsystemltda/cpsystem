@@ -1968,6 +1968,80 @@ export async function registrarMarcoAction(
 }
 
 // ============================================================
+// EXECUÇÃO — desfazer marco (marcha-ré na esteira)
+// Igor 02/06: usuario marcava etapa errada (ex: PAGO quando nao foi
+// pago) e nao tinha como voltar — so editar a data. Esta action zera
+// data+arquivo do marco e recua o status pro marco anterior preenchido.
+// PAGO desfeito tambem reverte comissoes (ComissaoExecucao volta pra
+// AGUARDANDO_ORGAO).
+// ============================================================
+const ORDEM_INVERSA_MARCO = [
+  "PAGO",
+  "NF_ENCAMINHADA",
+  "NF_EMITIDA",
+  "ENTREGUE",
+  "EM_TRANSITO",
+  "PEDIDO_RECEBIDO",
+];
+
+export async function desfazerMarcoAction(
+  _p: { erro?: string; ok?: boolean } | null,
+  formData: FormData,
+): Promise<{ erro?: string; ok?: boolean }> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  const empenhoId = String(formData.get("empenhoId") || "");
+  const marco = String(formData.get("marco") || "");
+  if (!CAMPO_DATA[marco]) return { erro: "Marco inválido." };
+
+  const empenho = await prisma.empenho.findFirst({
+    where: { id: empenhoId, empresa: { contaId: usuario.contaId } },
+  });
+  if (!empenho) return { erro: "Empenho não encontrado." };
+
+  // Zera data + arquivo do marco e recalcula o status pra o marco
+  // anterior preenchido (procurando de tras pra frente na ordem inversa).
+  // Se nenhum estiver preenchido, volta pra EMPENHADO.
+  const dataField = CAMPO_DATA[marco];
+  const arquivoField = CAMPO_ARQUIVO[marco];
+  const update: Record<string, Date | string | null> = {
+    [dataField]: null,
+    [arquivoField]: null,
+  };
+
+  // Determina novo status: vai recuar pra primeiro marco anterior
+  // (excluindo o marco sendo desfeito) cuja data esta preenchida.
+  let novoStatus: string = "EMPENHADO";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const e = empenho as any;
+  for (const m of ORDEM_INVERSA_MARCO) {
+    if (m === marco) continue;
+    if (e[CAMPO_DATA[m]]) {
+      novoStatus = m;
+      break;
+    }
+  }
+  update.status = novoStatus;
+
+  await prisma.empenho.update({ where: { id: empenhoId }, data: update });
+
+  // Se estava PAGO e foi desfeito, reverte as comissoes da Linha B
+  // que tinham sido liberadas (volta pra AGUARDANDO_ORGAO).
+  if (marco === "PAGO" && empenho.status === "PAGO") {
+    await prisma.comissaoExecucao.updateMany({
+      where: { empenhoId, status: { in: ["A_RECEBER", "ATRASADO"] } },
+      data: { status: "AGUARDANDO_ORGAO" },
+    });
+  }
+
+  revalidatePath(`/execucao/${empenhoId}`);
+  revalidatePath("/execucao");
+  revalidatePath("/dashboard");
+  revalidatePath("/painel-analista");
+  return { ok: true };
+}
+
+// ============================================================
 // EXECUÇÃO — atualizar marco logístico
 // ============================================================
 export async function avancarStatusAction(empenhoId: string, marco: string, dataIso: string) {
