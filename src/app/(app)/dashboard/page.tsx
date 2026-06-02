@@ -1147,7 +1147,7 @@ function BarsPosicao({
               >
                 <span
                   className="tabular text-[11px] font-extrabold"
-                  style={{ color: "var(--text)" }}
+                  style={{ color: "var(--text)", whiteSpace: "nowrap" }}
                 >
                   {brlCompacto(b.val)}
                 </span>
@@ -1182,10 +1182,14 @@ function BarsPosicao({
 }
 
 function brlCompacto(n: number): string {
-  if (n >= 1_000_000_000) return `R$ ${(n / 1_000_000_000).toFixed(2).replace(".", ",")} Bi`;
-  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} Mi`;
-  if (n >= 1_000) return `R$ ${(n / 1_000).toFixed(0)}k`;
-  return `R$ ${n.toFixed(0)}`;
+  // Usa NBSP ( ) em vez de espaço comum entre numero e sufixo pra
+  // que o texto nao quebre linha em layouts apertados (gráficos de
+  // barra, KPIs em coluna estreita). Regina 01/06: o "Mi" caía
+  // sozinho na linha seguinte sem o valor.
+  if (n >= 1_000_000_000) return `R$ ${(n / 1_000_000_000).toFixed(2).replace(".", ",")} Bi`;
+  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toFixed(2).replace(".", ",")} Mi`;
+  if (n >= 1_000) return `R$ ${(n / 1_000).toFixed(0)}k`;
+  return `R$ ${n.toFixed(0)}`;
 }
 
 function DonutChart({
