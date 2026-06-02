@@ -358,11 +358,73 @@ function normalizarDescricao(s: string): string {
   return s
     .trim()
     .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[.,;]+$/, "")
     .replace(/\s+/g, " ")
     .split(" ")
     .map((p) => (p.length > 3 && p.endsWith("s") ? p.slice(0, -1) : p))
     .join(" ");
+}
+
+// Stopwords portuguesas e prefixos comuns ('servico de', 'serviços de')
+// que o usuario costuma omitir ao redigitar a descricao no empenho.
+const STOPWORDS = new Set(["de", "da", "do", "e", "a", "o", "para", "em", "com", "por"]);
+
+function tokensSignificativos(s: string): Set<string> {
+  return new Set(
+    normalizarDescricao(s)
+      .split(/[^\w]+/)
+      .filter((w) => w.length >= 2 && !STOPWORDS.has(w)),
+  );
+}
+
+// Jaccard >= 0.6 trata o caso classico: usuario digitou
+// 'Sonorizacao ate 100 pessoas' no empenho mas o contrato tem
+// 'Servico de sonorizacao de ate 100 pessoas' — palavras-chave
+// batem (4 de 5 = 0.8), prefixo difere. Threshold conservador pra
+// evitar falsos positivos entre itens diferentes.
+function similaridadeDesc(a: string, b: string): number {
+  const ta = tokensSignificativos(a);
+  const tb = tokensSignificativos(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  return inter / (ta.size + tb.size - inter);
+}
+
+// Acha o ContratoItem que melhor casa com um EmpenhoItem. Usa cascata:
+// 1) ataItemId (link explicito) → 2) descricao exata com saldo restante
+// → 3) descricao exata sem saldo (overflow) → 4) similaridade >= 0.6
+// preferindo maior score e com saldo restante → 5) similaridade >= 0.6
+// (mesmo estourado). Retorna o id ou null.
+function acharAlvoEmCascata<
+  T extends { id: string; descricao: string; ataItemId: string | null; quantidade: number },
+>(
+  ei: { descricao: string; ataItemId: string | null },
+  candidatos: T[],
+  consumo: Map<string, { qty: number }>,
+): T | undefined {
+  const descEi = normalizarDescricao(ei.descricao);
+  if (ei.ataItemId) {
+    const m = candidatos.find((c) => c.ataItemId === ei.ataItemId);
+    if (m) return m;
+  }
+  const comSaldo = (c: T) => (consumo.get(c.id)?.qty ?? 0) < c.quantidade;
+  let exato = candidatos.find(
+    (c) => normalizarDescricao(c.descricao) === descEi && comSaldo(c),
+  );
+  if (exato) return exato;
+  exato = candidatos.find((c) => normalizarDescricao(c.descricao) === descEi);
+  if (exato) return exato;
+  // Fallback fuzzy
+  const ranked = candidatos
+    .map((c) => ({ c, score: similaridadeDesc(c.descricao, ei.descricao) }))
+    .filter((x) => x.score >= 0.6)
+    .sort((a, b) => b.score - a.score);
+  const fuzzyComSaldo = ranked.find((x) => comSaldo(x.c));
+  if (fuzzyComSaldo) return fuzzyComSaldo.c;
+  return ranked[0]?.c;
 }
 
 // Saldo de um Contrato por vigência. Empenhos de uma vigência abatem só
@@ -414,38 +476,19 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
     const itensDaVig = itensTodos.filter((it) => it.vigenciaId === vig.id);
     const empenhosDaVig = empenhoItens.filter((e) => e.empenho.vigenciaId === vig.id);
 
-    // Alocacao 1-para-1: cada EmpenhoItem consome 1 ContratoItem (nao
-    // pode contar em dobro quando ha ContratoItems com mesma descricao).
-    // Igor 02/06 reportou contrato 18/2025 com 'Espaço' e 'Buffet' em 2
-    // eventos diferentes (mesma descricao, vigenciaId, ata=null) — o
-    // empenho de 99.9k aparecia como executado 199.8k. Estrategia:
-    //   - Match por ataItemId (preferencial, caso contrato derive de ata).
-    //   - Fallback: match por descricao no primeiro ContratoItem com
-    //     saldo restante. Capacidade exata: quantidade do ContratoItem.
+    // Alocacao 1-para-1: cada EmpenhoItem consome 1 ContratoItem.
+    // Estrategia em cascata (ataItemId → desc exata → fuzzy Jaccard).
+    // Ver acharAlvoEmCascata pra detalhes. Resolve 2 bugs reportados pelo
+    // Igor:
+    //   18/2025 (CFQ): ContratoItems duplicados (2 eventos) contavam o
+    //     empenho 2x. Agora cada EmpenhoItem aloca pra 1 ContratoItem so.
+    //   20/2025 (Defensoria DF): OS 47 nao debitava porque a descricao no
+    //     empenho ('Sonorizacao ate 100 pessoas') estava encurtada vs o
+    //     contrato ('Servico de sonorizacao de ate 100 pessoas'). Jaccard
+    //     0.8 entre as duas → match valido.
     const consumoPorItem = new Map<string, { qty: number; valor: number }>();
     for (const ei of empenhosDaVig) {
-      const descEi = normalizarDescricao(ei.descricao);
-      // 1. Prefere match por ataItemId quando o contrato deriva de ata.
-      let alvo = ei.ataItemId
-        ? itensDaVig.find((it) => it.ataItemId === ei.ataItemId)
-        : undefined;
-      // 2. Fallback: primeiro ContratoItem com mesma descricao e saldo
-      //    disponivel (qty consumida < qty total).
-      if (!alvo) {
-        alvo = itensDaVig.find((it) => {
-          if (normalizarDescricao(it.descricao) !== descEi) return false;
-          const ja = consumoPorItem.get(it.id)?.qty ?? 0;
-          return ja < it.quantidade;
-        });
-      }
-      // 3. Ultimo recurso: primeiro ContratoItem com mesma descricao
-      //    (mesmo que esteja "estourado") — pra nao perder o registro
-      //    do empenho. Aparecera como overflow no proprio item.
-      if (!alvo) {
-        alvo = itensDaVig.find(
-          (it) => normalizarDescricao(it.descricao) === descEi,
-        );
-      }
+      const alvo = acharAlvoEmCascata(ei, itensDaVig, consumoPorItem);
       if (!alvo) continue;
       const atual = consumoPorItem.get(alvo.id) ?? { qty: 0, valor: 0 };
       atual.qty += ei.quantidade;
@@ -521,27 +564,11 @@ async function calcularSaldoContratoLegacy(contratoId: string): Promise<SaldoCon
     select: { quantidade: true, valorTotal: true, ataItemId: true, descricao: true },
   });
 
-  // Alocacao 1-para-1 (mesma logica da versao por vigencia) — cada
-  // EmpenhoItem so pode contar pra UM ContratoItem, evitando dupla
-  // contagem quando ha duplicatas de descricao no contrato.
+  // Alocacao 1-para-1 com fallback fuzzy (Jaccard). Mesma logica da
+  // versao por vigencia — ver acharAlvoEmCascata.
   const consumoPorItem = new Map<string, { qty: number; valor: number }>();
   for (const ei of empenhoItens) {
-    const descEi = normalizarDescricao(ei.descricao);
-    let alvo = ei.ataItemId
-      ? itens.find((it) => it.ataItemId === ei.ataItemId)
-      : undefined;
-    if (!alvo) {
-      alvo = itens.find((it) => {
-        if (normalizarDescricao(it.descricao) !== descEi) return false;
-        const ja = consumoPorItem.get(it.id)?.qty ?? 0;
-        return ja < it.quantidade;
-      });
-    }
-    if (!alvo) {
-      alvo = itens.find(
-        (it) => normalizarDescricao(it.descricao) === descEi,
-      );
-    }
+    const alvo = acharAlvoEmCascata(ei, itens, consumoPorItem);
     if (!alvo) continue;
     const atual = consumoPorItem.get(alvo.id) ?? { qty: 0, valor: 0 };
     atual.qty += ei.quantidade;
