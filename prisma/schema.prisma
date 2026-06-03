@@ -110,6 +110,12 @@ model MensagemIAsystem {
   role      String   // "user" | "assistant"
   content   String   @db.Text
   criadoEm  DateTime @default(now())
+  // Soft delete — quando o usuario limpa o historico, marca esse campo
+  // em vez de deletar a linha. Isso preserva a contagem de cota diaria
+  // do plano Basico (2 perguntas/dia) mesmo apos 'Limpar historico'
+  // (Regina 02/06: a cota volta no dia seguinte, nao quando o usuario
+  // limpa).
+  deletadaEm DateTime?
 
   @@index([usuarioId, criadoEm])
 }

@@ -15,6 +15,7 @@ import {
   enviarMensagemIAsystemAction,
   limparHistoricoIAsystemAction,
   carregarHistoricoIAsystem,
+  carregarPerguntasUsadasHojeAction,
 } from "@/app/actions/iasystem";
 import type { MensagemIAsystem } from "@/lib/iasystem";
 import { MarkdownInline } from "@/lib/markdownInline";
@@ -29,9 +30,11 @@ const SUGESTOES_INICIAIS = [
 // Botão flutuante (FAB) + drawer com o chat IAsystem embutido.
 // Toda conversa acontece no drawer — não navega pra outra rota.
 // Histórico vem do banco (isolado por usuarioId), não localStorage.
-// Plano Básico: 2 perguntas grátis vitalícias; 3ª dispara modal de
-// upgrade pro Premium (Regina 01/06). Premium e super admin: ilimitado.
-const LIMITE_PERGUNTAS_BASICO = 2;
+// Plano Básico: 2 perguntas grátis POR DIA (Regina 02/06). Cota reseta
+// na virada do dia. 3a pergunta dispara modal de upgrade pro Premium.
+// Premium e super admin: ilimitado. Contador vem do servidor — limpar
+// historico nao reseta a cota.
+const LIMITE_PERGUNTAS_BASICO_POR_DIA = 2;
 
 export function FlutuanteIAsystem({ plano }: { plano: string }) {
   const [aberto, setAberto] = useState(false);
@@ -88,27 +91,33 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
   const fimRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Contador de perguntas gratuitas usadas (so importa pra Bsico). Vem
-  // do historico carregado + atualiza a cada envio bem-sucedido.
-  const perguntasUsadas = mensagens.filter((m) => m.role === "user").length;
-  const cota = LIMITE_PERGUNTAS_BASICO - perguntasUsadas;
+  // Contador de perguntas usadas HOJE — vem do servidor (counta as
+  // soft-deletadas tambem, entao limpar historico nao reseta). Atualiza
+  // localmente apos cada envio bem-sucedido.
+  const [perguntasUsadas, setPerguntasUsadas] = useState(0);
+  const cota = LIMITE_PERGUNTAS_BASICO_POR_DIA - perguntasUsadas;
   const semCota = !isPremium && cota <= 0;
 
-  // Carrega histórico do banco quando o drawer abre — isolado por usuarioId.
+  // Carrega histórico + contagem de cota em paralelo quando o drawer abre.
   useEffect(() => {
     let ativo = true;
-    carregarHistoricoIAsystem()
-      .then((m) => {
-        if (ativo) {
-          setMensagens(m);
-          setCarregando(false);
-        }
+    Promise.all([
+      carregarHistoricoIAsystem(),
+      isPremium
+        ? Promise.resolve({ perguntasUsadas: 0, limiteGratis: LIMITE_PERGUNTAS_BASICO_POR_DIA })
+        : carregarPerguntasUsadasHojeAction(),
+    ])
+      .then(([m, cota]) => {
+        if (!ativo) return;
+        setMensagens(m);
+        setPerguntasUsadas(cota.perguntasUsadas);
+        setCarregando(false);
       })
       .catch(() => ativo && setCarregando(false));
     return () => {
       ativo = false;
     };
-  }, []);
+  }, [isPremium]);
 
   useEffect(() => {
     fimRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -155,6 +164,9 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
         return;
       }
       setMensagens((prev) => [...prev, { role: "assistant", content: res.resposta }]);
+      if (typeof res.perguntasUsadas === "number") {
+        setPerguntasUsadas(res.perguntasUsadas);
+      }
     });
   }
 
@@ -271,15 +283,16 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
             <span>
               {semCota ? (
                 <>
-                  <strong>Cota grátis esgotada.</strong> Você já usou suas{" "}
-                  {LIMITE_PERGUNTAS_BASICO} perguntas gratuitas. Faça o upgrade
-                  pro Premium pra continuar consultando o IAsystem.
+                  <strong>Cota grátis de hoje esgotada.</strong> Você já usou
+                  suas {LIMITE_PERGUNTAS_BASICO_POR_DIA} perguntas gratuitas
+                  do dia. A cota volta amanhã, ou faça upgrade pro Premium pra
+                  chat ilimitado.
                 </>
               ) : (
                 <>
                   <strong>{cota} pergunta{cota !== 1 ? "s" : ""} grátis</strong>{" "}
-                  restante{cota !== 1 ? "s" : ""} ({perguntasUsadas} de{" "}
-                  {LIMITE_PERGUNTAS_BASICO} usada
+                  restante{cota !== 1 ? "s" : ""} hoje ({perguntasUsadas} de{" "}
+                  {LIMITE_PERGUNTAS_BASICO_POR_DIA} usada
                   {perguntasUsadas !== 1 ? "s" : ""}). Upgrade pro Premium
                   desbloqueia chat ilimitado.
                 </>
@@ -357,13 +370,13 @@ function PaywallModal({ onFechar }: { onFechar: () => void }) {
           <Sparkles className="h-6 w-6" />
         </div>
         <h3 className="mt-4 text-lg font-extrabold text-slate-900">
-          Suas {LIMITE_PERGUNTAS_BASICO} perguntas grátis acabaram
+          Suas {LIMITE_PERGUNTAS_BASICO_POR_DIA} perguntas grátis de hoje acabaram
         </h3>
         <p className="mt-2 text-sm text-slate-600">
-          Pra continuar conversando com o <strong>IAsystem</strong> — assistente
-          jurídico especializado em Lei 14.133/2021 — faça o upgrade pro plano{" "}
-          <strong>Premium</strong>: chat ilimitado + análise de Atas, Contratos
-          e Empenhos + parecer estruturado.
+          A cota reseta amanhã. Se preferir não esperar, faça o upgrade pro
+          plano <strong>Premium</strong> — chat ilimitado com o{" "}
+          <strong>IAsystem</strong> (assistente jurídico Lei 14.133/2021),
+          análise de Atas, Contratos e Empenhos + parecer estruturado.
         </p>
         <ul className="mt-4 space-y-2 text-xs text-slate-700">
           <li className="flex items-start gap-2">
