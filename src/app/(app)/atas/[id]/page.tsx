@@ -290,6 +290,7 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
               content: (
                 <RelatorioContratacao
                   rotuloRecurso="Ata"
+                  pdfLink={{ tipo: "ata", id: ata.id }}
                   contrato={{
                     numero: ata.numero,
                     vigenciaInicio: ata.vigenciaInicio,
