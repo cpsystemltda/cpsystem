@@ -1944,8 +1944,17 @@ export async function registrarMarcoAction(
 
   const file = formData.get("arquivo") as File | null;
   if (file && file.size > 0) {
-    const salvo = await salvarArquivo(file);
-    update[CAMPO_ARQUIVO[marco]] = salvo.url;
+    // Salva arquivo ANTES do update — se o blob storage falhar, nada
+    // foi gravado no banco. Regina (03/06): upload silenciava em vez
+    // de mostrar a causa real (tipo invalido, tamanho, blob auth, etc).
+    try {
+      const salvo = await salvarArquivo(file);
+      update[CAMPO_ARQUIVO[marco]] = salvo.url;
+    } catch (e) {
+      return {
+        erro: e instanceof Error ? e.message : "Falha ao salvar arquivo.",
+      };
+    }
   }
 
   await prisma.empenho.update({ where: { id: empenhoId }, data: update });
