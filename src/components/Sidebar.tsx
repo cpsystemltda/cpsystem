@@ -85,7 +85,7 @@ const GRUPOS_ANALISTA: Grupo[] = [
     titulo: "Painel",
     itens: [
       { href: "/painel-analista", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/painel-analista?tab=empresas", label: "Empresas vinculadas", icon: Wallet },
+      { href: "/painel-analista#empresas-vinculadas", label: "Empresas vinculadas", icon: Wallet },
       { href: "/honorarios", label: "Comissões SaaS", icon: Sparkles },
       { href: "/notificacoes", label: "Notificações", icon: Bell },
     ],

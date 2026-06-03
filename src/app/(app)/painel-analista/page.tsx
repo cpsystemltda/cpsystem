@@ -431,7 +431,7 @@ export default async function PainelAnalistaPage({
         empresas={empresasOpcoes}
       />
 
-      <section className="mt-8">
+      <section id="empresas-vinculadas" className="mt-8 scroll-mt-20">
         <h2
           className="mb-3 text-[12px] font-bold uppercase"
           style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
