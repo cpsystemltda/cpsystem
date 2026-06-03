@@ -291,92 +291,194 @@ function Aba({
 
 function Card({
   c,
-  confirmando,
-  onConfirmar,
-  onCancelar,
+  confirmando: _confirmando,
+  onConfirmar: _onConfirmar,
+  onCancelar: _onCancelar,
 }: {
   c: ContratoCard;
   confirmando: boolean;
   onConfirmar: () => void;
   onCancelar: () => void;
 }) {
+  // Cores do tema para vencimento (alinhado com o resto do site —
+  // var(--coral-deep) pra vencido/urgente, var(--primary-deep) pra atencao,
+  // var(--text) pra normal).
   const corVencimento =
     c.diasParaVencer < 0
-      ? "text-red-700"
+      ? "var(--coral-deep)"
       : c.diasParaVencer <= 30
-      ? "text-amber-700"
+      ? "var(--coral-deep)"
       : c.diasParaVencer <= 90
-      ? "text-yellow-700"
-      : "text-slate-500";
+      ? "var(--primary-deep)"
+      : "var(--text)";
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-slate-300 hover:shadow-md">
-      <div className="border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white px-5 py-4">
-        <div className="flex items-start justify-between gap-3">
+    <div className="glass-tile group relative overflow-hidden rounded-[20px] transition hover:-translate-y-0.5">
+      {/* Header com avatar do contrato + numero + badges */}
+      <div
+        className="px-5 py-4"
+        style={{ borderBottom: "0.5px solid var(--hairline)" }}
+      >
+        <div className="flex items-start gap-3">
+          <div
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]"
+            style={{
+              background: "rgba(212,175,55,0.18)",
+              color: "var(--primary-deep)",
+            }}
+          >
+            <ClipboardList className="h-5 w-5" />
+          </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="truncate text-base font-bold text-slate-900">Contrato {c.numero}</h3>
-              <span className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3
+                className="truncate text-[16px] font-extrabold"
+                style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
+              >
+                Contrato {c.numero}
+              </h3>
+              <span
+                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase"
+                style={{
+                  background: "rgba(212,175,55,0.18)",
+                  color: "var(--primary-deep)",
+                  border: "0.5px solid rgba(168,137,71,0.5)",
+                  letterSpacing: "0.08em",
+                }}
+              >
                 {ROTULOS_TIPO[c.tipo] || c.tipo}
               </span>
               {c.ataNumero && (
-                <span className="shrink-0 rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                <span
+                  className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase"
+                  style={{
+                    background: "rgba(197,180,255,0.20)",
+                    color: "#6F58C5",
+                    letterSpacing: "0.08em",
+                  }}
+                >
                   Ata {c.ataNumero}
                 </span>
               )}
             </div>
-            <p className="mt-1.5 line-clamp-2 text-sm text-slate-700">{c.objeto}</p>
-            <p className="mt-1 text-[11px] text-slate-500">
+            <p
+              className="mt-1.5 line-clamp-2 text-[13px]"
+              style={{ color: "var(--text-soft)" }}
+            >
+              {c.objeto}
+            </p>
+            <p className="mt-1 text-[11px]" style={{ color: "var(--text-mute)" }}>
               {c.orgaoNome} · {c.empresaNome}
             </p>
           </div>
         </div>
       </div>
 
+      {/* Bloco de valores */}
       <div className="grid gap-3 px-5 py-4 sm:grid-cols-3">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Valor</p>
-          <p className="mt-0.5 text-base font-bold text-slate-900">{brl(c.valorTotal)}</p>
+          <p
+            className="text-[10px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+          >
+            Valor
+          </p>
+          <p
+            className="mt-1 text-[16px] font-extrabold tabular leading-none"
+            style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
+          >
+            {brl(c.valorTotal)}
+          </p>
         </div>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Executado</p>
-          <p className={`mt-0.5 text-base font-bold ${c.pctExecutado > 80 ? "text-emerald-700" : "text-slate-900"}`}>
+          <p
+            className="text-[10px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+          >
+            Executado
+          </p>
+          <p
+            className="mt-1 text-[16px] font-extrabold tabular leading-none"
+            style={{
+              color: c.pctExecutado >= 100 ? "var(--mint-deep)" : "var(--text)",
+              letterSpacing: "-0.02em",
+            }}
+          >
             {c.pctExecutado.toFixed(0)}%
           </p>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="mt-2 h-1.5 overflow-hidden rounded-full"
+            style={{ background: "rgba(15,14,12,0.06)" }}
+          >
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-600"
-              style={{ width: `${Math.min(100, c.pctExecutado)}%` }}
+              className="h-full rounded-full"
+              style={{
+                width: `${Math.min(100, c.pctExecutado)}%`,
+                background:
+                  "linear-gradient(90deg, var(--primary-deep), var(--primary))",
+              }}
             />
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Vigência</p>
-          <p className={`mt-0.5 text-sm font-semibold ${corVencimento}`}>
-            {c.diasParaVencer > 0 ? `${c.diasParaVencer}d restantes` : `Venceu há ${-c.diasParaVencer}d`}
+          <p
+            className="text-[10px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--text-soft)" }}
+          >
+            Vigência
           </p>
-          <p className="text-[11px] text-slate-500">até {new Date(c.vigenciaFim).toLocaleDateString("pt-BR")}</p>
+          <p
+            className="mt-1 text-[14px] font-extrabold tabular leading-none"
+            style={{ color: corVencimento, letterSpacing: "-0.015em" }}
+          >
+            {c.diasParaVencer > 0
+              ? `${c.diasParaVencer}d restantes`
+              : `Venceu há ${-c.diasParaVencer}d`}
+          </p>
+          <p className="mt-1 text-[11px]" style={{ color: "var(--text-mute)" }}>
+            até {new Date(c.vigenciaFim).toLocaleDateString("pt-BR")}
+          </p>
         </div>
       </div>
 
-      {/* Padronização (Regina 28/05): exclusão só no "lado de dentro"
-          (página de detalhe). Card só tem ações de navegação. */}
-      <div className="flex items-center gap-2 border-t border-slate-100 bg-slate-50/30 px-5 py-3">
+      {/* Barra de acoes — Regina 28/05: card so tem acoes de navegacao,
+          excluir fica no detalhe. */}
+      <div
+        className="flex items-center gap-2 px-5 py-3"
+        style={{
+          borderTop: "0.5px solid var(--hairline)",
+          background: "rgba(15,14,12,0.025)",
+        }}
+      >
         <Link
           href={`/contratos/${c.id}/imprimir`}
           target="_blank"
-          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition hover:opacity-80"
+          style={{
+            background: "white",
+            border: "0.5px solid var(--hairline)",
+            color: "var(--text-soft)",
+          }}
         >
           <Printer className="h-3.5 w-3.5" /> Imprimir
         </Link>
         <Link
           href={`/contratos/${c.id}`}
-          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition hover:opacity-80"
+          style={{
+            background: "white",
+            border: "0.5px solid var(--hairline)",
+            color: "var(--text-soft)",
+          }}
         >
           <Pencil className="h-3.5 w-3.5" /> Alterar
         </Link>
         <Link
           href={`/contratos/${c.id}`}
-          className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:text-blue-900"
+          className="ml-auto inline-flex items-center gap-1 text-xs font-extrabold uppercase transition group-hover:gap-1.5"
+          style={{
+            color: "var(--primary-deep)",
+            letterSpacing: "0.08em",
+          }}
         >
           Abrir <ChevronRight className="h-3 w-3" />
         </Link>

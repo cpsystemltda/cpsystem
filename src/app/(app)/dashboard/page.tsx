@@ -978,17 +978,65 @@ export default async function DashboardPage() {
                     {clientesDetalhe.map((o) => (
                       <tr key={o.cnpj}>
                         <td>
-                          <div className="strong" style={{ color: "var(--text)" }}>
-                            {o.nome}
-                          </div>
-                          <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
-                            CNPJ {o.cnpj.slice(0, 2)}.{o.cnpj.slice(2, 5)}.{o.cnpj.slice(5, 8)}/{o.cnpj.slice(8, 12)}-{o.cnpj.slice(12)}
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]"
+                              style={{
+                                background: "rgba(212,175,55,0.18)",
+                                color: "var(--primary-deep)",
+                              }}
+                            >
+                              <Building2 className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div
+                                className="font-extrabold leading-tight"
+                                style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
+                              >
+                                {o.nome}
+                              </div>
+                              <div
+                                className="mt-0.5 text-[11px] tabular"
+                                style={{ color: "var(--text-mute)" }}
+                              >
+                                CNPJ {o.cnpj.slice(0, 2)}.{o.cnpj.slice(2, 5)}.
+                                {o.cnpj.slice(5, 8)}/{o.cnpj.slice(8, 12)}-
+                                {o.cnpj.slice(12)}
+                              </div>
+                            </div>
                           </div>
                         </td>
-                        <td className="center tabular">{o.qtdAtas || "—"}</td>
-                        <td className="center tabular">{o.qtdContratos || "—"}</td>
-                        <td className="center tabular">{o.qtdEmpenhos || "—"}</td>
-                        <td className="num strong">{brl(o.valor)}</td>
+                        <td className="center">
+                          <ContagemPill
+                            n={o.qtdAtas}
+                            bg="rgba(212,175,55,0.18)"
+                            fg="var(--primary-deep)"
+                          />
+                        </td>
+                        <td className="center">
+                          <ContagemPill
+                            n={o.qtdContratos}
+                            bg="rgba(197,180,255,0.20)"
+                            fg="#6F58C5"
+                          />
+                        </td>
+                        <td className="center">
+                          <ContagemPill
+                            n={o.qtdEmpenhos}
+                            bg="rgba(93,216,182,0.18)"
+                            fg="var(--mint-deep)"
+                          />
+                        </td>
+                        <td
+                          className="num tabular"
+                          style={{
+                            fontWeight: 800,
+                            color: "var(--text)",
+                            letterSpacing: "-0.015em",
+                          }}
+                        >
+                          {brl(o.valor)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -1084,6 +1132,29 @@ export default async function DashboardPage() {
 /* ============================================================
    Sub-componentes server (gráficos puros, sem JS no cliente)
    ============================================================ */
+
+// Pilula de contagem usada na tabela "Clientes" — n=0 vira "—" mute,
+// caso contrario mostra n com cor de tom suave (depende da categoria).
+function ContagemPill({ n, bg, fg }: { n: number; bg: string; fg: string }) {
+  if (!n) {
+    return (
+      <span style={{ color: "var(--text-mute)", fontWeight: 700 }}>—</span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-[12px] tabular"
+      style={{
+        background: bg,
+        color: fg,
+        fontWeight: 800,
+        letterSpacing: "-0.01em",
+      }}
+    >
+      {n}
+    </span>
+  );
+}
 
 function BarsPosicao({
   recebido,
