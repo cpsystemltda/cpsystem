@@ -18,6 +18,7 @@ import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
 import { AtestadoCapacidadeTab } from "@/components/abas/AtestadoCapacidadeTab";
+import { RelatorioContratacao } from "@/components/RelatorioContratacao";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 import { LerMais } from "@/components/LerMais";
@@ -49,6 +50,7 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
       termosAditivos: { orderBy: { dataAssinatura: "desc" } },
       apostilamentos: { orderBy: { dataAssinatura: "desc" } },
       atestados: { orderBy: { dataEmissao: "desc" } },
+      itens: { select: { quantidade: true, valorTotal: true } },
     },
   });
 
@@ -281,6 +283,42 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
               label: "Histórico",
               badge: historico.length,
               content: <HistoricoLista entradas={historico} />,
+            },
+            {
+              key: "relatorio",
+              label: "Relatório",
+              content: (
+                <RelatorioContratacao
+                  rotuloRecurso="Ata"
+                  contrato={{
+                    numero: ata.numero,
+                    vigenciaInicio: ata.vigenciaInicio,
+                    vigenciaFim: ata.vigenciaFim,
+                    dataAssinatura: ata.dataAssinatura,
+                    prazoEntregaDias: null,
+                    prazoPagamentoDias: null,
+                    marcoOrcamentoEstimado: ata.marcoOrcamentoEstimado,
+                    itens: ata.itens.map((i) => ({
+                      quantidade: i.quantidade,
+                      valorTotal: i.valorTotal,
+                    })),
+                  }}
+                  saldo={saldo}
+                  qtdEmpenhos={ata.empenhos.length}
+                  empenhosPagos={ata.empenhos.filter((e) => e.status === "PAGO").length}
+                  qtdAditivos={ata.termosAditivos.length}
+                  aditivos={ata.termosAditivos.map((a) => ({
+                    alteraValor: a.alteraValor,
+                    novoValor: a.novoValor,
+                    alteraPrazoVigencia: a.alteraPrazoVigencia,
+                    novaVigenciaFim: a.novaVigenciaFim,
+                  }))}
+                  qtdApostilamentos={ata.apostilamentos.length}
+                  qtdReajustes={0}
+                  qtdNotificacoes={ata.notificacoes.length}
+                  qtdProcedimentos={ata.procedimentos.length}
+                />
+              ),
             },
           ]}
         />

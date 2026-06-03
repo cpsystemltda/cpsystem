@@ -35,8 +35,8 @@ type Aditivo = {
   novaVigenciaFim: Date | null;
 };
 
-/** id do recurso pra link de imprimir/baixar PDF — só funciona pra Contrato. */
-type PdfLink = { tipo: "contrato"; id: string };
+/** id do recurso pra link de imprimir/baixar PDF formatado. */
+type PdfLink = { tipo: "contrato" | "ata"; id: string };
 
 export function RelatorioContratacao({
   contrato,
@@ -62,7 +62,7 @@ export function RelatorioContratacao({
   qtdReajustes: number;
   qtdNotificacoes: number;
   qtdProcedimentos: number;
-  rotuloRecurso: "Contrato" | "Empenho";
+  rotuloRecurso: "Contrato" | "Empenho" | "Ata";
   pdfLink?: PdfLink;
 }) {
   const valorContratado = contrato.itens.reduce((s, i) => s + i.valorTotal, 0);
@@ -105,9 +105,9 @@ export function RelatorioContratacao({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <BotaoImprimirRelatorio />
-          {pdfLink?.tipo === "contrato" && (
+          {pdfLink && (
             <Link
-              href={`/contratos/${pdfLink.id}/imprimir`}
+              href={`/${pdfLink.tipo === "contrato" ? "contratos" : "atas"}/${pdfLink.id}/imprimir`}
               target="_blank"
               className="btn-primary inline-flex"
             >
@@ -183,7 +183,7 @@ export function RelatorioContratacao({
         <div className="grid gap-3 md:grid-cols-2">
           <Marco
             icone={FileSignature}
-            titulo={rotuloRecurso === "Contrato" ? "Assinatura" : "Emissão"}
+            titulo={rotuloRecurso === "Empenho" ? "Emissão" : "Assinatura"}
             data={contrato.dataAssinatura ?? contrato.dataEmissao}
           />
           <Marco
