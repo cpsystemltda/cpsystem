@@ -115,25 +115,25 @@ export function ItensAtaTab({
                 </span>
               </div>
             </header>
-            {/* minWidth reduzido (era 1240) — cabia em desktop wide, mas
-                vazava em viewport com sidebar (~1040 de area util) e
-                deixava as 2 ultimas colunas cortadas. Tambem encurtei
-                headers ('Qtd. reg.', 'Valor disp.') pra economizar espaco. */}
+            {/* Regina cobrou multiplas vezes que a tabela vazava pra
+                direita. Removi a coluna 'Valor unit.' (mostro no titulo
+                da linha quando editar, e ja temos 'Valor disp.' que e o
+                que importa pra decisao) e compactei min-width pra 760px,
+                que cabe em viewports estreitas com sidebar. */}
             <div style={{ overflowX: "auto" }}>
             <table
               className="table-glass"
-              style={{ width: "100%", minWidth: "960px", tableLayout: "fixed" }}
+              style={{ width: "100%", minWidth: "760px", tableLayout: "fixed" }}
             >
               <colgroup>
+                <col style={{ width: "44px" }} />
+                <col style={{ width: "auto", minWidth: "200px" }} />
                 <col style={{ width: "52px" }} />
-                <col style={{ width: "auto", minWidth: "220px" }} />
-                <col style={{ width: "56px" }} />
-                <col style={{ width: "84px" }} />
-                <col style={{ width: "84px" }} />
-                <col style={{ width: "88px" }} />
-                <col style={{ width: "96px" }} />
-                <col style={{ width: "108px" }} />
                 <col style={{ width: "72px" }} />
+                <col style={{ width: "72px" }} />
+                <col style={{ width: "76px" }} />
+                <col style={{ width: "100px" }} />
+                <col style={{ width: "60px" }} />
               </colgroup>
               <thead>
                 <tr>
@@ -143,7 +143,6 @@ export function ItensAtaTab({
                   <th className="num">Qtd. reg.</th>
                   <th className="num">Qtd. usada</th>
                   <th className="num">Qtd. disp.</th>
-                  <th className="num">Valor unit.</th>
                   <th className="num">Valor disp.</th>
                   <th className="center">Ações</th>
                 </tr>
@@ -173,7 +172,7 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
   if (editando) {
     return (
       <tr style={{ background: "rgba(255,205,80,0.10)" }}>
-        <td colSpan={9} className="p-3">
+        <td colSpan={8} className="p-3">
           <form action={formAction} className="grid grid-cols-8 gap-2 text-xs">
             <input type="hidden" name="id" value={it.ataItemId} />
             <label className="col-span-1 flex flex-col gap-1">
@@ -314,8 +313,9 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
           {it.quantidadeDisponivel}
         </span>
       </td>
-      <td className="num">{brl(it.valorUnitario)}</td>
-      <td className="num strong">{brl(it.valorDisponivel)}</td>
+      <td className="num strong" title={`Unitário: ${brl(it.valorUnitario)}`}>
+        {brl(it.valorDisponivel)}
+      </td>
       <td className="center">
         <div className="inline-flex items-center gap-1">
           <button

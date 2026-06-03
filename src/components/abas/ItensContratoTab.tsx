@@ -95,18 +95,33 @@ export function ItensContratoTab({
                 </span>
               </div>
             </header>
+            {/* Regina cobrou desconfiguracao analoga ao ItensAtaTab —
+                compacto pra caber em viewports estreitas com sidebar. */}
             <div style={{ overflowX: "auto" }}>
-              <table className="w-full text-sm">
+              <table
+                className="w-full text-sm"
+                style={{ minWidth: "660px", tableLayout: "fixed" }}
+              >
+                <colgroup>
+                  <col style={{ width: "44px" }} />
+                  <col style={{ width: "auto", minWidth: "200px" }} />
+                  <col style={{ width: "52px" }} />
+                  <col style={{ width: "76px" }} />
+                  <col style={{ width: "76px" }} />
+                  <col style={{ width: "84px" }} />
+                  <col style={{ width: "100px" }} />
+                  <col style={{ width: "60px" }} />
+                </colgroup>
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-3 py-2 text-center" style={{ width: 52 }}>Item</th>
-                    <th className="px-4 py-2 text-left">Descrição</th>
-                    <th className="px-2 py-2 text-left" style={{ width: 56 }}>Un.</th>
-                    <th className="px-2 py-2 text-right" style={{ width: 88 }}>Qtd. contr.</th>
-                    <th className="px-2 py-2 text-right" style={{ width: 88 }}>Qtd. exec.</th>
-                    <th className="px-2 py-2 text-right" style={{ width: 92 }}>A executar</th>
-                    <th className="px-2 py-2 text-right" style={{ width: 116 }}>Valor a exec.</th>
-                    <th className="px-2 py-2 text-center" style={{ width: 72 }}>Ações</th>
+                    <th className="px-2 py-2 text-center">Item</th>
+                    <th className="px-3 py-2 text-left">Descrição</th>
+                    <th className="px-1 py-2 text-left">Un.</th>
+                    <th className="px-1 py-2 text-right">Qtd. contr.</th>
+                    <th className="px-1 py-2 text-right">Qtd. exec.</th>
+                    <th className="px-1 py-2 text-right">A executar</th>
+                    <th className="px-1 py-2 text-right">Valor a exec.</th>
+                    <th className="px-1 py-2 text-center">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,7 +243,7 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
 
   return (
     <tr className="border-t border-slate-100">
-      <td className="px-3 py-2 text-center">
+      <td className="px-2 py-2 text-center">
         <span
           className="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold tabular"
           style={{
@@ -240,11 +255,16 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
           {it.numero ?? "—"}
         </span>
       </td>
-      <td className="px-4 py-2">{it.descricao}</td>
-      <td className="px-4 py-2 text-slate-600">{it.unidade}</td>
-      <td className="px-4 py-2 text-right">{it.quantidadeTotal}</td>
-      <td className="px-4 py-2 text-right text-slate-600">{it.quantidadeUsada}</td>
-      <td className="px-4 py-2 text-right">
+      <td
+        className="px-3 py-2"
+        style={{ whiteSpace: "normal", wordBreak: "break-word" }}
+      >
+        {it.descricao}
+      </td>
+      <td className="px-1 py-2 text-slate-600">{it.unidade}</td>
+      <td className="px-1 py-2 text-right">{it.quantidadeTotal}</td>
+      <td className="px-1 py-2 text-right text-slate-600">{it.quantidadeUsada}</td>
+      <td className="px-1 py-2 text-right">
         <span
           className={
             it.quantidadeDisponivel === 0
@@ -255,8 +275,8 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
           {it.quantidadeDisponivel}
         </span>
       </td>
-      <td className="px-4 py-2 text-right font-medium">{brl(it.valorDisponivel)}</td>
-      <td className="px-4 py-2 text-center">
+      <td className="px-1 py-2 text-right font-medium">{brl(it.valorDisponivel)}</td>
+      <td className="px-1 py-2 text-center">
         <div className="inline-flex items-center gap-1">
           <button
             type="button"
