@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, FileText, ArrowRight, Coins, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus, FileText, ArrowRight } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, ROTULO_TIPO } from "@/lib/validators";
@@ -8,8 +8,8 @@ import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { KpiVencimentos } from "@/components/KpiVencimentos";
 import { PageHeader } from "@/components/ui/SecaoGlass";
-import { KPI } from "@/components/ui/KPI";
 import { TimelineVencimentos } from "@/components/TimelineVencimentos";
+import { PainelFinanceiroExpansivel } from "@/components/PainelFinanceiroExpansivel";
 
 export default async function AtasPage({
   searchParams,
@@ -199,28 +199,27 @@ export default async function AtasPage({
         />
       </div>
 
-      {/* Bloco Financeiro de ARPs — Ampliação 1 do M3
-          Dois grupos: Série histórica (todas) × Vigentes (atuais).
+      {/* Bloco Financeiro de ARPs.
+          Vigentes no topo (sempre visível) + Série histórica colapsável.
           Reajuste só aparece em "Vigentes" — é sobre janela futura. */}
-      <div className="mt-6 space-y-6">
-        <FinanceiroArpsGrupo
-          titulo="Série histórica"
-          subtitulo="Todas as ARPs da empresa (vigentes + expiradas)"
-          contratados={valoresContratadosARPsHist}
-          executados={valoresExecutadosARPsHist}
-          aExecutar={valoresAExecutarARPsHist}
-          recebidos={valoresRecebidosARPsHist}
-          aReceber={valoresAReceberARPsHist}
-        />
-        <FinanceiroArpsGrupo
-          titulo="Vigentes"
-          subtitulo="Apenas ARPs atualmente vigentes"
-          contratados={valoresContratadosARPsVig}
-          executados={valoresExecutadosARPsVig}
-          aExecutar={valoresAExecutarARPsVig}
-          recebidos={valoresRecebidosARPsVig}
-          aReceber={valoresAReceberARPsVig}
-          reajusteQtd={atasComReajuste.length}
+      <div className="mt-6">
+        <PainelFinanceiroExpansivel
+          contexto="arps"
+          vigente={{
+            contratados: valoresContratadosARPsVig,
+            executados: valoresExecutadosARPsVig,
+            aExecutar: valoresAExecutarARPsVig,
+            recebidos: valoresRecebidosARPsVig,
+            aReceber: valoresAReceberARPsVig,
+            reajusteQtd: atasComReajuste.length,
+          }}
+          historico={{
+            contratados: valoresContratadosARPsHist,
+            executados: valoresExecutadosARPsHist,
+            aExecutar: valoresAExecutarARPsHist,
+            recebidos: valoresRecebidosARPsHist,
+            aReceber: valoresAReceberARPsHist,
+          }}
         />
       </div>
 
@@ -360,62 +359,6 @@ export default async function AtasPage({
         </div>
       )}
     </div>
-  );
-}
-
-function FinanceiroArpsGrupo({
-  titulo,
-  subtitulo,
-  contratados,
-  executados,
-  aExecutar,
-  recebidos,
-  aReceber,
-  reajusteQtd,
-}: {
-  titulo: string;
-  subtitulo: string;
-  contratados: number;
-  executados: number;
-  aExecutar: number;
-  recebidos: number;
-  aReceber: number;
-  reajusteQtd?: number;
-}) {
-  return (
-    <section>
-      <header className="mb-2 flex items-baseline gap-3">
-        <h3
-          className="text-[13px] font-extrabold uppercase"
-          style={{ letterSpacing: "0.15em", color: "var(--primary-deep)" }}
-        >
-          {titulo}
-        </h3>
-        <span className="text-xs" style={{ color: "var(--text-soft)" }}>
-          {subtitulo}
-        </span>
-      </header>
-      <div className="grid gap-3.5 lg:grid-cols-3">
-        <KPI tone="lavender" icon={Coins} label="Contratado em ARPs" value={brl(contratados)} meta="Valor total das ARPs" />
-        <KPI tone="primary" icon={TrendingUp} label="Executado em ARPs" value={brl(executados)} meta="Consumido via Contratos + Empenhos diretos" />
-        <KPI tone="mint" icon={ArrowRight} label="A executar em ARPs" value={brl(aExecutar)} meta="Contratado − Executado" />
-        <KPI tone="mint" icon={Coins} label="Recebido" value={brl(recebidos)} meta="Empenhos PAGOS vinculados a ARPs" href="/execucao?status=PAGO" />
-        <KPI tone="primary" icon={Coins} label="A receber" value={brl(aReceber)} meta="NF emitida/encaminhada, aguardando pagamento" href="/execucao?status=NF_ENCAMINHADA" />
-        {reajusteQtd !== undefined ? (
-          <KPI
-            tone="rose"
-            icon={AlertTriangle}
-            label="ARPs em janela de reajuste"
-            value={reajusteQtd}
-            meta="Marco + 12 meses dentro de 90 dias"
-            pulse={reajusteQtd > 0}
-            href="/reajustes"
-          />
-        ) : (
-          <div />
-        )}
-      </div>
-    </section>
   );
 }
 
