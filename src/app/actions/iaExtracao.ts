@@ -134,6 +134,7 @@ export async function extrairAtaPdfAction(formData: FormData): Promise<ExtracaoA
     }
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
+    console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
 }
@@ -158,6 +159,7 @@ export async function extrairContratoPdfAction(formData: FormData): Promise<Extr
     }
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
+    console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
 }
@@ -182,6 +184,7 @@ export async function extrairEmpenhoPdfAction(formData: FormData): Promise<Extra
     }
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
+    console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
 }
@@ -211,6 +214,7 @@ export async function extrairGarantiaPdfAction(formData: FormData): Promise<Extr
     }
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
+    console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
 }
@@ -239,6 +243,7 @@ export async function extrairAditivoPdfAction(formData: FormData): Promise<Extra
     }
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
+    console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
 }
@@ -267,6 +272,7 @@ export async function extrairProcedimentoPdfAction(formData: FormData): Promise<
     }
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
+    console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
 }
@@ -294,6 +300,7 @@ export async function extrairApostilamentoPdfAction(formData: FormData): Promise
     }
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
+    console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
   }
 }

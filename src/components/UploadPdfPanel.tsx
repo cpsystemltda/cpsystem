@@ -7,6 +7,19 @@ type Resultado<T> =
   | { ok: true; dados: T; demo?: boolean; arquivoUrl?: string; nomeArquivo?: string; tamanhoBytes?: number }
   | { ok: false; erro: string };
 
+// Limite de upload — bate com o limite em chamarClaudeComPdf (32MB) e
+// salvarArquivo (25MB). Usamos 25MB pra rejeitar antes de bater no server.
+const MAX_BYTES_PDF = 25 * 1024 * 1024;
+
+function ehPdf(file: File): boolean {
+  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+}
+
+function formatarTamanho(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function UploadPdfPanel<T>({
   titulo,
   descricao,
@@ -50,36 +63,63 @@ export function UploadPdfPanel<T>({
     if (extraindo) return;
     const file = ev.dataTransfer.files?.[0];
     if (!file) return;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setErro("Arquivo precisa ser um PDF.");
-      return;
-    }
     handleArquivo(file);
   }
 
   async function handleArquivo(file: File) {
+    // Validacao client-side — rejeita ANTES de bater no servidor pra
+    // dar feedback imediato e nao consumir token de IA por nada.
+    if (!ehPdf(file)) {
+      setErro(`Esperado um PDF — recebido "${file.name}" (${file.type || "tipo desconhecido"}).`);
+      return;
+    }
+    if (file.size === 0) {
+      setErro(`Arquivo "${file.name}" está vazio (0 bytes).`);
+      return;
+    }
+    if (file.size > MAX_BYTES_PDF) {
+      setErro(
+        `PDF "${file.name}" tem ${formatarTamanho(file.size)} — excede o limite de ${formatarTamanho(MAX_BYTES_PDF)}.`,
+      );
+      return;
+    }
+
     setExtraindo(true);
     setErro(null);
     setPdfNome(file.name);
     setBadge(null);
     setModoDemo(false);
 
-    const fd = new FormData();
-    fd.append("pdf", file);
-    const res = await action(fd);
-    setExtraindo(false);
+    try {
+      const fd = new FormData();
+      fd.append("pdf", file);
+      const res = await action(fd);
 
-    if (!res.ok) {
-      setErro(res.erro);
-      return;
+      if (!res.ok) {
+        setErro(res.erro);
+        return;
+      }
+      onSuccess(res.dados);
+      if (res.arquivoUrl && onArquivoSalvo) {
+        onArquivoSalvo({ url: res.arquivoUrl, nome: res.nomeArquivo ?? file.name });
+      }
+      if (res.demo) setModoDemo(true);
+      if (badgeAposExtracao) setBadge(badgeAposExtracao(res.dados));
+      else setBadge("Dados preenchidos");
+    } catch (e) {
+      // Erros de rede / runtime que escapam do try-catch da server action
+      // (Vercel timeout 60s, JSON corrompido, etc.). Antes silenciava.
+      setErro(
+        e instanceof Error
+          ? `Falha de comunicação: ${e.message}`
+          : "Falha ao enviar o PDF. Verifique sua conexão e tente novamente.",
+      );
+    } finally {
+      setExtraindo(false);
+      // Reset do input pra permitir reselecionar o MESMO arquivo (sem
+      // isso, o onChange nao dispara se o usuario escolher o mesmo PDF).
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    onSuccess(res.dados);
-    if (res.arquivoUrl && onArquivoSalvo) {
-      onArquivoSalvo({ url: res.arquivoUrl, nome: res.nomeArquivo ?? file.name });
-    }
-    if (res.demo) setModoDemo(true);
-    if (badgeAposExtracao) setBadge(badgeAposExtracao(res.dados));
-    else setBadge("Dados preenchidos");
   }
 
   return (
