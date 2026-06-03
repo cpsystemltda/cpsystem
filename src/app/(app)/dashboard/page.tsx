@@ -500,7 +500,14 @@ export default async function DashboardPage() {
     ? Math.max(0, Math.ceil((usuario.conta.trialAteEm!.getTime() - Date.now()) / 86400000))
     : 0;
 
-  const nomePrimeiro = usuario.nome.split(" ")[0];
+  // Regina (03/06): boas-vindas mostra nome + sobrenome (em vez de so o
+  // primeiro nome). Pra nomes compostos do tipo 'Igor da Silva Fernandes',
+  // descarta partículas no meio e usa primeiro + ultimo.
+  const partesNome = usuario.nome.trim().split(/\s+/);
+  const nomePrimeiro =
+    partesNome.length === 1
+      ? partesNome[0]
+      : `${partesNome[0]} ${partesNome[partesNome.length - 1]}`;
   const dataExtenso = hoje.toLocaleDateString("pt-BR", {
     weekday: "long",
     day: "numeric",
