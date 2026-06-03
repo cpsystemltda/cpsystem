@@ -23,6 +23,10 @@ type ItemSaldo = {
   valorDisponivel: number;
 };
 
+// Padding reduzido pra colunas estreitas (override do .table-glass que tem
+// padding 22px). Descricao mantem o padding generoso default.
+const padTight: React.CSSProperties = { paddingLeft: 10, paddingRight: 10 };
+
 export function ItensAtaTab({
   saldo,
 }: {
@@ -115,36 +119,38 @@ export function ItensAtaTab({
                 </span>
               </div>
             </header>
-            {/* Regina cobrou multiplas vezes que a tabela vazava pra
-                direita. Removi a coluna 'Valor unit.' (mostro no titulo
-                da linha quando editar, e ja temos 'Valor disp.' que e o
-                que importa pra decisao) e compactei min-width pra 760px,
-                que cabe em viewports estreitas com sidebar. */}
+            {/* Regina cobrou multiplas vezes a tabela cortando a coluna
+                Acoes. O .table-glass tem padding 22px de cada lado nas
+                celulas — em colunas pequenas (Item, Acoes, Qtd) o
+                conteudo nao cabia. Solucao: padding inline reduzido nas
+                colunas estreitas (descricao mantem o padding generoso),
+                e Acoes cresce pra 92px pra acomodar os 2 botoes + bordas.
+                Valor disp. cresce pra 124px pra caber 'R$ X.XXX.XXX,XX'. */}
             <div style={{ overflowX: "auto" }}>
             <table
               className="table-glass"
-              style={{ width: "100%", minWidth: "760px", tableLayout: "fixed" }}
+              style={{ width: "100%", minWidth: "780px", tableLayout: "fixed" }}
             >
               <colgroup>
-                <col style={{ width: "44px" }} />
+                <col style={{ width: "56px" }} />
                 <col style={{ width: "auto", minWidth: "200px" }} />
-                <col style={{ width: "52px" }} />
-                <col style={{ width: "72px" }} />
-                <col style={{ width: "72px" }} />
+                <col style={{ width: "64px" }} />
                 <col style={{ width: "76px" }} />
-                <col style={{ width: "100px" }} />
-                <col style={{ width: "60px" }} />
+                <col style={{ width: "76px" }} />
+                <col style={{ width: "80px" }} />
+                <col style={{ width: "124px" }} />
+                <col style={{ width: "92px" }} />
               </colgroup>
               <thead>
                 <tr>
-                  <th className="center">Item</th>
+                  <th className="center" style={padTight}>Item</th>
                   <th>Descrição</th>
-                  <th>Un.</th>
-                  <th className="num">Qtd. reg.</th>
-                  <th className="num">Qtd. usada</th>
-                  <th className="num">Qtd. disp.</th>
-                  <th className="num">Valor disp.</th>
-                  <th className="center">Ações</th>
+                  <th style={padTight}>Un.</th>
+                  <th className="num" style={padTight}>Qtd. reg.</th>
+                  <th className="num" style={padTight}>Qtd. usada</th>
+                  <th className="num" style={padTight}>Qtd. disp.</th>
+                  <th className="num" style={padTight}>Valor disp.</th>
+                  <th className="center" style={padTight}>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -280,7 +286,7 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
 
   return (
     <tr>
-      <td className="center" style={{ verticalAlign: "top" }}>
+      <td className="center" style={{ verticalAlign: "top", ...padTight }}>
         <span
           className="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold tabular"
           style={{
@@ -299,10 +305,10 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
       >
         <LerMais texto={it.descricao} limite={140} />
       </td>
-      <td>{it.unidade}</td>
-      <td className="num">{it.quantidadeTotal}</td>
-      <td className="num">{it.quantidadeUsada}</td>
-      <td className="num">
+      <td style={padTight}>{it.unidade}</td>
+      <td className="num" style={padTight}>{it.quantidadeTotal}</td>
+      <td className="num" style={padTight}>{it.quantidadeUsada}</td>
+      <td className="num" style={padTight}>
         <span
           style={{
             fontWeight: 700,
@@ -313,10 +319,10 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
           {it.quantidadeDisponivel}
         </span>
       </td>
-      <td className="num strong" title={`Unitário: ${brl(it.valorUnitario)}`}>
+      <td className="num strong" title={`Unitário: ${brl(it.valorUnitario)}`} style={padTight}>
         {brl(it.valorDisponivel)}
       </td>
-      <td className="center">
+      <td className="center" style={padTight}>
         <div className="inline-flex items-center gap-1">
           <button
             type="button"
