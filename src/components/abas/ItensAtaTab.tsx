@@ -115,32 +115,36 @@ export function ItensAtaTab({
                 </span>
               </div>
             </header>
+            {/* minWidth reduzido (era 1240) — cabia em desktop wide, mas
+                vazava em viewport com sidebar (~1040 de area util) e
+                deixava as 2 ultimas colunas cortadas. Tambem encurtei
+                headers ('Qtd. reg.', 'Valor disp.') pra economizar espaco. */}
             <div style={{ overflowX: "auto" }}>
             <table
               className="table-glass"
-              style={{ minWidth: "1240px", tableLayout: "fixed" }}
+              style={{ width: "100%", minWidth: "960px", tableLayout: "fixed" }}
             >
               <colgroup>
-                <col style={{ width: "64px" }} />
-                <col style={{ width: "auto", minWidth: "320px" }} />
-                <col style={{ width: "64px" }} />
-                <col style={{ width: "104px" }} />
-                <col style={{ width: "104px" }} />
-                <col style={{ width: "112px" }} />
+                <col style={{ width: "52px" }} />
+                <col style={{ width: "auto", minWidth: "220px" }} />
+                <col style={{ width: "56px" }} />
+                <col style={{ width: "84px" }} />
+                <col style={{ width: "84px" }} />
+                <col style={{ width: "88px" }} />
+                <col style={{ width: "96px" }} />
                 <col style={{ width: "108px" }} />
-                <col style={{ width: "128px" }} />
-                <col style={{ width: "80px" }} />
+                <col style={{ width: "72px" }} />
               </colgroup>
               <thead>
                 <tr>
                   <th className="center">Item</th>
                   <th>Descrição</th>
                   <th>Un.</th>
-                  <th className="num">Qtd. registrada</th>
+                  <th className="num">Qtd. reg.</th>
                   <th className="num">Qtd. usada</th>
-                  <th className="num">Qtd. disponível</th>
+                  <th className="num">Qtd. disp.</th>
                   <th className="num">Valor unit.</th>
-                  <th className="num">Valor disponível</th>
+                  <th className="num">Valor disp.</th>
                   <th className="center">Ações</th>
                 </tr>
               </thead>

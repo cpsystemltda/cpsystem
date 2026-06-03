@@ -99,14 +99,14 @@ export function ItensContratoTab({
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-3 py-2 text-center" style={{ width: 60 }}>Item</th>
+                    <th className="px-3 py-2 text-center" style={{ width: 52 }}>Item</th>
                     <th className="px-4 py-2 text-left">Descrição</th>
-                    <th className="px-4 py-2 text-left">Un.</th>
-                    <th className="px-4 py-2 text-right">Qtd. contratada</th>
-                    <th className="px-4 py-2 text-right">Qtd. executada</th>
-                    <th className="px-4 py-2 text-right">Qtd. a executar</th>
-                    <th className="px-4 py-2 text-right">Valor a executar</th>
-                    <th className="px-4 py-2 text-center">Ações</th>
+                    <th className="px-2 py-2 text-left" style={{ width: 56 }}>Un.</th>
+                    <th className="px-2 py-2 text-right" style={{ width: 88 }}>Qtd. contr.</th>
+                    <th className="px-2 py-2 text-right" style={{ width: 88 }}>Qtd. exec.</th>
+                    <th className="px-2 py-2 text-right" style={{ width: 92 }}>A executar</th>
+                    <th className="px-2 py-2 text-right" style={{ width: 116 }}>Valor a exec.</th>
+                    <th className="px-2 py-2 text-center" style={{ width: 72 }}>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
