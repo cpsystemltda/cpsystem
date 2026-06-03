@@ -90,17 +90,51 @@ function extrairCidadeUf(endereco: string): string | null {
 }
 
 /**
- * Geocodifica um endereco com 3 tentativas em cascata:
- *   1. Endereco completo (precisao "exact" quando o Nominatim acha).
- *   2. Fallback: "Cidade, UF" extraida do endereco (precisao "city").
- *   3. Ultimo recurso: so a UF (precisao "state").
- * Sem isso, enderecos B2G especificos do DF (ex: "SAISo Setor Policial
- * Sul...") batem em null e o orgao nao aparecia no mapa.
+ * Geocodifica um endereco com varias tentativas em cascata. Prioridade:
+ * resultado 'exact' do Nominatim. So caimos pra fallback aproximado se
+ * nenhuma tentativa exata funcionar.
+ *
+ *   1. Endereco completo (frequentemente acha rua/numero — exact).
+ *   2. Quando temos nomeOrgao: '{nomeOrgao}, {cidade}, {UF}' (Nominatim
+ *      reconhece UnB, Senado, Ministerios etc. como entidade — exact).
+ *   3. Endereco completo (resultado nao-exact, se houver).
+ *   4. Fallback 'Cidade, UF' (precisao city).
+ *   5. Ultimo recurso: so a UF (precisao state).
+ *
+ * Regina 03/06: pin caia errado pra orgaos com endereco generico (UnB,
+ * PMDF) — Nominatim nao achava o numero e voltava null, ai jitter de
+ * 9km empurrava pra qualquer canto. Agora a tentativa por nome do
+ * orgao + cidade resolve a maioria desses casos com precisao exact.
  */
-async function chamarNominatim(endereco: string): Promise<Geocode | null> {
+async function chamarNominatim(
+  endereco: string,
+  nomeOrgao?: string,
+): Promise<Geocode | null> {
+  // 1. Endereco completo. Se exact, retorna direto.
   const direto = await tentarNominatim(endereco);
+  if (direto && direto.precisao === "exact") return direto;
+
+  // 2. Nome do orgao + cidade — frequentemente o Nominatim conhece a
+  //    entidade (universidade, prefeitura, ministerio) e devolve a coord
+  //    exata do edificio principal.
+  if (nomeOrgao && nomeOrgao.trim().length >= 4) {
+    const cidadeUf = extrairCidadeUf(endereco);
+    const queryNome = cidadeUf
+      ? `${nomeOrgao}, ${cidadeUf.replace(/, Brasil$/, "")}`
+      : `${nomeOrgao}, Brasil`;
+    const porNome = await tentarNominatim(queryNome);
+    if (porNome && porNome.precisao === "exact") return porNome;
+    // Se nao exact mas tem algo, guardamos pra usar so se o resto falhar.
+    if (porNome && !direto) {
+      // Continua tentando, mas se nada melhor surgir, devolve este no fim.
+    }
+  }
+
+  // 3. Se a 1a tentativa (endereco direto) deu algum resultado, prefere
+  //    ele antes de cair pra fallback de cidade.
   if (direto) return direto;
 
+  // 4. Fallback 'Cidade, UF'.
   const cidadeUf = extrairCidadeUf(endereco);
   if (cidadeUf) {
     const fallback = await tentarNominatim(cidadeUf);
@@ -109,7 +143,7 @@ async function chamarNominatim(endereco: string): Promise<Geocode | null> {
     }
   }
 
-  // Ultimo recurso: tenta so a UF. Ainda melhor que pin ausente.
+  // 5. Ultimo recurso: so a UF. Pin aproximado, ainda melhor que sumir.
   const matchUf = endereco
     .toUpperCase()
     .match(/\b(AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO)\b/);
@@ -128,6 +162,7 @@ async function chamarNominatim(endereco: string): Promise<Geocode | null> {
 export async function geocodificarOrgao(
   cnpj: string,
   endereco: string,
+  nomeOrgao?: string,
 ): Promise<Geocode | null> {
   const cnpjLimpo = cnpj.replace(/\D/g, "");
   if (!cnpjLimpo || !endereco?.trim()) return null;
@@ -141,7 +176,7 @@ export async function geocodificarOrgao(
     };
   }
 
-  const geo = await chamarNominatim(endereco);
+  const geo = await chamarNominatim(endereco, nomeOrgao);
   if (!geo) return null;
 
   await prisma.orgaoGeocode.upsert({
@@ -173,17 +208,19 @@ export async function geocodificarOrgao(
  * só chama Nominatim para os que faltam.
  */
 export async function geocodificarOrgaosEmBatch(
-  orgaos: { cnpj: string; endereco: string }[],
+  orgaos: { cnpj: string; endereco: string; nome?: string }[],
 ): Promise<Map<string, Geocode>> {
   const out = new Map<string, Geocode>();
   if (orgaos.length === 0) return out;
 
-  // Normaliza CNPJs e remove duplicatas (mesmo órgão em várias Atas)
-  const normalizado = new Map<string, string>(); // cnpjLimpo → endereco
+  // Normaliza CNPJs e remove duplicatas (mesmo órgão em várias Atas).
+  // Guarda endereco + nome — nome serve pra fallback "Nome do orgao,
+  // cidade" no Nominatim (Regina 03/06).
+  const normalizado = new Map<string, { endereco: string; nome?: string }>();
   for (const o of orgaos) {
     const cnpj = o.cnpj.replace(/\D/g, "");
     if (cnpj && o.endereco && !normalizado.has(cnpj)) {
-      normalizado.set(cnpj, o.endereco);
+      normalizado.set(cnpj, { endereco: o.endereco, nome: o.nome });
     }
   }
 
@@ -195,25 +232,24 @@ export async function geocodificarOrgaosEmBatch(
   const cacheByCnpj = new Map(cached.map((c) => [c.cnpj, c]));
 
   // 2. Lista de pendentes (sem cache ou cache com endereço diferente)
-  const pendentes: { cnpj: string; endereco: string }[] = [];
-  for (const [cnpj, endereco] of normalizado) {
+  const pendentes: { cnpj: string; endereco: string; nome?: string }[] = [];
+  for (const [cnpj, info] of normalizado) {
     const c = cacheByCnpj.get(cnpj);
-    if (c && c.endereco === endereco) {
+    if (c && c.endereco === info.endereco) {
       out.set(cnpj, {
         latitude: c.latitude,
         longitude: c.longitude,
         precisao: c.precisao,
       });
     } else {
-      pendentes.push({ cnpj, endereco });
+      pendentes.push({ cnpj, endereco: info.endereco, nome: info.nome });
     }
   }
 
-  // 3. Geocodifica pendentes serialmente (rate limit). Limita a 5 por
-  // renderização pra não atrasar o dashboard mais que 5-6s. Os demais
-  // ficam pra próximas cargas (já têm cache parcial após cada chamada).
+  // 3. Geocodifica pendentes serialmente (rate limit). Limita a 10 por
+  // renderização. Os demais ficam pra próximas cargas (cache parcial).
   for (const p of pendentes.slice(0, 10)) {
-    const geo = await geocodificarOrgao(p.cnpj, p.endereco);
+    const geo = await geocodificarOrgao(p.cnpj, p.endereco, p.nome);
     if (geo) out.set(p.cnpj, geo);
   }
 
@@ -299,12 +335,12 @@ export function aplicarJitter(
   }
   const r1 = ((h >>> 0) % 10000) / 10000 - 0.5;
   const r2 = (((h * 16807) >>> 0) % 10000) / 10000 - 0.5;
-  // ~0.08 graus = ~9km no equador. Garantia que mesmo no mesmo
-  // centroide de cidade os pins fiquem visualmente separados (Regina
-  // tinha 5 orgaos no DF caindo todos no mesmo ponto; com 0.03 ainda
-  // sobrepunham apos o cluster do Leaflet).
+  // ~0.003 graus = ~300m. Suficiente pra desambiguar pins que cairiam
+  // EXATAMENTE no mesmo ponto, sem mover demais. Antes era 9km — o
+  // pin ia parar longe do endereco real (Regina 03/06: 'mapa
+  // indicando pontos errados'). Pins exatos nao recebem jitter.
   return {
-    latitude: lat + r1 * 0.08,
-    longitude: lng + r2 * 0.08,
+    latitude: lat + r1 * 0.003,
+    longitude: lng + r2 * 0.003,
   };
 }

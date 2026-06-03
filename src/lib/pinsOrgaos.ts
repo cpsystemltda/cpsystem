@@ -125,10 +125,13 @@ export async function coletarPinsOrgaos(
 
   if (agg.size === 0) return [];
 
-  // Geocodifica
+  // Geocodifica. Passa o nome do orgao pra o Nominatim tentar achar
+  // como entidade (ex: 'Universidade de Brasília' bate exact mesmo
+  // quando o endereco completo nao bate).
   const orgaosParaGeo = Array.from(agg.values()).map((a) => ({
     cnpj: a.cnpj,
     endereco: a.endereco,
+    nome: a.nome,
   }));
   const geoMap = await geocodificarOrgaosEmBatch(orgaosParaGeo);
 
