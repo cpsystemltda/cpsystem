@@ -14,14 +14,15 @@ export function Block({
   titulo,
   tag,
   children,
-  inicialmenteAberto = false,
+  inicialmenteAberto = true,
 }: {
   numero: string;
   eyebrow: string;
   titulo: ReactNode;
   tag?: string;
   children: ReactNode;
-  /** Default e recolhido (Regina 05/06) — clica no header pra expandir. */
+  /** Default e expandido (Regina 05/06 — segunda decisao). Usuario clica
+   *  na setinha pra recolher. */
   inicialmenteAberto?: boolean;
 }) {
   const [aberto, setAberto] = useState(inicialmenteAberto);
