@@ -237,9 +237,15 @@ export async function extrairAtaDoPdf(file: File): Promise<AtaExtraida> {
   const buffer = await file.arrayBuffer();
   const base64 = Buffer.from(buffer).toString("base64");
 
+  // Igor (05/06): Ata com 132 itens em lotes nao extraia. Causa: o
+  // max_tokens de 8192 era curto pro JSON com 132 itens (~130 tokens por
+  // item = 17K+ tokens). O modelo cortava no meio do JSON e o JSON.parse
+  // falhava com 'Resposta nao e JSON valido'. Subido pra 32000 (limite
+  // do Haiku 4.5). Adicionalmente, detectamos stop_reason='max_tokens'
+  // pra dar erro claro caso ainda assim nao caiba.
   const response = await client.messages.create({
     model: "claude-haiku-4-5",
-    max_tokens: 8192,
+    max_tokens: 32000,
     system: [
       {
         type: "text",
@@ -344,6 +350,15 @@ export async function extrairAtaDoPdf(file: File): Promise<AtaExtraida> {
     ],
   });
 
+  // Stop_reason 'max_tokens' = JSON foi cortado no meio. Pula o
+  // JSON.parse (que vai falhar) e da mensagem util ao usuario.
+  if (response.stop_reason === "max_tokens") {
+    throw new Error(
+      "PDF excede a capacidade de extracao automatica em uma unica passada (muitos itens). " +
+        "Cadastre os campos principais manualmente — depois adicione os itens em lote.",
+    );
+  }
+
   const textBlock = response.content.find((b) => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {
     throw new Error("Modelo não retornou conteúdo textual.");
@@ -416,7 +431,9 @@ async function chamarClaudeComPdf(file: File, schema: any, prompt: string) {
   try {
     const response = await client.messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 8192,
+      // Subido de 8192 -> 32000 (limite Haiku 4.5) pra suportar PDFs
+      // com muitos itens (ex: Contrato 132 itens em lotes). Igor (05/06).
+      max_tokens: 32000,
       system: [{ type: "text", text: SYSTEM_PROMPT_BASE, cache_control: { type: "ephemeral" } }],
       output_config: { format: { type: "json_schema", schema } },
       messages: [
@@ -429,6 +446,13 @@ async function chamarClaudeComPdf(file: File, schema: any, prompt: string) {
         },
       ],
     });
+
+    if (response.stop_reason === "max_tokens") {
+      throw new Error(
+        "PDF excede a capacidade de extracao automatica em uma unica passada (muitos itens). " +
+          "Cadastre os campos principais manualmente — depois adicione os itens em lote.",
+      );
+    }
 
     const textBlock = response.content.find((b) => b.type === "text");
     if (!textBlock || textBlock.type !== "text") throw new Error("Modelo não retornou conteúdo textual.");
