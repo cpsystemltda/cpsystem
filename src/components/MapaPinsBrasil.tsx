@@ -31,6 +31,67 @@ export type PinEntregaMapa = {
   orgaos: string[];
 };
 
+// Links externos pra navegacao precisa. Regina (05/06): 'endereco no
+// mapa do sistema precisa ser exato a ponto de eu chegar no local.'
+// Nominatim resolve coordenadas aproximadas; o link abaixo passa o
+// endereco TAL COMO CADASTRADO pro Google Maps, que tem geocoder
+// melhor e roteamento turn-by-turn. Os dois links cobrem 'ver o local'
+// e 'como chegar'.
+function linkGoogleMaps(endereco: string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
+}
+function linkComoChegar(endereco: string): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(endereco)}`;
+}
+
+function LinksMapaExterno({ endereco }: { endereco: string }) {
+  if (!endereco?.trim()) return null;
+  return (
+    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+      <a
+        href={linkGoogleMaps(endereco)}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "5px 9px",
+          borderRadius: 999,
+          background: "#1A73E8",
+          color: "white",
+          fontSize: 11,
+          fontWeight: 700,
+          textDecoration: "none",
+        }}
+        title="Abrir o endereço no Google Maps"
+      >
+        Abrir no Maps
+      </a>
+      <a
+        href={linkComoChegar(endereco)}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "5px 9px",
+          borderRadius: 999,
+          background: "#0F9D58",
+          color: "white",
+          fontSize: 11,
+          fontWeight: 700,
+          textDecoration: "none",
+        }}
+        title="Iniciar rota até este endereço"
+      >
+        Como chegar
+      </a>
+    </div>
+  );
+}
+
 // Sede de uma EMPRESA da fornecedora (CNPJ cadastrado na conta). Usado
 // no toggle "Sua empresa" do mapa pra distinguir das sedes dos orgaos
 // publicos atendidos (PinMapa) e dos locais de entrega (PinEntregaMapa).
@@ -426,6 +487,7 @@ export function MapaPinsBrasil({
                         </div>
                       )}
                     </div>
+                    <LinksMapaExterno endereco={p.endereco} />
                   </div>
                 </Popup>
               </Marker>
@@ -491,6 +553,7 @@ export function MapaPinsBrasil({
                         </div>
                       )}
                     </div>
+                    <LinksMapaExterno endereco={p.endereco} />
                   </div>
                 </Popup>
               </Marker>
@@ -527,6 +590,7 @@ export function MapaPinsBrasil({
                         Localização aproximada ({p.precisao})
                       </p>
                     )}
+                    <LinksMapaExterno endereco={p.endereco} />
                   </div>
                 </Popup>
               </Marker>
