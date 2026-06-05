@@ -131,7 +131,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <NavigationProgress />
       {espionagem && <BannerEspionagem contaNome={espionagem.contaNome} />}
-      <FlutuanteIAsystem plano={usuario.conta.plano} />
+      <FlutuanteIAsystem plano={usuario.conta.plano} superAdmin={usuario.superAdmin} />
       <ComandoRapido visao={visao} superAdmin={usuario.superAdmin} />
       <div className="app-content flex flex-1 w-full overflow-hidden">
         <Sidebar

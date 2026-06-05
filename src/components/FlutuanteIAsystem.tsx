@@ -36,9 +36,19 @@ const SUGESTOES_INICIAIS = [
 // historico nao reseta a cota.
 const LIMITE_PERGUNTAS_BASICO_POR_DIA = 2;
 
-export function FlutuanteIAsystem({ plano }: { plano: string }) {
+export function FlutuanteIAsystem({
+  plano,
+  superAdmin = false,
+}: {
+  plano: string;
+  superAdmin?: boolean;
+}) {
   const [aberto, setAberto] = useState(false);
-  const isPremium = plano === "PREMIUM";
+  // Servidor trata superAdmin como ilimitado (sem cota) — UI precisa
+  // espelhar isso. Regina (05/06): antes o cliente so olhava `plano`,
+  // entao super admin no plano Basico via contador travado em 0
+  // (servidor nao retornava contagem).
+  const isPremium = plano === "PREMIUM" || superAdmin;
 
   return (
     <>

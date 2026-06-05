@@ -72,7 +72,11 @@ export async function responderIAsystem(
   ];
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
+    // Regina (05/06): chat estava muito lento. Trocado de claude-sonnet-4-6
+    // pra claude-haiku-4-5 — modelo otimizado pra Q&A rapido, com latencia
+    // tipicamente 2-3x menor. Pra perguntas tecnicas jurídicas o Haiku
+    // entrega qualidade suficiente; se cair muito, voltamos pro Sonnet.
+    model: "claude-haiku-4-5",
     max_tokens: 2048,
     // Prompt caching no system — system varia pelo nome do usuário, mas
     // mesmo usuário consecutivo aproveita o cache.
