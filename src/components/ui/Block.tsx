@@ -14,14 +14,14 @@ export function Block({
   titulo,
   tag,
   children,
-  inicialmenteAberto = true,
+  inicialmenteAberto = false,
 }: {
   numero: string;
   eyebrow: string;
   titulo: ReactNode;
   tag?: string;
   children: ReactNode;
-  /** Permite renderizar fechado por padrao (raro — default e aberto). */
+  /** Default e recolhido (Regina 05/06) — clica no header pra expandir. */
   inicialmenteAberto?: boolean;
 }) {
   const [aberto, setAberto] = useState(inicialmenteAberto);
