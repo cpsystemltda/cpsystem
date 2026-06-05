@@ -70,11 +70,23 @@ export default async function ImprimirContratoPage({ params }: { params: Promise
 
   const saldo = await calcularSaldoContrato(id);
   const valorTotal = saldo.valorTotal;
+  // Regina (05/06): 'valor a receber' aparecia > 0 mesmo quando todos
+  // empenhos estavam PAGO. Causa: saldo.valorUsado pode incluir itens
+  // 'orfaos'/snapshots que nao batem 1:1 com contrato.empenhos.itens.
+  // Fix: calcular executado e pago da MESMA fonte (contrato.empenhos.itens)
+  // — assim, todos pagos -> valorAReceber = 0 garantido.
+  const valorExecutadoEmpenhos = contrato.empenhos.reduce(
+    (s, e) => s + e.itens.reduce((ss, i) => ss + i.valorTotal, 0),
+    0,
+  );
+  // valorExecutado pra exibicao continua sendo o saldo.valorUsado (mais
+  // preciso quando ha reajuste retroativo), mas o A RECEBER usa a base
+  // simetrica acima.
   const valorExecutado = saldo.valorUsado;
   const valorPago = contrato.empenhos
     .filter((e) => e.status === "PAGO")
     .reduce((s, e) => s + e.itens.reduce((ss, i) => ss + i.valorTotal, 0), 0);
-  const valorAReceber = valorExecutado - valorPago;
+  const valorAReceber = Math.max(0, valorExecutadoEmpenhos - valorPago);
 
   return (
     <>

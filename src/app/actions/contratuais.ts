@@ -1231,9 +1231,11 @@ export async function criarReajusteAction(_p: Result | null, formData: FormData)
     const percentual = Number(formData.get("percentual") || 0);
     const valorNovo = valorAnterior * (1 + percentual / 100);
 
+    const dataPedido = new Date(String(formData.get("dataPedido")));
+
     const r = await prisma.reajuste.create({
       data: {
-        dataPedido: new Date(String(formData.get("dataPedido"))),
+        dataPedido,
         dataAprovacao: formData.get("dataAprovacao") ? new Date(String(formData.get("dataAprovacao"))) : null,
         indice: String(formData.get("indice") || "CONTRATUAL") as "IPCA" | "IGPM" | "INCC" | "INPC" | "CONTRATUAL" | "OUTRO",
         percentual,
@@ -1247,6 +1249,21 @@ export async function criarReajusteAction(_p: Result | null, formData: FormData)
       },
     });
 
+    // Regina (05/06): reajuste cadastrado nao refletia na tela principal
+    // do contrato (valor + marco). Quando ha link.contratoId, atualizar:
+    // - valorInicial: reflete o novo valor base do contrato.
+    // - marcoOrcamentoEstimado: bumpa pra dataPedido — proxima janela de
+    //   12 meses conta a partir daqui (mesmo padrao do criarAditivoAction).
+    if (link.contratoId) {
+      await prisma.contrato.update({
+        where: { id: link.contratoId },
+        data: {
+          valorInicial: valorNovo,
+          marcoOrcamentoEstimado: dataPedido,
+        },
+      });
+    }
+
     await registrarAuditoria({
       contaId: usuario.contaId,
       usuarioId: usuario.id,
@@ -1258,6 +1275,7 @@ export async function criarReajusteAction(_p: Result | null, formData: FormData)
 
     revalidatePath(link.paiPath);
     revalidatePath("/reajustes");
+    if (link.contratoId) revalidatePath(`/contratos/${link.contratoId}`);
     return { ok: true };
   } catch (err) {
     return { erro: err instanceof Error ? err.message : "Erro." };
