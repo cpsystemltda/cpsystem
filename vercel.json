@@ -3,7 +3,7 @@
   "regions": ["gru1"],
   "functions": {
     "src/app/actions/iaExtracao.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "src/app/actions/iaMinutas.ts": {
       "maxDuration": 60

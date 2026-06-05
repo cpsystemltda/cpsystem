@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Sparkles, Upload, Check, AlertCircle, Loader2, Beaker } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Sparkles, Upload, Check, AlertCircle, Loader2, Beaker, UploadCloud } from "lucide-react";
 
 type Resultado<T> =
   | { ok: true; dados: T; demo?: boolean; arquivoUrl?: string; nomeArquivo?: string; tamanhoBytes?: number }
@@ -45,6 +45,21 @@ export function UploadPdfPanel<T>({
   const [badge, setBadge] = useState<string | null>(null);
   const [modoDemo, setModoDemo] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+
+  // Bloqueio global do navegador: se o usuario arrastar o PDF e soltar
+  // FORA da zona, o browser abriria o arquivo (e o usuario perderia o
+  // contexto). Aqui prevenimos isso enquanto o componente esta montado —
+  // o drop ainda funciona normal dentro da nossa zona porque <section>
+  // tem onDrop proprio que executa primeiro (capture/bubble).
+  useEffect(() => {
+    const prevent = (ev: DragEvent) => ev.preventDefault();
+    window.addEventListener("dragover", prevent);
+    window.addEventListener("drop", prevent);
+    return () => {
+      window.removeEventListener("dragover", prevent);
+      window.removeEventListener("drop", prevent);
+    };
+  }, []);
 
   function onDragOver(ev: React.DragEvent) {
     ev.preventDefault();
@@ -128,16 +143,37 @@ export function UploadPdfPanel<T>({
       onDragEnter={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`glass-tile overflow-hidden rounded-[20px] px-7 py-6 transition ${
-        dragOver ? "ring-2 ring-offset-2" : ""
-      }`}
+      className={`glass-tile relative overflow-hidden rounded-[20px] px-7 py-6 transition`}
       style={{
         background: dragOver
-          ? "linear-gradient(135deg, rgba(197,180,255,0.28), rgba(184,197,214,0.10)), var(--glass-2)"
+          ? "linear-gradient(135deg, rgba(197,180,255,0.40), rgba(184,197,214,0.20)), var(--glass-2)"
           : "linear-gradient(135deg, rgba(197,180,255,0.12), rgba(184,197,214,0.04)), var(--glass-2)",
-        ...(dragOver ? { boxShadow: "0 0 0 2px var(--lavender)" } : {}),
+        outline: dragOver ? "3px dashed var(--lavender)" : undefined,
+        outlineOffset: dragOver ? "-8px" : undefined,
+        minHeight: dragOver ? "180px" : undefined,
       }}
     >
+      {/* Overlay grande mostrando 'Solte o PDF aqui' enquanto arrastando.
+          Cobre o card inteiro pra eliminar duvida sobre onde soltar. */}
+      {dragOver && !extraindo && (
+        <div
+          className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center"
+          style={{
+            background: "rgba(197,180,255,0.18)",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <div className="flex flex-col items-center gap-2 text-center">
+            <UploadCloud className="h-12 w-12" style={{ color: "var(--lavender-deep, #6B4FC9)" }} />
+            <p
+              className="text-[18px] font-extrabold"
+              style={{ color: "#0A0A0A", letterSpacing: "-0.02em" }}
+            >
+              Solte o PDF aqui
+            </p>
+          </div>
+        </div>
+      )}
       <div className="relative z-[1] flex items-start gap-4">
         <div
           className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl"
