@@ -243,7 +243,14 @@ export async function extrairAtaDoPdf(file: File): Promise<AtaExtraida> {
   // falhava com 'Resposta nao e JSON valido'. Subido pra 32000 (limite
   // do Haiku 4.5). Adicionalmente, detectamos stop_reason='max_tokens'
   // pra dar erro claro caso ainda assim nao caiba.
-  const response = await client.messages.create({
+  //
+  // Regina (05/06): apos subir max_tokens, o SDK comecou a rejeitar com
+  // 'Streaming is required for operations that may take longer than 10
+  // minutes'. Fix: usar .stream().finalMessage() em vez de .create() —
+  // a API e identica mas o SDK aceita responses longas sem o limite
+  // sincrono de 10min.
+  const response = await client.messages
+    .stream({
     model: "claude-haiku-4-5",
     max_tokens: 32000,
     system: [
@@ -348,7 +355,8 @@ export async function extrairAtaDoPdf(file: File): Promise<AtaExtraida> {
         ],
       },
     ],
-  });
+  })
+    .finalMessage();
 
   // Stop_reason 'max_tokens' = JSON foi cortado no meio. Pula o
   // JSON.parse (que vai falhar) e da mensagem util ao usuario.
@@ -429,23 +437,28 @@ async function chamarClaudeComPdf(file: File, schema: any, prompt: string) {
   const base64 = Buffer.from(buffer).toString("base64");
 
   try {
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5",
-      // Subido de 8192 -> 32000 (limite Haiku 4.5) pra suportar PDFs
-      // com muitos itens (ex: Contrato 132 itens em lotes). Igor (05/06).
-      max_tokens: 32000,
-      system: [{ type: "text", text: SYSTEM_PROMPT_BASE, cache_control: { type: "ephemeral" } }],
-      output_config: { format: { type: "json_schema", schema } },
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-            { type: "text", text: prompt },
-          ],
-        },
-      ],
-    });
+    // Regina (05/06): usar .stream().finalMessage() em vez de .create()
+    // — com max_tokens=32000 o SDK rejeita .create() sincrono porque a
+    // operacao pode passar de 10min. Stream nao tem esse limite.
+    const response = await client.messages
+      .stream({
+        model: "claude-haiku-4-5",
+        // Subido de 8192 -> 32000 (limite Haiku 4.5) pra suportar PDFs
+        // com muitos itens (ex: Contrato 132 itens em lotes). Igor (05/06).
+        max_tokens: 32000,
+        system: [{ type: "text", text: SYSTEM_PROMPT_BASE, cache_control: { type: "ephemeral" } }],
+        output_config: { format: { type: "json_schema", schema } },
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
+              { type: "text", text: prompt },
+            ],
+          },
+        ],
+      })
+      .finalMessage();
 
     if (response.stop_reason === "max_tokens") {
       throw new Error(
