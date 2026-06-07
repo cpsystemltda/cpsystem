@@ -5,6 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { brl, tierPorAtivos } from "@/lib/validators";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { HonorariosAnalistaBloco } from "@/components/HonorariosAnalistaBloco";
+import { LinkIndicacaoCard } from "@/components/LinkIndicacaoCard";
+
+// Quantos clientes ativos faltam pra subir de tier. null = ja esta no
+// tier maximo (DIAMOND).
+function faltaParaProximoTier(ativos: number): { proximo: string; faltam: number } | null {
+  if (ativos < 6) return { proximo: "Prata", faltam: 6 - ativos };
+  if (ativos < 11) return { proximo: "Ouro", faltam: 11 - ativos };
+  if (ativos < 16) return { proximo: "Diamante", faltam: 16 - ativos };
+  return null;
+}
 
 export default async function HonorariosPage() {
   const usuario = await exigirUsuario();
@@ -79,9 +89,21 @@ export default async function HonorariosPage() {
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
         <Card titulo="Clientes ativos" valor={String(ativos.length)} sub={`${trial.length} em trial`} />
-        <Card titulo="Tier atual" valor={tier} sub={`Comissão ${percentual}%`} />
+        <Card
+          titulo="Tier atual"
+          valor={tier}
+          sub={
+            faltaParaProximoTier(ativos.length)
+              ? `Comissão ${percentual}% · faltam ${faltaParaProximoTier(ativos.length)!.faltam} pra ${faltaParaProximoTier(ativos.length)!.proximo}`
+              : `Comissão ${percentual}% · tier máximo`
+          }
+        />
         <Card titulo="A receber" valor={brl(totalAReceber)} sub={`${comissoes.filter((c) => !c.paga).length} comissões`} cor="amber" />
         <Card titulo="Já recebido" valor={brl(totalRecebido)} sub={`${comissoes.filter((c) => c.paga).length} pagamentos`} cor="emerald" />
+      </div>
+
+      <div className="mt-6">
+        <LinkIndicacaoCard analistaId={analistaId} nomeCompleto={conta.analista.nomeCompleto} />
       </div>
 
       {!conta.analista.divulgacaoUrl && (

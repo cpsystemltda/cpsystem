@@ -111,12 +111,27 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     analistaValido = { id: a.id, contaId: a.contaId };
   }
 
+  // Programa de Embaixador: ID do analista que indicou via link pessoal
+  // /signup?ref=ANALISTA_ID. Valida que existe e ta ativo. Se invalido
+  // (link expirado, analista desativado), simplesmente ignora (signup
+  // segue normal sem embaixador) — nao bloquear cadastro por isso.
+  const embaixadorIdRefRaw = String(formData.get("embaixadorIdRef") || "").trim();
+  let embaixadorIdValido: string | null = null;
+  if (embaixadorIdRefRaw) {
+    const emb = await prisma.analista.findUnique({
+      where: { id: embaixadorIdRefRaw },
+      select: { id: true, ativo: true },
+    });
+    if (emb && emb.ativo) embaixadorIdValido = emb.id;
+  }
+
   const conta = await prisma.conta.create({
     data: {
       tipo: "EMPRESA",
       plano: v.plano,
       statusAssinatura: "TRIAL",
       trialAteEm,
+      embaixadorId: embaixadorIdValido,
       usuarios: {
         create: {
           nome: v.nome,

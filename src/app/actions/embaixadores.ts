@@ -89,7 +89,13 @@ export async function vincularEmbaixadorAction(_p: Result | null, formData: Form
   return { ok: true };
 }
 
-// Calcula e gera comissões da competência atual
+// Calcula e gera comissões da competência atual.
+//
+// Regra de elegibilidade (Regina 07/06): a conta indicada SO conta como
+// "ativa pro embaixador" depois de ter pago pelo menos UMA fatura
+// (Cobranca.status=PAGA). Trial nao gera comissao. Apos a 1a fatura,
+// a comissao e VITALICIA enquanto a conta continuar pagando (basta
+// ter Cobranca.status=ATIVA no mes).
 export async function calcularComissoesDoMesAction(_p: Result | null, _formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
@@ -100,7 +106,16 @@ export async function calcularComissoesDoMesAction(_p: Result | null, _formData:
 
   const analistas = await prisma.analista.findMany({
     where: { ativo: true },
-    include: { contasIndicadas: { where: { statusAssinatura: "ATIVA" } } },
+    include: {
+      contasIndicadas: {
+        where: {
+          statusAssinatura: "ATIVA",
+          // Gatilho: a conta precisa ter pelo menos UMA Cobranca PAGA
+          // historicamente — protege contra trial nao convertido.
+          cobrancas: { some: { status: "PAGA" } },
+        },
+      },
+    },
   });
 
   const ops: Promise<unknown>[] = [];

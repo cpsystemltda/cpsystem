@@ -227,6 +227,17 @@ function FormEmpresa() {
     v.plano === "PREMIUM" ? "PREMIUM" : v.plano === "BASICO" ? "BASICO" : null
   );
 
+  // Programa de Embaixador: link pessoal /signup?ref=ANALISTA_ID grava o
+  // analista que indicou como embaixadorId da conta nova. Comissao
+  // mensal (3-6% MRR) flui pra esse analista enquanto a conta paga.
+  const [embaixadorIdRef, setEmbaixadorIdRef] = useState<string>("");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref") || "";
+    if (ref) setEmbaixadorIdRef(ref);
+  }, []);
+
   // Rola até o resumo de erros e dá foco no primeiro campo problemático
   useEffect(() => {
     if (errosResumo.length === 0) return;
@@ -240,6 +251,14 @@ function FormEmpresa() {
 
   return (
     <form action={formAction} className="mt-8 grid grid-cols-4 gap-4">
+      {/* Hidden: id do analista que indicou (link /signup?ref=ID). A
+          server action valida + grava em Conta.embaixadorId. */}
+      <input type="hidden" name="embaixadorIdRef" value={embaixadorIdRef} />
+      {embaixadorIdRef && (
+        <div className="col-span-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-800">
+          ✓ Indicação registrada. O analista que te trouxe ganha comissão automática enquanto sua conta estiver ativa.
+        </div>
+      )}
       {/* Resumo de erros no topo, com lista clicável */}
       {(state?.erro || errosResumo.length > 0) && (
         <div
