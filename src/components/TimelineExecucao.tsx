@@ -138,76 +138,84 @@ export function TimelineExecucao({
     return { concluido, atual };
   }
 
-  return (
-    <div className={comDatas ? "space-y-2" : ""}>
-      <div className="flex items-center">
-        {etapasUsadas.map((etapa, i) => {
-          const { concluido, atual } = statusEtapa(etapa.key, i);
-          // Pendente: i > idxAtual
+  // Igor (08/06): nomes desalinhados com os simbolos. Causa: a linha do
+  // tempo usava `flex flex-1` por etapa contendo circle + linha conectora
+  // 'embutida', mas o label era renderizado em um grid SEPARADO. Em N
+  // etapas, o grid de labels tinha N colunas, mas o flex dos circles
+  // distribuia diferente — circles ficavam encostados a esquerda e linhas
+  // ocupavam todo o resto. Resultado: labels nao batiam com circles.
+  //
+  // Fix: cada etapa agora e UM container flex-col com circle no topo e
+  // label embaixo, ambos centralizados na mesma coluna. A linha conectora
+  // virou position-absolute saindo do centro do circle atual ate o centro
+  // do proximo. Alinha 100%.
+  const topLinha = compacta ? "13px" : "17px"; // metade do circulo
 
-          return (
-            <div key={etapa.key} className="flex flex-1 items-center">
+  return (
+    <div className="flex items-start">
+      {etapasUsadas.map((etapa, i) => {
+        const { concluido, atual } = statusEtapa(etapa.key, i);
+        const proxConcluida =
+          i < etapasUsadas.length - 1 &&
+          statusEtapa(etapasUsadas[i + 1].key, i + 1).concluido;
+        const data =
+          i < ETAPAS_BASE.length
+            ? (marcos as Record<string, Date | null | undefined> | undefined)?.[etapa.key] ?? null
+            : marcosReajuste[etapa.key];
+
+        return (
+          <div key={etapa.key} className="relative flex flex-1 flex-col items-center">
+            {/* Linha conectora horizontal — sai do centro do circle atual
+                ate o centro do proximo (50% pra cada lado). */}
+            {i < etapasUsadas.length - 1 && (
               <div
-                className={`grid shrink-0 place-items-center rounded-full font-semibold transition ${tamCirculo} ${tamFonte} ${
-                  concluido
-                    ? "bg-emerald-600 text-white"
-                    : atual
-                      ? "bg-slate-900 text-white"
-                      : "border border-slate-300 bg-white text-slate-400"
+                className={`absolute h-px ${
+                  proxConcluida || concluido ? "bg-emerald-600" : "bg-slate-200"
                 }`}
-                title={etapa.label}
-              >
-                {concluido ? (
-                  <LogoCpInline className={tamLogo} />
-                ) : (
-                  <span>{i + 1}</span>
-                )}
-              </div>
-              {i < etapasUsadas.length - 1 && (
-                <div
-                  className={`h-px flex-1 ${
-                    concluido ? "bg-emerald-600" : "bg-slate-200"
-                  }`}
-                />
+                style={{ left: "50%", right: "-50%", top: topLinha }}
+              />
+            )}
+
+            {/* Circle */}
+            <div
+              className={`relative z-[1] grid shrink-0 place-items-center rounded-full font-semibold transition ${tamCirculo} ${tamFonte} ${
+                concluido
+                  ? "bg-emerald-600 text-white"
+                  : atual
+                    ? "bg-slate-900 text-white"
+                    : "border border-slate-300 bg-white text-slate-400"
+              }`}
+              title={etapa.label}
+            >
+              {concluido ? (
+                <LogoCpInline className={tamLogo} />
+              ) : (
+                <span>{i + 1}</span>
               )}
             </div>
-          );
-        })}
-      </div>
 
-      {comDatas && (
-        <div
-          className="grid gap-1 pt-1 text-center text-[10px] leading-tight"
-          style={{ gridTemplateColumns: `repeat(${etapasUsadas.length}, minmax(0, 1fr))` }}
-        >
-          {etapasUsadas.map((etapa, i) => {
-            // Pra etapas base usa `marcos`; pra etapas de reajuste usa `marcosReajuste`
-            const data =
-              i < ETAPAS_BASE.length
-                ? (marcos as Record<string, Date | null | undefined> | undefined)?.[etapa.key] ?? null
-                : marcosReajuste[etapa.key];
-            const { concluido, atual } = statusEtapa(etapa.key, i);
-            return (
-              <div key={etapa.key} className="flex flex-col items-center">
+            {/* Label embaixo do circle, centralizado na MESMA coluna */}
+            {comDatas && (
+              <div className="mt-1.5 px-1 text-center text-[10px] leading-tight">
                 <span
-                  className={`font-medium ${
+                  className={`block font-medium ${
                     atual ? "text-slate-900" : concluido ? "text-slate-700" : "text-slate-400"
                   }`}
                 >
                   {etapa.label}
                 </span>
                 {data ? (
-                  <span className="mt-0.5 text-[10px] font-semibold text-slate-600">
+                  <span className="mt-0.5 block text-[10px] font-semibold text-slate-600">
                     {fmtData(data)}
                   </span>
                 ) : (
-                  <span className="mt-0.5 text-[10px] text-slate-300">—</span>
+                  <span className="mt-0.5 block text-[10px] text-slate-300">—</span>
                 )}
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

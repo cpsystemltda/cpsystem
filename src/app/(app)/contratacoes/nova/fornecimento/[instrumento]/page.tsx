@@ -22,10 +22,19 @@ export default async function Page({
     select: { id: true, razaoSocial: true, nomeFantasia: true, responsavel: true, cnpj: true },
   });
 
+  // Igor (08/06): ao criar fornecimento vinculado a Ata, sistema nao
+  // puxava pontos focais nem enderecos cadastrados — usuario reescrevia
+  // tudo a cada execucao. Fix: carregar essas relacoes da Ata tambem
+  // (espelho do que ja fazia com Contrato).
   const atas = await prisma.ata.findMany({
     where: { empresa: { contaId: usuario.contaId }, vigenciaFim: { gte: new Date() } },
     orderBy: { criadoEm: "desc" },
-    select: { id: true, numero: true, objeto: true, orgaoNome: true },
+    include: {
+      enderecosEntrega: { select: { id: true, rotulo: true, endereco: true } },
+      pontosFocais: {
+        select: { id: true, nome: true, email: true, telefone: true, funcao: true, funcaoDescricao: true },
+      },
+    },
   });
 
   const atasComItens = await Promise.all(
@@ -41,6 +50,10 @@ export default async function Page({
           quantidadeDisponivel: it.quantidadeDisponivel,
           valorUnitario: it.valorUnitario,
         })),
+        // Pontos focais e enderecos cadastrados na Ata — sao herdados
+        // pelos empenhos derivados (Igor 08/06).
+        enderecosEntrega: a.enderecosEntrega,
+        pontosFocais: a.pontosFocais,
       };
     }),
   );

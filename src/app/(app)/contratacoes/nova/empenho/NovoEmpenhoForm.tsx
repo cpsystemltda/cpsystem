@@ -29,7 +29,23 @@ import {
 import { AnexosAdicionaisEditor } from "@/components/forms/AnexosAdicionaisEditor";
 
 type EmpresaOpt = { value: string; label: string };
-type AtaOpt = { value: string; label: string; itens: AtaItemRef[] };
+// Igor (08/06): Ata agora carrega tambem pontos focais e enderecos pra
+// pre-preencher o form quando o usuario seleciona a Ata como origem
+// (igual ao Contrato ja fazia).
+type AtaOpt = {
+  value: string;
+  label: string;
+  itens: AtaItemRef[];
+  enderecosEntrega?: { id: string; rotulo: string | null; endereco: string }[];
+  pontosFocais?: {
+    id: string;
+    nome: string;
+    email: string | null;
+    telefone: string | null;
+    funcao: string;
+    funcaoDescricao: string | null;
+  }[];
+};
 
 // Dados herdáveis do Contrato pai pra pré-preencher o form de execução.
 // Opcional: quando ausente (rota editar), o seletor de contrato não auto-preenche.
@@ -238,13 +254,17 @@ export default function NovoEmpenhoForm({
           : undefined
       : undefined;
 
-  // Quando troca de contrato (ou volta pra origem "livre"), remonta o form
-  // pra que defaultValue/iniciais sejam reaplicados com os dados do contrato.
+  // Quando troca de contrato OU de Ata (ou volta pra origem "livre"),
+  // remonta o form pra que defaultValue/iniciais sejam reaplicados.
+  // Igor (08/06): incluido ata-* pra herdar pontos focais ao selecionar
+  // Ata como origem.
   const formKey = dados
     ? `auto-${dados.numero}`
     : heranca
       ? `contrato-${contratoId}`
-      : "manual";
+      : ataSelecionada
+        ? `ata-${ataSelecionada.value}`
+        : "manual";
 
   // Key específica do ItensEditor — remonta quando muda o pai (Ata/Contrato)
   // ou quando a IA gera novos itens. Sem isso, o useState do editor não
@@ -705,14 +725,29 @@ export default function NovoEmpenhoForm({
           <p className="mb-3 text-xs text-slate-600">
             Locais onde este {nomeInstr.toLowerCase()} será cumprido.
           </p>
-          <EnderecosEntregaEditor iniciais={heranca?.enderecosEntrega ?? vi?.enderecosEntrega} />
+          {/* Igor (08/06): heranca de enderecos vem do contrato (se origem
+              = contrato) OU da ata (se origem = ata). Antes so puxava de
+              contrato — usuario reescrevia tudo a cada empenho de Ata. */}
+          <EnderecosEntregaEditor
+            iniciais={
+              heranca?.enderecosEntrega ??
+              ataSelecionada?.enderecosEntrega ??
+              vi?.enderecosEntrega
+            }
+          />
         </Secao>
 
         <Secao titulo="Pontos focais do órgão (Lei 14.133 art. 117)">
           <p className="mb-3 text-xs text-slate-600">
             Gestor + Fiscais Técnico/Administrativo do contrato.
           </p>
-          <PontosFocaisEditor iniciais={heranca?.pontosFocais ?? vi?.pontosFocais} />
+          <PontosFocaisEditor
+            iniciais={
+              heranca?.pontosFocais ??
+              ataSelecionada?.pontosFocais ??
+              vi?.pontosFocais
+            }
+          />
         </Secao>
 
         <Secao titulo="Itens">
