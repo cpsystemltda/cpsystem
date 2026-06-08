@@ -119,14 +119,17 @@ export default function SejaEmbaixadorPage() {
             Suba de tier e ganhe mais
           </h2>
           <div className="mt-8 grid gap-4 md:grid-cols-4">
-            <Tier nome="Bronze" pct="3%" range="1–5 contas ativas" cor="#A88947" />
-            <Tier nome="Prata" pct="4%" range="6–10 contas ativas" cor="#8B9BA8" />
-            <Tier nome="Ouro" pct="5%" range="11–15 contas ativas" cor="#D4AF37" destaque />
-            <Tier nome="Diamante" pct="6%" range="15+ contas ativas" cor="#6F8BAA" />
+            <Tier nome="Bronze" pct="5%" range="1–2 contas ativas" cor="#A88947" />
+            <Tier nome="Prata" pct="7%" range="3–7 contas ativas" cor="#8B9BA8" />
+            <Tier nome="Ouro" pct="10%" range="8–14 contas ativas" cor="#D4AF37" destaque />
+            <Tier nome="Diamante" pct="15%" range="15+ contas ativas" cor="#6F8BAA" />
           </div>
           <p className="mt-6 text-center text-xs text-[#5D6470]">
             % aplicado sobre o valor da mensalidade de cada empresa indicada (Básico R$ 397 / Premium R$ 997).
-            Em <strong>Diamante</strong>, 15 empresas Premium = R$ 897/mês recorrente.
+            Em <strong>Diamante</strong>, 15 empresas Premium = <strong>R$ 2.244/mês recorrente</strong> + <strong>bônus de R$ 5.000/ano</strong>.
+          </p>
+          <p className="mt-2 text-center text-xs text-[#5D6470]">
+            ✨ <strong>Bônus de início:</strong> R$ 500 fixos pra você na 1ª fatura paga de cada empresa indicada — independente do tier.
           </p>
         </section>
 

@@ -489,12 +489,19 @@ export function formatarMoeda(valor: number, moeda: Moeda = "BRL"): string {
   return valor.toLocaleString(locale, { style: "currency", currency: moeda });
 }
 
-// Tier do programa de embaixadores (Bronze 1-5: 3% / Prata 6-10: 4% / Ouro 11-15: 5% / Diamond 16+: 6%)
+// Tier do programa de embaixadores (Regina 08/06 — plano marketing v7).
+// Bronze 1-2: 5%   (tier inicial mais atrativo — pega embaixador novo)
+// Prata  3-7: 7%   (atingivel em 60 dias com esforco)
+// Ouro   8-14: 10% (compensa virar 'indicador profissional')
+// Diamante 15+: 15% + bonus R$ 5k/ano (figura aspiracional real)
+//
+// Alem disso ha bonus FIXO de R$ 500 na 1a Cobranca paga de cada conta
+// indicada (resolvido na action de pagamento — nao na funcao de tier).
 export function tierPorAtivos(qtdAtivos: number): { tier: "BRONZE" | "PRATA" | "OURO" | "DIAMOND"; percentual: number } {
-  if (qtdAtivos >= 16) return { tier: "DIAMOND", percentual: 6 };
-  if (qtdAtivos >= 11) return { tier: "OURO", percentual: 5 };
-  if (qtdAtivos >= 6) return { tier: "PRATA", percentual: 4 };
-  return { tier: "BRONZE", percentual: 3 };
+  if (qtdAtivos >= 15) return { tier: "DIAMOND", percentual: 15 };
+  if (qtdAtivos >= 8) return { tier: "OURO", percentual: 10 };
+  if (qtdAtivos >= 3) return { tier: "PRATA", percentual: 7 };
+  return { tier: "BRONZE", percentual: 5 };
 }
 
 // Limites de carona Lei 14.133/2021 art. 86
