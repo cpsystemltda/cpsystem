@@ -115,14 +115,33 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   // /signup?ref=ANALISTA_ID. Valida que existe e ta ativo. Se invalido
   // (link expirado, analista desativado), simplesmente ignora (signup
   // segue normal sem embaixador) — nao bloquear cadastro por isso.
-  const embaixadorIdRefRaw = String(formData.get("embaixadorIdRef") || "").trim();
+  //
+  // ALEM disso: programa de Referral C2C — link /signup?ref=conta-<id>
+  // grava 'indicadoPorContaId'. Cliente que indicou ganha 1 mes gratis
+  // quando essa conta nova pagar a 1a fatura.
+  const refRaw = String(formData.get("embaixadorIdRef") || "").trim();
   let embaixadorIdValido: string | null = null;
-  if (embaixadorIdRefRaw) {
-    const emb = await prisma.analista.findUnique({
-      where: { id: embaixadorIdRefRaw },
-      select: { id: true, ativo: true },
-    });
-    if (emb && emb.ativo) embaixadorIdValido = emb.id;
+  let indicadoPorContaIdValido: string | null = null;
+  if (refRaw) {
+    if (refRaw.startsWith("conta-")) {
+      // Referral C2C: ?ref=conta-<contaId>
+      const contaIdRef = refRaw.slice("conta-".length);
+      const c = await prisma.conta.findUnique({
+        where: { id: contaIdRef },
+        select: { id: true, statusAssinatura: true },
+      });
+      // Só aceita se a conta indicadora existe e nao esta bloqueada/cancelada.
+      if (c && c.statusAssinatura !== "CANCELADA") {
+        indicadoPorContaIdValido = c.id;
+      }
+    } else {
+      // Programa Embaixador: ?ref=<analistaId>
+      const emb = await prisma.analista.findUnique({
+        where: { id: refRaw },
+        select: { id: true, ativo: true },
+      });
+      if (emb && emb.ativo) embaixadorIdValido = emb.id;
+    }
   }
 
   const conta = await prisma.conta.create({
@@ -132,6 +151,7 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       statusAssinatura: "TRIAL",
       trialAteEm,
       embaixadorId: embaixadorIdValido,
+      indicadoPorContaId: indicadoPorContaIdValido,
       usuarios: {
         create: {
           nome: v.nome,

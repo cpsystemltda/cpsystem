@@ -40,6 +40,12 @@ model Conta {
   proximoVencimento DateTime?
   termosAceitosEm   DateTime?
   embaixadorId      String? // analista que indicou esta conta (programa de embaixadores SaaS — não confundir com VinculoAnalista B2G)
+  // Programa de referral cliente-indica-cliente (Regina 08/06, plano marketing v7).
+  // Quando cliente atual compartilha link `/conta/indicar` e outra empresa
+  // se cadastra via ?ref=conta-<id>, fica vinculada aqui. A cada indicacao
+  // que paga 1a fatura, o cliente que indicou ganha 1 mes gratis (creditado
+  // como Cobranca de valor 0 no proximo ciclo).
+  indicadoPorContaId String?
   // Gateway de pagamento (ASAAS por padrão)
   gatewayProvider   GatewayProvider?
   gatewayCustomerId String?          // customer_id no gateway
@@ -53,11 +59,17 @@ model Conta {
   empresas       Empresa[]
   analista       Analista?
   embaixador     Analista?       @relation("ContasIndicadas", fields: [embaixadorId], references: [id])
+  // Cliente que indicou esta conta (referral C2C).
+  indicadoPor    Conta?          @relation("ContasIndicadasPorCliente", fields: [indicadoPorContaId], references: [id], onDelete: SetNull)
+  // Contas que esta conta indicou.
+  contasIndicadas Conta[]        @relation("ContasIndicadasPorCliente")
   comissoes      Comissao[]
   logsAuditoria  LogAuditoria[]
   cobrancas      Cobranca[]
   metodosPagamento MetodoPagamento[]
   vinculosAnalista VinculoAnalista[]
+
+  @@index([indicadoPorContaId])
 }
 
 enum GatewayProvider {
