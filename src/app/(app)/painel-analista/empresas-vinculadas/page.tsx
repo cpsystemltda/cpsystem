@@ -70,25 +70,90 @@ export default async function EmpresasVinculadasPage({
         ? await prisma.analista.findUnique({ where: { id: sp.analistaId } })
         : null;
 
+  // Super admin sem analistaId — Regina (08/06): antes mostrava "Selecione
+  // um analista" sem link, parecia tela quebrada. Agora lista os analistas
+  // ativos com link clicavel direto.
+  if (!analista && usuario.superAdmin) {
+    const analistas = await prisma.analista.findMany({
+      where: { ativo: true },
+      orderBy: { criadoEm: "desc" },
+      include: {
+        contasIndicadas: {
+          where: { statusAssinatura: "ATIVA" },
+          select: { id: true },
+        },
+      },
+    });
+    return (
+      <div className="mx-auto max-w-4xl px-8 py-8">
+        <h1
+          className="text-[28px] font-extrabold"
+          style={{ color: "var(--text)", letterSpacing: "-0.03em" }}
+        >
+          Empresas vinculadas
+        </h1>
+        <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
+          Você é super admin — escolha qual analista quer visualizar.
+        </p>
+        {analistas.length === 0 ? (
+          <div
+            className="glass-tile mt-8 rounded-[20px] p-12 text-center"
+            style={{ border: "0.5px dashed var(--hairline)" }}
+          >
+            <Briefcase className="mx-auto h-10 w-10" style={{ color: "var(--text-mute)" }} />
+            <p className="mt-4 text-sm" style={{ color: "var(--text-soft)" }}>
+              Nenhum analista cadastrado ainda.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-3 md:grid-cols-2">
+            {analistas.map((a) => (
+              <Link
+                key={a.id}
+                href={`/painel-analista/empresas-vinculadas?analistaId=${a.id}`}
+                className="glass-tile group block rounded-[18px] px-5 py-5 transition hover:-translate-y-0.5"
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px]"
+                    style={{
+                      background: "rgba(212,175,55,0.18)",
+                      color: "var(--primary-deep)",
+                    }}
+                  >
+                    <Briefcase className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3
+                      className="text-[15px] font-extrabold"
+                      style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
+                    >
+                      {a.nomeCompleto}
+                    </h3>
+                    <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
+                      {a.contasIndicadas.length} empresa
+                      {a.contasIndicadas.length !== 1 ? "s" : ""} vinculada
+                      {a.contasIndicadas.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (!analista) {
     return (
       <div className="mx-auto max-w-3xl px-8 py-12 text-center">
         <AlertCircle className="mx-auto h-10 w-10" style={{ color: "var(--primary-deep)" }} />
         <h1 className="mt-4 text-2xl font-bold" style={{ color: "var(--text)" }}>
-          {usuario.superAdmin ? "Selecione um analista" : "Perfil de analista não encontrado"}
+          Perfil de analista não encontrado
         </h1>
         <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
-          {usuario.superAdmin ? (
-            <>
-              Abra o{" "}
-              <Link href="/painel-analista" className="font-bold underline" style={{ color: "var(--primary-deep)" }}>
-                painel do analista
-              </Link>{" "}
-              e escolha quem visualizar.
-            </>
-          ) : (
-            "Entre em contato com o suporte."
-          )}
+          Entre em contato com o suporte.
         </p>
       </div>
     );
