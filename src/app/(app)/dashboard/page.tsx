@@ -743,7 +743,31 @@ export default async function DashboardPage() {
               disponivel={valoresAExecutarAcumulado}
               percentualUsado={pctExecutadoAcumulado}
               sublabel={`Soma de ${totalAtasConta} ata(s) + ${totalContratosConta} contrato(s)`}
-            />
+            >
+              <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5">
+                <h4
+                  className="text-[14px] font-bold leading-tight"
+                  style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
+                >
+                  Executado / Contratado (acumulado)
+                </h4>
+                <p className="mt-1 text-[12px]" style={{ color: "var(--text-mute)" }}>
+                  Considerando todas as vigências da conta
+                </p>
+                <div
+                  className="my-4 h-px"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent, var(--hairline), transparent)",
+                  }}
+                />
+                <DonutChart
+                  pct={Math.min(100, Math.round(pctExecutadoAcumulado))}
+                  executado={valoresExecutados}
+                  contratado={valoresContratadosAcumulado}
+                />
+              </div>
+            </SerieHistoricaColapsavel>
           </div>
         )}
       </Block>

@@ -104,6 +104,7 @@ export function SerieHistoricaColapsavel({
   percentualUsado,
   sublabel,
   qtdVigencias,
+  children,
 }: {
   total: number;
   usado: number;
@@ -113,6 +114,9 @@ export function SerieHistoricaColapsavel({
   // "Soma das N vigências" (uso original em Ata/Contrato individual).
   sublabel?: string;
   qtdVigencias?: number;
+  // Conteúdo extra renderizado dentro do colapsável, abaixo dos 3 cards
+  // (uso no dashboard: gráfico donut consolidado).
+  children?: React.ReactNode;
 }) {
   const [aberto, setAberto] = useState(false);
   const sub = sublabel ?? (qtdVigencias != null ? `Soma das ${qtdVigencias} vigências` : "");
@@ -143,27 +147,30 @@ export function SerieHistoricaColapsavel({
         </span>
       </button>
       {aberto && (
-        <div className="mt-3 grid gap-4 md:grid-cols-3">
-          <Stat
-            titulo="Valor total contratado"
-            valor={brl(total)}
-            icone={CalendarClock}
-            cor="indigo"
-          />
-          <Stat
-            titulo="Já executado"
-            valor={brl(usado)}
-            sub={`${percentualUsado.toFixed(1)}%`}
-            icone={TrendingUp}
-            cor="amber"
-          />
-          <Stat
-            titulo="A executar"
-            valor={brl(disponivel)}
-            icone={TrendingDown}
-            cor="emerald"
-          />
-        </div>
+        <>
+          <div className="mt-3 grid gap-4 md:grid-cols-3">
+            <Stat
+              titulo="Valor total contratado"
+              valor={brl(total)}
+              icone={CalendarClock}
+              cor="indigo"
+            />
+            <Stat
+              titulo="Já executado"
+              valor={brl(usado)}
+              sub={`${percentualUsado.toFixed(1)}%`}
+              icone={TrendingUp}
+              cor="amber"
+            />
+            <Stat
+              titulo="A executar"
+              valor={brl(disponivel)}
+              icone={TrendingDown}
+              cor="emerald"
+            />
+          </div>
+          {children && <div className="mt-4">{children}</div>}
+        </>
       )}
     </section>
   );
