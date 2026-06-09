@@ -744,29 +744,30 @@ export default async function DashboardPage() {
               percentualUsado={pctExecutadoAcumulado}
               sublabel={`Soma de ${totalAtasConta} ata(s) + ${totalContratosConta} contrato(s)`}
             >
-              <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5">
-                <h4
-                  className="text-[14px] font-bold leading-tight"
-                  style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
-                >
-                  Executado / Contratado (acumulado)
-                </h4>
-                <p className="mt-1 text-[12px]" style={{ color: "var(--text-mute)" }}>
-                  Considerando todas as vigências da conta
-                </p>
-                <div
-                  className="my-4 h-px"
-                  style={{
-                    background:
-                      "linear-gradient(90deg, transparent, var(--hairline), transparent)",
-                  }}
+              <ChartCard
+                title="Acumulado da carteira"
+                subtitle="Soma de todas as vigências (vigentes + vencidas)"
+              >
+                <BarsTrio
+                  barras={[
+                    {
+                      val: valoresContratadosAcumulado,
+                      cor: "linear-gradient(180deg, #E8C875, #A88947)",
+                      rotulo: "Valor total",
+                    },
+                    {
+                      val: valoresExecutados,
+                      cor: "linear-gradient(180deg, #5DD8B6, #2EAB85)",
+                      rotulo: "Já executado",
+                    },
+                    {
+                      val: valoresAExecutarAcumulado,
+                      cor: "linear-gradient(180deg, #C5B4FF, #8E73E0)",
+                      rotulo: "A executar",
+                    },
+                  ]}
                 />
-                <DonutChart
-                  pct={Math.min(100, Math.round(pctExecutadoAcumulado))}
-                  executado={valoresExecutados}
-                  contratado={valoresContratadosAcumulado}
-                />
-              </div>
+              </ChartCard>
             </SerieHistoricaColapsavel>
           </div>
         )}
@@ -1270,12 +1271,22 @@ function BarsPosicao({
   aReceber: number;
   aExecutar: number;
 }) {
-  const max = Math.max(1, recebido, aReceber, aExecutar);
-  const barras: { val: number; cor: string; rotulo: string }[] = [
-    { val: recebido, cor: "linear-gradient(180deg, #5DD8B6, #2EAB85)", rotulo: "Recebidos" },
-    { val: aReceber, cor: "linear-gradient(180deg, #F0B8A8, #C66B4A)", rotulo: "A receber" },
-    { val: aExecutar, cor: "linear-gradient(180deg, #C5B4FF, #8E73E0)", rotulo: "A executar" },
-  ];
+  return (
+    <BarsTrio
+      barras={[
+        { val: recebido, cor: "linear-gradient(180deg, #5DD8B6, #2EAB85)", rotulo: "Recebidos" },
+        { val: aReceber, cor: "linear-gradient(180deg, #F0B8A8, #C66B4A)", rotulo: "A receber" },
+        { val: aExecutar, cor: "linear-gradient(180deg, #C5B4FF, #8E73E0)", rotulo: "A executar" },
+      ]}
+    />
+  );
+}
+
+// Bloco de 3 barras verticais usado tanto em "Posicao financeira" (Bloco
+// Financeiro) quanto em "Serie historica" (acumulado). Mesma estilizacao
+// glass que ja existia no BarsPosicao; abstraido pra reuso (Regina 09/06).
+function BarsTrio({ barras }: { barras: { val: number; cor: string; rotulo: string }[] }) {
+  const max = Math.max(1, ...barras.map((b) => b.val));
   // Eixo Y — calcula 4 ticks múltiplos de mil/milhão pra "respirar" o gráfico
   const escala = (() => {
     if (max >= 1_000_000) return Math.ceil(max / 100_000) * 100_000;
