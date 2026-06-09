@@ -97,20 +97,25 @@ export function KpisSaldoVigencia({ saldo }: { saldo: SaldoAta | SaldoContrato }
   );
 }
 
-function SerieHistoricaColapsavel({
+export function SerieHistoricaColapsavel({
   total,
   usado,
   disponivel,
-  qtdVigencias,
   percentualUsado,
+  sublabel,
+  qtdVigencias,
 }: {
   total: number;
   usado: number;
   disponivel: number;
-  qtdVigencias: number;
   percentualUsado: number;
+  // Texto à direita do "Série histórica" — quando omitido, cai no padrão
+  // "Soma das N vigências" (uso original em Ata/Contrato individual).
+  sublabel?: string;
+  qtdVigencias?: number;
 }) {
   const [aberto, setAberto] = useState(false);
+  const sub = sublabel ?? (qtdVigencias != null ? `Soma das ${qtdVigencias} vigências` : "");
   return (
     <section>
       <button
@@ -133,8 +138,8 @@ function SerieHistoricaColapsavel({
           Série histórica
         </h3>
         <span className="text-xs" style={{ color: "var(--text-soft)" }}>
-          Soma das {qtdVigencias} vigências
-          {!aberto && " · clique pra expandir"}
+          {sub}
+          {!aberto && sub && " · clique pra expandir"}
         </span>
       </button>
       {aberto && (

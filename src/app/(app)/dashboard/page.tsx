@@ -29,6 +29,7 @@ import { MapaBrasil } from "@/components/MapaBrasil";
 import { ClientesMapaSync } from "@/components/ClientesMapaSync";
 import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
 import { prazoLimiteOuVigencia, type PrazoEntregaModo, type PrazoEntregaUnidade } from "@/lib/prazoEntrega";
+import { SerieHistoricaColapsavel } from "@/components/KpisSaldoVigencia";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { Block } from "@/components/ui/Block";
 import { KPI, CurrencyValue } from "@/components/ui/KPI";
@@ -89,6 +90,10 @@ export default async function DashboardPage() {
     dadosUf,
     procedimentos,
     reajustesPendentes,
+    somaAtasTodas,
+    somaContratosTodos,
+    totalAtasConta,
+    totalContratosConta,
   ] = await Promise.all([
     prisma.empresa.findMany({ where: { contaId }, select: { id: true, cnpj: true } }),
     prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
@@ -205,6 +210,21 @@ export default async function DashboardPage() {
         marcoOrcamentoEstimado: { gte: hoje, lte: em30dias },
       },
     }).catch(() => 0),
+    // Serie historica (Regina 09/06): bloco colapsavel no painel Carteira
+    // que soma TODAS as atas + contratos da conta (vigentes + vencidos +
+    // futuros), espelhando o mesmo padrao Vigentes × Serie historica usado
+    // em /atas/[id] e /contratos/[id]. Agregamos no Postgres pra nao
+    // carregar todos os itens em memoria.
+    prisma.ataItem.aggregate({
+      where: { ata: { empresa: filtroEmpresa } },
+      _sum: { valorTotal: true },
+    }),
+    prisma.contratoItem.aggregate({
+      where: { contrato: { empresa: filtroEmpresa } },
+      _sum: { valorTotal: true },
+    }),
+    prisma.ata.count({ where: { empresa: filtroEmpresa } }),
+    prisma.contrato.count({ where: { empresa: filtroEmpresa } }),
   ]);
 
   // Bloco "Honorários do analista" foi movido pro módulo /honorarios
@@ -263,6 +283,23 @@ export default async function DashboardPage() {
   // efetiva. Antes era um filtro por status dos empenhos, o que dava número
   // diferente do "Contratados − Executados" esperado.
   const valoresAExecutar = Math.max(0, valoresContratados - valoresExecutados);
+
+  // Serie historica (Regina 09/06): acumulado de TODAS as atas + contratos
+  // (vigentes + vencidos + futuros). Espelha o bloco colapsavel ja existente
+  // em /atas/[id] e /contratos/[id], so que consolidado pela conta.
+  // Executados acumulado = mesmo `valoresExecutados` (empenhosCompletos ja
+  // nao filtra por vigencia — soma todos os empenhos da conta).
+  const valoresContratadosAcumulado =
+    (somaAtasTodas._sum.valorTotal ?? 0) + (somaContratosTodos._sum.valorTotal ?? 0);
+  const valoresAExecutarAcumulado = Math.max(
+    0,
+    valoresContratadosAcumulado - valoresExecutados,
+  );
+  const totalDocumentosAcumulado = totalAtasConta + totalContratosConta;
+  const pctExecutadoAcumulado =
+    valoresContratadosAcumulado > 0
+      ? (valoresExecutados / valoresContratadosAcumulado) * 100
+      : 0;
 
   const valoresRecebidos = empenhosCompletos
     .filter((e) => e.status === "PAGO")
@@ -693,6 +730,22 @@ export default async function DashboardPage() {
             <DonutChart pct={pctExecutado} executado={valoresExecutados} contratado={totalContratado} />
           </ChartCard>
         </div>
+
+        {/* Serie historica (Regina 09/06): consolidado de todas as atas +
+            contratos, espelhando o bloco existente em /atas/[id] e
+            /contratos/[id]. So aparece quando ha pelo menos 1 documento
+            vencido — caso contrario "vigentes" e "acumulado" sao iguais. */}
+        {totalDocumentosAcumulado > atasVigentes + contratosVigentes && (
+          <div className="mt-4">
+            <SerieHistoricaColapsavel
+              total={valoresContratadosAcumulado}
+              usado={valoresExecutados}
+              disponivel={valoresAExecutarAcumulado}
+              percentualUsado={pctExecutadoAcumulado}
+              sublabel={`Soma de ${totalAtasConta} ata(s) + ${totalContratosConta} contrato(s)`}
+            />
+          </div>
+        )}
       </Block>
 
       {/* === Bloco II — Atas & Contratos === */}
