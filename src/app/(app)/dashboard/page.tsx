@@ -28,6 +28,7 @@ import { coletarPinsEmpresas } from "@/lib/pinsEmpresas";
 import { MapaBrasil } from "@/components/MapaBrasil";
 import { ClientesMapaSync } from "@/components/ClientesMapaSync";
 import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
+import { prazoLimiteOuVigencia, type PrazoEntregaModo, type PrazoEntregaUnidade } from "@/lib/prazoEntrega";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { Block } from "@/components/ui/Block";
 import { KPI, CurrencyValue } from "@/components/ui/KPI";
@@ -157,8 +158,21 @@ export default async function DashboardPage() {
         instrumento: true,
         vigenciaFim: true,
         dataPrevistaExecucao: true,
+        // Campos do prazo-limite tempestivo (Regina 09/06): antes o painel
+        // caia no fallback vigenciaFim quando dataPrevistaExecucao era null,
+        // ignorando dataEntregaCerta. Carregamos tudo pra calcularPrazoLimite.
+        prazoEntregaModo: true,
+        dataEntregaCerta: true,
+        dataEntregaInicio: true,
+        dataEntregaFim: true,
+        dataPedidoRecebido: true,
+        prazoEntregaDias: true,
+        prazoEntregaUnidade: true,
         empresa: { select: { nomeFantasia: true, razaoSocial: true } },
       },
+      // Ordenacao real fica no JS via prazoLimiteOuVigencia(). O orderBy aqui
+      // serve so de heuristica pra take=50 nao cortar antes — mantemos por
+      // dataPrevistaExecucao + vigenciaFim, que sao indexaveis no Postgres.
       orderBy: [{ dataPrevistaExecucao: "asc" }, { vigenciaFim: "asc" }],
       // Take maior pra capturar agenda da semana corrente + lista geral
       take: 50,
@@ -329,9 +343,16 @@ export default async function DashboardPage() {
   const fimSemana = new Date(inicioSemana);
   fimSemana.setDate(fimSemana.getDate() + 7);
   const agendaSemana = proximasEntregas
-    .map((e) => ({ ...e, limite: e.dataPrevistaExecucao ?? e.vigenciaFim }))
+    .map((e) => ({ ...e, limite: prazoLimiteOuVigencia(e) }))
     .filter((e) => e.limite >= inicioSemana && e.limite < fimSemana)
     .sort((a, b) => a.limite.getTime() - b.limite.getTime());
+
+  // Reordena pela data-limite real (a query trazia ordenada por
+  // dataPrevistaExecucao/vigenciaFim, que ignorava dataEntregaCerta —
+  // bug Regina 09/06).
+  const proximasEntregasOrdenadas = [...proximasEntregas].sort(
+    (a, b) => prazoLimiteOuVigencia(a).getTime() - prazoLimiteOuVigencia(b).getTime(),
+  );
 
   // Lista única pra TimelineVencimentos: Atas + Contratos com vigência em
   // até 120 dias. Sort feito no componente client (pra reagir aos filtros).
@@ -830,7 +851,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mt-3.5">
-          <TabelaLogistica entregas={proximasEntregas.slice(0, 6)} hoje={hoje} />
+          <TabelaLogistica entregas={proximasEntregasOrdenadas.slice(0, 6)} hoje={hoje} />
         </div>
       </Block>
 
@@ -1539,12 +1560,19 @@ function TabelaLogistica({
     instrumento: InstrumentoContratual;
     vigenciaFim: Date;
     dataPrevistaExecucao: Date | null;
+    prazoEntregaModo: PrazoEntregaModo;
+    dataEntregaCerta: Date | null;
+    dataEntregaInicio: Date | null;
+    dataEntregaFim: Date | null;
+    dataPedidoRecebido: Date | null;
+    prazoEntregaDias: number | null;
+    prazoEntregaUnidade: PrazoEntregaUnidade;
     empresa: { nomeFantasia: string | null; razaoSocial: string };
   }[];
   hoje: Date;
 }) {
   const emAtraso = entregas.filter((e) => {
-    const limite = e.dataPrevistaExecucao ?? e.vigenciaFim;
+    const limite = prazoLimiteOuVigencia(e);
     return limite < hoje && !["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(e.status);
   }).length;
 
@@ -1587,7 +1615,7 @@ function TabelaLogistica({
         </thead>
         <tbody>
           {entregas.map((e) => {
-            const limite = e.dataPrevistaExecucao ?? e.vigenciaFim;
+            const limite = prazoLimiteOuVigencia(e);
             const diasAtraso = Math.floor((hoje.getTime() - limite.getTime()) / 86400000);
             const atrasado = diasAtraso > 0;
             return (

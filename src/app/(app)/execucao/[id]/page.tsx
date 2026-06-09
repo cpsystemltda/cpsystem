@@ -7,6 +7,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, formatarCnpj, ROTULO_PROCEDIMENTO, ROTULO_TIPO } from "@/lib/validators";
 import { podeEditarDocumento } from "@/lib/permissoes";
+import { calcularPrazoLimiteEntrega } from "@/lib/prazoEntrega";
 import { AvancarStatus } from "@/components/AvancarStatus";
 import { Tabs } from "@/components/Tabs";
 import { TimelineExecucao } from "@/components/TimelineExecucao";
@@ -506,28 +507,18 @@ function Timeline({
   reajusteRetroativo: ReajusteRetroativoData | null;
   podeEditar: boolean;
 }) {
-  // Prazo-limite — quatro formas:
-  //  - DATA_CERTA:  a data ja eh o limite tempestivo (vale pra Locacao,
-  //    eventos com data fixa, etc.). Nao depende de pedido recebido.
-  //  - PRAZO_CERTO: janela com inicio e fim — usa o fim como prazo-limite.
-  //  - RELATIVO:    contado a partir do recebimento do pedido. Multiplica
-  //    pela unidade (DIAS direto, MESES = 30 dias por mes).
-  //  - SOB_DEMANDA: sem data fixa.
-  const prazoLimiteEntrega: Date | null = (() => {
-    if (empenho.prazoEntregaModo === "DATA_CERTA") {
-      return empenho.dataEntregaCerta ?? null;
-    }
-    if (empenho.prazoEntregaModo === "PRAZO_CERTO") {
-      return empenho.dataEntregaFim ?? null;
-    }
-    if (!empenho.dataPedidoRecebido || !empenho.prazoEntregaDias) return null;
-    const fatorDias =
-      empenho.prazoEntregaUnidade === "MESES" ? 30 : 1;
-    return new Date(
-      empenho.dataPedidoRecebido.getTime() +
-        empenho.prazoEntregaDias * fatorDias * 86400000,
-    );
-  })();
+  // Prazo-limite tempestivo — extraido pra lib/prazoEntrega pra bater com
+  // o dashboard de Logistica (bug Regina 09/06: dashboard mostrava
+  // vigenciaFim ao inves de dataEntregaCerta).
+  const prazoLimiteEntrega = calcularPrazoLimiteEntrega({
+    prazoEntregaModo: empenho.prazoEntregaModo ?? "RELATIVO",
+    dataEntregaCerta: empenho.dataEntregaCerta ?? null,
+    dataEntregaInicio: empenho.dataEntregaInicio ?? null,
+    dataEntregaFim: empenho.dataEntregaFim ?? null,
+    dataPedidoRecebido: empenho.dataPedidoRecebido,
+    prazoEntregaDias: empenho.prazoEntregaDias,
+    prazoEntregaUnidade: empenho.prazoEntregaUnidade ?? "DIAS",
+  });
 
   // Prazo-limite de pagamento (30 dias após NF encaminhada, ou prazoPagamentoDias se definido)
   const diasPgto = empenho.prazoPagamentoDias ?? 30;
