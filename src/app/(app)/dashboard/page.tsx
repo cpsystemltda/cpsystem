@@ -712,7 +712,7 @@ export default async function DashboardPage() {
           />
         </div>
 
-        <div className="mt-3.5 grid grid-cols-2 gap-3.5">
+        <div className="mt-3.5 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
           <ChartCard
             title="Posição financeira"
             subtitle="Distribuição entre os estágios do contrato"
@@ -1277,9 +1277,9 @@ function BarsPosicao({
       </div>
 
       {/* Área do gráfico com gridlines */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <div
-          className="relative flex items-end gap-10 px-2"
+          className="relative flex items-end gap-4 px-2"
           style={{ height: `${alturaGrafico}px` }}
         >
           {/* Gridlines horizontais */}
@@ -1323,7 +1323,7 @@ function BarsPosicao({
         </div>
         {/* Rótulos abaixo das barras */}
         <div
-          className="mt-3 flex gap-10 px-2 text-[12px] font-semibold"
+          className="mt-3 flex gap-4 px-2 text-[12px] font-semibold"
           style={{ color: "var(--text-soft)" }}
         >
           {barras.map((b) => (
