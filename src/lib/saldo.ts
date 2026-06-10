@@ -153,54 +153,83 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
       contratoItens: {
         select: { quantidade: true, valorTotal: true, vigenciaId: true, contrato: { select: { vigencias: { select: { id: true } } } } },
       },
-      empenhoItens: {
-        select: {
-          quantidade: true,
-          valorTotal: true,
-          empenho: { select: { contratoId: true, vigenciaId: true } },
-        },
-      },
     },
     orderBy: { id: "asc" },
   });
 
-  // Empenho itens órfãos (ataItemId NULL) — agrupados por vigenciaId pra
-  // não vazar entre vigências.
-  const empenhoItensOrfaosPorVig = await prisma.empenhoItem.findMany({
-    where: {
-      ataItemId: null,
-      empenho: { ataId, contratoId: null },
-    },
+  // TODOS os EmpenhoItens da ata (empenhos diretos, sem contrato).
+  // Antes filtravamos so os orfaos (ataItemId NULL) + match por back-ref de
+  // ataItemId — isso quebrava quando o EmpenhoItem.ataItemId apontava pra
+  // um AtaItem de OUTRA vigencia. Caso Igor (09/06): ata SSP 3/25 com
+  // aditivo, empenho retroativo na V1 escolhia item da V2 (form lista so
+  // itens da vigencia atual), entao nem V1 nem V2 reconheciam o consumo.
+  // Agora cada vigencia pega seus empenhos por empenho.vigenciaId e aloca
+  // via cascata por descricao (mesmo padrao do calcularSaldoContrato).
+  const empenhoItensDaAta = await prisma.empenhoItem.findMany({
+    where: { empenho: { ataId, contratoId: null } },
     select: {
       quantidade: true,
       valorTotal: true,
       descricao: true,
+      ataItemId: true,
       empenho: { select: { vigenciaId: true } },
     },
   });
 
   const saldosPorVig: SaldoVigencia[] = vigencias.map((vig) => {
     const itensDaVig = itensTodos.filter((it) => it.vigenciaId === vig.id);
+    const empenhosDaVig = empenhoItensDaAta.filter(
+      (e) => e.empenho.vigenciaId === vig.id,
+    );
+
+    // Alocacao cascata (espelho do calcularSaldoContrato):
+    //  1) ataItemId aponta pra item DESSA vigencia → match direto
+    //  2) descricao exata com saldo restante
+    //  3) descricao exata sem saldo (overflow)
+    //  4) fuzzy >= 0.6
+    // Empenhos que nao matcham nada ficam fora do calculo dessa vigencia
+    // (nao deveriam acontecer — mas se acontecer, valorUsado fica menor
+    // que a realidade e o sintoma e o que o Igor viu).
+    type Candidato = { id: string; descricao: string; ataItemId: null; quantidade: number };
+    const candidatos: Candidato[] = itensDaVig.map((it) => ({
+      id: it.id,
+      descricao: it.descricao,
+      ataItemId: null, // AtaItem nao tem ataItemId (raiz); cascata salta etapa 1 abaixo
+      quantidade: it.quantidade,
+    }));
+    const consumoPorItem = new Map<string, { qty: number; valor: number }>();
+    // View "soh qty" do consumo (espelho — acharAlvoEmCascata so precisa de qty
+    // pra checar saldo restante). Atualizada in-place no loop.
+    const consumoQty = new Map<string, { qty: number }>();
+    for (const ei of empenhosDaVig) {
+      // Etapa 1 custom: match por id de AtaItem (substitui o `ataItemId === ataItemId`
+      // do contrato pelo `id === ataItemId` que faz sentido aqui).
+      let alvo = ei.ataItemId
+        ? candidatos.find((c) => c.id === ei.ataItemId)
+        : undefined;
+      if (!alvo) {
+        alvo = acharAlvoEmCascata(
+          { descricao: ei.descricao, ataItemId: null }, // forca pular etapa 1 interna
+          candidatos,
+          consumoQty,
+        );
+      }
+      if (!alvo) continue;
+      const atual = consumoPorItem.get(alvo.id) ?? { qty: 0, valor: 0 };
+      atual.qty += ei.quantidade;
+      atual.valor += ei.valorTotal;
+      consumoPorItem.set(alvo.id, atual);
+      consumoQty.set(alvo.id, { qty: atual.qty });
+    }
 
     const itensSaldo: SaldoItem[] = itensDaVig.map((it) => {
-      // Quantidades (consumo via contrato derivado + empenho direto + órfão)
+      // Quantidades (consumo via contrato derivado + empenho alocado em cascata)
       const usadoContrato = it.contratoItens
         .filter((c) => c.vigenciaId === vig.id)
         .reduce((s, c) => s + c.quantidade, 0);
-      const usadoEmpenhoSolto = it.empenhoItens
-        .filter(
-          (e) => e.empenho.contratoId === null && e.empenho.vigenciaId === vig.id,
-        )
-        .reduce((s, e) => s + e.quantidade, 0);
-      const descItemNorm = normalizarDescricao(it.descricao);
-      const usadoOrfaos = empenhoItensOrfaosPorVig
-        .filter(
-          (e) =>
-            e.empenho.vigenciaId === vig.id &&
-            normalizarDescricao(e.descricao) === descItemNorm,
-        )
-        .reduce((s, e) => s + e.quantidade, 0);
-      const usado = usadoContrato + usadoEmpenhoSolto + usadoOrfaos;
+      const consumoEmpenho = consumoPorItem.get(it.id) ?? { qty: 0, valor: 0 };
+      const usadoEmpenho = consumoEmpenho.qty;
+      const usado = usadoContrato + usadoEmpenho;
       const disponivel = Math.max(0, it.quantidade - usado);
 
       // Valores: valorUsado é a soma dos VALORES CONGELADOS (snapshot do
@@ -210,19 +239,7 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
       const valorUsadoContrato = it.contratoItens
         .filter((c) => c.vigenciaId === vig.id)
         .reduce((s, c) => s + c.valorTotal, 0);
-      const valorUsadoEmpenhoSolto = it.empenhoItens
-        .filter(
-          (e) => e.empenho.contratoId === null && e.empenho.vigenciaId === vig.id,
-        )
-        .reduce((s, e) => s + e.valorTotal, 0);
-      const valorUsadoOrfaos = empenhoItensOrfaosPorVig
-        .filter(
-          (e) =>
-            e.empenho.vigenciaId === vig.id &&
-            normalizarDescricao(e.descricao) === descItemNorm,
-        )
-        .reduce((s, e) => s + e.valorTotal, 0);
-      const valorUsado = valorUsadoContrato + valorUsadoEmpenhoSolto + valorUsadoOrfaos;
+      const valorUsado = valorUsadoContrato + consumoEmpenho.valor;
 
       return {
         ataItemId: it.id,
