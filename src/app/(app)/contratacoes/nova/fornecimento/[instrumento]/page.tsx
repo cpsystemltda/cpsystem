@@ -26,9 +26,15 @@ export default async function Page({
   // puxava pontos focais nem enderecos cadastrados — usuario reescrevia
   // tudo a cada execucao. Fix: carregar essas relacoes da Ata tambem
   // (espelho do que ja fazia com Contrato).
+  // Igor (11/06): cadastros retroativos exigem listar tambem atas vencidas
+  // (caso da ata 66/2024 TST que ele estava alimentando — primeira vigencia
+  // ja encerrada, mas precisa lancar empenhos retroativos antes do aditivo).
+  // Antes filtravamos so vigentes (vigenciaFim >= hoje). Agora trazemos
+  // TUDO, marcando "vencida" no label pra o usuario nao confundir.
+  const hoje = new Date();
   const atas = await prisma.ata.findMany({
-    where: { empresa: { contaId: usuario.contaId }, vigenciaFim: { gte: new Date() } },
-    orderBy: { criadoEm: "desc" },
+    where: { empresa: { contaId: usuario.contaId } },
+    orderBy: [{ vigenciaFim: "desc" }, { criadoEm: "desc" }],
     include: {
       enderecosEntrega: { select: { id: true, rotulo: true, endereco: true } },
       pontosFocais: {
@@ -40,9 +46,12 @@ export default async function Page({
   const atasComItens = await Promise.all(
     atas.map(async (a) => {
       const saldo = await calcularSaldoAta(a.id);
+      const vencida = a.vigenciaFim < hoje;
       return {
         value: a.id,
-        label: `Ata ${a.numero} — ${a.orgaoNome}`,
+        label: vencida
+          ? `Ata ${a.numero} — ${a.orgaoNome} · VENCIDA (${a.vigenciaFim.toLocaleDateString("pt-BR")})`
+          : `Ata ${a.numero} — ${a.orgaoNome}`,
         itens: saldo.itens.map((it) => ({
           id: it.ataItemId,
           descricao: it.descricao,
@@ -61,9 +70,11 @@ export default async function Page({
   // Carrega contratos com TODOS os campos herdáveis pra pré-preencher o
   // form quando o usuário seleciona "Derivado de Contrato" (M3.3 — Igor:
   // cadastrar várias execuções do mesmo contrato sem redigitar tudo).
+  // Mesma logica das atas (Igor 11/06): tras contratos vencidos tambem,
+  // marcando visualmente, pra suportar cadastro retroativo.
   const contratos = await prisma.contrato.findMany({
-    where: { empresa: { contaId: usuario.contaId }, vigenciaFim: { gte: new Date() } },
-    orderBy: { criadoEm: "desc" },
+    where: { empresa: { contaId: usuario.contaId } },
+    orderBy: [{ vigenciaFim: "desc" }, { criadoEm: "desc" }],
     include: {
       enderecosEntrega: { select: { id: true, rotulo: true, endereco: true } },
       pontosFocais: {
@@ -89,7 +100,9 @@ export default async function Page({
       atas={atasComItens}
       contratos={contratos.map((c) => ({
         value: c.id,
-        label: `Contrato ${c.numero} — ${c.orgaoNome}`,
+        label: c.vigenciaFim < hoje
+          ? `Contrato ${c.numero} — ${c.orgaoNome} · VENCIDO (${c.vigenciaFim.toLocaleDateString("pt-BR")})`
+          : `Contrato ${c.numero} — ${c.orgaoNome}`,
         ataId: c.ataId,
         dados: {
           empresaId: c.empresaId,
