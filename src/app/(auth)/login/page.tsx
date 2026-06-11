@@ -24,7 +24,7 @@ export default function LoginPage() {
 
   return (
     <div className="auth-shell relative min-h-screen overflow-hidden">
-      {/* Background atmosférico — mesma família do app interno */}
+      {/* Background atmosférico */}
       <div
         aria-hidden
         className="fixed inset-0 z-0 pointer-events-none"
@@ -42,37 +42,23 @@ export default function LoginPage() {
         <div className="mx-auto flex max-w-[1320px] items-center justify-between px-8 py-6">
           <Logo variant="md" mode="brand" priority />
           <nav className="hidden items-center gap-7 md:flex">
-            <Link
-              href="/"
-              className="text-[13px] font-semibold transition hover:opacity-80"
-              style={{ color: "var(--text-soft)" }}
-            >
+            <Link href="/" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               O sistema
             </Link>
-            <Link
-              href="/precos"
-              className="text-[13px] font-semibold transition hover:opacity-80"
-              style={{ color: "var(--text-soft)" }}
-            >
+            <Link href="/precos" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Planos
             </Link>
-            <Link
-              href="/seja-embaixador"
-              className="text-[13px] font-semibold transition hover:opacity-80"
-              style={{ color: "var(--text-soft)" }}
-            >
+            <Link href="/seja-embaixador" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Embaixadores
             </Link>
             <Link
               href="/signup"
               className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
               style={{
-                background:
-                  "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+                background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
                 color: "#0A0A0A",
                 letterSpacing: "0.18em",
-                boxShadow:
-                  "0 8px 22px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.45)",
+                boxShadow: "0 8px 22px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.45)",
               }}
             >
               Criar conta
@@ -81,14 +67,11 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* ======================= HERO INSTITUCIONAL ======================= */}
-      <main className="relative z-[1] mx-auto w-full max-w-[1320px] px-8 pb-14 pt-6 lg:pt-10">
-        {/* Eyebrow centralizado */}
-        <div className="mb-10 text-center">
-          <span
-            className="text-[11px] font-bold uppercase"
-            style={{ color: "var(--primary-deep)", letterSpacing: "0.34em" }}
-          >
+      <main className="relative z-[1] mx-auto w-full max-w-[1320px] px-8 pb-14">
+
+        {/* ======================= SEÇÃO 1 — HERO TÍTULO ======================= */}
+        <section className="pt-6 pb-12 text-center lg:pt-10 lg:pb-16">
+          <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.34em" }}>
             Plataforma premium
           </span>
           <h1
@@ -109,42 +92,37 @@ export default function LoginPage() {
             </em>{" "}
             ajuda na gestão dos seus contratos
           </h1>
-          <p
-            className="mx-auto mt-5 max-w-[700px] text-[16px] leading-relaxed lg:text-[17px]"
-            style={{ color: "var(--text-soft)", letterSpacing: "-0.005em" }}
-          >
+          <p className="mx-auto mt-5 max-w-[700px] text-[16px] leading-relaxed lg:text-[17px]" style={{ color: "var(--text-soft)", letterSpacing: "-0.005em" }}>
             Atas, contratos, empenhos, reajustes e fiscalização num só lugar. IA jurídica nativa que se adapta a qualquer legislação — federal, estadual ou municipal.
           </p>
-        </div>
+        </section>
 
-        {/* Grid principal — texto + login à esquerda · vídeo à direita */}
-        <div className="grid items-stretch gap-10 lg:grid-cols-2 lg:gap-12">
-
-          {/* ====== Coluna 1 — TEXTO + LOGIN ====== */}
-          <section className="flex flex-col">
-            {/* Bloco institucional */}
-            <div>
-              <span
-                className="text-[11px] font-bold uppercase"
-                style={{ color: "var(--primary-deep)", letterSpacing: "0.3em" }}
-              >
-                O sistema
-              </span>
-              <h2
-                className="mt-3 text-[24px] font-extrabold leading-tight lg:text-[28px]"
-                style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-              >
-                Conecta de forma inteligente toda a execução contratual
-              </h2>
-              <p
-                className="mt-3 text-[14.5px] leading-relaxed"
-                style={{ color: "var(--text-soft)" }}
-              >
-                Disponibiliza informações fundamentais e melhora as condições operacionais da gestão e da fiscalização. Permite gerir diversos contratos, das mais diferentes complexidades, com a periodicidade pretendida — organizando atribuições dos envolvidos e registrando cada ato praticado em trilha auditável.
-              </p>
+        {/* ======================= SEÇÃO 2 — SPLIT TEXTO + VÍDEO ======================= */}
+        {/* Altura controlada — texto curto à esquerda, vídeo aspect 16:10 à direita.
+            items-stretch garante que as duas colunas tenham EXATAMENTE a mesma altura.
+            Texto institucional é compacto pra bater visualmente com a altura do vídeo. */}
+        <section className="grid items-stretch gap-10 lg:grid-cols-2 lg:gap-12">
+          {/* Coluna esquerda — texto institucional compacto */}
+          <div className="flex flex-col justify-center">
+            <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.3em" }}>
+              O sistema
+            </span>
+            <h2
+              className="mt-3 text-[26px] font-extrabold leading-tight lg:text-[30px]"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+            >
+              Conecta de forma inteligente toda a execução contratual
+            </h2>
+            <p
+              className="mt-4 text-[15px] leading-relaxed lg:text-[16px]"
+              style={{ color: "var(--text-soft)" }}
+            >
+              Disponibiliza informações fundamentais e melhora as condições operacionais da gestão e da fiscalização. Permite gerir diversos contratos, das mais diferentes complexidades, registrando cada ato praticado em trilha auditável.
+            </p>
+            <div className="mt-6">
               <Link
                 href="/precos"
-                className="mt-5 inline-flex items-center gap-2 rounded-full px-6 py-3 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
+                className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
                 style={{
                   background: "rgba(255,255,255,0.7)",
                   border: "0.5px solid var(--hairline)",
@@ -156,71 +134,89 @@ export default function LoginPage() {
                 <ArrowRight className="h-4 w-4" strokeWidth={2.2} />
               </Link>
             </div>
+          </div>
 
-            {/* ====== CARD DE LOGIN ====== */}
+          {/* Coluna direita — vídeo com moldura em L envolvendo APENAS o vídeo */}
+          <div className="flex items-center justify-center">
+            <VideoPlayerInstitucional aberto={videoAberto} onAbrir={() => setVideoAberto(true)} />
+          </div>
+        </section>
+
+        {/* ======================= SEÇÃO 3 — LOGIN CARD CENTRALIZADO ======================= */}
+        <section className="mt-20 flex justify-center">
+          <div className="w-full max-w-[520px]">
             <div
-              className="glass mt-9 overflow-hidden rounded-[24px] px-8 py-8"
+              className="glass overflow-hidden rounded-[24px] px-9 py-9"
               style={{ color: "var(--text-soft)" }}
             >
               <div className="relative z-[1]">
-                <div className="flex items-end justify-between">
-                  <div>
-                    <span
-                      className="text-[10px] font-bold uppercase"
-                      style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}
+                <div className="text-center">
+                  <span
+                    className="text-[10px] font-bold uppercase"
+                    style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}
+                  >
+                    Já é cliente?
+                  </span>
+                  <h3
+                    className="mt-2.5 text-[26px] font-extrabold leading-tight"
+                    style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+                  >
+                    Entrar na sua{" "}
+                    <em
+                      style={{
+                        fontStyle: "normal",
+                        background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}
                     >
-                      Acessar plataforma
-                    </span>
-                    <h3
-                      className="mt-2 text-[24px] font-extrabold leading-tight"
-                      style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-                    >
-                      Entrar na sua conta
-                    </h3>
-                  </div>
-                  {tipoEscolhido !== null && (
-                    <button
-                      type="button"
-                      onClick={() => setTipoEscolhido(null)}
-                      className="text-[10px] font-bold uppercase transition hover:opacity-80"
-                      style={{ color: "var(--text-mute)", letterSpacing: "0.18em" }}
-                    >
-                      Trocar
-                    </button>
-                  )}
+                      conta
+                    </em>
+                  </h3>
                 </div>
 
                 {/* Tabs Empresa/Analista */}
-                <p
-                  className="mt-5 text-[11px] font-bold uppercase"
-                  style={{
-                    color:
-                      tipoEscolhido === null ? "var(--coral-deep)" : "var(--text-mute)",
-                    letterSpacing: "0.22em",
-                  }}
-                >
-                  Você é:
-                </p>
-                <div className="mt-2 grid grid-cols-2 gap-2.5">
-                  <TabTipo
-                    icone={Building2}
-                    label="Empresa"
-                    hint="Vendo ao governo"
-                    ativo={tipoEscolhido === "EMPRESA"}
-                    destacarVazio={tipoEscolhido === null}
-                    onClick={() => setTipoEscolhido("EMPRESA")}
-                  />
-                  <TabTipo
-                    icone={UserCheck}
-                    label="Analista"
-                    hint="Indico clientes"
-                    ativo={tipoEscolhido === "ANALISTA"}
-                    destacarVazio={tipoEscolhido === null}
-                    onClick={() => setTipoEscolhido("ANALISTA")}
-                  />
+                <div className="mt-6">
+                  <div
+                    className="mb-2.5 flex items-center justify-between text-[11px] font-bold uppercase"
+                    style={{ letterSpacing: "0.22em" }}
+                  >
+                    <span style={{ color: tipoEscolhido === null ? "var(--coral-deep)" : "var(--text-mute)" }}>
+                      Você é:
+                    </span>
+                    {tipoEscolhido !== null && (
+                      <button
+                        type="button"
+                        onClick={() => setTipoEscolhido(null)}
+                        className="text-[10px] font-bold uppercase transition hover:opacity-80"
+                        style={{ color: "var(--text-mute)", letterSpacing: "0.18em" }}
+                      >
+                        Trocar
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <TabTipo
+                      icone={Building2}
+                      label="Empresa"
+                      hint="Vendo ao governo"
+                      ativo={tipoEscolhido === "EMPRESA"}
+                      destacarVazio={tipoEscolhido === null}
+                      onClick={() => setTipoEscolhido("EMPRESA")}
+                    />
+                    <TabTipo
+                      icone={UserCheck}
+                      label="Analista"
+                      hint="Indico clientes"
+                      ativo={tipoEscolhido === "ANALISTA"}
+                      destacarVazio={tipoEscolhido === null}
+                      onClick={() => setTipoEscolhido("ANALISTA")}
+                    />
+                  </div>
                 </div>
 
-                {/* Form ou aviso — mesma posição visual */}
                 <div className="mt-6">
                   {tipoEscolhido === null ? (
                     <div
@@ -230,38 +226,18 @@ export default function LoginPage() {
                         border: "1px dashed var(--hairline)",
                       }}
                     >
-                      <p
-                        className="text-[13px] font-semibold"
-                        style={{ color: "var(--text-soft)" }}
-                      >
+                      <p className="text-[13px] font-semibold" style={{ color: "var(--text-soft)" }}>
                         Escolha acima o tipo de conta pra continuar.
                       </p>
-                      <p
-                        className="mt-2 text-[11.5px] leading-relaxed"
-                        style={{ color: "var(--text-mute)" }}
-                      >
+                      <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: "var(--text-mute)" }}>
                         <strong style={{ color: "var(--text-soft)" }}>Empresa</strong> usa o sistema pra gerir contratos · <strong style={{ color: "var(--text-soft)" }}>Analista</strong> indica clientes e ganha comissão.
                       </p>
                     </div>
                   ) : (
                     <form action={formAction} className="grid grid-cols-1 gap-5">
                       <input type="hidden" name="tipo" value={tipoEscolhido} />
-                      <Field
-                        label="E-mail"
-                        name="email"
-                        type="email"
-                        autoComplete="email"
-                        required
-                        span={4}
-                      />
-                      <Field
-                        label="Senha"
-                        name="senha"
-                        type="password"
-                        autoComplete="current-password"
-                        required
-                        span={4}
-                      />
+                      <Field label="E-mail" name="email" type="email" autoComplete="email" required span={4} />
+                      <Field label="Senha" name="senha" type="password" autoComplete="current-password" required span={4} />
 
                       {state?.erro && (
                         <div
@@ -285,12 +261,8 @@ export default function LoginPage() {
                   )}
                 </div>
 
-                {/* Footer do card */}
                 <div className="mt-7">
-                  <p
-                    className="text-center text-[13px]"
-                    style={{ color: "var(--text-mute)" }}
-                  >
+                  <p className="text-center text-[13px]" style={{ color: "var(--text-mute)" }}>
                     Não tem conta?{" "}
                     <Link
                       href={`/signup${tipoEscolhido ? `?tipo=${tipoEscolhido}` : ""}`}
@@ -311,49 +283,21 @@ export default function LoginPage() {
                 </div>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
-          {/* ====== Coluna 2 — VÍDEO ====== */}
-          <section className="flex h-full">
-            <VideoPlayerInstitucional
-              aberto={videoAberto}
-              onAbrir={() => setVideoAberto(true)}
-            />
-          </section>
-        </div>
-
-        {/* ============ FEATURES — 4 cards estilo Tela 1 da referência ============ */}
-        <section className="mt-16">
+        {/* ======================= SEÇÃO 4 — FEATURES ======================= */}
+        <section className="mt-20">
           <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-4">
-            <FeatureCard
-              icon={BellRing}
-              titulo="Controle de prazos"
-              descricao="Alerta antes de cada vencimento: entrega, NF, pagamento, reajuste, fim de vigência."
-            />
-            <FeatureCard
-              icon={FileCheck2}
-              titulo="Controle financeiro"
-              descricao="Pago, a receber e saldos por vigência em tempo real."
-            />
-            <FeatureCard
-              icon={ShieldCheck}
-              titulo="Fiscalização completa"
-              descricao="Garantias, aditivos, apostilamentos e procedimentos com trilha auditável."
-            />
-            <FeatureCard
-              icon={Brain}
-              titulo="IA jurídica nativa"
-              descricao="Lê PDFs, calcula reajustes, responde dúvidas em qualquer legislação."
-            />
+            <FeatureCard icon={BellRing} titulo="Controle de prazos" descricao="Alerta antes de cada vencimento: entrega, NF, pagamento, reajuste, fim de vigência." />
+            <FeatureCard icon={FileCheck2} titulo="Controle financeiro" descricao="Pago, a receber e saldos por vigência em tempo real." />
+            <FeatureCard icon={ShieldCheck} titulo="Fiscalização completa" descricao="Garantias, aditivos, apostilamentos e procedimentos com trilha auditável." />
+            <FeatureCard icon={Brain} titulo="IA jurídica nativa" descricao="Lê PDFs, calcula reajustes, responde dúvidas em qualquer legislação." />
           </div>
         </section>
       </main>
 
-      {/* ======================= FOOTER ======================= */}
-      <footer
-        className="relative z-[1] border-t pb-9 pt-7"
-        style={{ borderColor: "var(--hairline)" }}
-      >
+      <footer className="relative z-[1] border-t pb-9 pt-7" style={{ borderColor: "var(--hairline)" }}>
         <div
           className="mx-auto flex max-w-[1320px] flex-col items-center gap-3 px-8 text-[11px] uppercase sm:flex-row sm:justify-between"
           style={{ letterSpacing: "0.24em", color: "var(--text-faint)" }}
@@ -448,9 +392,9 @@ function TabTipo({
 }
 
 // ===========================================================
-// VÍDEO INSTITUCIONAL — moldura em L (espelho da Tela 2 da referência)
-// Container ocupa toda a altura da coluna (h-full), mantendo aspect 16:9
-// dentro de um wrapper que respira nas bordas da moldura.
+// VÍDEO INSTITUCIONAL — moldura em L envolvendo SÓ o vídeo
+// (não a coluna). Vídeo com aspect-ratio 16:10, full width na
+// coluna. Moldura recua ~12px nos cantos pra dar respiro.
 // ===========================================================
 function VideoPlayerInstitucional({
   aberto,
@@ -460,97 +404,94 @@ function VideoPlayerInstitucional({
   onAbrir: () => void;
 }) {
   return (
-    <div className="relative flex h-full min-h-[420px] w-full items-center">
-      {/* Moldura em L externa — cantos decorativos teal/dourado */}
-      <span aria-hidden className="absolute left-0 top-2 h-20 w-20 rounded-tl-3xl"
+    <div className="relative w-full">
+      {/* Moldura em L — 4 cantos decorativos dourados envolvendo o vídeo */}
+      <span aria-hidden className="absolute -left-3 -top-3 h-14 w-14 rounded-tl-2xl"
         style={{ borderTop: "2px solid var(--primary)", borderLeft: "2px solid var(--primary)" }} />
-      <span aria-hidden className="absolute right-0 top-2 h-20 w-20 rounded-tr-3xl"
+      <span aria-hidden className="absolute -right-3 -top-3 h-14 w-14 rounded-tr-2xl"
         style={{ borderTop: "2px solid var(--primary)", borderRight: "2px solid var(--primary)" }} />
-      <span aria-hidden className="absolute bottom-2 left-0 h-20 w-20 rounded-bl-3xl"
+      <span aria-hidden className="absolute -bottom-3 -left-3 h-14 w-14 rounded-bl-2xl"
         style={{ borderBottom: "2px solid var(--primary)", borderLeft: "2px solid var(--primary)" }} />
-      <span aria-hidden className="absolute bottom-2 right-0 h-20 w-20 rounded-br-3xl"
+      <span aria-hidden className="absolute -bottom-3 -right-3 h-14 w-14 rounded-br-2xl"
         style={{ borderBottom: "2px solid var(--primary)", borderRight: "2px solid var(--primary)" }} />
 
-      {/* Player com aspect 16:9, recuado pra dentro da moldura */}
-      <div className="relative mx-6 my-8 w-full">
+      {/* Player com aspect 16:10 — mais alto que 16:9 pra bater com o texto */}
+      <div
+        className="glass relative w-full overflow-hidden rounded-[20px]"
+        style={{ aspectRatio: "16 / 10" }}
+      >
         <div
-          className="glass relative w-full overflow-hidden rounded-[20px]"
-          style={{ aspectRatio: "16 / 9" }}
-        >
-          {/* Background do mock */}
-          <div
-            aria-hidden
-            className="absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(ellipse 520px 360px at 28% 32%, rgba(212,175,55,0.22), transparent 60%), radial-gradient(ellipse 420px 280px at 78% 72%, rgba(197,180,255,0.18), transparent 60%), linear-gradient(135deg, rgba(255,254,249,0.82), rgba(245,239,221,0.95))",
-            }}
-          />
-          <div aria-hidden className="absolute inset-0 flex items-center justify-center opacity-45">
-            <svg width="86%" height="64%" viewBox="0 0 400 220" fill="none">
-              <rect x="0" y="0" width="120" height="80" rx="10" fill="rgba(212,175,55,0.24)" />
-              <rect x="140" y="0" width="120" height="80" rx="10" fill="rgba(94,168,159,0.22)" />
-              <rect x="280" y="0" width="120" height="80" rx="10" fill="rgba(197,180,255,0.26)" />
-              <rect x="0" y="100" width="260" height="120" rx="12" fill="rgba(255,255,255,0.7)" />
-              <rect x="280" y="100" width="120" height="120" rx="12" fill="rgba(212,175,55,0.2)" />
-              <path d="M14 200 Q 60 150 100 170 T 180 160 T 250 130" stroke="rgba(168,137,71,0.7)" strokeWidth="2.6" fill="none" strokeLinecap="round" />
-            </svg>
-          </div>
-
-          {!aberto && (
-            <button
-              type="button"
-              onClick={onAbrir}
-              className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-4 transition-transform hover:scale-[1.01]"
-              aria-label="Assistir vídeo institucional"
-            >
-              <span
-                aria-hidden
-                className="absolute h-[160px] w-[160px] rounded-full"
-                style={{ background: "radial-gradient(circle, rgba(212,175,55,0.42) 0%, rgba(212,175,55,0) 70%)" }}
-              />
-              <span
-                className="relative flex h-[96px] w-[96px] items-center justify-center rounded-full"
-                style={{
-                  background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
-                  boxShadow: "0 16px 38px -6px rgba(168,137,71,0.6), inset 0 1px 0 rgba(255,255,255,0.55)",
-                }}
-              >
-                <Play
-                  className="h-12 w-12 translate-x-[3px]"
-                  style={{ color: "#FFFEF9", fill: "#FFFEF9" }}
-                  strokeWidth={2.2}
-                />
-              </span>
-              <span
-                className="relative text-[11px] font-bold uppercase"
-                style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}
-              >
-                Tour guiado · 2:22 min
-              </span>
-            </button>
-          )}
-
-          {aberto && (
-            <div
-              className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3"
-              style={{ background: "rgba(15,14,12,0.94)" }}
-            >
-              <span
-                className="text-[11px] font-bold uppercase"
-                style={{ color: "var(--primary)", letterSpacing: "0.3em" }}
-              >
-                Em produção
-              </span>
-              <span
-                className="max-w-[360px] text-center text-[13px]"
-                style={{ color: "rgba(255,254,249,0.78)" }}
-              >
-                O vídeo institucional está sendo finalizado. Assim que estiver pronto, ele toca direto aqui.
-              </span>
-            </div>
-          )}
+          aria-hidden
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 520px 360px at 28% 32%, rgba(212,175,55,0.22), transparent 60%), radial-gradient(ellipse 420px 280px at 78% 72%, rgba(197,180,255,0.18), transparent 60%), linear-gradient(135deg, rgba(255,254,249,0.82), rgba(245,239,221,0.95))",
+          }}
+        />
+        <div aria-hidden className="absolute inset-0 flex items-center justify-center opacity-40">
+          <svg width="84%" height="62%" viewBox="0 0 400 220" fill="none">
+            <rect x="0" y="0" width="120" height="80" rx="10" fill="rgba(212,175,55,0.22)" />
+            <rect x="140" y="0" width="120" height="80" rx="10" fill="rgba(94,168,159,0.20)" />
+            <rect x="280" y="0" width="120" height="80" rx="10" fill="rgba(197,180,255,0.24)" />
+            <rect x="0" y="100" width="260" height="120" rx="12" fill="rgba(255,255,255,0.65)" />
+            <rect x="280" y="100" width="120" height="120" rx="12" fill="rgba(212,175,55,0.18)" />
+            <path d="M14 200 Q 60 150 100 170 T 180 160 T 250 130" stroke="rgba(168,137,71,0.65)" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+          </svg>
         </div>
+
+        {!aberto && (
+          <button
+            type="button"
+            onClick={onAbrir}
+            className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-4 transition-transform hover:scale-[1.01]"
+            aria-label="Assistir vídeo institucional"
+          >
+            <span
+              aria-hidden
+              className="absolute h-[160px] w-[160px] rounded-full"
+              style={{ background: "radial-gradient(circle, rgba(212,175,55,0.42) 0%, rgba(212,175,55,0) 70%)" }}
+            />
+            <span
+              className="relative flex h-[96px] w-[96px] items-center justify-center rounded-full"
+              style={{
+                background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+                boxShadow: "0 16px 38px -6px rgba(168,137,71,0.6), inset 0 1px 0 rgba(255,255,255,0.55)",
+              }}
+            >
+              <Play
+                className="h-12 w-12 translate-x-[3px]"
+                style={{ color: "#FFFEF9", fill: "#FFFEF9" }}
+                strokeWidth={2.2}
+              />
+            </span>
+            <span
+              className="relative text-[11px] font-bold uppercase"
+              style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}
+            >
+              Tour guiado · 2:22 min
+            </span>
+          </button>
+        )}
+
+        {aberto && (
+          <div
+            className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3"
+            style={{ background: "rgba(15,14,12,0.94)" }}
+          >
+            <span
+              className="text-[11px] font-bold uppercase"
+              style={{ color: "var(--primary)", letterSpacing: "0.3em" }}
+            >
+              Em produção
+            </span>
+            <span
+              className="max-w-[360px] text-center text-[13px]"
+              style={{ color: "rgba(255,254,249,0.78)" }}
+            >
+              O vídeo institucional está sendo finalizado. Assim que estiver pronto, ele toca direto aqui.
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -582,16 +523,10 @@ function FeatureCard({
       >
         <Icone className="h-5 w-5" style={{ color: "var(--primary-deep)" }} strokeWidth={1.7} />
       </span>
-      <h4
-        className="mt-3.5 text-[14px] font-bold leading-tight"
-        style={{ letterSpacing: "-0.015em" }}
-      >
+      <h4 className="mt-3.5 text-[14px] font-bold leading-tight" style={{ letterSpacing: "-0.015em" }}>
         {titulo}
       </h4>
-      <p
-        className="mt-1.5 text-[12px] leading-relaxed"
-        style={{ color: "var(--text-soft)" }}
-      >
+      <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "var(--text-soft)" }}>
         {descricao}
       </p>
     </div>
