@@ -640,9 +640,14 @@ export async function extrairAditivoDoPdf(file: File): Promise<AditivoExtraido> 
       dataAssinatura: { type: "string", format: "date" },
 
       alteraValor: { type: "boolean" },
+      // Anthropic structured outputs rejeita `type: ["string","null"]` quando
+      // combinado com `enum` que inclui null (Igor 11/06, ata 66/2024 TST).
+      // Usar `anyOf` pra dar a opcao "string com enum OU null" funciona.
       tipoAlteracaoValor: {
-        type: ["string", "null"],
-        enum: ["ACRESCIMO", "SUPRESSAO", "REAJUSTE_REPACTUACAO", "REEQUILIBRIO", null],
+        anyOf: [
+          { type: "string", enum: ["ACRESCIMO", "SUPRESSAO", "REAJUSTE_REPACTUACAO", "REEQUILIBRIO"] },
+          { type: "null" },
+        ],
       },
       novoValor: { type: ["number", "null"] },
 
@@ -650,16 +655,28 @@ export async function extrairAditivoDoPdf(file: File): Promise<AditivoExtraido> 
       novaVigenciaInicio: { type: ["string", "null"], format: "date" },
       novaVigenciaFim: { type: ["string", "null"], format: "date" },
       novaVigenciaPrazo: { type: ["integer", "null"] },
-      novaVigenciaUnidade: { type: ["string", "null"], enum: ["DIAS", "MESES", null] },
+      novaVigenciaUnidade: {
+        anyOf: [
+          { type: "string", enum: ["DIAS", "MESES"] },
+          { type: "null" },
+        ],
+      },
 
       alteraPrazoEntrega: { type: "boolean" },
       novoPrazoEntregaDias: { type: ["integer", "null"] },
-      novoPrazoEntregaUnidade: { type: ["string", "null"], enum: ["DIAS", "MESES", null] },
+      novoPrazoEntregaUnidade: {
+        anyOf: [
+          { type: "string", enum: ["DIAS", "MESES"] },
+          { type: "null" },
+        ],
+      },
 
       aplicaReajuste: { type: "boolean" },
       reajusteIndice: {
-        type: ["string", "null"],
-        enum: ["IPCA", "IPCA_E", "IPCA_15", "IGPM", "INCC", "INPC", "IST", "CONTRATUAL", "OUTRO", null],
+        anyOf: [
+          { type: "string", enum: ["IPCA", "IPCA_E", "IPCA_15", "IGPM", "INCC", "INPC", "IST", "CONTRATUAL", "OUTRO"] },
+          { type: "null" },
+        ],
       },
       reajusteIndiceOutro: { type: ["string", "null"] },
       reajustePeriodoInicio: { type: ["string", "null"], format: "date" },
@@ -909,15 +926,22 @@ export async function extrairApostilamentoDoPdf(file: File): Promise<Apostilamen
       dataAssinatura: { type: "string", format: "date" },
 
       finalidade: {
-        type: ["string", "null"],
-        enum: ["REAJUSTE", "APLICACAO_PENALIDADE", "EMPENHO_CREDITO_SUPLEMENTAR", "OUTROS", null],
+        anyOf: [
+          { type: "string", enum: ["REAJUSTE", "APLICACAO_PENALIDADE", "EMPENHO_CREDITO_SUPLEMENTAR", "OUTROS"] },
+          { type: "null" },
+        ],
       },
       motivo: { type: ["string", "null"] },
 
       alteraValor: { type: "boolean" },
+      // Anthropic structured outputs rejeita `type: ["string","null"]` quando
+      // combinado com `enum` que inclui null (Igor 11/06, ata 66/2024 TST).
+      // Usar `anyOf` pra dar a opcao "string com enum OU null" funciona.
       tipoAlteracaoValor: {
-        type: ["string", "null"],
-        enum: ["ACRESCIMO", "SUPRESSAO", "REAJUSTE_REPACTUACAO", "REEQUILIBRIO", null],
+        anyOf: [
+          { type: "string", enum: ["ACRESCIMO", "SUPRESSAO", "REAJUSTE_REPACTUACAO", "REEQUILIBRIO"] },
+          { type: "null" },
+        ],
       },
       novoValor: { type: ["number", "null"] },
 
@@ -925,16 +949,28 @@ export async function extrairApostilamentoDoPdf(file: File): Promise<Apostilamen
       novaVigenciaInicio: { type: ["string", "null"], format: "date" },
       novaVigenciaFim: { type: ["string", "null"], format: "date" },
       novaVigenciaPrazo: { type: ["integer", "null"] },
-      novaVigenciaUnidade: { type: ["string", "null"], enum: ["DIAS", "MESES", null] },
+      novaVigenciaUnidade: {
+        anyOf: [
+          { type: "string", enum: ["DIAS", "MESES"] },
+          { type: "null" },
+        ],
+      },
 
       alteraPrazoEntrega: { type: "boolean" },
       novoPrazoEntregaDias: { type: ["integer", "null"] },
-      novoPrazoEntregaUnidade: { type: ["string", "null"], enum: ["DIAS", "MESES", null] },
+      novoPrazoEntregaUnidade: {
+        anyOf: [
+          { type: "string", enum: ["DIAS", "MESES"] },
+          { type: "null" },
+        ],
+      },
 
       aplicaReajuste: { type: "boolean" },
       reajusteIndice: {
-        type: ["string", "null"],
-        enum: ["IPCA", "IPCA_E", "IPCA_15", "IGPM", "INCC", "INPC", "IST", "CONTRATUAL", "OUTRO", null],
+        anyOf: [
+          { type: "string", enum: ["IPCA", "IPCA_E", "IPCA_15", "IGPM", "INCC", "INPC", "IST", "CONTRATUAL", "OUTRO"] },
+          { type: "null" },
+        ],
       },
       reajusteIndiceOutro: { type: ["string", "null"] },
       reajustePeriodoInicio: { type: ["string", "null"], format: "date" },
