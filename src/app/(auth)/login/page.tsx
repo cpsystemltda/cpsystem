@@ -24,13 +24,13 @@ export default function LoginPage() {
 
   return (
     <div className="auth-shell relative min-h-screen overflow-hidden">
-      {/* Background atmosférico */}
+      {/* Background atmosférico fixo */}
       <div
         aria-hidden
         className="fixed inset-0 z-0 pointer-events-none"
         style={{
           background:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.6' opacity='0.10'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E\"), radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.18), transparent 55%), radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.12), transparent 55%), radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.12), transparent 55%), radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.14), transparent 55%), linear-gradient(135deg, #FAF7F0 0%, #FFFEF9 50%, #F5EFDD 100%)",
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.6' opacity='0.08'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E\"), radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.18), transparent 55%), radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.12), transparent 55%), radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.12), transparent 55%), radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.14), transparent 55%), linear-gradient(135deg, #FAF7F0 0%, #FFFEF9 50%, #F5EFDD 100%)",
           backgroundSize: "240px 240px, auto, auto, auto, auto, auto",
           backgroundRepeat: "repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat",
           backgroundAttachment: "fixed",
@@ -38,19 +38,34 @@ export default function LoginPage() {
       />
 
       {/* ======================= HEADER ======================= */}
-      <header className="relative z-[2] w-full">
-        <div className="mx-auto flex max-w-[1320px] items-center justify-between px-8 py-6">
+      <header className="relative z-[3] w-full">
+        <div className="mx-auto flex max-w-[1320px] items-center justify-between px-8 py-5">
           <Logo variant="md" mode="brand" priority />
-          <nav className="hidden items-center gap-7 md:flex">
+          <nav className="hidden items-center gap-6 md:flex">
             <Link href="/" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
-              O sistema
+              Home
             </Link>
+            <a href="#sistema" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
+              O sistema
+            </a>
             <Link href="/precos" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Planos
             </Link>
             <Link href="/seja-embaixador" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Embaixadores
             </Link>
+            <a
+              href="#login"
+              className="ml-2 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[12px] font-bold uppercase transition hover:opacity-90"
+              style={{
+                background: "rgba(255,255,255,0.7)",
+                border: "0.5px solid var(--hairline)",
+                color: "var(--text)",
+                letterSpacing: "0.18em",
+              }}
+            >
+              Login
+            </a>
             <Link
               href="/signup"
               className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
@@ -61,24 +76,24 @@ export default function LoginPage() {
                 boxShadow: "0 8px 22px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.45)",
               }}
             >
-              Criar conta
+              Cadastrar
             </Link>
           </nav>
         </div>
       </header>
 
-      <main className="relative z-[1] mx-auto w-full max-w-[1320px] px-8 pb-14">
+      <main className="relative z-[1] mx-auto w-full max-w-[1320px] px-8 pb-16">
 
-        {/* ======================= SEÇÃO 1 — HERO TÍTULO ======================= */}
-        <section className="pt-6 pb-12 text-center lg:pt-10 lg:pb-16">
+        {/* ============== SEÇÃO 1 — HERO ============== */}
+        <section className="pt-10 pb-14 text-center lg:pt-14 lg:pb-16">
           <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.34em" }}>
-            Plataforma premium
+            Plataforma Premium
           </span>
           <h1
-            className="mx-auto mt-4 max-w-[820px] text-[34px] font-extrabold leading-[1.05] lg:text-[44px]"
+            className="mx-auto mt-4 max-w-[920px] text-[36px] font-extrabold leading-[1.05] lg:text-[52px]"
             style={{ color: "var(--text)", letterSpacing: "-0.03em" }}
           >
-            Entenda como o{" "}
+            Gestão e fiscalização de{" "}
             <em
               style={{
                 fontStyle: "normal",
@@ -88,96 +103,168 @@ export default function LoginPage() {
                 WebkitTextFillColor: "transparent",
               }}
             >
-              CP System
-            </em>{" "}
-            ajuda na gestão dos seus contratos
+              contratos públicos
+            </em>
           </h1>
-          <p className="mx-auto mt-5 max-w-[700px] text-[16px] leading-relaxed lg:text-[17px]" style={{ color: "var(--text-soft)", letterSpacing: "-0.005em" }}>
-            Atas, contratos, empenhos, reajustes e fiscalização num só lugar. IA jurídica nativa que se adapta a qualquer legislação — federal, estadual ou municipal.
+          <p
+            className="mx-auto mt-5 max-w-[680px] text-[16px] leading-relaxed lg:text-[18px]"
+            style={{ color: "var(--text-soft)", letterSpacing: "-0.005em" }}
+          >
+            Reduza custos e riscos na gestão e fiscalização de contratos — atas, contratos, empenhos, reajustes e trilha auditável em qualquer legislação.
           </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              href="/signup"
+              className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition hover:scale-[1.02]"
+              style={{
+                background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+                color: "#0A0A0A",
+                letterSpacing: "0.2em",
+                boxShadow: "0 12px 32px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
+              }}
+            >
+              Solicite demonstração
+              <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
+            </Link>
+            <Link
+              href="/precos"
+              className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition"
+              style={{
+                background: "rgba(255,255,255,0.7)",
+                border: "0.5px solid var(--hairline)",
+                color: "var(--text)",
+                letterSpacing: "0.2em",
+              }}
+            >
+              Ver planos
+            </Link>
+          </div>
         </section>
 
-        {/* ======================= SEÇÃO 2 — SPLIT TEXTO + VÍDEO ======================= */}
-        {/* Altura controlada — texto curto à esquerda, vídeo aspect 16:10 à direita.
-            items-stretch garante que as duas colunas tenham EXATAMENTE a mesma altura.
-            Texto institucional é compacto pra bater visualmente com a altura do vídeo. */}
-        <section className="grid items-stretch gap-10 lg:grid-cols-2 lg:gap-12">
-          {/* Coluna esquerda — texto institucional compacto */}
-          <div className="flex flex-col justify-center">
-            <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.3em" }}>
-              O sistema
-            </span>
-            <h2
-              className="mt-3 text-[26px] font-extrabold leading-tight lg:text-[30px]"
-              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-            >
-              Conecta de forma inteligente toda a execução contratual
-            </h2>
-            <p
-              className="mt-4 text-[15px] leading-relaxed lg:text-[16px]"
-              style={{ color: "var(--text-soft)" }}
-            >
-              Disponibiliza informações fundamentais e melhora as condições operacionais da gestão e da fiscalização. Permite gerir diversos contratos, das mais diferentes complexidades, registrando cada ato praticado em trilha auditável.
-            </p>
-            <div className="mt-6">
-              <Link
-                href="/precos"
-                className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
-                style={{
-                  background: "rgba(255,255,255,0.7)",
-                  border: "0.5px solid var(--hairline)",
-                  color: "var(--text)",
-                  letterSpacing: "0.2em",
-                }}
+        {/* ============== SEÇÃO 2 — 4 CARDS DE FEATURES ============== */}
+        <section>
+          <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-4">
+            <FeatureCard
+              icon={BellRing}
+              titulo="Controle de prazos"
+              descricao="Seja alertado sobre cada etapa: entrega, NF, pagamento, reajuste, fim de vigência."
+            />
+            <FeatureCard
+              icon={FileCheck2}
+              titulo="Controle financeiro"
+              descricao="Pagamentos efetuados, débitos, saldos por vigência em tempo real."
+            />
+            <FeatureCard
+              icon={ShieldCheck}
+              titulo="Fiscalização completa"
+              descricao="Acompanhe o cumprimento das cláusulas com trilha auditável de cada ato."
+            />
+            <FeatureCard
+              icon={Brain}
+              titulo="IA jurídica nativa"
+              descricao="Lê PDFs, calcula reajustes e responde dúvidas em qualquer legislação."
+            />
+          </div>
+        </section>
+
+        {/* ============== SEÇÃO 3 — INSTITUCIONAL SPLIT (TEXTO + STATS / VÍDEO) ============== */}
+        <section id="sistema" className="mt-24">
+          <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-14">
+            {/* Coluna esquerda — texto + stats */}
+            <div>
+              <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.3em" }}>
+                O sistema
+              </span>
+              <h2
+                className="mt-3 text-[30px] font-extrabold leading-[1.1] lg:text-[36px]"
+                style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
               >
-                Mais sobre o sistema
-                <ArrowRight className="h-4 w-4" strokeWidth={2.2} />
-              </Link>
+                Entenda como o{" "}
+                <em
+                  style={{
+                    fontStyle: "normal",
+                    background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  CP System
+                </em>{" "}
+                ajuda na gestão dos seus contratos
+              </h2>
+              <p className="mt-5 text-[15px] leading-relaxed lg:text-[16px]" style={{ color: "var(--text-soft)" }}>
+                Ferramenta gerencial que conecta de forma inteligente a atuação dos setores e agentes envolvidos na execução contratual, disponibilizando informações fundamentais e melhorando as condições operacionais da gestão e da fiscalização.
+              </p>
+              <p className="mt-3 text-[15px] leading-relaxed lg:text-[16px]" style={{ color: "var(--text-soft)" }}>
+                Permite gerir diversos contratos, das mais diferentes complexidades, organizando atribuições e registrando cada ato praticado em trilha auditável.
+              </p>
+
+              {/* Mini-stats horizontais (substituem números factuais ainda inexistentes) */}
+              <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <StatBlock numero="12+" label="Tipos de instrumentos" />
+                <StatBlock numero="100%" label="Auditável" />
+                <StatBlock numero="IA" label="Jurídica nativa" />
+                <StatBlock numero="∞" label="Multi-empresa" />
+              </div>
+
+              <div className="mt-7">
+                <Link
+                  href="/precos"
+                  className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
+                  style={{
+                    background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+                    color: "#0A0A0A",
+                    letterSpacing: "0.2em",
+                    boxShadow: "0 10px 26px -6px rgba(168,137,71,0.4), inset 0 1px 0 rgba(255,255,255,0.45)",
+                  }}
+                >
+                  Mais sobre o sistema
+                  <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
+                </Link>
+              </div>
+            </div>
+
+            {/* Coluna direita — vídeo */}
+            <div className="flex items-center justify-center">
+              <VideoPlayerInstitucional aberto={videoAberto} onAbrir={() => setVideoAberto(true)} />
             </div>
           </div>
-
-          {/* Coluna direita — vídeo com moldura em L envolvendo APENAS o vídeo */}
-          <div className="flex items-center justify-center">
-            <VideoPlayerInstitucional aberto={videoAberto} onAbrir={() => setVideoAberto(true)} />
-          </div>
         </section>
 
-        {/* ======================= SEÇÃO 3 — LOGIN CARD CENTRALIZADO ======================= */}
-        <section className="mt-20 flex justify-center">
-          <div className="w-full max-w-[520px]">
-            <div
-              className="glass overflow-hidden rounded-[24px] px-9 py-9"
-              style={{ color: "var(--text-soft)" }}
+        {/* ============== SEÇÃO 4 — LOGIN ============== */}
+        <section id="login" className="mt-24">
+          <div className="text-center">
+            <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}>
+              Acessar plataforma
+            </span>
+            <h2
+              className="mx-auto mt-3 max-w-[600px] text-[26px] font-extrabold leading-tight lg:text-[32px]"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
             >
-              <div className="relative z-[1]">
-                <div className="text-center">
-                  <span
-                    className="text-[10px] font-bold uppercase"
-                    style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}
-                  >
-                    Já é cliente?
-                  </span>
-                  <h3
-                    className="mt-2.5 text-[26px] font-extrabold leading-tight"
-                    style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
-                  >
-                    Entrar na sua{" "}
-                    <em
-                      style={{
-                        fontStyle: "normal",
-                        background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
-                        WebkitBackgroundClip: "text",
-                        backgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                      }}
-                    >
-                      conta
-                    </em>
-                  </h3>
-                </div>
+              Já é cliente? Entre na sua{" "}
+              <em
+                style={{
+                  fontStyle: "normal",
+                  background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                conta
+              </em>
+            </h2>
+          </div>
 
-                {/* Tabs Empresa/Analista */}
-                <div className="mt-6">
+          <div className="mt-8 flex justify-center">
+            <div className="w-full max-w-[520px]">
+              <div
+                className="glass overflow-hidden rounded-[24px] px-9 py-9"
+                style={{ color: "var(--text-soft)" }}
+              >
+                <div className="relative z-[1]">
+                  {/* Tabs Empresa/Analista */}
                   <div
                     className="mb-2.5 flex items-center justify-between text-[11px] font-bold uppercase"
                     style={{ letterSpacing: "0.22em" }}
@@ -215,70 +302,70 @@ export default function LoginPage() {
                       onClick={() => setTipoEscolhido("ANALISTA")}
                     />
                   </div>
-                </div>
 
-                <div className="mt-6">
-                  {tipoEscolhido === null ? (
-                    <div
-                      className="rounded-2xl px-5 py-5 text-center"
-                      style={{
-                        background: "rgba(255,255,255,0.4)",
-                        border: "1px dashed var(--hairline)",
-                      }}
-                    >
-                      <p className="text-[13px] font-semibold" style={{ color: "var(--text-soft)" }}>
-                        Escolha acima o tipo de conta pra continuar.
-                      </p>
-                      <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: "var(--text-mute)" }}>
-                        <strong style={{ color: "var(--text-soft)" }}>Empresa</strong> usa o sistema pra gerir contratos · <strong style={{ color: "var(--text-soft)" }}>Analista</strong> indica clientes e ganha comissão.
-                      </p>
-                    </div>
-                  ) : (
-                    <form action={formAction} className="grid grid-cols-1 gap-5">
-                      <input type="hidden" name="tipo" value={tipoEscolhido} />
-                      <Field label="E-mail" name="email" type="email" autoComplete="email" required span={4} />
-                      <Field label="Senha" name="senha" type="password" autoComplete="current-password" required span={4} />
-
-                      {state?.erro && (
-                        <div
-                          className="rounded-2xl px-4 py-3 text-sm"
-                          style={{
-                            background: "rgba(232,138,152,0.14)",
-                            border: "0.5px solid rgba(198,103,112,0.5)",
-                            color: "var(--coral-deep)",
-                          }}
-                        >
-                          {state.erro}
-                        </div>
-                      )}
-
-                      <div className="mt-1">
-                        <SubmitButton>
-                          Entrar como {tipoEscolhido === "EMPRESA" ? "Empresa" : "Analista"}
-                        </SubmitButton>
+                  <div className="mt-6">
+                    {tipoEscolhido === null ? (
+                      <div
+                        className="rounded-2xl px-5 py-5 text-center"
+                        style={{
+                          background: "rgba(255,255,255,0.4)",
+                          border: "1px dashed var(--hairline)",
+                        }}
+                      >
+                        <p className="text-[13px] font-semibold" style={{ color: "var(--text-soft)" }}>
+                          Escolha acima o tipo de conta pra continuar.
+                        </p>
+                        <p className="mt-2 text-[11.5px] leading-relaxed" style={{ color: "var(--text-mute)" }}>
+                          <strong style={{ color: "var(--text-soft)" }}>Empresa</strong> usa o sistema pra gerir contratos · <strong style={{ color: "var(--text-soft)" }}>Analista</strong> indica clientes e ganha comissão.
+                        </p>
                       </div>
-                    </form>
-                  )}
-                </div>
+                    ) : (
+                      <form action={formAction} className="grid grid-cols-1 gap-5">
+                        <input type="hidden" name="tipo" value={tipoEscolhido} />
+                        <Field label="E-mail" name="email" type="email" autoComplete="email" required span={4} />
+                        <Field label="Senha" name="senha" type="password" autoComplete="current-password" required span={4} />
 
-                <div className="mt-7">
-                  <p className="text-center text-[13px]" style={{ color: "var(--text-mute)" }}>
-                    Não tem conta?{" "}
-                    <Link
-                      href={`/signup${tipoEscolhido ? `?tipo=${tipoEscolhido}` : ""}`}
-                      className="font-bold transition hover:opacity-80"
-                      style={{ color: "var(--primary-deep)" }}
+                        {state?.erro && (
+                          <div
+                            className="rounded-2xl px-4 py-3 text-sm"
+                            style={{
+                              background: "rgba(232,138,152,0.14)",
+                              border: "0.5px solid rgba(198,103,112,0.5)",
+                              color: "var(--coral-deep)",
+                            }}
+                          >
+                            {state.erro}
+                          </div>
+                        )}
+
+                        <div className="mt-1">
+                          <SubmitButton>
+                            Entrar como {tipoEscolhido === "EMPRESA" ? "Empresa" : "Analista"}
+                          </SubmitButton>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+
+                  <div className="mt-7">
+                    <p className="text-center text-[13px]" style={{ color: "var(--text-mute)" }}>
+                      Não tem conta?{" "}
+                      <Link
+                        href={`/signup${tipoEscolhido ? `?tipo=${tipoEscolhido}` : ""}`}
+                        className="font-bold transition hover:opacity-80"
+                        style={{ color: "var(--primary-deep)" }}
+                      >
+                        Criar conta {tipoEscolhido === "EMPRESA" ? "de empresa" : tipoEscolhido === "ANALISTA" ? "de analista" : "agora"}
+                      </Link>
+                    </p>
+                    <div
+                      className="mt-5 flex items-center justify-center gap-3 text-[10px] uppercase"
+                      style={{ letterSpacing: "0.3em", color: "var(--text-faint)" }}
                     >
-                      Criar conta {tipoEscolhido === "EMPRESA" ? "de empresa" : tipoEscolhido === "ANALISTA" ? "de analista" : "agora"}
-                    </Link>
-                  </p>
-                  <div
-                    className="mt-5 flex items-center justify-center gap-3 text-[10px] uppercase"
-                    style={{ letterSpacing: "0.3em", color: "var(--text-faint)" }}
-                  >
-                    <span className="h-px w-8" style={{ background: "var(--hairline)" }} />
-                    <span>Conexão segura · LGPD</span>
-                    <span className="h-px w-8" style={{ background: "var(--hairline)" }} />
+                      <span className="h-px w-8" style={{ background: "var(--hairline)" }} />
+                      <span>Conexão segura · LGPD</span>
+                      <span className="h-px w-8" style={{ background: "var(--hairline)" }} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -286,13 +373,66 @@ export default function LoginPage() {
           </div>
         </section>
 
-        {/* ======================= SEÇÃO 4 — FEATURES ======================= */}
-        <section className="mt-20">
-          <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-4">
-            <FeatureCard icon={BellRing} titulo="Controle de prazos" descricao="Alerta antes de cada vencimento: entrega, NF, pagamento, reajuste, fim de vigência." />
-            <FeatureCard icon={FileCheck2} titulo="Controle financeiro" descricao="Pago, a receber e saldos por vigência em tempo real." />
-            <FeatureCard icon={ShieldCheck} titulo="Fiscalização completa" descricao="Garantias, aditivos, apostilamentos e procedimentos com trilha auditável." />
-            <FeatureCard icon={Brain} titulo="IA jurídica nativa" descricao="Lê PDFs, calcula reajustes, responde dúvidas em qualquer legislação." />
+        {/* ============== SEÇÃO 5 — "SE INTERESSOU" CTA FINAL ============== */}
+        <section className="mt-24">
+          <div
+            className="glass overflow-hidden rounded-[28px] px-10 py-12 text-center lg:px-14 lg:py-14"
+            style={{ color: "var(--text)" }}
+          >
+            <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.34em" }}>
+              Pronto pra começar?
+            </span>
+            <h2
+              className="mx-auto mt-4 max-w-[760px] text-[28px] font-extrabold leading-tight lg:text-[36px]"
+              style={{ letterSpacing: "-0.025em" }}
+            >
+              Se interessou e quer ter o{" "}
+              <em
+                style={{
+                  fontStyle: "normal",
+                  background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                CP System
+              </em>{" "}
+              na sua empresa?
+            </h2>
+            <p
+              className="mx-auto mt-4 max-w-[560px] text-[15px] leading-relaxed lg:text-[16px]"
+              style={{ color: "var(--text-soft)" }}
+            >
+              Teste 14 dias grátis, sem cartão de crédito. Configuração assistida e suporte humano via WhatsApp.
+            </p>
+            <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link
+                href="/signup"
+                className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition hover:scale-[1.02]"
+                style={{
+                  background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+                  color: "#0A0A0A",
+                  letterSpacing: "0.2em",
+                  boxShadow: "0 12px 32px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
+                }}
+              >
+                Solicite demonstração
+                <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
+              </Link>
+              <Link
+                href="/precos"
+                className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition"
+                style={{
+                  background: "rgba(255,255,255,0.7)",
+                  border: "0.5px solid var(--hairline)",
+                  color: "var(--text)",
+                  letterSpacing: "0.2em",
+                }}
+              >
+                Ver planos
+              </Link>
+            </div>
           </div>
         </section>
       </main>
@@ -329,6 +469,40 @@ export default function LoginPage() {
 }
 
 // ===========================================================
+// MINI-STAT (4 blocos compactos abaixo do texto institucional)
+// ===========================================================
+function StatBlock({ numero, label }: { numero: string; label: string }) {
+  return (
+    <div
+      className="rounded-2xl px-3 py-3.5 text-center"
+      style={{
+        background: "rgba(255,255,255,0.7)",
+        border: "0.5px solid var(--hairline)",
+      }}
+    >
+      <div
+        className="text-[24px] font-extrabold leading-none"
+        style={{
+          background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          letterSpacing: "-0.03em",
+        }}
+      >
+        {numero}
+      </div>
+      <div
+        className="mt-1.5 text-[10px] font-bold uppercase leading-tight"
+        style={{ color: "var(--text-mute)", letterSpacing: "0.16em" }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+// ===========================================================
 // TAB Empresa/Analista
 // ===========================================================
 function TabTipo({
@@ -359,8 +533,7 @@ function TabTipo({
               background:
                 "linear-gradient(135deg, rgba(212,175,55,0.34) 0%, rgba(212,175,55,0.10) 100%), rgba(255,255,255,0.55)",
               border: "1.5px solid rgba(168,137,71,0.7)",
-              boxShadow:
-                "0 0 24px rgba(212,175,55,0.30), inset 0 1px 0 rgba(255,255,255,0.65)",
+              boxShadow: "0 0 24px rgba(212,175,55,0.30), inset 0 1px 0 rgba(255,255,255,0.65)",
               color: "var(--text)",
             }
           : {
@@ -392,9 +565,7 @@ function TabTipo({
 }
 
 // ===========================================================
-// VÍDEO INSTITUCIONAL — moldura em L envolvendo SÓ o vídeo
-// (não a coluna). Vídeo com aspect-ratio 16:10, full width na
-// coluna. Moldura recua ~12px nos cantos pra dar respiro.
+// VÍDEO INSTITUCIONAL
 // ===========================================================
 function VideoPlayerInstitucional({
   aberto,
@@ -405,7 +576,7 @@ function VideoPlayerInstitucional({
 }) {
   return (
     <div className="relative w-full">
-      {/* Moldura em L — 4 cantos decorativos dourados envolvendo o vídeo */}
+      {/* Moldura em L envolvendo o vídeo */}
       <span aria-hidden className="absolute -left-3 -top-3 h-14 w-14 rounded-tl-2xl"
         style={{ borderTop: "2px solid var(--primary)", borderLeft: "2px solid var(--primary)" }} />
       <span aria-hidden className="absolute -right-3 -top-3 h-14 w-14 rounded-tr-2xl"
@@ -415,7 +586,6 @@ function VideoPlayerInstitucional({
       <span aria-hidden className="absolute -bottom-3 -right-3 h-14 w-14 rounded-br-2xl"
         style={{ borderBottom: "2px solid var(--primary)", borderRight: "2px solid var(--primary)" }} />
 
-      {/* Player com aspect 16:10 — mais alto que 16:9 pra bater com o texto */}
       <div
         className="glass relative w-full overflow-hidden rounded-[20px]"
         style={{ aspectRatio: "16 / 10" }}
@@ -511,22 +681,22 @@ function FeatureCard({
 }) {
   return (
     <div
-      className="glass-tile flex flex-col rounded-[18px] px-5 py-5 transition-transform hover:translate-y-[-2px]"
+      className="glass-tile flex flex-col rounded-[20px] px-6 py-7 transition-transform hover:translate-y-[-2px]"
       style={{ color: "var(--text)" }}
     >
       <span
-        className="flex h-11 w-11 items-center justify-center rounded-xl"
+        className="flex h-12 w-12 items-center justify-center rounded-2xl"
         style={{
           background: "linear-gradient(135deg, rgba(212,175,55,0.30), rgba(212,175,55,0.08))",
           border: "0.5px solid rgba(168,137,71,0.32)",
         }}
       >
-        <Icone className="h-5 w-5" style={{ color: "var(--primary-deep)" }} strokeWidth={1.7} />
+        <Icone className="h-6 w-6" style={{ color: "var(--primary-deep)" }} strokeWidth={1.7} />
       </span>
-      <h4 className="mt-3.5 text-[14px] font-bold leading-tight" style={{ letterSpacing: "-0.015em" }}>
+      <h4 className="mt-4 text-[16px] font-bold leading-tight" style={{ letterSpacing: "-0.015em" }}>
         {titulo}
       </h4>
-      <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "var(--text-soft)" }}>
+      <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--text-soft)" }}>
         {descricao}
       </p>
     </div>
