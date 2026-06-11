@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import { Building2, UserCheck } from "lucide-react";
+import {
+  Building2,
+  UserCheck,
+  Play,
+  ShieldCheck,
+  BellRing,
+  Brain,
+  FileCheck2,
+} from "lucide-react";
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
 import { loginAction } from "@/app/actions/auth";
@@ -11,10 +19,11 @@ import { Logo } from "@/components/Logo";
 export default function LoginPage() {
   const [state, formAction] = useActionState(loginAction, null);
   const [tipoEscolhido, setTipoEscolhido] = useState<"EMPRESA" | "ANALISTA">("EMPRESA");
+  const [videoAberto, setVideoAberto] = useState(false);
 
   return (
     <div className="auth-shell relative min-h-screen overflow-hidden">
-      {/* Background atmosférico clean — mesma família do app interno */}
+      {/* Background atmosférico — mesma família do app interno (creme/dourado/glass) */}
       <div
         aria-hidden
         className="fixed inset-0 z-0 pointer-events-none"
@@ -27,14 +36,16 @@ export default function LoginPage() {
         }}
       />
 
-      {/* Conteúdo — desktop 2 colunas (brand statement + card), mobile stack */}
-      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1200px] flex-col items-center justify-center gap-12 px-6 py-12 lg:flex-row lg:items-center lg:gap-16 lg:px-10">
-        {/* Coluna esquerda — brand statement (desktop) — totalmente centralizado */}
-        <aside className="hidden flex-col items-center text-center lg:flex lg:flex-1 lg:max-w-[480px]">
+      {/* Conteúdo */}
+      <div className="relative z-[1] mx-auto flex min-h-screen w-full max-w-[1280px] flex-col items-center justify-center gap-10 px-6 py-12 lg:flex-row lg:items-center lg:gap-14 lg:px-10">
+        {/* Coluna esquerda — brand + vídeo + features */}
+        <section className="flex w-full flex-col items-center text-center lg:flex-1 lg:max-w-[600px] lg:items-start lg:text-left">
+          {/* Logo */}
           <Logo variant="xl" mode="brand" priority />
 
+          {/* Brand statement curto */}
           <p
-            className="mx-auto mt-12 max-w-[400px] text-[18px] leading-relaxed"
+            className="mt-7 max-w-[520px] text-[18px] leading-relaxed lg:text-[20px]"
             style={{ color: "var(--text-soft)", letterSpacing: "-0.005em", fontWeight: 400 }}
           >
             Plataforma{" "}
@@ -50,29 +61,42 @@ export default function LoginPage() {
             >
               premium
             </em>{" "}
-            de gestão de contratos para empresas que vendem ao governo.
+            de gestão pós-licitação para empresas que vendem ao governo — Lei 14.133, fiscalização auditável e IA jurídica embutida.
           </p>
 
-          <div
-            className="mx-auto mt-10 h-px w-[140px]"
-            style={{ background: "linear-gradient(90deg, transparent, var(--primary-deep), transparent)" }}
-          />
+          {/* PLAYER DE VÍDEO TUTORIAL — glass card com aspect 16:9 */}
+          <div className="mt-9 w-full max-w-[560px]">
+            <div className="mb-3 flex items-center gap-2">
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ background: "var(--primary)" }}
+              />
+              <span
+                className="text-[11px] font-bold uppercase"
+                style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}
+              >
+                Conheça em 2 minutos
+              </span>
+            </div>
+            <VideoPlayerTutorial aberto={videoAberto} onAbrir={() => setVideoAberto(true)} />
+          </div>
 
-          <p
-            className="mt-5 text-[11px] font-bold uppercase"
-            style={{ color: "var(--primary-deep)", letterSpacing: "0.4em" }}
-          >
-            Contratos Públicos
-          </p>
-        </aside>
+          {/* Features inline — 4 mini-cards glass */}
+          <div className="mt-8 grid w-full max-w-[560px] grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <FeatureMini icon={ShieldCheck} titulo="LGPD" sub="Auditável" />
+            <FeatureMini icon={BellRing} titulo="Prazos" sub="Alerta antes" />
+            <FeatureMini icon={Brain} titulo="IA jurídica" sub="14.133 nativo" />
+            <FeatureMini icon={FileCheck2} titulo="Trilha" sub="Histórico total" />
+          </div>
+        </section>
 
-        {/* Coluna direita — card de login (mantém o que foi aprovado) */}
-        <div
+        {/* Coluna direita — card de login glass (mantém funcional) */}
+        <aside
           className="glass w-full max-w-[460px] overflow-hidden rounded-[28px] px-9 py-10 lg:flex-shrink-0"
           style={{ color: "var(--text-soft)" }}
         >
           <div className="relative z-[1]">
-            {/* Logo — só no mobile (no desktop fica na coluna esquerda) */}
+            {/* Logo só no mobile */}
             <div className="flex justify-center lg:hidden">
               <Logo variant="md" mode="brand" priority />
             </div>
@@ -114,7 +138,8 @@ export default function LoginPage() {
                         background:
                           "linear-gradient(135deg, rgba(212,175,55,0.32), rgba(212,175,55,0.10)), rgba(255,255,255,0.5)",
                         border: "0.5px solid rgba(168,137,71,0.5)",
-                        boxShadow: "0 0 18px rgba(212,175,55,0.20), inset 0 1px 0 rgba(255,255,255,0.6)",
+                        boxShadow:
+                          "0 0 18px rgba(212,175,55,0.20), inset 0 1px 0 rgba(255,255,255,0.6)",
                         color: "var(--text)",
                       }
                     : {
@@ -144,7 +169,8 @@ export default function LoginPage() {
                         background:
                           "linear-gradient(135deg, rgba(212,175,55,0.32), rgba(212,175,55,0.10)), rgba(255,255,255,0.5)",
                         border: "0.5px solid rgba(168,137,71,0.5)",
-                        boxShadow: "0 0 18px rgba(212,175,55,0.20), inset 0 1px 0 rgba(255,255,255,0.6)",
+                        boxShadow:
+                          "0 0 18px rgba(212,175,55,0.20), inset 0 1px 0 rgba(255,255,255,0.6)",
                         color: "var(--text)",
                       }
                     : {
@@ -230,7 +256,7 @@ export default function LoginPage() {
               <span className="h-px w-8" style={{ background: "var(--hairline)" }} />
             </div>
           </div>
-        </div>
+        </aside>
       </div>
 
       {/* Inputs e botões precisam herdar paleta dark mesmo fora de .app-shell */}
@@ -251,6 +277,162 @@ export default function LoginPage() {
           box-shadow: 0 0 0 3px var(--primary-glow);
         }
       `}</style>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------
+// Player de vídeo tutorial — placeholder elegante até a Regina
+// gravar o MP4 oficial. Quando o arquivo existir, basta trocar
+// o conteúdo do bloco `aberto` por uma tag <video> apontando pra
+// /videos/tutorial-login.mp4 (ou iframe do YouTube).
+// -----------------------------------------------------------
+function VideoPlayerTutorial({
+  aberto,
+  onAbrir,
+}: {
+  aberto: boolean;
+  onAbrir: () => void;
+}) {
+  return (
+    <div
+      className="glass-tile relative overflow-hidden rounded-[24px]"
+      style={{ aspectRatio: "16 / 9" }}
+    >
+      {/* Fundo decorativo — gradiente dourado + pattern sutil mesmo do auth-shell */}
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 480px 320px at 30% 35%, rgba(212,175,55,0.22), transparent 60%), radial-gradient(ellipse 380px 260px at 75% 70%, rgba(197,180,255,0.18), transparent 60%), linear-gradient(135deg, rgba(255,254,249,0.7), rgba(245,239,221,0.85))",
+        }}
+      />
+
+      {/* Mock do dashboard atrás do play — só pra dar densidade visual */}
+      <div
+        aria-hidden
+        className="absolute inset-0 flex items-center justify-center opacity-40"
+      >
+        <svg width="80%" height="60%" viewBox="0 0 400 200" fill="none">
+          <rect x="0" y="0" width="120" height="80" rx="10" fill="rgba(212,175,55,0.18)" />
+          <rect x="140" y="0" width="120" height="80" rx="10" fill="rgba(94,168,159,0.18)" />
+          <rect x="280" y="0" width="120" height="80" rx="10" fill="rgba(197,180,255,0.20)" />
+          <rect x="0" y="100" width="400" height="100" rx="12" fill="rgba(255,255,255,0.5)" />
+          <path
+            d="M10 180 Q 60 130 100 150 T 200 140 T 300 110 T 390 130"
+            stroke="rgba(168,137,71,0.55)"
+            strokeWidth="2.5"
+            fill="none"
+            strokeLinecap="round"
+          />
+        </svg>
+      </div>
+
+      {/* Estado fechado: botão de play + label */}
+      {!aberto && (
+        <button
+          type="button"
+          onClick={onAbrir}
+          className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-4 transition hover:scale-[1.01]"
+          aria-label="Assistir vídeo tutorial"
+        >
+          {/* Anel dourado pulsante atrás do play */}
+          <span
+            aria-hidden
+            className="absolute h-[110px] w-[110px] rounded-full"
+            style={{
+              background:
+                "radial-gradient(circle, rgba(212,175,55,0.32) 0%, rgba(212,175,55,0) 70%)",
+            }}
+          />
+          <span
+            className="relative flex h-[78px] w-[78px] items-center justify-center rounded-full"
+            style={{
+              background:
+                "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+              boxShadow:
+                "0 12px 32px -6px rgba(168,137,71,0.55), inset 0 1px 0 rgba(255,255,255,0.5)",
+            }}
+          >
+            <Play
+              className="h-9 w-9 translate-x-[2px]"
+              style={{ color: "#FFFEF9", fill: "#FFFEF9" }}
+              strokeWidth={2.2}
+            />
+          </span>
+          <span
+            className="relative text-[14px] font-bold"
+            style={{ color: "var(--text)", letterSpacing: "-0.01em" }}
+          >
+            Tour guiado pelo sistema
+          </span>
+          <span
+            className="relative text-[11px] uppercase"
+            style={{ color: "var(--text-mute)", letterSpacing: "0.24em" }}
+          >
+            Vídeo de 2 min · sem cadastro
+          </span>
+        </button>
+      )}
+
+      {/* Estado aberto: placeholder do player. Substituir por <video> ou iframe quando o MP4 estiver pronto. */}
+      {aberto && (
+        <div
+          className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3"
+          style={{ background: "rgba(15,14,12,0.92)" }}
+        >
+          <span
+            className="text-[12px] font-bold uppercase"
+            style={{ color: "var(--primary)", letterSpacing: "0.28em" }}
+          >
+            Em produção
+          </span>
+          <span
+            className="max-w-[320px] text-center text-[13px]"
+            style={{ color: "rgba(255,254,249,0.78)" }}
+          >
+            O vídeo tutorial está sendo finalizado. Assim que ficar pronto, ele toca direto aqui.
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// -----------------------------------------------------------
+// Mini-card de feature (4 abaixo do player)
+// -----------------------------------------------------------
+function FeatureMini({
+  icon: Icone,
+  titulo,
+  sub,
+}: {
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties; strokeWidth?: number }>;
+  titulo: string;
+  sub: string;
+}) {
+  return (
+    <div
+      className="glass-tile rounded-[14px] px-3 py-3"
+      style={{ color: "var(--text)" }}
+    >
+      <div className="flex items-center gap-2">
+        <Icone
+          className="h-[18px] w-[18px] shrink-0"
+          style={{ color: "var(--primary-deep)" }}
+          strokeWidth={1.8}
+        />
+        <span className="text-[12px] font-bold leading-tight" style={{ letterSpacing: "-0.01em" }}>
+          {titulo}
+        </span>
+      </div>
+      <p
+        className="mt-1 text-[10.5px] leading-tight"
+        style={{ color: "var(--text-mute)" }}
+      >
+        {sub}
+      </p>
     </div>
   );
 }
