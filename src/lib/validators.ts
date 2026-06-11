@@ -71,6 +71,13 @@ export const signupSchema = z
 export const loginSchema = z.object({
   email: z.string().email("E-mail inválido"),
   senha: z.string().min(1, "Senha obrigatória"),
+  // Tipo de conta escolhido no toggle do form. Quando presente, a action
+  // valida que bate com o tipo real da conta — evita o caso reportado
+  // pela Regina de logar como Empresa quando queria Analista (mesmo
+  // e-mail nas duas? Não — emails distintos, mas usuário esquecia de
+  // alternar e o sistema deixava entrar sem aviso). SuperAdmin é
+  // isento dessa checagem.
+  tipo: z.enum(["EMPRESA", "ANALISTA"]).optional(),
 });
 
 const cpfRegex = /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/;

@@ -288,6 +288,20 @@ export async function loginAction(_prev: ActionResult | null, formData: FormData
   const ok = await verificarSenha(parsed.data.senha, usuario.senhaHash);
   if (!ok) return { erro: "Credenciais inválidas." };
 
+  // Valida que o tipo escolhido no toggle bate com o tipo real da conta
+  // (Regina 10/06: caso comum de tentar logar no lado errado). SuperAdmin
+  // ignora — pra Regina/Igor poderem entrar mesmo na conta de testes.
+  if (
+    parsed.data.tipo &&
+    !usuario.superAdmin &&
+    parsed.data.tipo !== usuario.conta.tipo
+  ) {
+    const tipoCertoLabel = usuario.conta.tipo === "ANALISTA" ? "Analista" : "Empresa";
+    return {
+      erro: `Esse e-mail é de uma conta de ${tipoCertoLabel}. Volte e selecione "${tipoCertoLabel}" no topo do formulário.`,
+    };
+  }
+
   await criarSessao(usuario.id);
   // Redireciona pra rota inicial conforme o tipo da conta:
   // - SuperAdmin: visão de plataforma
