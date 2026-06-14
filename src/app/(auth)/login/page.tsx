@@ -6,11 +6,13 @@ import {
   Building2,
   UserCheck,
   Play,
-  ShieldCheck,
-  BellRing,
   Brain,
   FileCheck2,
   ArrowRight,
+  DollarSign,
+  Truck,
+  Users,
+  Briefcase,
 } from "lucide-react";
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -38,9 +40,23 @@ export default function LoginPage() {
       />
 
       {/* ======================= HEADER ======================= */}
+      {/* Logo dentro de uma "pilula" glass branca pra ganhar contraste sobre
+          o fundo dourado/creme atmosferico (Igor 14/06: marca sumia no canto). */}
       <header className="relative z-[3] w-full">
         <div className="mx-auto flex max-w-[1320px] items-center justify-between px-8 py-5">
-          <Logo variant="md" mode="brand" priority />
+          <div
+            className="inline-flex items-center rounded-2xl px-4 py-2"
+            style={{
+              background: "rgba(255,255,255,0.78)",
+              backdropFilter: "blur(20px) saturate(180%)",
+              WebkitBackdropFilter: "blur(20px) saturate(180%)",
+              border: "0.5px solid rgba(168,137,71,0.30)",
+              boxShadow:
+                "0 6px 20px -4px rgba(20,16,8,0.10), inset 0 1px 0 rgba(255,255,255,0.7)",
+            }}
+          >
+            <Logo variant="lg" mode="brand" priority />
+          </div>
           <nav className="hidden items-center gap-6 md:flex">
             <Link href="/" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Home
@@ -51,8 +67,8 @@ export default function LoginPage() {
             <Link href="/precos" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Planos
             </Link>
-            <Link href="/seja-embaixador" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
-              Embaixadores
+            <a href="#analistas" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
+              Para analistas
             </Link>
             <a
               href="#login"
@@ -90,10 +106,10 @@ export default function LoginPage() {
             Plataforma Premium
           </span>
           <h1
-            className="mx-auto mt-4 max-w-[920px] text-[36px] font-extrabold leading-[1.05] lg:text-[52px]"
+            className="mx-auto mt-4 max-w-[1000px] text-[36px] font-extrabold leading-[1.05] lg:text-[52px]"
             style={{ color: "var(--text)", letterSpacing: "-0.03em" }}
           >
-            Gestão e fiscalização de{" "}
+            Gestão e controle de{" "}
             <em
               style={{
                 fontStyle: "normal",
@@ -103,14 +119,14 @@ export default function LoginPage() {
                 WebkitTextFillColor: "transparent",
               }}
             >
-              contratos públicos
+              Contratos, Atas (SRP) e Empenhos
             </em>
           </h1>
           <p
-            className="mx-auto mt-5 max-w-[680px] text-[16px] leading-relaxed lg:text-[18px]"
+            className="mx-auto mt-5 max-w-[760px] text-[16px] leading-relaxed lg:text-[18px]"
             style={{ color: "var(--text-soft)", letterSpacing: "-0.005em" }}
           >
-            Reduza custos e riscos na gestão e fiscalização de contratos — atas, contratos, empenhos, reajustes e trilha auditável em qualquer legislação.
+            Assuma o controle total da sua execução pública: elimine gargalos operacionais e proteja o lucro de cada Contrato, Ata e Empenho.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
@@ -141,28 +157,33 @@ export default function LoginPage() {
           </div>
         </section>
 
-        {/* ============== SEÇÃO 2 — 4 CARDS DE FEATURES ============== */}
+        {/* ============== SEÇÃO 2 — 5 CARDS DE FEATURES ============== */}
         <section>
-          <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-5">
             <FeatureCard
-              icon={BellRing}
-              titulo="Controle de prazos"
-              descricao="Seja alertado sobre cada etapa: entrega, NF, pagamento, reajuste, fim de vigência."
+              icon={DollarSign}
+              titulo="Controle financeiro"
+              descricao="Valores contratados, executados, a executar, recebidos e a receber."
             />
             <FeatureCard
               icon={FileCheck2}
-              titulo="Controle financeiro"
-              descricao="Pagamentos efetuados, débitos, saldos por vigência em tempo real."
+              titulo="Controle de contratações"
+              descricao="Contratos, atas e empenhos vigentes, expirados, a expirar."
             />
             <FeatureCard
-              icon={ShieldCheck}
-              titulo="Fiscalização completa"
-              descricao="Acompanhe o cumprimento das cláusulas com trilha auditável de cada ato."
+              icon={Truck}
+              titulo="Controle logístico"
+              descricao="Esteira de entrega/execução com agenda, controle de prazos e alertas."
+            />
+            <FeatureCard
+              icon={Users}
+              titulo="Controle de clientes"
+              descricao="Órgãos atendidos, locais de entrega/execução."
             />
             <FeatureCard
               icon={Brain}
-              titulo="IA jurídica nativa"
-              descricao="Lê PDFs, calcula reajustes e responde dúvidas em qualquer legislação."
+              titulo="Inteligência jurídica nativa"
+              descricao="Alimentação de dados, cálculo de reajustes e tira-dúvidas."
             />
           </div>
         </section>
@@ -194,10 +215,10 @@ export default function LoginPage() {
                 ajuda na gestão dos seus contratos
               </h2>
               <p className="mt-5 text-[15px] leading-relaxed lg:text-[16px]" style={{ color: "var(--text-soft)" }}>
-                Ferramenta gerencial que conecta de forma inteligente a atuação dos setores e agentes envolvidos na execução contratual, disponibilizando informações fundamentais e melhorando as condições operacionais da gestão e da fiscalização.
+                Vencer a licitação é apenas o primeiro passo; o seu verdadeiro lucro é garantido na execução. O CP System substitui planilhas amadoras por um painel inteligente que centraliza toda a sua operação governamental. Acompanhe a linha do tempo de empenhos, controle o saldo das suas Atas (SRP) e contratos em tempo real e elimine a desorganização que gera atrasos e multas.
               </p>
               <p className="mt-3 text-[15px] leading-relaxed lg:text-[16px]" style={{ color: "var(--text-soft)" }}>
-                Permite gerir diversos contratos, das mais diferentes complexidades, organizando atribuições e registrando cada ato praticado em trilha auditável.
+                Mais do que gestão logística, nossa plataforma oferece inteligência jurídica nativa. O sistema audita automaticamente os limites legais de aditivos e adesões, avisa o momento exato para solicitar reajustes de preços e emite alertas de prazos parametrizados. Pare de perder dinheiro com falhas operacionais: assuma o controle com o CP System e foque apenas em expandir as suas vendas.
               </p>
 
               {/* Mini-stats horizontais (substituem números factuais ainda inexistentes) */}
@@ -228,6 +249,206 @@ export default function LoginPage() {
             {/* Coluna direita — vídeo */}
             <div className="flex items-center justify-center">
               <VideoPlayerInstitucional aberto={videoAberto} onAbrir={() => setVideoAberto(true)} />
+            </div>
+          </div>
+        </section>
+
+        {/* ============== SEÇÃO 3.5 — PARA O ANALISTA DE LICITAÇÃO ============== */}
+        {/* Lean Canvas item 5 (Canais): "Indicação e parcerias com ecossistemas
+            de analistas de licitação". Analista NAO eh cliente — eh canal de
+            aquisicao. Empresa contrata, analista indica, ganha comissao. */}
+        <section id="analistas" className="mt-20">
+          <div
+            className="glass overflow-hidden rounded-[28px] px-10 py-12 lg:px-14"
+            style={{ color: "var(--text)" }}
+          >
+            <div className="grid items-center gap-10 lg:grid-cols-[1.3fr_1fr] lg:gap-14">
+              <div>
+                <span
+                  className="text-[11px] font-bold uppercase"
+                  style={{ color: "var(--primary-deep)", letterSpacing: "0.34em" }}
+                >
+                  Para o analista de licitação
+                </span>
+                <h2
+                  className="mt-3 text-[28px] font-extrabold leading-[1.1] lg:text-[36px]"
+                  style={{ letterSpacing: "-0.025em" }}
+                >
+                  Módulo{" "}
+                  <em
+                    style={{
+                      fontStyle: "normal",
+                      background:
+                        "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                      WebkitBackgroundClip: "text",
+                      backgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}
+                  >
+                    exclusivo
+                  </em>{" "}
+                  para quem indica clientes
+                </h2>
+                <p
+                  className="mt-4 text-[15px] leading-relaxed lg:text-[16px]"
+                  style={{ color: "var(--text-soft)" }}
+                >
+                  Controle as execuções dos seus clientes e receba{" "}
+                  <strong style={{ color: "var(--text)" }}>comissões fixas e variáveis</strong>{" "}
+                  enquanto a empresa que você indicou for assinante do CP System. Você acompanha tudo num painel próprio, sem misturar com a operação interna do cliente.
+                </p>
+                <ul
+                  className="mt-5 space-y-2 text-[14px] leading-relaxed"
+                  style={{ color: "var(--text-soft)" }}
+                >
+                  <li className="flex items-start gap-2">
+                    <span
+                      className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: "var(--primary)" }}
+                    />
+                    Cadastre seus clientes empresariais e gere link de indicação único.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span
+                      className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: "var(--primary)" }}
+                    />
+                    Acompanhe as execuções de cada empresa cliente em painel separado.
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span
+                      className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ background: "var(--primary)" }}
+                    />
+                    Receba comissões recorrentes enquanto o cliente for ativo.
+                  </li>
+                </ul>
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href="/signup?tipo=ANALISTA"
+                    className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition hover:scale-[1.02]"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+                      color: "#0A0A0A",
+                      letterSpacing: "0.2em",
+                      boxShadow:
+                        "0 12px 32px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
+                    }}
+                  >
+                    Cadastrar como analista
+                    <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
+                  </Link>
+                  <Link
+                    href="/seja-embaixador"
+                    className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition"
+                    style={{
+                      background: "rgba(255,255,255,0.7)",
+                      border: "0.5px solid var(--hairline)",
+                      color: "var(--text)",
+                      letterSpacing: "0.2em",
+                    }}
+                  >
+                    Como funciona
+                  </Link>
+                </div>
+              </div>
+
+              {/* Mini "card de comissão" decorativo */}
+              <div
+                className="rounded-[22px] px-7 py-7 lg:px-9 lg:py-9"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.04))",
+                  border: "0.5px solid rgba(168,137,71,0.40)",
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+                      boxShadow:
+                        "0 8px 20px -4px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
+                    }}
+                  >
+                    <Briefcase
+                      className="h-5 w-5"
+                      style={{ color: "#FFFEF9" }}
+                      strokeWidth={2}
+                    />
+                  </span>
+                  <span
+                    className="text-[11px] font-bold uppercase"
+                    style={{ color: "var(--primary-deep)", letterSpacing: "0.28em" }}
+                  >
+                    Programa de Analistas
+                  </span>
+                </div>
+                <p
+                  className="mt-5 text-[13px] leading-relaxed"
+                  style={{ color: "var(--text-soft)" }}
+                >
+                  Indique uma empresa que vende ao governo. Quando ela assinar e te apontar como analista, você passa a receber comissão recorrente sobre a mensalidade dela, enquanto seguir ativa.
+                </p>
+                <div
+                  className="mt-5 grid grid-cols-2 gap-3 text-center"
+                >
+                  <div
+                    className="rounded-2xl px-3 py-3"
+                    style={{
+                      background: "rgba(255,255,255,0.65)",
+                      border: "0.5px solid var(--hairline)",
+                    }}
+                  >
+                    <div
+                      className="text-[20px] font-extrabold leading-none"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}
+                    >
+                      Fixa
+                    </div>
+                    <div
+                      className="mt-1.5 text-[10px] font-bold uppercase"
+                      style={{ color: "var(--text-mute)", letterSpacing: "0.16em" }}
+                    >
+                      Por indicação ativa
+                    </div>
+                  </div>
+                  <div
+                    className="rounded-2xl px-3 py-3"
+                    style={{
+                      background: "rgba(255,255,255,0.65)",
+                      border: "0.5px solid var(--hairline)",
+                    }}
+                  >
+                    <div
+                      className="text-[20px] font-extrabold leading-none"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}
+                    >
+                      Variável
+                    </div>
+                    <div
+                      className="mt-1.5 text-[10px] font-bold uppercase"
+                      style={{ color: "var(--text-mute)", letterSpacing: "0.16em" }}
+                    >
+                      % sobre o MRR
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
