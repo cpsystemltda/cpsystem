@@ -70,7 +70,7 @@ export default function HomeLandingClient() {
             </Link>
             <a href="#analistas" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Para analistas
-            </Link>
+            </a>
             <a
               href="#login"
               className="ml-2 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[12px] font-bold uppercase transition hover:opacity-90"
