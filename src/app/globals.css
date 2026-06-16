@@ -846,16 +846,34 @@ textarea:focus {
 /* Backgrounds inline com rgba branca alta (cards "branco quase solido") */
 .app-shell.theme-dark-premium [style*="rgba(255, 255, 255, 0.9"],
 .app-shell.theme-dark-premium [style*="rgba(255, 255, 255, 0.8"],
+.app-shell.theme-dark-premium [style*="rgba(255, 255, 255, 0.7"],
+.app-shell.theme-dark-premium [style*="rgba(255, 255, 255, 0.6"],
 .app-shell.theme-dark-premium [style*="rgba(255,255,255,0.9"],
-.app-shell.theme-dark-premium [style*="rgba(255,255,255,0.8"] {
+.app-shell.theme-dark-premium [style*="rgba(255,255,255,0.8"],
+.app-shell.theme-dark-premium [style*="rgba(255,255,255,0.7"],
+.app-shell.theme-dark-premium [style*="rgba(255,255,255,0.6"],
+.app-shell.theme-dark-premium [style*="background: white"],
+.app-shell.theme-dark-premium [style*="background:white"],
+.app-shell.theme-dark-premium [style*="background: #fff"],
+.app-shell.theme-dark-premium [style*="background:#fff"],
+.app-shell.theme-dark-premium [style*="background: #FFFFFF"],
+.app-shell.theme-dark-premium [style*="background:#FFFFFF"] {
   background: rgba(20, 28, 40, 0.85) !important;
 }
 
 /* Pastilhas/badges com bg-white/X (Tailwind alpha) */
-.app-shell.theme-dark-premium .bg-white\/80,
-.app-shell.theme-dark-premium .bg-white\/70,
+.app-shell.theme-dark-premium .bg-white\/10,
+.app-shell.theme-dark-premium .bg-white\/15,
+.app-shell.theme-dark-premium .bg-white\/20,
+.app-shell.theme-dark-premium .bg-white\/25,
+.app-shell.theme-dark-premium .bg-white\/30,
+.app-shell.theme-dark-premium .bg-white\/40,
+.app-shell.theme-dark-premium .bg-white\/50,
 .app-shell.theme-dark-premium .bg-white\/60,
-.app-shell.theme-dark-premium .bg-white\/50 {
+.app-shell.theme-dark-premium .bg-white\/70,
+.app-shell.theme-dark-premium .bg-white\/80,
+.app-shell.theme-dark-premium .bg-white\/90,
+.app-shell.theme-dark-premium .bg-white\/95 {
   background: rgba(20, 28, 40, 0.70) !important;
 }
 
