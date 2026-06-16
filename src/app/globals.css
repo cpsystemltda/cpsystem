@@ -693,3 +693,182 @@ textarea:focus {
   color: #FFFFFF !important;
   border: 1px solid rgba(212, 175, 55, 0.30) !important;
 }
+
+/* ============================================================
+   PENTE FINO — contraste de cards coloridos
+   Tonalidades .t-* tinham fundo claro com texto colorido (legivel
+   em light mode, ilegivel em dark). Override: fundo dark uniforme +
+   accent da cor preservado em borda/icone/numero.
+   ============================================================ */
+.app-shell.theme-dark-premium .t-primary,
+.app-shell.theme-dark-premium .t-mint,
+.app-shell.theme-dark-premium .t-rose,
+.app-shell.theme-dark-premium .t-lavender,
+.app-shell.theme-dark-premium .t-sky,
+.app-shell.theme-dark-premium .t-coral {
+  background: rgba(20, 28, 40, 0.82) !important;
+  color: #FFFFFF !important;
+}
+.app-shell.theme-dark-premium .t-primary {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(212, 175, 55, 0.55),
+    0 8px 24px -8px rgba(212, 175, 55, 0.30) !important;
+}
+.app-shell.theme-dark-premium .t-mint {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(93, 216, 182, 0.55),
+    0 8px 24px -8px rgba(93, 216, 182, 0.25) !important;
+}
+.app-shell.theme-dark-premium .t-rose {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(240, 184, 168, 0.55),
+    0 8px 24px -8px rgba(240, 184, 168, 0.25) !important;
+}
+.app-shell.theme-dark-premium .t-lavender {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(197, 180, 255, 0.55),
+    0 8px 24px -8px rgba(197, 180, 255, 0.25) !important;
+}
+.app-shell.theme-dark-premium .t-sky {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(184, 197, 214, 0.55),
+    0 8px 24px -8px rgba(184, 197, 214, 0.25) !important;
+}
+.app-shell.theme-dark-premium .t-coral {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(232, 138, 152, 0.55),
+    0 8px 24px -8px rgba(232, 138, 152, 0.30) !important;
+}
+
+/* Aura ja existe em .kpi-aura — abaixa opacidade pra nao saturar o card dark */
+.app-shell.theme-dark-premium .kpi-aura { opacity: 0.45; }
+
+/* Tailwind bg-*-50/100/200 (cards de alerta como 30/60/90 dias):
+   ficavam claros com texto branco ilegivel. Agora: fundo dark com tinta da cor. */
+.app-shell.theme-dark-premium [class*="bg-rose-50"],
+.app-shell.theme-dark-premium [class*="bg-rose-100"],
+.app-shell.theme-dark-premium [class*="bg-red-50"],
+.app-shell.theme-dark-premium [class*="bg-red-100"],
+.app-shell.theme-dark-premium [class*="bg-pink-50"],
+.app-shell.theme-dark-premium [class*="bg-pink-100"] {
+  background: rgba(232, 138, 152, 0.12) !important;
+}
+.app-shell.theme-dark-premium [class*="bg-emerald-50"],
+.app-shell.theme-dark-premium [class*="bg-emerald-100"],
+.app-shell.theme-dark-premium [class*="bg-green-50"],
+.app-shell.theme-dark-premium [class*="bg-green-100"],
+.app-shell.theme-dark-premium [class*="bg-teal-50"],
+.app-shell.theme-dark-premium [class*="bg-teal-100"] {
+  background: rgba(93, 216, 182, 0.12) !important;
+}
+.app-shell.theme-dark-premium [class*="bg-blue-50"],
+.app-shell.theme-dark-premium [class*="bg-blue-100"],
+.app-shell.theme-dark-premium [class*="bg-sky-50"],
+.app-shell.theme-dark-premium [class*="bg-sky-100"],
+.app-shell.theme-dark-premium [class*="bg-indigo-50"],
+.app-shell.theme-dark-premium [class*="bg-indigo-100"] {
+  background: rgba(184, 197, 214, 0.12) !important;
+}
+.app-shell.theme-dark-premium [class*="bg-purple-50"],
+.app-shell.theme-dark-premium [class*="bg-purple-100"],
+.app-shell.theme-dark-premium [class*="bg-violet-50"],
+.app-shell.theme-dark-premium [class*="bg-violet-100"],
+.app-shell.theme-dark-premium [class*="bg-fuchsia-50"],
+.app-shell.theme-dark-premium [class*="bg-fuchsia-100"] {
+  background: rgba(197, 180, 255, 0.12) !important;
+}
+/* Amber/Yellow/Orange ja cobertos antes — reforco com !important */
+.app-shell.theme-dark-premium [class*="bg-amber-50"],
+.app-shell.theme-dark-premium [class*="bg-amber-100"],
+.app-shell.theme-dark-premium [class*="bg-yellow-50"],
+.app-shell.theme-dark-premium [class*="bg-yellow-100"],
+.app-shell.theme-dark-premium [class*="bg-orange-50"],
+.app-shell.theme-dark-premium [class*="bg-orange-100"] {
+  background: rgba(244, 211, 116, 0.14) !important;
+}
+
+/* Textos coloridos com tom escuro (-700, -800, -900) eram legiveis sobre fundo
+   claro. Em dark precisam clarear pra continuar legiveis. */
+.app-shell.theme-dark-premium [class*="text-red-700"],
+.app-shell.theme-dark-premium [class*="text-red-800"],
+.app-shell.theme-dark-premium [class*="text-red-900"],
+.app-shell.theme-dark-premium [class*="text-rose-700"],
+.app-shell.theme-dark-premium [class*="text-rose-800"],
+.app-shell.theme-dark-premium [class*="text-rose-900"] {
+  color: #F0A8B3 !important;
+}
+.app-shell.theme-dark-premium [class*="text-emerald-700"],
+.app-shell.theme-dark-premium [class*="text-emerald-800"],
+.app-shell.theme-dark-premium [class*="text-emerald-900"],
+.app-shell.theme-dark-premium [class*="text-green-700"],
+.app-shell.theme-dark-premium [class*="text-green-800"],
+.app-shell.theme-dark-premium [class*="text-green-900"],
+.app-shell.theme-dark-premium [class*="text-teal-700"],
+.app-shell.theme-dark-premium [class*="text-teal-800"] {
+  color: #7FE8C9 !important;
+}
+.app-shell.theme-dark-premium [class*="text-amber-700"],
+.app-shell.theme-dark-premium [class*="text-amber-800"],
+.app-shell.theme-dark-premium [class*="text-amber-900"],
+.app-shell.theme-dark-premium [class*="text-yellow-700"],
+.app-shell.theme-dark-premium [class*="text-yellow-800"],
+.app-shell.theme-dark-premium [class*="text-yellow-900"],
+.app-shell.theme-dark-premium [class*="text-orange-700"],
+.app-shell.theme-dark-premium [class*="text-orange-800"],
+.app-shell.theme-dark-premium [class*="text-orange-900"] {
+  color: #F4D374 !important;
+}
+.app-shell.theme-dark-premium [class*="text-blue-700"],
+.app-shell.theme-dark-premium [class*="text-blue-800"],
+.app-shell.theme-dark-premium [class*="text-blue-900"],
+.app-shell.theme-dark-premium [class*="text-indigo-700"],
+.app-shell.theme-dark-premium [class*="text-indigo-800"],
+.app-shell.theme-dark-premium [class*="text-indigo-900"],
+.app-shell.theme-dark-premium [class*="text-sky-700"],
+.app-shell.theme-dark-premium [class*="text-sky-800"] {
+  color: #D4DDE8 !important;
+}
+.app-shell.theme-dark-premium [class*="text-purple-700"],
+.app-shell.theme-dark-premium [class*="text-purple-800"],
+.app-shell.theme-dark-premium [class*="text-purple-900"],
+.app-shell.theme-dark-premium [class*="text-violet-700"],
+.app-shell.theme-dark-premium [class*="text-violet-800"],
+.app-shell.theme-dark-premium [class*="text-violet-900"] {
+  color: #C5B4FF !important;
+}
+
+/* Backgrounds inline com rgba branca alta (cards "branco quase solido") */
+.app-shell.theme-dark-premium [style*="rgba(255, 255, 255, 0.9"],
+.app-shell.theme-dark-premium [style*="rgba(255, 255, 255, 0.8"],
+.app-shell.theme-dark-premium [style*="rgba(255,255,255,0.9"],
+.app-shell.theme-dark-premium [style*="rgba(255,255,255,0.8"] {
+  background: rgba(20, 28, 40, 0.85) !important;
+}
+
+/* Pastilhas/badges com bg-white/X (Tailwind alpha) */
+.app-shell.theme-dark-premium .bg-white\/80,
+.app-shell.theme-dark-premium .bg-white\/70,
+.app-shell.theme-dark-premium .bg-white\/60,
+.app-shell.theme-dark-premium .bg-white\/50 {
+  background: rgba(20, 28, 40, 0.70) !important;
+}
+
+/* Tipografia: text-black + classes Tailwind sem variacao explicita */
+.app-shell.theme-dark-premium .text-black { color: #FFFFFF !important; }
+
+/* Botão secundário — fundo dark com borda dourada */
+.app-shell.theme-dark-premium .btn-secondary {
+  background: rgba(20, 28, 40, 0.70);
+  border: 0.5px solid rgba(212, 175, 55, 0.30);
+  color: rgba(255, 255, 255, 0.92);
+}
+.app-shell.theme-dark-premium .btn-secondary:hover {
+  background: rgba(20, 28, 40, 0.85);
+  border-color: rgba(212, 175, 55, 0.55);
+}
