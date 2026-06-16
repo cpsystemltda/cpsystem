@@ -506,3 +506,70 @@ textarea:focus {
   box-shadow: 0 24px 64px rgba(20,16,8,0.14), inset 0 1px 0 rgba(255,255,255,0.6);
   border: 0.5px solid var(--hairline);
 }
+
+/* ============================================================
+   THEME DARK PREMIUM (Regina 16/06)
+   Aplicado em .theme-dark-premium — override de vars CSS pra
+   transformar o glass system em paleta preto+dourado premium.
+   Usado na home publica (HomeLandingClient).
+   ============================================================ */
+.theme-dark-premium {
+  --text:        #FFFFFF;
+  --text-soft:   rgba(255, 255, 255, 0.85);
+  --text-mute:   rgba(255, 255, 255, 0.62);
+  --text-faint:  rgba(255, 255, 255, 0.40);
+  --hairline:    rgba(212, 175, 55, 0.22);
+  --glass-1:     rgba(15, 22, 33, 0.55);
+  --glass-2:     rgba(15, 22, 33, 0.72);
+  --glass-3:     rgba(20, 28, 40, 0.85);
+  color: var(--text);
+}
+.theme-dark-premium .glass {
+  background: rgba(15, 22, 33, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(212, 175, 55, 0.22),
+    0 28px 72px -18px rgba(0, 0, 0, 0.55),
+    0 10px 28px -6px rgba(0, 0, 0, 0.40);
+}
+.theme-dark-premium .glass::before {
+  background: linear-gradient(135deg,
+    rgba(244, 211, 116, 0.28) 0%,
+    rgba(212, 175, 55, 0.14) 30%,
+    rgba(255, 255, 255, 0.04) 60%,
+    rgba(212, 175, 55, 0.12) 100%
+  );
+}
+.theme-dark-premium .glass-tile {
+  background: rgba(15, 22, 33, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(212, 175, 55, 0.22),
+    0 4px 14px rgba(0, 0, 0, 0.35),
+    0 16px 40px -10px rgba(0, 0, 0, 0.45);
+}
+.theme-dark-premium .glass-tile::before {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.26), rgba(212, 175, 55, 0.06));
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .theme-dark-premium .glass,
+  .theme-dark-premium .glass-tile { background: rgba(15, 22, 33, 0.92); }
+}
+/* Inputs em paleta dark */
+.theme-dark-premium input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="color"]):not([type="range"]),
+.theme-dark-premium select,
+.theme-dark-premium textarea {
+  background: rgba(255, 255, 255, 0.06);
+  color: #FFFFFF;
+  border: 1px solid rgba(212, 175, 55, 0.30);
+}
+.theme-dark-premium input::placeholder,
+.theme-dark-premium textarea::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+.theme-dark-premium input:focus,
+.theme-dark-premium select:focus,
+.theme-dark-premium textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.30) !important;
+}
