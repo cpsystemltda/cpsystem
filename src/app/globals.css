@@ -573,3 +573,123 @@ textarea:focus {
   border-color: var(--primary) !important;
   box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.30) !important;
 }
+
+/* ============================================================
+   THEME DARK PREMIUM — overrides quando combinado com .app-shell
+   Aplicado no /(app)/layout.tsx pra transformar o sistema inteiro
+   em paleta preto+dourado premium SEM mexer em cada componente
+   individualmente.
+   ============================================================ */
+.app-shell.theme-dark-premium {
+  background: #0C1019;
+  color: #FFFFFF;
+}
+.app-shell.theme-dark-premium .bg-image {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23F4D374' stroke-width='0.6' opacity='0.10'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.30), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(244, 211, 116, 0.18), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(168, 137, 71, 0.22), transparent 55%),
+    radial-gradient(ellipse 950px 750px at 78% 92%, rgba(232, 200, 117, 0.20), transparent 55%),
+    radial-gradient(ellipse 800px 600px at 50% 50%, rgba(212, 175, 55, 0.10), transparent 60%),
+    linear-gradient(135deg, #0C1019 0%, #1A1F2E 50%, #0C1019 100%);
+}
+.app-shell.theme-dark-premium .blob {
+  mix-blend-mode: screen;
+  filter: blur(180px);
+}
+.app-shell.theme-dark-premium .blob-1 { background: radial-gradient(circle, rgba(212, 175, 55, 0.45), transparent 70%); }
+.app-shell.theme-dark-premium .blob-2 { background: radial-gradient(circle, rgba(244, 211, 116, 0.32), transparent 70%); }
+.app-shell.theme-dark-premium .blob-3 { background: radial-gradient(circle, rgba(168, 137, 71, 0.40), transparent 70%); }
+.app-shell.theme-dark-premium .blob-4 { background: radial-gradient(circle, rgba(232, 200, 117, 0.28), transparent 70%); }
+.app-shell.theme-dark-premium .blob-5 { background: radial-gradient(circle, rgba(212, 175, 55, 0.22), transparent 70%); }
+.app-shell.theme-dark-premium .bg-blobs::after { opacity: 0.18; }
+
+/* Texto base do main em dark */
+.app-shell.theme-dark-premium main { color: rgba(255, 255, 255, 0.85); }
+
+/* Tailwind bg-white viralizado: agora vira card dark com border dourada sutil */
+.app-shell.theme-dark-premium .bg-white {
+  background: rgba(20, 28, 40, 0.85) !important;
+  color: #FFFFFF;
+}
+.app-shell.theme-dark-premium [class*="bg-slate-50"],
+.app-shell.theme-dark-premium [class*="bg-slate-100"],
+.app-shell.theme-dark-premium [class*="bg-gray-50"],
+.app-shell.theme-dark-premium [class*="bg-gray-100"],
+.app-shell.theme-dark-premium [class*="bg-neutral-50"],
+.app-shell.theme-dark-premium [class*="bg-neutral-100"] {
+  background: rgba(20, 28, 40, 0.70) !important;
+}
+.app-shell.theme-dark-premium [class*="bg-amber-50"],
+.app-shell.theme-dark-premium [class*="bg-yellow-50"],
+.app-shell.theme-dark-premium [class*="bg-orange-50"] {
+  background: rgba(212, 175, 55, 0.12) !important;
+}
+
+/* Textos cinzas viram brancos com opacidades */
+.app-shell.theme-dark-premium [class*="text-slate-900"],
+.app-shell.theme-dark-premium [class*="text-slate-800"],
+.app-shell.theme-dark-premium [class*="text-gray-900"],
+.app-shell.theme-dark-premium [class*="text-gray-800"],
+.app-shell.theme-dark-premium [class*="text-neutral-900"],
+.app-shell.theme-dark-premium [class*="text-neutral-800"] {
+  color: #FFFFFF !important;
+}
+.app-shell.theme-dark-premium [class*="text-slate-700"],
+.app-shell.theme-dark-premium [class*="text-slate-600"],
+.app-shell.theme-dark-premium [class*="text-gray-700"],
+.app-shell.theme-dark-premium [class*="text-gray-600"],
+.app-shell.theme-dark-premium [class*="text-neutral-700"],
+.app-shell.theme-dark-premium [class*="text-neutral-600"] {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+.app-shell.theme-dark-premium [class*="text-slate-500"],
+.app-shell.theme-dark-premium [class*="text-slate-400"],
+.app-shell.theme-dark-premium [class*="text-gray-500"],
+.app-shell.theme-dark-premium [class*="text-gray-400"],
+.app-shell.theme-dark-premium [class*="text-neutral-500"],
+.app-shell.theme-dark-premium [class*="text-neutral-400"] {
+  color: rgba(255, 255, 255, 0.62) !important;
+}
+
+/* Borders cinzas viram douradas sutis */
+.app-shell.theme-dark-premium [class*="border-slate-200"],
+.app-shell.theme-dark-premium [class*="border-slate-100"],
+.app-shell.theme-dark-premium [class*="border-gray-200"],
+.app-shell.theme-dark-premium [class*="border-gray-100"],
+.app-shell.theme-dark-premium [class*="border-neutral-200"],
+.app-shell.theme-dark-premium [class*="border-neutral-100"] {
+  border-color: rgba(212, 175, 55, 0.18) !important;
+}
+
+/* Scrollbar dark */
+.app-shell.theme-dark-premium ::-webkit-scrollbar-thumb {
+  background: rgba(212, 175, 55, 0.25);
+}
+.app-shell.theme-dark-premium ::-webkit-scrollbar-thumb:hover {
+  background: rgba(212, 175, 55, 0.45);
+}
+
+/* Table dark */
+.app-shell.theme-dark-premium .table-glass thead th {
+  background: rgba(212, 175, 55, 0.08);
+  color: rgba(255, 255, 255, 0.62);
+  border-bottom: 0.5px solid rgba(212, 175, 55, 0.22);
+}
+.app-shell.theme-dark-premium .table-glass tbody td {
+  border-bottom: 0.5px solid rgba(212, 175, 55, 0.10);
+  color: rgba(255, 255, 255, 0.85);
+}
+.app-shell.theme-dark-premium .table-glass tbody tr:hover {
+  background: rgba(212, 175, 55, 0.06);
+}
+
+/* Inputs default dark */
+.app-shell.theme-dark-premium input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="color"]):not([type="range"]),
+.app-shell.theme-dark-premium select,
+.app-shell.theme-dark-premium textarea {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(212, 175, 55, 0.30) !important;
+}

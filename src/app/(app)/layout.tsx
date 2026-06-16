@@ -118,7 +118,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     : "EMPRESA";
 
   return (
-    <div className="app-shell flex h-screen flex-col">
+    <div className="app-shell theme-dark-premium flex h-screen flex-col">
       {/* Background atmosférico Liquid Glass — fixed atrás de tudo */}
       <div className="bg-image" aria-hidden />
       <div className="bg-blobs" aria-hidden>
