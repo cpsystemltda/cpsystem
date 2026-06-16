@@ -861,6 +861,33 @@ textarea:focus {
   background: rgba(20, 28, 40, 0.85) !important;
 }
 
+/* Tailwind gradient utilities — from-/to-white viram dark
+   (cards KPI Vigentes/Finalizados usam bg-gradient-to-br from-emerald-50 to-white) */
+.app-shell.theme-dark-premium [class*="from-white"],
+.app-shell.theme-dark-premium [class*="to-white"],
+.app-shell.theme-dark-premium [class*="via-white"],
+.app-shell.theme-dark-premium [class*="from-emerald-50"],
+.app-shell.theme-dark-premium [class*="from-slate-50"],
+.app-shell.theme-dark-premium [class*="from-gray-50"],
+.app-shell.theme-dark-premium [class*="from-amber-50"],
+.app-shell.theme-dark-premium [class*="from-blue-50"],
+.app-shell.theme-dark-premium [class*="from-rose-50"],
+.app-shell.theme-dark-premium [class*="from-red-50"],
+.app-shell.theme-dark-premium [class*="from-purple-50"],
+.app-shell.theme-dark-premium [class*="from-violet-50"],
+.app-shell.theme-dark-premium [class*="from-neutral-50"],
+.app-shell.theme-dark-premium [class*="from-yellow-50"],
+.app-shell.theme-dark-premium [class*="from-orange-50"],
+.app-shell.theme-dark-premium [class*="from-emerald-100"],
+.app-shell.theme-dark-premium [class*="from-slate-100"],
+.app-shell.theme-dark-premium [class*="from-amber-100"],
+.app-shell.theme-dark-premium [class*="from-blue-100"],
+.app-shell.theme-dark-premium [class*="from-rose-100"],
+.app-shell.theme-dark-premium [class*="from-purple-100"] {
+  background-image: none !important;
+  background: rgba(20, 28, 40, 0.85) !important;
+}
+
 /* Pastilhas/badges com bg-white/X (Tailwind alpha) */
 .app-shell.theme-dark-premium .bg-white\/10,
 .app-shell.theme-dark-premium .bg-white\/15,
