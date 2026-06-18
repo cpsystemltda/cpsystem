@@ -12,7 +12,6 @@ import {
   DollarSign,
   Truck,
   Users,
-  Briefcase,
 } from "lucide-react";
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -25,17 +24,17 @@ export default function HomeLandingClient() {
   const [videoAberto, setVideoAberto] = useState(false);
 
   return (
-    <div className="auth-shell theme-dark-premium relative min-h-screen overflow-hidden">
-      {/* Background atmosfericamente DARK premium (Regina 16/06): preto profundo
-          com aura dourada — mantem identidade preto+dourado da pagina inicial */}
+    <div className="auth-shell relative min-h-screen overflow-hidden">
+      {/* Background atmosferico (Igor 17/06): predominio branco/creme com
+          algumas partes escuras como destaque — reverte o dark-premium */}
       <div
         aria-hidden
         className="fixed inset-0 z-0 pointer-events-none"
         style={{
           background:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23F4D374' stroke-width='0.6' opacity='0.10'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E\"), radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.30), transparent 55%), radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(244, 211, 116, 0.18), transparent 55%), radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.22), transparent 55%), linear-gradient(135deg, #0C1019 0%, #1A1F2E 50%, #0C1019 100%)",
-          backgroundSize: "240px 240px, auto, auto, auto, auto",
-          backgroundRepeat: "repeat, no-repeat, no-repeat, no-repeat, no-repeat",
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.6' opacity='0.08'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E\"), radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.18), transparent 55%), radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.12), transparent 55%), radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.12), transparent 55%), radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.14), transparent 55%), linear-gradient(135deg, #FAF7F0 0%, #FFFEF9 50%, #F5EFDD 100%)",
+          backgroundSize: "240px 240px, auto, auto, auto, auto, auto",
+          backgroundRepeat: "repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat",
           backgroundAttachment: "fixed",
         }}
       />
@@ -255,201 +254,142 @@ export default function HomeLandingClient() {
         </section>
 
         {/* ============== SEÇÃO 3.5 — PARA O ANALISTA DE LICITAÇÃO ============== */}
-        {/* Lean Canvas item 5 (Canais): "Indicação e parcerias com ecossistemas
-            de analistas de licitação". Analista NAO eh cliente — eh canal de
-            aquisicao. Empresa contrata, analista indica, ganha comissao. */}
+        {/* Igor (17/06 00:58): nova versao da secao do analista — 3 beneficios
+            + timeline visual "Como funciona na pratica" com emojis 1-4 */}
         <section id="analistas" className="mt-20">
           <div
             className="glass overflow-hidden rounded-[28px] px-10 py-12 lg:px-14"
             style={{ color: "var(--text)" }}
           >
-            <div className="grid items-center gap-10 lg:grid-cols-[1.3fr_1fr] lg:gap-14">
-              <div>
+            {/* Header da secao */}
+            <div className="mx-auto max-w-[840px] text-center">
+              <span
+                className="text-[11px] font-bold uppercase"
+                style={{ color: "var(--primary-deep)", letterSpacing: "0.34em" }}
+              >
+                Para o analista de licitação
+              </span>
+              <h2
+                className="mt-3 text-[28px] font-extrabold leading-[1.15] lg:text-[36px]"
+                style={{ letterSpacing: "-0.025em" }}
+              >
+                Módulo{" "}
+                <em
+                  style={{
+                    fontStyle: "normal",
+                    background:
+                      "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  exclusivo
+                </em>{" "}
+                para o Analista de Licitação com comissionamento por assinatura
+              </h2>
+              <p
+                className="mt-5 text-[15px] leading-relaxed lg:text-[17px]"
+                style={{ color: "var(--text-soft)" }}
+              >
+                Analista, para cada cliente seu que assinar o CP System, você terá acesso imediato aos seguintes benefícios:
+              </p>
+            </div>
+
+            {/* 3 beneficios em grid */}
+            <div className="mt-10 grid gap-5 lg:grid-cols-3">
+              <BeneficioAnalista
+                icone="💼"
+                titulo="Módulo Exclusivo e Gratuito"
+                descricao="Acompanhe os contratos, atas e a execução de todos os seus clientes em uma única tela, de forma totalmente gratuita, enquanto a empresa for assinante do CP System."
+              />
+              <BeneficioAnalista
+                icone="📊"
+                titulo="Controle dos Seus Honorários"
+                descricao="O módulo do analista possui uma área dedicada para você controlar o status de pagamento das suas próprias comissões (fixas e variáveis de êxito) sobre a execução de cada contrato."
+              />
+              <BeneficioAnalista
+                icone="💰"
+                titulo="Comissionamento Gamificado (Renda Passiva)"
+                descricao="Indique o CP System para organizar a operação do seu cliente e seja recompensado por isso. Você recebe uma comissão mensal recorrente, paga diretamente pela nossa plataforma, enquanto o seu cliente for assinante. Quanto mais clientes ativos, maior o seu percentual."
+              />
+            </div>
+
+            {/* Timeline "Como funciona na pratica" — 4 passos visuais */}
+            <div className="mt-12 lg:mt-14">
+              <div className="text-center">
                 <span
                   className="text-[11px] font-bold uppercase"
                   style={{ color: "var(--primary-deep)", letterSpacing: "0.34em" }}
                 >
-                  Para o analista de licitação
+                  Como funciona na prática?
                 </span>
-                <h2
-                  className="mt-3 text-[28px] font-extrabold leading-[1.1] lg:text-[36px]"
-                  style={{ letterSpacing: "-0.025em" }}
-                >
-                  Módulo{" "}
-                  <em
-                    style={{
-                      fontStyle: "normal",
-                      background:
-                        "linear-gradient(135deg, var(--primary-deep), var(--primary))",
-                      WebkitBackgroundClip: "text",
-                      backgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                    }}
-                  >
-                    exclusivo
-                  </em>{" "}
-                  para quem indica clientes
-                </h2>
-                <p
-                  className="mt-4 text-[15px] leading-relaxed lg:text-[16px]"
-                  style={{ color: "var(--text-soft)" }}
-                >
-                  Controle as execuções dos seus clientes e receba{" "}
-                  <strong style={{ color: "var(--text)" }}>comissões fixas e variáveis</strong>{" "}
-                  enquanto a empresa que você indicou for assinante do CP System. Você acompanha tudo num painel próprio, sem misturar com a operação interna do cliente.
-                </p>
-                <ul
-                  className="mt-5 space-y-2 text-[14px] leading-relaxed"
-                  style={{ color: "var(--text-soft)" }}
-                >
-                  <li className="flex items-start gap-2">
-                    <span
-                      className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: "var(--primary)" }}
-                    />
-                    Cadastre seus clientes empresariais e gere link de indicação único.
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span
-                      className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: "var(--primary)" }}
-                    />
-                    Acompanhe as execuções de cada empresa cliente em painel separado.
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span
-                      className="mt-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: "var(--primary)" }}
-                    />
-                    Receba comissões recorrentes enquanto o cliente for ativo.
-                  </li>
-                </ul>
-                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                  <Link
-                    href="/signup?tipo=ANALISTA"
-                    className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition hover:scale-[1.02]"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
-                      color: "#0A0A0A",
-                      letterSpacing: "0.2em",
-                      boxShadow:
-                        "0 12px 32px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
-                    }}
-                  >
-                    Cadastrar como analista
-                    <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
-                  </Link>
-                  <Link
-                    href="/seja-embaixador"
-                    className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition"
-                    style={{
-                      background: "rgba(255,255,255,0.7)",
-                      border: "0.5px solid var(--hairline)",
-                      color: "var(--text)",
-                      letterSpacing: "0.2em",
-                    }}
-                  >
-                    Como funciona
-                  </Link>
+              </div>
+              <div className="relative mt-7">
+                {/* Linha horizontal conectora (desktop) */}
+                <div
+                  aria-hidden
+                  className="absolute left-[8%] right-[8%] top-[34px] hidden h-px lg:block"
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent, var(--primary), var(--primary), transparent)",
+                    opacity: 0.55,
+                  }}
+                />
+                <div className="relative grid gap-6 lg:grid-cols-4 lg:gap-4">
+                  <PassoTimeline
+                    numero="1"
+                    icone="📝"
+                    texto="Cadastre-se na plataforma gratuitamente como Analista de Licitação."
+                  />
+                  <PassoTimeline
+                    numero="2"
+                    icone="🗣️"
+                    texto="Indique o CP System aos seus clientes."
+                  />
+                  <PassoTimeline
+                    numero="3"
+                    icone="🤝"
+                    texto="O cliente assina a plataforma e vincula o seu perfil ao cadastro dele."
+                  />
+                  <PassoTimeline
+                    numero="4"
+                    icone="💸"
+                    texto="Automaticamente, você ganha acesso ao módulo de gestão exclusivo e começa a gerar uma nova fonte de renda passiva."
+                  />
                 </div>
               </div>
+            </div>
 
-              {/* Mini "card de comissão" decorativo */}
-              <div
-                className="rounded-[22px] px-7 py-7 lg:px-9 lg:py-9"
+            {/* CTA */}
+            <div className="mt-12 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <Link
+                href="/signup?tipo=ANALISTA"
+                className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition hover:scale-[1.02]"
                 style={{
                   background:
-                    "linear-gradient(135deg, rgba(212,175,55,0.18), rgba(212,175,55,0.04))",
-                  border: "0.5px solid rgba(168,137,71,0.40)",
+                    "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+                  color: "#0A0A0A",
+                  letterSpacing: "0.2em",
+                  boxShadow:
+                    "0 12px 32px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
                 }}
               >
-                <div className="flex items-center gap-3">
-                  <span
-                    className="flex h-11 w-11 items-center justify-center rounded-2xl"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
-                      boxShadow:
-                        "0 8px 20px -4px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
-                    }}
-                  >
-                    <Briefcase
-                      className="h-5 w-5"
-                      style={{ color: "#FFFEF9" }}
-                      strokeWidth={2}
-                    />
-                  </span>
-                  <span
-                    className="text-[11px] font-bold uppercase"
-                    style={{ color: "var(--primary-deep)", letterSpacing: "0.28em" }}
-                  >
-                    Programa de Analistas
-                  </span>
-                </div>
-                <p
-                  className="mt-5 text-[13px] leading-relaxed"
-                  style={{ color: "var(--text-soft)" }}
-                >
-                  Indique uma empresa que vende ao governo. Quando ela assinar e te apontar como analista, você passa a receber comissão recorrente sobre a mensalidade dela, enquanto seguir ativa.
-                </p>
-                <div
-                  className="mt-5 grid grid-cols-2 gap-3 text-center"
-                >
-                  <div
-                    className="rounded-2xl px-3 py-3"
-                    style={{
-                      background: "rgba(255,255,255,0.65)",
-                      border: "0.5px solid var(--hairline)",
-                    }}
-                  >
-                    <div
-                      className="text-[20px] font-extrabold leading-none"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, var(--primary-deep), var(--primary))",
-                        WebkitBackgroundClip: "text",
-                        backgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                      }}
-                    >
-                      Fixa
-                    </div>
-                    <div
-                      className="mt-1.5 text-[10px] font-bold uppercase"
-                      style={{ color: "var(--text-mute)", letterSpacing: "0.16em" }}
-                    >
-                      Por indicação ativa
-                    </div>
-                  </div>
-                  <div
-                    className="rounded-2xl px-3 py-3"
-                    style={{
-                      background: "rgba(255,255,255,0.65)",
-                      border: "0.5px solid var(--hairline)",
-                    }}
-                  >
-                    <div
-                      className="text-[20px] font-extrabold leading-none"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, var(--primary-deep), var(--primary))",
-                        WebkitBackgroundClip: "text",
-                        backgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                      }}
-                    >
-                      Variável
-                    </div>
-                    <div
-                      className="mt-1.5 text-[10px] font-bold uppercase"
-                      style={{ color: "var(--text-mute)", letterSpacing: "0.16em" }}
-                    >
-                      % sobre o MRR
-                    </div>
-                  </div>
-                </div>
-              </div>
+                Cadastrar como analista
+                <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
+              </Link>
+              <Link
+                href="/seja-embaixador"
+                className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition"
+                style={{
+                  background: "rgba(255,255,255,0.7)",
+                  border: "0.5px solid var(--hairline)",
+                  color: "var(--text)",
+                  letterSpacing: "0.2em",
+                }}
+              >
+                Saiba mais
+              </Link>
             </div>
           </div>
         </section>
@@ -920,6 +860,85 @@ function FeatureCard({
       </h4>
       <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--text-soft)" }}>
         {descricao}
+      </p>
+    </div>
+  );
+}
+
+// ===========================================================
+// Card de Beneficio do Analista (3 cards horizontal — Igor 17/06)
+// ===========================================================
+function BeneficioAnalista({
+  icone,
+  titulo,
+  descricao,
+}: {
+  icone: string;
+  titulo: string;
+  descricao: string;
+}) {
+  return (
+    <div
+      className="rounded-[22px] px-7 py-7"
+      style={{
+        background:
+          "linear-gradient(135deg, rgba(212,175,55,0.12), rgba(212,175,55,0.03))",
+        border: "0.5px solid rgba(168,137,71,0.30)",
+      }}
+    >
+      <div className="text-[36px] leading-none">{icone}</div>
+      <h4
+        className="mt-5 text-[17px] font-extrabold leading-tight"
+        style={{ color: "var(--text)", letterSpacing: "-0.015em" }}
+      >
+        {titulo}
+      </h4>
+      <p
+        className="mt-3 text-[13.5px] leading-relaxed"
+        style={{ color: "var(--text-soft)" }}
+      >
+        {descricao}
+      </p>
+    </div>
+  );
+}
+
+// ===========================================================
+// Passo da Timeline "Como funciona na pratica" (Igor 17/06)
+// ===========================================================
+function PassoTimeline({
+  numero,
+  icone,
+  texto,
+}: {
+  numero: string;
+  icone: string;
+  texto: string;
+}) {
+  return (
+    <div className="relative flex flex-col items-center text-center">
+      <div
+        className="relative z-[1] flex h-[68px] w-[68px] items-center justify-center rounded-full text-[26px]"
+        style={{
+          background:
+            "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+          boxShadow:
+            "0 10px 24px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
+        }}
+      >
+        {icone}
+      </div>
+      <span
+        className="mt-3 text-[10px] font-bold uppercase"
+        style={{ color: "var(--primary-deep)", letterSpacing: "0.28em" }}
+      >
+        Passo {numero}
+      </span>
+      <p
+        className="mt-2 max-w-[220px] text-[13px] leading-relaxed"
+        style={{ color: "var(--text-soft)" }}
+      >
+        {texto}
       </p>
     </div>
   );
