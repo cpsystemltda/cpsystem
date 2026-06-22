@@ -119,15 +119,26 @@ textarea:focus {
 .app-shell {
   position: relative;
   min-height: 100vh;
-  background: #FFFFFF;
+  background: #FAF7F0;
   color: var(--text);
 }
 .app-shell .bg-image {
   position: fixed; inset: 0;
   z-index: 0;
   pointer-events: none;
-  /* Regina 19/06: fundo branco puro, sem textura nem auras */
-  background: #FFFFFF;
+  background:
+    /* Camada 1: padrão de Flor da Vida (geometria sagrada) em dourado — visível para o glass filtrar */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.6' opacity='0.12'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E"),
+    /* Camada 2: gradient mesh quente — define a atmosfera (visível para o glass filtrar) */
+    radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.16), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 82% 28%, rgba(232, 138, 152, 0.10), transparent 55%),
+    radial-gradient(ellipse 1100px 800px at 28% 78%, rgba(197, 180, 255, 0.10), transparent 55%),
+    radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.14), transparent 55%),
+    radial-gradient(ellipse 800px 600px at 50% 50%, rgba(93, 216, 182, 0.06), transparent 60%),
+    /* Camada 3: base creme warm */
+    linear-gradient(135deg, #FAF7F0 0%, #FFFEF9 50%, #F5EFDD 100%);
+  background-size: 240px 240px, auto, auto, auto, auto, auto, auto;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
   background-attachment: fixed;
 }
 .app-shell .bg-blobs {
@@ -135,8 +146,6 @@ textarea:focus {
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
-  /* Regina 19/06: desativados pra fundo branco clean */
-  display: none;
 }
 .app-shell .blob {
   position: absolute;
