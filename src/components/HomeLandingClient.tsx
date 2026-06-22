@@ -25,18 +25,13 @@ export default function HomeLandingClient() {
 
   return (
     <div className="auth-shell relative min-h-screen overflow-hidden">
-      {/* Background atmosferico (Regina 19/06): fundo branco off-white nas partes
-          claras (substitui o creme/bege original) — mantem textura geometrica e
-          discreta aura dourada pra preservar o premium */}
+      {/* Background fundo branco puro (Regina 19/06): sem textura geometrica,
+          sem auras douradas. As auras douradas ficam SO nas section-dark-bleed. */}
       <div
         aria-hidden
         className="fixed inset-0 z-0 pointer-events-none"
         style={{
-          background:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.6' opacity='0.07'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3Ccircle cx='120' cy='40' r='40'/%3E%3Ccircle cx='120' cy='200' r='40'/%3E%3Ccircle cx='50.72' cy='80' r='40'/%3E%3Ccircle cx='50.72' cy='160' r='40'/%3E%3Ccircle cx='189.28' cy='80' r='40'/%3E%3Ccircle cx='189.28' cy='160' r='40'/%3E%3C/g%3E%3C/svg%3E\"), radial-gradient(ellipse 1400px 900px at 18% 12%, rgba(212, 175, 55, 0.08), transparent 55%), radial-gradient(ellipse 950px 750px at 78% 92%, rgba(168, 137, 71, 0.06), transparent 55%), linear-gradient(135deg, #FFFFFF 0%, #FCFCFA 50%, #FFFFFF 100%)",
-          backgroundSize: "240px 240px, auto, auto, auto",
-          backgroundRepeat: "repeat, no-repeat, no-repeat, no-repeat",
-          backgroundAttachment: "fixed",
+          background: "#FFFFFF",
         }}
       />
 
