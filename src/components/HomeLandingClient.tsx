@@ -154,7 +154,7 @@ export default function HomeLandingClient() {
         </section>
 
         {/* ============== SEÇÃO 2 — 5 CARDS DE FEATURES ============== */}
-        <section>
+        <section className="pt-20 pb-20 lg:pt-24 lg:pb-24">
           <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-5">
             <FeatureCard
               icon={DollarSign}
