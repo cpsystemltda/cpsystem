@@ -508,6 +508,65 @@ textarea:focus {
 }
 
 /* ============================================================
+   SECTION DARK BLEED (Regina 19/06)
+   Wrap em uma <section> da home publica que ganha fundo dark
+   premium + aura dourada. Usa pseudo-elemento pra sangrar alem
+   das margens do container (max-w-[1320px]).
+   ============================================================ */
+.section-dark-bleed {
+  position: relative;
+  isolation: isolate;
+  padding-top: 96px;
+  padding-bottom: 96px;
+  color: #FFFFFF;
+  /* Sobrescreve vars pra textos internos brancos */
+  --text: #FFFFFF;
+  --text-soft: rgba(255, 255, 255, 0.85);
+  --text-mute: rgba(255, 255, 255, 0.62);
+  --text-faint: rgba(255, 255, 255, 0.40);
+  --hairline: rgba(212, 175, 55, 0.22);
+}
+.section-dark-bleed::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 50%; right: 50%;
+  margin-left: -50vw; margin-right: -50vw;
+  width: 100vw;
+  background:
+    radial-gradient(ellipse 800px 500px at 18% 12%, rgba(212, 175, 55, 0.30), transparent 55%),
+    radial-gradient(ellipse 700px 500px at 82% 88%, rgba(244, 211, 116, 0.18), transparent 55%),
+    radial-gradient(ellipse 600px 400px at 50% 50%, rgba(168, 137, 71, 0.12), transparent 60%),
+    linear-gradient(135deg, #0C1019 0%, #1A1F2E 50%, #0C1019 100%);
+  z-index: -1;
+}
+/* Quando glass aparece dentro de section-dark-bleed, vira glass escuro */
+.section-dark-bleed .glass {
+  background: rgba(15, 22, 33, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 0.5px rgba(212, 175, 55, 0.22),
+    0 28px 72px -18px rgba(0, 0, 0, 0.55),
+    0 10px 28px -6px rgba(0, 0, 0, 0.40);
+}
+.section-dark-bleed .glass::before {
+  background: linear-gradient(135deg,
+    rgba(244, 211, 116, 0.28) 0%,
+    rgba(212, 175, 55, 0.14) 30%,
+    rgba(255, 255, 255, 0.04) 60%,
+    rgba(212, 175, 55, 0.12) 100%
+  );
+}
+/* Card auxiliar branco dentro de dark-bleed vira dark */
+.section-dark-bleed [style*="background: rgba(255,255,255,0.7"],
+.section-dark-bleed [style*="background: rgba(255, 255, 255, 0.7"],
+.section-dark-bleed [style*="background: rgba(255,255,255,0.65"],
+.section-dark-bleed [style*="background: rgba(255, 255, 255, 0.65"] {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(212, 175, 55, 0.28) !important;
+}
+
+/* ============================================================
    THEME DARK PREMIUM (Regina 16/06)
    Aplicado em .theme-dark-premium — override de vars CSS pra
    transformar o glass system em paleta preto+dourado premium.

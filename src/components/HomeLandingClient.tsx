@@ -100,8 +100,8 @@ export default function HomeLandingClient() {
 
       <main className="relative z-[1] mx-auto w-full max-w-[1320px] px-8 pb-16">
 
-        {/* ============== SEÇÃO 1 — HERO ============== */}
-        <section className="pt-10 pb-14 text-center lg:pt-14 lg:pb-16">
+        {/* ============== SEÇÃO 1 — HERO (DARK) ============== */}
+        <section className="section-dark-bleed text-center">
           <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.34em" }}>
             Plataforma Premium
           </span>
@@ -162,34 +162,39 @@ export default function HomeLandingClient() {
           <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-5">
             <FeatureCard
               icon={DollarSign}
+              cor="dourado"
               titulo="Controle financeiro"
               descricao="Valores contratados, executados, a executar, recebidos e a receber."
             />
             <FeatureCard
               icon={FileCheck2}
+              cor="verde"
               titulo="Controle de contratações"
               descricao="Contratos, atas e empenhos vigentes, expirados, a expirar."
             />
             <FeatureCard
               icon={Truck}
+              cor="escuro"
               titulo="Controle logístico"
               descricao="Esteira de entrega/execução com agenda, controle de prazos e alertas."
             />
             <FeatureCard
               icon={Users}
+              cor="bronze"
               titulo="Controle de clientes"
               descricao="Órgãos atendidos, locais de entrega/execução."
             />
             <FeatureCard
               icon={Brain}
+              cor="vinho"
               titulo="Inteligência jurídica nativa"
               descricao="Alimentação de dados, cálculo de reajustes e tira-dúvidas."
             />
           </div>
         </section>
 
-        {/* ============== SEÇÃO 3 — INSTITUCIONAL SPLIT (TEXTO + STATS / VÍDEO) ============== */}
-        <section id="sistema" className="mt-24">
+        {/* ============== SEÇÃO 3 — INSTITUCIONAL SPLIT (DARK) ============== */}
+        <section id="sistema" className="section-dark-bleed mt-12">
           <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-14">
             {/* Coluna esquerda — texto + stats */}
             <div>
@@ -535,8 +540,8 @@ export default function HomeLandingClient() {
           </div>
         </section>
 
-        {/* ============== SEÇÃO 5 — "SE INTERESSOU" CTA FINAL ============== */}
-        <section className="mt-24">
+        {/* ============== SEÇÃO 5 — "SE INTERESSOU" CTA FINAL (DARK) ============== */}
+        <section className="section-dark-bleed mt-12">
           <div
             className="glass overflow-hidden rounded-[28px] px-10 py-12 text-center lg:px-14 lg:py-14"
             style={{ color: "var(--text)" }}
@@ -599,10 +604,16 @@ export default function HomeLandingClient() {
         </section>
       </main>
 
-      <footer className="relative z-[1] border-t pb-9 pt-7" style={{ borderColor: "var(--hairline)" }}>
+      <footer
+        className="relative z-[1] border-t pb-9 pt-7"
+        style={{
+          background: "#0C1019",
+          borderTopColor: "rgba(212, 175, 55, 0.18)",
+        }}
+      >
         <div
           className="mx-auto flex max-w-[1320px] flex-col items-center gap-3 px-8 text-[11px] uppercase sm:flex-row sm:justify-between"
-          style={{ letterSpacing: "0.24em", color: "var(--text-faint)" }}
+          style={{ letterSpacing: "0.24em", color: "rgba(255, 255, 255, 0.55)" }}
         >
           <span>CP System · Plataforma Premium</span>
           <span>LGPD · Trilha auditável · Conexão segura</span>
@@ -830,35 +841,67 @@ function VideoPlayerInstitucional({
 }
 
 // ===========================================================
-// CARD DE FEATURE
+// CARD DE FEATURE — paleta colorida premium (Regina 19/06)
+// 5 cores distintas pra contraste, mantendo padrao premium.
 // ===========================================================
+const FEATURE_PALETTES = {
+  dourado: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+  verde:   "linear-gradient(135deg, #4CAF6C 0%, #3FA85F 50%, #2F8F4C 100%)",
+  escuro:  "linear-gradient(135deg, #2A2A33 0%, #1A1A1F 100%)",
+  bronze:  "linear-gradient(135deg, #B8860B 0%, #8B6914 50%, #5A4622 100%)",
+  vinho:   "linear-gradient(135deg, #6B2D5C 0%, #4A1F40 50%, #2D0E26 100%)",
+} as const;
+
+type FeatureCor = keyof typeof FEATURE_PALETTES;
+
 function FeatureCard({
   icon: Icone,
   titulo,
   descricao,
+  cor = "dourado",
 }: {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties; strokeWidth?: number }>;
   titulo: string;
   descricao: string;
+  cor?: FeatureCor;
 }) {
   return (
     <div
-      className="glass-tile flex flex-col rounded-[20px] px-6 py-7 transition-transform hover:translate-y-[-2px]"
-      style={{ color: "var(--text)" }}
+      className="relative flex flex-col overflow-hidden rounded-[22px] px-7 py-8 transition-transform hover:-translate-y-1"
+      style={{
+        background: FEATURE_PALETTES[cor],
+        color: "#FFFFFF",
+        boxShadow: "0 20px 44px -16px rgba(20, 16, 8, 0.32), 0 6px 14px -6px rgba(20, 16, 8, 0.18)",
+        minHeight: "240px",
+      }}
     >
+      {/* Icone gigante decorativo no canto direito inferior */}
+      <Icone
+        aria-hidden
+        className="pointer-events-none absolute -bottom-4 -right-4 h-[160px] w-[160px]"
+        style={{ color: "rgba(255, 255, 255, 0.10)" }}
+        strokeWidth={1.4}
+      />
       <span
-        className="flex h-12 w-12 items-center justify-center rounded-2xl"
+        className="relative z-[1] flex h-12 w-12 items-center justify-center rounded-2xl"
         style={{
-          background: "linear-gradient(135deg, rgba(212,175,55,0.30), rgba(212,175,55,0.08))",
-          border: "0.5px solid rgba(168,137,71,0.32)",
+          background: "rgba(255, 255, 255, 0.18)",
+          border: "0.5px solid rgba(255, 255, 255, 0.25)",
+          backdropFilter: "blur(10px)",
         }}
       >
-        <Icone className="h-6 w-6" style={{ color: "var(--primary-deep)" }} strokeWidth={1.7} />
+        <Icone className="h-6 w-6" style={{ color: "#FFFFFF" }} strokeWidth={2} />
       </span>
-      <h4 className="mt-4 text-[16px] font-bold leading-tight" style={{ letterSpacing: "-0.015em" }}>
+      <h4
+        className="relative z-[1] mt-6 text-[18px] font-extrabold leading-tight"
+        style={{ letterSpacing: "-0.015em", color: "#FFFFFF" }}
+      >
         {titulo}
       </h4>
-      <p className="mt-2 text-[13px] leading-relaxed" style={{ color: "var(--text-soft)" }}>
+      <p
+        className="relative z-[1] mt-3 text-[13px] leading-relaxed"
+        style={{ color: "rgba(255, 255, 255, 0.85)" }}
+      >
         {descricao}
       </p>
     </div>
