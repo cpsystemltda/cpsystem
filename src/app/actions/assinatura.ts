@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
-import { getGateway, type FormaPagamento, type Plano, PRECO_PLANO } from "@/lib/gateway";
+import { getGateway, type FormaPagamento, type Plano } from "@/lib/gateway";
+import { calcularValorMensal } from "@/lib/precos";
 import { normalizarCnpj } from "@/lib/validators";
 
 type Result = { erro?: string; ok?: boolean; cobrancaId?: string };
@@ -56,7 +57,10 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
   if (!["BASICO", "PREMIUM"].includes(plano)) return { erro: "Plano inválido." };
   if (!["PIX", "BOLETO", "CARTAO_CREDITO"].includes(forma)) return { erro: "Forma de pagamento inválida." };
 
-  const valor = PRECO_PLANO[plano];
+  // Calcula valor dinamico: BASICO = R$ 397 + R$ 39,90 por CNPJ acima de 1.
+  // PREMIUM ja tem CNPJs ilimitados, sem adicional. Regina 23/06.
+  const breakdown = await calcularValorMensal(usuario.contaId, plano);
+  const valor = breakdown.valorTotal;
   const competencia = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
   const vencimento = new Date(Date.now() + 3 * 86400000); // 3 dias
 
@@ -93,7 +97,10 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
       valor,
       vencimento,
       forma,
-      descricao: `CP System — Plano ${plano} (${competencia})`,
+      descricao:
+        breakdown.cnpjsAdicionais > 0
+          ? `CP System — Plano ${plano} (${competencia}) · ${breakdown.numCnpjs} CNPJs (${breakdown.cnpjsAdicionais} adicional)`
+          : `CP System — Plano ${plano} (${competencia})`,
       cartao,
     });
 

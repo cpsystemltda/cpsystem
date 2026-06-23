@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { Building2, Plus } from "lucide-react";
+import { Building2, Plus, AlertCircle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/SecaoGlass";
-
-const LIMITE = 4;
+import { brl } from "@/lib/validators";
+import { PRECO_CNPJ_ADICIONAL, CNPJS_INCLUSOS_BASICO } from "@/lib/precos";
 
 function formatarCnpj(cnpj: string) {
   const d = cnpj.replace(/\D/g, "");
@@ -19,7 +19,11 @@ export default async function EmpresasPage() {
     orderBy: { criadoEm: "asc" },
   });
 
-  const podeAdicionar = empresas.length < LIMITE;
+  // Politica de CNPJs (Regina 23/06): BASICO inclui 1 CNPJ + R$ 39,90 por
+  // adicional. PREMIUM ilimitado. Sem teto absoluto — cliente decide.
+  const plano = usuario.conta.plano;
+  const ehBasico = plano === "BASICO";
+  const cnpjsAdicionais = ehBasico ? Math.max(0, empresas.length - CNPJS_INCLUSOS_BASICO) : 0;
 
   return (
     <div className="mx-auto max-w-6xl px-8 py-8">
@@ -27,27 +31,41 @@ export default async function EmpresasPage() {
         eyebrow="Visão geral · Grupo econômico"
         titulo="Empresas"
         destaque="(CNPJs)"
-        subtitulo={`Gerencie os CNPJs do seu grupo. Usando ${empresas.length} de ${LIMITE} CNPJs incluídos no plano.`}
+        subtitulo={
+          ehBasico
+            ? `Plano Básico: 1 CNPJ incluso · cada CNPJ adicional custa ${brl(PRECO_CNPJ_ADICIONAL)}/mês.`
+            : `Plano Premium: CNPJs ilimitados sem custo adicional.`
+        }
         cta={
-          podeAdicionar ? (
-            <Link href="/empresas/nova" className="btn-primary">
-              <Plus className="h-4 w-4" /> Adicionar CNPJ
-            </Link>
-          ) : (
-            <span
-              className="rounded-full px-4 py-2 text-xs font-bold uppercase"
-              style={{
-                background: "rgba(212,175,55,0.18)",
-                color: "var(--primary-deep)",
-                border: "0.5px solid rgba(168,137,71,0.4)",
-                letterSpacing: "0.08em",
-              }}
-            >
-              Limite atingido — fale com o comercial
-            </span>
-          )
+          <Link href="/empresas/nova" className="btn-primary">
+            <Plus className="h-4 w-4" /> Adicionar CNPJ
+          </Link>
         }
       />
+
+      {ehBasico && empresas.length >= CNPJS_INCLUSOS_BASICO && (
+        <div
+          className="mt-6 flex items-start gap-3 rounded-2xl px-5 py-4"
+          style={{
+            background: "rgba(212,175,55,0.10)",
+            border: "0.5px solid rgba(168,137,71,0.32)",
+          }}
+        >
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--primary-deep)" }} />
+          <div className="text-sm" style={{ color: "var(--text-soft)" }}>
+            Você tem <strong>{empresas.length}</strong> CNPJ{empresas.length > 1 ? "s" : ""} cadastrado{empresas.length > 1 ? "s" : ""}.{" "}
+            {cnpjsAdicionais > 0 ? (
+              <>
+                Sua próxima cobrança incluirá um adicional de{" "}
+                <strong>{brl(cnpjsAdicionais * PRECO_CNPJ_ADICIONAL)}</strong> ({cnpjsAdicionais} ×{" "}
+                {brl(PRECO_CNPJ_ADICIONAL)}).
+              </>
+            ) : (
+              <>Cada novo CNPJ adicionará {brl(PRECO_CNPJ_ADICIONAL)}/mês à sua fatura.</>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4">
         {empresas.map((e) => (

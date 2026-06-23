@@ -7,20 +7,15 @@ import { exigirUsuario, hashSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { normalizarCnpj, novaEmpresaSchema } from "@/lib/validators";
 
-const LIMITE_EMPRESAS_GRATIS = 4;
-
 type ActionResult = { erro?: string; campos?: Record<string, string> };
 
 export async function criarEmpresaAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
 
-  const total = await prisma.empresa.count({ where: { contaId: usuario.contaId } });
-  if (total >= LIMITE_EMPRESAS_GRATIS) {
-    return {
-      erro: `Limite de ${LIMITE_EMPRESAS_GRATIS} CNPJs atingido. A partir do 5º há cobrança adicional — fale com a equipe comercial.`,
-    };
-  }
+  // Politica de CNPJs (Regina 23/06): sem teto absoluto.
+  // BASICO: 1 CNPJ incluso + R$ 39,90 por adicional (calculado na renovacao).
+  // PREMIUM: ilimitado sem custo extra.
 
   const parsed = novaEmpresaSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {

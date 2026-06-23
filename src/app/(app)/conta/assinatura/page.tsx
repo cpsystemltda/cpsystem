@@ -4,9 +4,9 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { statusGateway } from "@/lib/gateway";
+import { calcularValorMensal, PRECO_CNPJ_ADICIONAL } from "@/lib/precos";
 import { CancelarAssinaturaForm } from "./CancelarForm";
 
-const PRECO = { BASICO: 397, PREMIUM: 997 };
 const ROTULO_PLANO = { BASICO: "Básico", PREMIUM: "Premium" };
 
 const COR_STATUS: Record<string, string> = {
@@ -46,6 +46,8 @@ export default async function AssinaturaPage() {
   if (!conta) return null;
 
   const gw = await statusGateway();
+  // Breakdown dinâmico: BASICO cobra adicional por CNPJ excedente (Regina 23/06).
+  const breakdown = await calcularValorMensal(conta.id, conta.plano as "BASICO" | "PREMIUM");
 
   const trial = conta.statusAssinatura === "TRIAL" && conta.trialAteEm;
   const diasTrial = trial ? Math.max(0, Math.ceil((conta.trialAteEm!.getTime() - Date.now()) / 86400000)) : 0;
@@ -97,8 +99,13 @@ export default async function AssinaturaPage() {
               className="mt-2 text-[24px] font-extrabold leading-tight"
               style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
             >
-              {ROTULO_PLANO[conta.plano as "BASICO" | "PREMIUM"]} — {brl(PRECO[conta.plano as "BASICO" | "PREMIUM"])}/mês
+              {ROTULO_PLANO[conta.plano as "BASICO" | "PREMIUM"]} — {brl(breakdown.valorTotal)}/mês
             </h2>
+            {breakdown.cnpjsAdicionais > 0 && (
+              <div className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <strong>{brl(breakdown.valorBase)}</strong> plano base + <strong>{breakdown.cnpjsAdicionais}</strong> CNPJ{breakdown.cnpjsAdicionais > 1 ? "s" : ""} adicional × {brl(PRECO_CNPJ_ADICIONAL)} = {brl(breakdown.valorAdicional)}
+              </div>
+            )}
             <div className="mt-2 flex items-center gap-2">
               <span className={`rounded px-2 py-0.5 text-xs font-medium ${COR_STATUS[conta.statusAssinatura]}`}>
                 {conta.statusAssinatura}

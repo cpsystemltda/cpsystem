@@ -5,17 +5,27 @@ import Link from "next/link";
 import { ChevronLeft, CreditCard, QrCode, FileText, Lock } from "lucide-react";
 import { iniciarCheckoutAction } from "@/app/actions/assinatura";
 import { brl } from "@/lib/validators";
+import type { BreakdownCobranca } from "@/lib/precos";
+import { PRECO_CNPJ_ADICIONAL } from "@/lib/precos";
 
-const PRECO = { BASICO: 397, PREMIUM: 997 };
 const ROTULO = { BASICO: "Básico", PREMIUM: "Premium" };
 
 type Forma = "PIX" | "BOLETO" | "CARTAO_CREDITO";
 
-export function CheckoutClient({ planoInicial }: { planoInicial: "BASICO" | "PREMIUM" }) {
+export function CheckoutClient({
+  planoInicial,
+  breakdownBasico,
+  breakdownPremium,
+}: {
+  planoInicial: "BASICO" | "PREMIUM";
+  breakdownBasico: BreakdownCobranca;
+  breakdownPremium: BreakdownCobranca;
+}) {
   const [state, formAction] = useActionState(iniciarCheckoutAction, null);
   const [plano, setPlano] = useState<"BASICO" | "PREMIUM">(planoInicial);
   const [forma, setForma] = useState<Forma>("PIX");
-  const valor = PRECO[plano];
+  const breakdownAtivo = plano === "BASICO" ? breakdownBasico : breakdownPremium;
+  const valor = breakdownAtivo.valorTotal;
 
   // Se já criou cobrança e ela tem PIX/boleto, mostra os dados
   // (cobrancaId vem no state — precisaríamos buscar pelo cliente; pra simplificar, recarregamos)
@@ -60,8 +70,32 @@ export function CheckoutClient({ planoInicial }: { planoInicial: "BASICO" | "PRE
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Plano</h2>
           <div className="grid gap-3 md:grid-cols-2">
-            <PlanoCard ativo={plano === "BASICO"} onClick={() => setPlano("BASICO")} titulo="Básico" valor={397} bullets={["Software completo", "Inteligência jurídica embutida", "Suporte técnico"]} />
-            <PlanoCard ativo={plano === "PREMIUM"} onClick={() => setPlano("PREMIUM")} titulo="Premium" valor={997} bullets={["Tudo do Básico", "12 consultas jurídicas/ano", "2 peças administrativas/ano", "Canal VIP SLA 4h"]} destaque />
+            <PlanoCard
+              ativo={plano === "BASICO"}
+              onClick={() => setPlano("BASICO")}
+              titulo="Básico"
+              valor={breakdownBasico.valorTotal}
+              bullets={[
+                "1 CNPJ incluso + R$ 39,90 por CNPJ adicional",
+                "Software completo",
+                "Inteligência jurídica embutida",
+                "Suporte técnico",
+              ]}
+            />
+            <PlanoCard
+              ativo={plano === "PREMIUM"}
+              onClick={() => setPlano("PREMIUM")}
+              titulo="Premium"
+              valor={breakdownPremium.valorTotal}
+              bullets={[
+                "CNPJs ilimitados",
+                "Tudo do Básico",
+                "12 consultas jurídicas/ano",
+                "2 peças administrativas/ano",
+                "Canal VIP SLA 4h",
+              ]}
+              destaque
+            />
           </div>
         </section>
 
@@ -97,7 +131,15 @@ export function CheckoutClient({ planoInicial }: { planoInicial: "BASICO" | "PRE
           <div>
             <p className="text-xs uppercase tracking-wide text-blue-700">Total mensal</p>
             <p className="mt-1 text-3xl font-bold text-blue-900">{brl(valor)}</p>
-            <p className="mt-1 text-xs text-blue-700">Plano {ROTULO[plano]} · {forma.replace("_", " ")}</p>
+            <p className="mt-1 text-xs text-blue-700">
+              Plano {ROTULO[plano]} · {forma.replace("_", " ")}
+            </p>
+            {breakdownAtivo.cnpjsAdicionais > 0 && (
+              <p className="mt-2 text-[11px] text-blue-700">
+                {brl(breakdownAtivo.valorBase)} base + {breakdownAtivo.cnpjsAdicionais} CNPJ adicional ×{" "}
+                {brl(PRECO_CNPJ_ADICIONAL)} = {brl(breakdownAtivo.valorAdicional)}
+              </p>
+            )}
           </div>
           <button
             type="submit"

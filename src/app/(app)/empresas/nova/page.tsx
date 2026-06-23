@@ -147,8 +147,9 @@ export default function NovaEmpresaPage() {
         Adicionar CNPJ
       </h1>
       <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
-        Inclua mais uma empresa do seu grupo econômico. A assinatura cobre até 4 CNPJs;
-        a partir do 5º há cobrança adicional.
+        Inclua mais uma empresa do seu grupo econômico. <strong>Plano Básico:</strong>
+        {" "}1 CNPJ incluso · cada CNPJ adicional custa R$ 39,90/mês. <strong>Plano Premium:</strong>
+        {" "}CNPJs ilimitados sem custo extra.
       </p>
 
       {/* Upload zone — IA */}
