@@ -13,7 +13,7 @@ import { normalizarCnpj } from "@/lib/validators";
 type Result = { erro?: string; ok?: boolean; cobrancaId?: string };
 
 // Garante customerId no gateway pra esta conta
-async function garantirCustomer(contaId: string) {
+export async function garantirCustomer(contaId: string) {
   const conta = await prisma.conta.findUnique({
     where: { id: contaId },
     include: {

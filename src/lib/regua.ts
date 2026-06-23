@@ -15,6 +15,9 @@ import { prisma } from "@/lib/prisma";
  * - Cron (`/api/cron/regua-cobranca`) — Vercel Cron diário
  */
 export type ResumoRegua = {
+  renovacoesGeradas: number;
+  renovacoesIgnoradas: number;
+  renovacoesErros: number;
   avisosVencimento: number;
   marcadasAtrasadas: number;
   contasBloqueadas: number;
@@ -30,6 +33,11 @@ export async function executarRegua(): Promise<ResumoRegua> {
   const ha2dias = new Date(hoje.getTime() - 2 * 86400000);
   const ha3dias = new Date(hoje.getTime() - 3 * 86400000);
   const ha7dias = new Date(hoje.getTime() - 7 * 86400000);
+
+  // 0. Gera renovação automática mensal pra contas ATIVAS vencendo
+  //    Regina 23/06 — fecha o ciclo de cobrança recorrente.
+  const { gerarRenovacoesMensais } = await import("@/lib/renovacaoAutomatica");
+  const renov = await gerarRenovacoesMensais();
 
   // 1. Aviso de vencimento (3 dias antes) — registra evento; integração e-mail/WhatsApp pelo gateway
   const aVencer = await prisma.cobranca.findMany({
@@ -111,6 +119,9 @@ export async function executarRegua(): Promise<ResumoRegua> {
   const fixosAtrasados = await marcarFixosAtrasados();
 
   return {
+    renovacoesGeradas: renov.geradas,
+    renovacoesIgnoradas: renov.ignoradas,
+    renovacoesErros: renov.erros,
     avisosVencimento: aVencer.length,
     marcadasAtrasadas: vencidas.length,
     contasBloqueadas: aBloquear.length,
