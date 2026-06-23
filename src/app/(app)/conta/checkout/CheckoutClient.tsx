@@ -5,8 +5,8 @@ import Link from "next/link";
 import { ChevronLeft, CreditCard, QrCode, FileText, Lock } from "lucide-react";
 import { iniciarCheckoutAction } from "@/app/actions/assinatura";
 import { brl } from "@/lib/validators";
-import type { BreakdownCobranca } from "@/lib/precos";
-import { PRECO_CNPJ_ADICIONAL } from "@/lib/precos";
+import type { BreakdownCobranca } from "@/lib/precosConstants";
+import { PRECO_CNPJ_ADICIONAL } from "@/lib/precosConstants";
 
 const ROTULO = { BASICO: "Básico", PREMIUM: "Premium" };
 
