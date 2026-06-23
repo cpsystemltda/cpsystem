@@ -65,7 +65,7 @@ export default function PrecosPage() {
             descricao="Pra empresa com 1 CNPJ que precisa controlar contratos públicos."
             cta="Começar trial grátis"
             features={[
-              "1 empresa (CNPJ)",
+              "1 CNPJ incluso · CNPJ adicional: R$ 39,90/mês cada",
               "Atas, Contratos e Empenhos ilimitados",
               "Alertas automáticos de prazo, pagamento e reajuste",
               "Saldo de Ata por vigência separada (Lei 14.133)",
@@ -110,32 +110,6 @@ export default function PrecosPage() {
               "Workshop trimestral de melhores práticas Lei 14.133",
             ]}
           />
-        </section>
-
-        {/* Anual */}
-        <section className="mt-12 rounded-2xl bg-white p-8 shadow-md ring-1 ring-slate-100">
-          <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-            <div>
-              <p
-                className="text-[11px] font-bold uppercase"
-                style={{ letterSpacing: "0.20em", color: "#9C7A2D" }}
-              >
-                💰 Cobrança anual
-              </p>
-              <h2 className="mt-2 text-[22px] font-extrabold text-[#2D3340]">
-                Pague 12 meses, leve 14 — economia de <span style={{ color: "#B8860B" }}>16%</span>
-              </h2>
-              <p className="mt-1 text-sm text-[#5D6470]">
-                Disponível em qualquer plano. Configurável em [Conta &gt; Assinatura].
-              </p>
-            </div>
-            <Link
-              href="/signup"
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#B8860B] to-[#D4AF37] px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:opacity-90"
-            >
-              Começar trial <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
         </section>
 
         {/* FAQ rápido */}
