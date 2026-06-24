@@ -19,6 +19,9 @@ import type {
   CriarCobrancaInput,
   CriarCobrancaResultado,
   EventoWebhook,
+  CriarAssinaturaInput,
+  CriarAssinaturaResultado,
+  AtualizarAssinaturaInput,
 } from "./types";
 
 type AsaasConfig = {
@@ -125,6 +128,82 @@ export class GatewayAsaas implements GatewayPagamento {
 
   async cancelarCobranca(chargeId: string): Promise<void> {
     await this.req(`/payments/${chargeId}`, { method: "DELETE" });
+  }
+
+  // === Subscriptions (cartão recorrente — Regina 23/06) ===
+  // Asaas tokeniza o cartão internamente e cobra todo mês. Primeira cobrança
+  // já vem incluída no retorno; demais virão via webhook PAYMENT_CREATED.
+
+  async criarAssinatura(input: CriarAssinaturaInput): Promise<CriarAssinaturaResultado> {
+    type SubResp = {
+      id: string;
+      status: string;
+      nextDueDate: string;
+    };
+    type FirstPaymentResp = {
+      data: Array<{
+        id: string;
+        status: string;
+        invoiceUrl?: string;
+      }>;
+    };
+
+    const body: Record<string, unknown> = {
+      customer: input.customerId,
+      billingType: "CREDIT_CARD",
+      value: input.valor,
+      nextDueDate: input.proximoVencimento.toISOString().slice(0, 10),
+      cycle: "MONTHLY",
+      description: input.descricao,
+      externalReference: input.cobrancaIdInterno,
+      creditCard: {
+        holderName: input.cartao.nome,
+        number: input.cartao.numero.replace(/\D/g, ""),
+        expiryMonth: String(input.cartao.validadeMes).padStart(2, "0"),
+        expiryYear: String(input.cartao.validadeAno),
+        ccv: input.cartao.cvv,
+      },
+      creditCardHolderInfo: {
+        name: input.titular.nome,
+        email: input.titular.email,
+        cpfCnpj: input.titular.cpfCnpj.replace(/\D/g, ""),
+        phone: input.titular.telefone,
+        postalCode: input.titular.cep,
+        addressNumber: input.titular.numeroEndereco,
+      },
+    };
+
+    const sub = await this.req<SubResp>("/subscriptions", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+
+    // Asaas gera a primeira cobrança automaticamente — busca pra retornar.
+    const payments = await this.req<FirstPaymentResp>(
+      `/subscriptions/${sub.id}/payments`,
+    );
+    const first = payments.data[0];
+    if (!first) throw new Error("Asaas criou subscription mas não retornou primeira cobrança");
+
+    return {
+      subscriptionId: sub.id,
+      primeiraCobranca: {
+        chargeId: first.id,
+        invoiceUrl: first.invoiceUrl,
+        status: mapearStatusAsaas(first.status),
+      },
+    };
+  }
+
+  async atualizarAssinatura(input: AtualizarAssinaturaInput): Promise<void> {
+    await this.req(`/subscriptions/${input.subscriptionId}`, {
+      method: "POST", // Asaas usa POST pra update tb
+      body: JSON.stringify({ value: input.novoValor }),
+    });
+  }
+
+  async cancelarAssinatura(subscriptionId: string): Promise<void> {
+    await this.req(`/subscriptions/${subscriptionId}`, { method: "DELETE" });
   }
 
   async validarWebhook(headers: Headers, _rawBody: string): Promise<boolean> {

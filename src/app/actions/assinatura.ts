@@ -91,18 +91,57 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
           }
         : undefined;
 
-    const result = await gateway.criarCobranca({
-      customerId,
-      cobrancaIdInterno: cobrancaInterna.id,
-      valor,
-      vencimento,
-      forma,
-      descricao:
-        breakdown.cnpjsAdicionais > 0
-          ? `CP System — Plano ${plano} (${competencia}) · ${breakdown.numCnpjs} CNPJs (${breakdown.cnpjsAdicionais} adicional)`
-          : `CP System — Plano ${plano} (${competencia})`,
-      cartao,
-    });
+    const descricao =
+      breakdown.cnpjsAdicionais > 0
+        ? `CP System — Plano ${plano} (${competencia}) · ${breakdown.numCnpjs} CNPJs (${breakdown.cnpjsAdicionais} adicional)`
+        : `CP System — Plano ${plano} (${competencia})`;
+
+    let result: import("@/lib/gateway").CriarCobrancaResultado;
+    let subscriptionId: string | null = null;
+
+    if (forma === "CARTAO_CREDITO" && cartao && gateway.criarAssinatura) {
+      // Cartão: cria Subscription Asaas pra cobrança recorrente automática.
+      // Asaas tokeniza o cartão e cobra todo mês. Regina 23/06.
+      const conta = await prisma.conta.findUnique({
+        where: { id: usuario.contaId },
+        include: { empresas: { take: 1 } },
+      });
+      const empresa = conta?.empresas[0];
+      if (!empresa) return { erro: "Cadastre uma empresa antes de assinar com cartão." };
+
+      const sub = await gateway.criarAssinatura({
+        customerId,
+        cobrancaIdInterno: cobrancaInterna.id,
+        valor,
+        proximoVencimento: vencimento,
+        descricao,
+        cartao,
+        titular: {
+          nome: empresa.razaoSocial,
+          email: usuario.email,
+          cpfCnpj: empresa.cnpj,
+          telefone: empresa.telefones || undefined,
+          cep: empresa.cep || undefined,
+          // Asaas exige número do endereço — extrai do campo endereco ou usa S/N
+          numeroEndereco:
+            empresa.endereco.match(/,\s*(\d+[A-Za-z]?)\b/)?.[1] || "S/N",
+        },
+      });
+
+      subscriptionId = sub.subscriptionId;
+      result = sub.primeiraCobranca;
+    } else {
+      // PIX/Boleto: cobrança única (renovação automática gera próximas via régua).
+      result = await gateway.criarCobranca({
+        customerId,
+        cobrancaIdInterno: cobrancaInterna.id,
+        valor,
+        vencimento,
+        forma,
+        descricao,
+        cartao,
+      });
+    }
 
     const cobrancaAtualizada = await prisma.cobranca.update({
       where: { id: cobrancaInterna.id },
@@ -115,6 +154,14 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
         status: result.status,
       },
     });
+
+    // Salva subscription ID na conta (Asaas vai cuidar das próximas cobranças)
+    if (subscriptionId) {
+      await prisma.conta.update({
+        where: { id: usuario.contaId },
+        data: { gatewaySubscriptionId: subscriptionId },
+      });
+    }
 
     // Salva últimos dígitos do cartão (PCI-DSS: nunca o PAN inteiro)
     if (cartao) {
@@ -160,20 +207,38 @@ export async function cancelarAssinaturaAction(_p: Result | null, _formData: For
   await bloquearEspionagem();
   if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins." };
 
+  // Busca subscription antes de zerar
+  const contaAtual = await prisma.conta.findUnique({
+    where: { id: usuario.contaId },
+    select: { gatewaySubscriptionId: true },
+  });
+
   await prisma.conta.update({
     where: { id: usuario.contaId },
     data: {
       statusAssinatura: "CANCELADA",
       proximoVencimento: null,
       bloqueadoEm: new Date(),
+      gatewaySubscriptionId: null,
     },
   });
+
+  const gateway = await getGateway();
+
+  // Cancela Subscription no Asaas (se houver) — pra não cobrar próximas mensalidades
+  if (contaAtual?.gatewaySubscriptionId && gateway.cancelarAssinatura) {
+    try {
+      await gateway.cancelarAssinatura(contaAtual.gatewaySubscriptionId);
+    } catch (e) {
+      console.error("Erro cancelando subscription Asaas:", e);
+      // segue — a conta já foi marcada CANCELADA no nosso lado
+    }
+  }
 
   // Cancela cobranças pendentes no gateway
   const pendentes = await prisma.cobranca.findMany({
     where: { contaId: usuario.contaId, status: "PENDENTE" },
   });
-  const gateway = await getGateway();
   for (const c of pendentes) {
     if (c.gatewayChargeId) {
       try {

@@ -31,10 +31,13 @@ export async function gerarRenovacoesMensais(): Promise<{
   const hoje = new Date();
   const em3dias = new Date(hoje.getTime() + 3 * 86400000);
 
+  // Pula contas com gatewaySubscriptionId — Asaas já gera cobranças
+  // automaticamente pra elas (cartão recorrente). Regina 23/06.
   const aRenovar = await prisma.conta.findMany({
     where: {
       statusAssinatura: "ATIVA",
       proximoVencimento: { lte: em3dias },
+      gatewaySubscriptionId: null,
     },
     select: { id: true, plano: true, proximoVencimento: true },
   });
