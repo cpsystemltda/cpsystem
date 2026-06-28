@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, CheckCircle2 } from "lucide-react";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 import { labelCurtoInstrumento, labelInstrumento } from "@/lib/instrumentoLabel";
 
@@ -75,10 +75,12 @@ export function AgendaMes({
   entregas,
   mesReferencia,
   hoje,
+  googleConectado,
 }: {
   entregas: EmpenhoAgenda[];
   mesReferencia: Date; // primeiro dia do mes visualizado, hora 00:00
   hoje: Date;
+  googleConectado: boolean;
 }) {
   const hojeNorm = zerarHora(hoje);
   const primeiroDoMes = zerarHora(new Date(mesReferencia.getFullYear(), mesReferencia.getMonth(), 1));
@@ -101,7 +103,7 @@ export function AgendaMes({
       className="glass overflow-hidden rounded-[20px] px-5 py-5"
       style={{ border: "0.5px solid var(--hairline)" }}
     >
-      <header className="mb-4 flex items-end justify-between gap-3">
+      <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h3
             className="text-[12px] font-bold uppercase"
@@ -113,7 +115,37 @@ export function AgendaMes({
             {entregas.length} execução(ões) com janela neste mês
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
+          {googleConectado ? (
+            <Link
+              href="/conta/integracoes"
+              className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition hover:bg-white/70"
+              style={{
+                border: "0.5px solid rgba(63,168,95,0.3)",
+                color: "#2F8F4C",
+                background: "rgba(63,168,95,0.08)",
+              }}
+              title="Google Agenda conectado — clique pra gerenciar"
+            >
+              <CheckCircle2 size={12} />
+              Google sincronizado
+            </Link>
+          ) : (
+            <a
+              href="/api/google/connect"
+              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition hover:opacity-90"
+              style={{
+                background: "linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)",
+                color: "#FFFFFF",
+                border: "0.5px solid rgba(2,132,199,1)",
+                letterSpacing: "0.02em",
+              }}
+              title="Sincroniza suas execuções com o Google Agenda"
+            >
+              <Calendar size={12} />
+              Conectar Google Agenda
+            </a>
+          )}
           <Link
             href={`/dashboard?mesAgenda=${formatMesAgenda(mesAnt)}#agenda`}
             className="flex h-8 w-8 items-center justify-center rounded-full transition hover:bg-white/70"

@@ -435,6 +435,13 @@ export default async function DashboardPage({
     .filter((e) => e.janelaInicio < fimMesAgenda && e.janelaFim >= mesAgenda)
     .sort((a, b) => a.janelaInicio.getTime() - b.janelaInicio.getTime());
 
+  // Verifica se o usuario tem conta Google conectada — usado pra
+  // mostrar botao "Conectar Google Agenda" no header da AgendaMes.
+  const googleConectado = !!(await prisma.googleAccount.findUnique({
+    where: { usuarioId: usuario.id },
+    select: { id: true },
+  }));
+
   // Reordena pela data-limite real (a query trazia ordenada por
   // dataPrevistaExecucao/vigenciaFim, que ignorava dataEntregaCerta —
   // bug Regina 09/06).
@@ -971,7 +978,7 @@ export default async function DashboardPage({
         </div>
 
         <div className="mt-3.5">
-          <AgendaMes entregas={agendaMes} mesReferencia={mesAgenda} hoje={hoje} />
+          <AgendaMes entregas={agendaMes} mesReferencia={mesAgenda} hoje={hoje} googleConectado={googleConectado} />
         </div>
 
         <div className="mt-3.5">
