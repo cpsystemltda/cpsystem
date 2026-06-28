@@ -28,7 +28,7 @@ import { coletarPinsEmpresas } from "@/lib/pinsEmpresas";
 import { MapaBrasil } from "@/components/MapaBrasil";
 import { ClientesMapaSync } from "@/components/ClientesMapaSync";
 import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto";
-import { prazoLimiteOuVigencia, type PrazoEntregaModo, type PrazoEntregaUnidade } from "@/lib/prazoEntrega";
+import { prazoLimiteOuVigencia, janelaExecucao, type PrazoEntregaModo, type PrazoEntregaUnidade } from "@/lib/prazoEntrega";
 import { SerieHistoricaColapsavel } from "@/components/KpisSaldoVigencia";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { Block } from "@/components/ui/Block";
@@ -36,6 +36,7 @@ import { KPI, CurrencyValue } from "@/components/ui/KPI";
 import { ChartCard } from "@/components/ui/ChartCard";
 import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 import { UploadInteligenteCard } from "@/components/UploadInteligenteCard";
+import { AgendaMes, parseMesAgenda, type EmpenhoAgenda } from "@/components/AgendaMes";
 import { labelCurtoInstrumento, labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
@@ -68,7 +69,11 @@ function formatDate(d: Date | null | undefined): string {
   return d.toLocaleDateString("pt-BR");
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mesAgenda?: string }>;
+}) {
   const usuario = await exigirUsuario();
   const contaId = usuario.contaId;
   const filtroEmpresa = await filtroEmpresaWhere(contaId);
@@ -76,6 +81,12 @@ export default async function DashboardPage() {
   const hoje = new Date();
   const fimAno = new Date(hoje.getFullYear(), 11, 31);
   const em30dias = new Date(hoje.getTime() + 30 * 86400000);
+
+  // Agenda mensal (Igor 26/06): mes visualizado vem do search param
+  // ?mesAgenda=YYYY-MM. Default = mes corrente.
+  const sp = await searchParams;
+  const mesAgenda = parseMesAgenda(sp?.mesAgenda);
+  const fimMesAgenda = new Date(mesAgenda.getFullYear(), mesAgenda.getMonth() + 1, 1);
 
   const [
     empresasDaConta,
@@ -94,6 +105,7 @@ export default async function DashboardPage() {
     somaContratosTodos,
     totalAtasConta,
     totalContratosConta,
+    empenhosAgendaMes,
   ] = await Promise.all([
     prisma.empresa.findMany({ where: { contaId }, select: { id: true, cnpj: true } }),
     prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
@@ -225,6 +237,40 @@ export default async function DashboardPage() {
     }),
     prisma.ata.count({ where: { empresa: filtroEmpresa } }),
     prisma.contrato.count({ where: { empresa: filtroEmpresa } }),
+    // Empenhos cuja janela toca o mes visualizado pela AgendaMes
+    // (Igor 26/06). Filtra os campos de data relevantes; fallback no JS
+    // por janelaExecucao cobre os modos sem coluna direta.
+    prisma.empenho.findMany({
+      where: {
+        empresa: filtroEmpresa,
+        status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] },
+        OR: [
+          { dataEntregaInicio: { lt: fimMesAgenda }, dataEntregaFim: { gte: mesAgenda } },
+          { dataEntregaCerta: { gte: mesAgenda, lt: fimMesAgenda } },
+          { dataPrevistaExecucao: { gte: mesAgenda, lt: fimMesAgenda } },
+          { vigenciaFim: { gte: mesAgenda, lt: fimMesAgenda } },
+        ],
+      },
+      select: {
+        id: true,
+        numero: true,
+        objeto: true,
+        orgaoNome: true,
+        status: true,
+        instrumento: true,
+        vigenciaFim: true,
+        dataPrevistaExecucao: true,
+        prazoEntregaModo: true,
+        dataEntregaCerta: true,
+        dataEntregaInicio: true,
+        dataEntregaFim: true,
+        dataPedidoRecebido: true,
+        prazoEntregaDias: true,
+        prazoEntregaUnidade: true,
+        horaInicio: true,
+        horaFim: true,
+      },
+    }),
   ]);
 
   // Bloco "Honorários do analista" foi movido pro módulo /honorarios
@@ -366,23 +412,28 @@ export default async function DashboardPage() {
   }
   const maxVenc = Math.max(1, ...vencimentosPorMes);
 
-  // Agenda da semana corrente (segunda a domingo). Recorta proximasEntregas
-  // pelo intervalo. Usa dataPrevistaExecucao quando preenchida, senão
-  // vigenciaFim como proxy de "data limite".
-  const inicioSemana = (() => {
-    const d = new Date(hoje);
-    d.setHours(0, 0, 0, 0);
-    // getDay: 0=domingo, 1=segunda... — converte pra semana iniciando na seg
-    const diaSemana = (d.getDay() + 6) % 7;
-    d.setDate(d.getDate() - diaSemana);
-    return d;
-  })();
-  const fimSemana = new Date(inicioSemana);
-  fimSemana.setDate(fimSemana.getDate() + 7);
-  const agendaSemana = proximasEntregas
-    .map((e) => ({ ...e, limite: prazoLimiteOuVigencia(e) }))
-    .filter((e) => e.limite >= inicioSemana && e.limite < fimSemana)
-    .sort((a, b) => a.limite.getTime() - b.limite.getTime());
+  // Agenda mensal (Igor 26/06): substitui a visao semanal antiga. Calcula
+  // janela inicio->fim de cada empenho pra eventos multi-dia aparecerem em
+  // todos os dias do intervalo, e filtra pelos que tocam o mes visualizado.
+  const agendaMes: EmpenhoAgenda[] = empenhosAgendaMes
+    .map((e): EmpenhoAgenda => {
+      const janela = janelaExecucao(e);
+      return {
+        id: e.id,
+        numero: e.numero,
+        objeto: e.objeto,
+        orgaoNome: e.orgaoNome,
+        status: e.status,
+        instrumento: e.instrumento,
+        limite: prazoLimiteOuVigencia(e),
+        janelaInicio: janela.inicio,
+        janelaFim: janela.fim,
+        horaInicio: e.horaInicio,
+        horaFim: e.horaFim,
+      };
+    })
+    .filter((e) => e.janelaInicio < fimMesAgenda && e.janelaFim >= mesAgenda)
+    .sort((a, b) => a.janelaInicio.getTime() - b.janelaInicio.getTime());
 
   // Reordena pela data-limite real (a query trazia ordenada por
   // dataPrevistaExecucao/vigenciaFim, que ignorava dataEntregaCerta —
@@ -920,12 +971,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mt-3.5">
-          <AgendaSemana
-            entregas={agendaSemana}
-            inicio={inicioSemana}
-            fim={fimSemana}
-            hoje={hoje}
-          />
+          <AgendaMes entregas={agendaMes} mesReferencia={mesAgenda} hoje={hoje} />
         </div>
 
         <div className="mt-3.5">
@@ -1733,156 +1779,5 @@ function TabelaLogistica({
         </tbody>
       </table>
     </div>
-  );
-}
-
-// Agenda da semana corrente (segunda a domingo) — empenhos cujo prazo de
-// execução cai no intervalo. Renderiza em 7 colunas (dia da semana) com os
-// itens agrupados; se um dia está vazio mostra "—" pra dar previsibilidade
-// visual.
-function AgendaSemana({
-  entregas,
-  inicio,
-  fim,
-  hoje,
-}: {
-  entregas: {
-    id: string;
-    numero: string;
-    objeto: string;
-    orgaoNome: string;
-    status: string;
-    instrumento: InstrumentoContratual;
-    limite: Date;
-  }[];
-  inicio: Date;
-  fim: Date;
-  hoje: Date;
-}) {
-  const DIAS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-  const hojeNorm = new Date(hoje);
-  hojeNorm.setHours(0, 0, 0, 0);
-
-  // Agrupa por offset 0..6 a partir do início da semana
-  const porDia: Map<number, typeof entregas> = new Map();
-  for (let i = 0; i < 7; i++) porDia.set(i, []);
-  for (const e of entregas) {
-    const ms = e.limite.getTime() - inicio.getTime();
-    const dia = Math.floor(ms / 86400000);
-    if (dia >= 0 && dia < 7) porDia.get(dia)!.push(e);
-  }
-
-  const total = entregas.length;
-  const fimMostrar = new Date(fim.getTime() - 86400000);
-
-  return (
-    <section
-      className="glass overflow-hidden rounded-[20px] px-5 py-5"
-      style={{ border: "0.5px solid var(--hairline)" }}
-    >
-      <header className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h3
-            className="text-[12px] font-bold uppercase"
-            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
-          >
-            Agenda da semana
-          </h3>
-          <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
-            {inicio.toLocaleDateString("pt-BR")} → {fimMostrar.toLocaleDateString("pt-BR")} · {total} execução(ões) com prazo nesta semana
-          </p>
-        </div>
-      </header>
-
-      {total === 0 ? (
-        <div
-          className="rounded-xl px-6 py-10 text-center"
-          style={{ border: "0.5px dashed var(--hairline)" }}
-        >
-          <p className="text-sm font-extrabold" style={{ color: "var(--text)" }}>
-            Sem entregas previstas para esta semana.
-          </p>
-          <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-            Empenhos com prazo entre {inicio.toLocaleDateString("pt-BR")} e {fimMostrar.toLocaleDateString("pt-BR")}.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-2 md:grid-cols-7">
-          {DIAS.map((label, idx) => {
-            const dataDia = new Date(inicio);
-            dataDia.setDate(dataDia.getDate() + idx);
-            const ehHoje = dataDia.getTime() === hojeNorm.getTime();
-            const itens = porDia.get(idx) ?? [];
-            return (
-              <div
-                key={idx}
-                className="rounded-xl px-3 py-2"
-                style={{
-                  background: ehHoje ? "rgba(212,175,55,0.14)" : "rgba(15,14,12,0.03)",
-                  border: ehHoje
-                    ? "0.5px solid rgba(168,137,71,0.5)"
-                    : "0.5px solid var(--hairline)",
-                  minHeight: "92px",
-                }}
-              >
-                <div className="mb-1.5 flex items-center justify-between gap-1">
-                  <span
-                    className="text-[10px] font-bold uppercase"
-                    style={{
-                      letterSpacing: "0.12em",
-                      color: ehHoje ? "var(--primary-deep)" : "var(--text-mute)",
-                    }}
-                  >
-                    {label} {dataDia.getDate().toString().padStart(2, "0")}
-                  </span>
-                  {ehHoje && (
-                    <span
-                      className="rounded-full px-1.5 py-0.5 text-[9px] font-extrabold"
-                      style={{
-                        background: "var(--primary-deep)",
-                        color: "white",
-                        letterSpacing: "0.06em",
-                      }}
-                    >
-                      HOJE
-                    </span>
-                  )}
-                </div>
-                {itens.length === 0 ? (
-                  <p className="text-[11px]" style={{ color: "var(--text-mute)" }}>
-                    —
-                  </p>
-                ) : (
-                  <ul className="space-y-1">
-                    {itens.map((e) => {
-                      const atrasado = e.limite < hojeNorm;
-                      return (
-                        <li key={e.id}>
-                          <Link
-                            href={`/execucao/${e.id}`}
-                            className="block rounded px-1.5 py-1 text-[11px] hover:bg-white/70"
-                            style={{
-                              color: atrasado ? "var(--coral-deep)" : "var(--text)",
-                              background: "rgba(255,255,255,0.5)",
-                              border: "0.5px solid var(--hairline)",
-                            }}
-                            title={`${labelInstrumento(e.instrumento)} ${e.numero} · ${e.orgaoNome} · ${e.objeto}`}
-                          >
-                            <p className="truncate font-bold">{labelCurtoInstrumento(e.instrumento)} {e.numero}</p>
-                            <p className="truncate" style={{ color: "var(--text-soft)" }}>
-                              {e.orgaoNome}
-                            </p>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
   );
 }

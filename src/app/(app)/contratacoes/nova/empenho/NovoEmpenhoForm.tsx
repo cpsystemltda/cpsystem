@@ -114,6 +114,9 @@ export type EmpenhoValoresIniciais = {
   dataEntregaCerta?: string | null;
   dataEntregaInicio?: string | null;
   dataEntregaFim?: string | null;
+  // Horario da execucao (Igor 26/06) — opcional, pra servicos/locacoes.
+  horaInicio?: string | null;
+  horaFim?: string | null;
   prazoPagamentoDias: number | null;
   // Campos específicos por instrumento (todos opcionais; só aparecem no
   // form quando o instrumento correspondente está selecionado).
@@ -681,6 +684,32 @@ export default function NovoEmpenhoForm({
                   />
                 </div>
               )}
+              {/* Horario de execucao (opcional) — pra servicos/locacoes que
+                  tem hora marcada. Igor 26/06: visualizar na agenda. */}
+              <div className="mt-2 flex items-end gap-2">
+                <div className="flex-1">
+                  <label className="mb-1 block text-[10px] font-bold uppercase" style={{ letterSpacing: "0.1em", color: "var(--text-soft)" }}>
+                    Horário início (opcional)
+                  </label>
+                  <input
+                    type="time"
+                    name="horaInicio"
+                    defaultValue={vi?.horaInicio ?? ""}
+                    className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="mb-1 block text-[10px] font-bold uppercase" style={{ letterSpacing: "0.1em", color: "var(--text-soft)" }}>
+                    Horário término (opcional)
+                  </label>
+                  <input
+                    type="time"
+                    name="horaFim"
+                    defaultValue={vi?.horaFim ?? ""}
+                    className="w-full rounded-xl px-4 py-3 text-sm font-medium"
+                  />
+                </div>
+              </div>
             </div>
             <Field
               label="Prazo de pagamento (dias)"

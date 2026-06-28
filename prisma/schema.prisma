@@ -848,6 +848,11 @@ model Empenho {
   // Modo PRAZO_CERTO — janela com inicio e fim.
   dataEntregaInicio       DateTime?
   dataEntregaFim          DateTime?
+  // Horario da execucao (Igor 26/06): pra servicos/locacoes que tem
+  // horario marcado. Strings "HH:MM" (24h). Opcionais — empenhos de
+  // fornecimento normalmente nao tem horario.
+  horaInicio              String?
+  horaFim                 String?
   prazoPagamentoDias      Int?
 
   status StatusExecucao @default(EMPENHADO)

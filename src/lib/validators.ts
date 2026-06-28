@@ -444,6 +444,16 @@ export const novoEmpenhoSchema = contratacaoBase
       (v) => (v === "" || v == null ? undefined : v),
       z.coerce.date().optional(),
     ),
+    // Horario da execucao (Igor 26/06) — opcional, "HH:MM" 24h. Pra
+    // servicos/locacoes que tem hora marcada.
+    horaInicio: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").optional(),
+    ),
+    horaFim: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").optional(),
+    ),
     enderecosEntrega: z.array(enderecoEntregaSchema).optional(),
     pontosFocais: z.array(pontoFocalSchema).optional(),
     itens: z

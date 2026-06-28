@@ -123,6 +123,8 @@ export default async function EditarEmpenhoPage({ params }: { params: Promise<{ 
     dataEntregaCerta: toDateInput(empenho.dataEntregaCerta),
     dataEntregaInicio: toDateInput(empenho.dataEntregaInicio),
     dataEntregaFim: toDateInput(empenho.dataEntregaFim),
+    horaInicio: empenho.horaInicio,
+    horaFim: empenho.horaFim,
     prazoPagamentoDias: empenho.prazoPagamentoDias,
     classificacaoOrcamentaria: empenho.classificacaoOrcamentaria,
     signatario: empenho.signatario,
