@@ -19,6 +19,7 @@ import {
   Bell,
   Sparkles,
   Wallet,
+  Plug,
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { SeletorVisao } from "@/components/SeletorVisao";
@@ -71,6 +72,7 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
     itens: [
       { href: "/notificacoes", label: "Notificações", icon: Bell },
       { href: "/conta/assinatura", label: "Assinatura", icon: CreditCard },
+      { href: "/conta/integracoes", label: "Integrações", icon: Plug },
       { href: "/conta/indicar", label: "Indique e ganhe", icon: Gift },
       { href: "/vinculos", label: "Analista vinculado", icon: UserCheck },
       { href: "/equipe", label: "Equipe", icon: Users },

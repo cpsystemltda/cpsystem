@@ -33,6 +33,7 @@ import {
 } from "@/lib/diff";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
+import { sincronizarEmpenho } from "@/lib/googleCalendar";
 
 type ActionResult = {
   erro?: string;
@@ -1264,6 +1265,8 @@ export async function excluirEmpenhoAction(formData: FormData) {
   // (ComissaoExecucao, ReajusteRetroativo, EmpenhoItem, etc.) tem
   // onDelete: Cascade no schema, entao a remocao limpa o historico
   // financeiro junto. Confirmacao inline ja existe no botao.
+  // Sync Google Calendar ANTES de deletar (precisa do googleEventId)
+  await sincronizarEmpenho(id, "delete");
   await prisma.empenho.delete({ where: { id } });
   revalidatePath("/execucao");
   revalidatePath("/dashboard");
@@ -1530,6 +1533,9 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
       }
       idx++;
     }
+
+    // Sync best-effort com Google Calendar (Igor 26/06).
+    await sincronizarEmpenho(empenho.id, "upsert");
 
     revalidatePath("/execucao");
     revalidatePath("/contratos");
@@ -1854,6 +1860,9 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
       }
       idx++;
     }
+
+    // Sync best-effort com Google Calendar (Igor 26/06).
+    await sincronizarEmpenho(empenhoId, "upsert");
 
     revalidatePath("/execucao");
     revalidatePath(`/execucao/${empenhoId}`);

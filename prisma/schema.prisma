@@ -108,8 +108,27 @@ model Usuario {
   empenhosCriados  Empenho[]  @relation("EmpenhosCriados")
   pareceresCriados ParecerJuridico[] @relation("ParecresCriados")
   reajustesRetroativosCriados ReajusteRetroativo[] @relation("ReajustesRetroativosCriados")
+  contaGoogle      GoogleAccount?
 
   @@index([contaId])
+}
+
+// Conta Google conectada via OAuth (Igor 26/06). 1 conta Google por
+// usuario do CP System. Empenhos criados por esse usuario sincronizam
+// pro Google Calendar dele. accessToken expira em ~1h; refreshToken
+// usado pra renovar.
+model GoogleAccount {
+  id           String   @id @default(cuid())
+  usuarioId    String   @unique
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  googleEmail  String
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
+  expiresAt    DateTime
+  // Calendario destino: null = primary (calendario principal do usuario)
+  calendarId   String?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 }
 
 // Histórico do chat com o IAsystem — uma linha por mensagem, isolada por
@@ -853,6 +872,11 @@ model Empenho {
   // fornecimento normalmente nao tem horario.
   horaInicio              String?
   horaFim                 String?
+  // ID do evento sincronizado no Google Calendar (Igor 26/06). Quando
+  // preenchido, ediçoes/exclusoes propagam pro Google. null = nao
+  // sincronizado (usuario sem GoogleAccount ou empenho criado antes
+  // da integracao).
+  googleEventId           String?
   prazoPagamentoDias      Int?
 
   status StatusExecucao @default(EMPENHADO)
