@@ -12,6 +12,7 @@ import {
   DollarSign,
   Truck,
   Users,
+  Check,
 } from "lucide-react";
 import { Field } from "@/components/Field";
 import { SubmitButton } from "@/components/SubmitButton";
@@ -60,9 +61,9 @@ export default function HomeLandingClient() {
             <a href="#sistema" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               O sistema
             </a>
-            <Link href="/precos" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
+            <a href="#planos" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Planos
-            </Link>
+            </a>
             <a href="#analistas" className="text-[13px] font-semibold transition hover:opacity-80" style={{ color: "var(--text-soft)" }}>
               Para analistas
             </a>
@@ -138,8 +139,8 @@ export default function HomeLandingClient() {
               Solicite demonstração
               <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
             </Link>
-            <Link
-              href="/precos"
+            <a
+              href="#planos"
               className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition"
               style={{
                 background: "rgba(255,255,255,0.7)",
@@ -149,7 +150,7 @@ export default function HomeLandingClient() {
               }}
             >
               Ver planos
-            </Link>
+            </a>
           </div>
         </section>
 
@@ -231,8 +232,8 @@ export default function HomeLandingClient() {
               </div>
 
               <div className="mt-7">
-                <Link
-                  href="/precos"
+                <a
+                  href="#planos"
                   className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
                   style={{
                     background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
@@ -241,9 +242,9 @@ export default function HomeLandingClient() {
                     boxShadow: "0 10px 26px -6px rgba(168,137,71,0.4), inset 0 1px 0 rgba(255,255,255,0.45)",
                   }}
                 >
-                  Mais sobre o sistema
+                  Ver planos
                   <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
-                </Link>
+                </a>
               </div>
             </div>
 
@@ -392,6 +393,73 @@ export default function HomeLandingClient() {
                 Saiba mais
               </Link>
             </div>
+          </div>
+        </section>
+
+        {/* ============== SEÇÃO 4.5 — PLANOS (DARK) ============== */}
+        {/* Igor 28/06: tirar pagina /precos separada, embutir aqui na home
+            como ancora #planos. So 2 planos (Basico+Premium) — corporativo
+            nao existe. */}
+        <section id="planos" className="section-dark-bleed mt-12">
+          <div className="text-center">
+            <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}>
+              Planos transparentes
+            </span>
+            <h2
+              className="mx-auto mt-3 max-w-[700px] text-[28px] font-extrabold leading-tight lg:text-[36px]"
+              style={{ color: "var(--text)", letterSpacing: "-0.025em" }}
+            >
+              Escolha seu plano e comece em{" "}
+              <em
+                style={{
+                  fontStyle: "normal",
+                  background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                14 dias grátis
+              </em>
+              .
+            </h2>
+            <p className="mx-auto mt-4 max-w-[640px] text-[14px] leading-relaxed lg:text-[15px]" style={{ color: "var(--text-soft)" }}>
+              Cartão validado no cadastro — <strong>não cobramos durante o teste</strong>. Cancela com 1 clique antes do 14º dia, sem fidelidade.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-12 grid max-w-[1000px] gap-5 md:grid-cols-2">
+            <PlanoCardDark
+              nome="Básico"
+              preco="R$ 397"
+              descricao="Pra empresa com 1 CNPJ que precisa controlar contratos públicos."
+              cta="Começar trial grátis"
+              features={[
+                "1 CNPJ incluso · CNPJ adicional: R$ 39,90/mês cada",
+                "Atas, Contratos e Empenhos ilimitados",
+                "Alertas automáticos de prazo, pagamento e reajuste",
+                "Saldo de Ata por vigência separada (Lei 14.133)",
+                "Histórico de execução com timeline",
+                "Suporte por email e chat (4h dia útil)",
+                "10 perguntas IAsystem / mês",
+              ]}
+            />
+            <PlanoCardDark
+              destaque
+              nome="Premium"
+              preco="R$ 997"
+              descricao="Pra empresa com múltiplos CNPJs ou que precisa de IA jurídica completa."
+              cta="Começar trial grátis"
+              features={[
+                "Múltiplas empresas (CNPJs ilimitados)",
+                "Tudo do Básico, sem limite",
+                "IAsystem ilimitado — parecer jurídico em 30s",
+                "Análise jurídica de PDF (Ata, Contrato, Aditivo, Apostilamento)",
+                "Painel financeiro consolidado multi-empresa",
+                "Programa de vínculo com analista parceiro",
+                "Suporte prioritário (4h dia útil)",
+              ]}
+            />
           </div>
         </section>
 
@@ -583,8 +651,8 @@ export default function HomeLandingClient() {
                 Solicite demonstração
                 <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
               </Link>
-              <Link
-                href="/precos"
+              <a
+                href="#planos"
                 className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition"
                 style={{
                   background: "rgba(255,255,255,0.7)",
@@ -594,7 +662,7 @@ export default function HomeLandingClient() {
                 }}
               >
                 Ver planos
-              </Link>
+              </a>
             </div>
           </div>
         </section>
@@ -633,6 +701,100 @@ export default function HomeLandingClient() {
           box-shadow: 0 0 0 3px var(--primary-glow);
         }
       `}</style>
+    </div>
+  );
+}
+
+// ===========================================================
+// PLANO CARD DARK (seção #planos na home, tema escuro premium)
+// ===========================================================
+function PlanoCardDark({
+  nome,
+  preco,
+  descricao,
+  cta,
+  features,
+  destaque,
+}: {
+  nome: string;
+  preco: string;
+  descricao: string;
+  cta: string;
+  features: string[];
+  destaque?: boolean;
+}) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-3xl p-7"
+      style={{
+        background: destaque
+          ? "linear-gradient(180deg, rgba(212,175,55,0.08) 0%, rgba(232,200,117,0.03) 100%)"
+          : "rgba(255,255,255,0.04)",
+        border: destaque ? "1px solid rgba(212,175,55,0.5)" : "0.5px solid var(--hairline)",
+        boxShadow: destaque ? "0 20px 50px -10px rgba(212,175,55,0.25)" : undefined,
+      }}
+    >
+      {destaque && (
+        <div
+          className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-4 py-1 text-[10px] font-extrabold uppercase text-[#0A0A0A]"
+          style={{
+            background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
+            letterSpacing: "0.18em",
+          }}
+        >
+          ⭐ Mais escolhido
+        </div>
+      )}
+
+      <h3
+        className="text-[12px] font-bold uppercase"
+        style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+      >
+        {nome}
+      </h3>
+
+      <p
+        className="mt-3 text-[40px] font-extrabold leading-none"
+        style={{ color: "var(--text)", letterSpacing: "-0.04em" }}
+      >
+        {preco}
+        <span className="text-[15px] font-semibold" style={{ color: "var(--text-soft)" }}>
+          {" "}
+          /mês
+        </span>
+      </p>
+
+      <p className="mt-3 min-h-[44px] text-[13px]" style={{ color: "var(--text-soft)" }}>
+        {descricao}
+      </p>
+
+      <Link
+        href="/signup"
+        className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
+        style={{
+          background: destaque
+            ? "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)"
+            : "rgba(255,255,255,0.06)",
+          color: destaque ? "#0A0A0A" : "var(--text)",
+          border: destaque ? "0.5px solid rgba(168,137,71,0.5)" : "0.5px solid var(--hairline)",
+          letterSpacing: "0.18em",
+          boxShadow: destaque
+            ? "0 10px 26px -6px rgba(168,137,71,0.4), inset 0 1px 0 rgba(255,255,255,0.45)"
+            : undefined,
+        }}
+      >
+        {cta}
+        <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
+      </Link>
+
+      <ul className="mt-7 space-y-3">
+        {features.map((f, i) => (
+          <li key={i} className="flex items-start gap-2.5 text-[13px]" style={{ color: "var(--text-soft)" }}>
+            <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: "var(--primary)" }} />
+            <span>{f}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
