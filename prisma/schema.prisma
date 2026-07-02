@@ -96,6 +96,14 @@ model Usuario {
   // em E.164 sem "+" (ex: 5521997209623). optIn ausente = sem envio.
   telefoneWhatsApp  String?
   optInWhatsApp     Boolean       @default(false)
+  // Dados pessoais completados no onboarding do 1o login (Regina 02/07).
+  // Contas migradas (ex: Igor -> Leo) chegam com dados null e usuario
+  // preenche antes de acessar o sistema. dataNascimento tambem serve
+  // pra CP System mandar mensagem de aniversario no dia.
+  cpf               String?
+  cargo             String?
+  dataNascimento    DateTime?
+  onboardingConcluido Boolean     @default(true)
   criadoEm          DateTime      @default(now())
   atualizadoEm      DateTime      @updatedAt
 
@@ -141,6 +149,7 @@ enum TipoNotificacaoWhatsApp {
   ANALISTA_VINCULADO
   COMISSAO_LIBERADA
   REAJUSTE_APROVADO
+  ANIVERSARIO
 }
 
 enum StatusNotificacaoWhatsApp {

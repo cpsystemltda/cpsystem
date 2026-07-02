@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/Sidebar";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { contarNaoLidas } from "@/lib/notificacoes";
@@ -52,6 +53,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     lerVisao(),
     lerEspionagemAtual(),
   ]);
+
+  // Onboarding pendente: usuario migrado ou com dados incompletos precisa
+  // completar cadastro pessoal antes de acessar (Regina 02/07).
+  // Super admin escapa (nao passa por wizard).
+  const pathnameAtual = h.get("x-pathname") || "/";
+  if (!usuario.superAdmin && !pathnameAtual.startsWith("/onboarding")) {
+    const perfilUsuario = await prisma.usuario.findUnique({
+      where: { id: usuario.id },
+      select: { onboardingConcluido: true },
+    });
+    if (perfilUsuario && !perfilUsuario.onboardingConcluido) {
+      redirect("/onboarding");
+    }
+  }
 
   const qtdNotificacoes = await contarNaoLidas(usuario.id);
 

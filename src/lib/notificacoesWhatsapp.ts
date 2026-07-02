@@ -768,6 +768,43 @@ export async function notificarReajusteAprovado(opts: {
   }
 }
 
+// ==================== ANIVERSARIO ====================
+
+// Envia mensagem de parabens pra usuarios com dataNascimento=hoje.
+// Idempotente por ano — usa referenciaId = "aniv-YYYY".
+export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ enviados: number }> {
+  const mes = hoje.getMonth() + 1;
+  const dia = hoje.getDate();
+  const ano = hoje.getFullYear();
+
+  // Postgres — WHERE extract(month/day). Prisma nao suporta direto,
+  // uso $queryRaw pra performance.
+  const usuarios = await prisma.$queryRaw<Array<{ id: string; nome: string }>>`
+    SELECT id, nome FROM "Usuario"
+    WHERE "optInWhatsApp" = true
+      AND "telefoneWhatsApp" IS NOT NULL
+      AND EXTRACT(MONTH FROM "dataNascimento") = ${mes}
+      AND EXTRACT(DAY FROM "dataNascimento") = ${dia}
+  `;
+
+  let enviados = 0;
+  for (const u of usuarios) {
+    const msg =
+      `🎉 *Feliz aniversário, ${primeiroNome(u.nome)}!* 🎂\n\n` +
+      `Toda a equipe do CP System te deseja um dia incrível e um ano cheio de contratos fechados, prazos cumpridos e pagamentos em dia.\n\n` +
+      `Muito obrigado por confiar na gente pra cuidar da sua execução pública. Que venha muito sucesso!\n\n` +
+      `Com carinho,\nEquipe CP System 💚`;
+    const r = await dispararNotificacao({
+      usuarioId: u.id,
+      tipo: "ANIVERSARIO",
+      referenciaId: `aniv-${ano}`,
+      mensagem: msg,
+    });
+    if (r.enviado) enviados++;
+  }
+  return { enviados };
+}
+
 // ==================== ORQUESTRADOR DIARIO ====================
 
 // Chamado pela regua diaria (que ja roda no cron da Vercel).
@@ -779,6 +816,7 @@ export async function executarNotificacoesDiarias(): Promise<{
   nfPendente: Awaited<ReturnType<typeof notificarNfSemPagamento30d>>;
   cartaoExpira: Awaited<ReturnType<typeof notificarCartaoExpirando>>;
   garantia: Awaited<ReturnType<typeof notificarGarantiaVencendo>>;
+  aniversario: Awaited<ReturnType<typeof notificarAniversarios>>;
 }> {
   const hoje = new Date();
   const empenhos = await notificarPrazosEmpenho(hoje).catch((e) => {
@@ -805,5 +843,9 @@ export async function executarNotificacoesDiarias(): Promise<{
     console.error("[notif] erro em garantia vencendo:", e);
     return { enviados: 0 };
   });
-  return { empenhos, carteira, planos, nfPendente, cartaoExpira, garantia };
+  const aniversario = await notificarAniversarios(hoje).catch((e) => {
+    console.error("[notif] erro em aniversarios:", e);
+    return { enviados: 0 };
+  });
+  return { empenhos, carteira, planos, nfPendente, cartaoExpira, garantia, aniversario };
 }
