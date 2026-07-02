@@ -88,6 +88,18 @@ export async function criarVinculoAnalistaAction(_p: Result | null, formData: Fo
       }
     }
 
+    // Notifica WhatsApp — analista vinculado a conta (best-effort).
+    try {
+      const { notificarAnalistaVinculado } = await import("@/lib/notificacoesWhatsapp");
+      await notificarAnalistaVinculado({
+        contaId: usuario.contaId,
+        vinculoId: vinculo.id,
+        nomeAnalista: analista.nomeCompleto,
+      });
+    } catch (e) {
+      console.error("[notif vinculo]", e);
+    }
+
     revalidatePath("/vinculos");
     revalidatePath("/painel-analista");
     return { ok: true, vinculoId: vinculo.id };

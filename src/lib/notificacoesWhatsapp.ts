@@ -513,6 +513,261 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
   return { enviados };
 }
 
+// ==================== FASE 2 — CRON ====================
+
+// NF emitida ou encaminhada ha 30+ dias sem PAGO. Cliente pode acionar
+// cobranca do orgao (juros art. 141 Lei 14.133).
+export async function notificarNfSemPagamento30d(hoje: Date = new Date()): Promise<{ enviados: number }> {
+  const inicioHoje = new Date(hoje);
+  inicioHoje.setHours(0, 0, 0, 0);
+  const ha30d = new Date(inicioHoje.getTime() - 30 * 86400000);
+  const hojeStr = inicioHoje.toISOString().slice(0, 10);
+
+  const empenhos = await prisma.empenho.findMany({
+    where: {
+      status: { in: ["NF_EMITIDA", "NF_ENCAMINHADA"] },
+      OR: [
+        { dataNfEncaminhada: { lte: ha30d } },
+        { AND: [{ dataNfEncaminhada: null }, { dataNfEmitida: { lte: ha30d } }] },
+      ],
+    },
+    select: {
+      id: true, numero: true, orgaoNome: true, instrumento: true,
+      dataNfEmitida: true, dataNfEncaminhada: true,
+      itens: { select: { valorTotal: true } },
+      empresa: { select: { contaId: true } },
+    },
+  });
+
+  let enviados = 0;
+  for (const e of empenhos) {
+    const usuarios = await destinatariosDaConta(e.empresa.contaId);
+    if (!usuarios.length) continue;
+    const valorTotal = e.itens.reduce((s, i) => s + i.valorTotal, 0);
+    const dataNf = e.dataNfEncaminhada ?? e.dataNfEmitida;
+    const diasSemPago = dataNf ? Math.floor((inicioHoje.getTime() - dataNf.getTime()) / 86400000) : 30;
+    for (const u of usuarios) {
+      const msg =
+        `💸 *NF sem pagamento há ${diasSemPago} dias*\n\n` +
+        `${primeiroNome(u.nome)}, o ${LABEL_INSTRUMENTO[e.instrumento]} *${e.numero}* (${e.orgaoNome}) teve NF encaminhada há mais de 30 dias e ainda não foi pago.\n\n` +
+        `Valor: ${brl(valorTotal)}\n\n` +
+        `Você pode acionar a cobrança do órgão (juros art. 141, Lei 14.133/2021).\n\nDetalhes: https://cpsystem.app.br/execucao/${e.id}`;
+      const r = await dispararNotificacao({
+        usuarioId: u.id,
+        tipo: "NF_SEM_PAGAMENTO_30D",
+        referenciaId: `nf30-${e.id}-${hojeStr}`,
+        mensagem: msg,
+      });
+      if (r.enviado) enviados++;
+    }
+  }
+  return { enviados };
+}
+
+// Cartao de credito da assinatura CP System expirando nos proximos 30 dias.
+export async function notificarCartaoExpirando(hoje: Date = new Date()): Promise<{ enviados: number }> {
+  const inicioHoje = new Date(hoje);
+  inicioHoje.setHours(0, 0, 0, 0);
+  const hojeStr = inicioHoje.toISOString().slice(0, 10);
+  const mesAtual = inicioHoje.getMonth() + 1;
+  const anoAtual = inicioHoje.getFullYear();
+
+  // Cartoes com validade neste mes ou proximo
+  const cartoes = await prisma.metodoPagamento.findMany({
+    where: {
+      forma: "CARTAO_CREDITO",
+      padrao: true,
+      OR: [
+        { validadeAno: anoAtual, validadeMes: { gte: mesAtual, lte: mesAtual + 1 } },
+        // dezembro deste ano -> janeiro proximo
+        ...(mesAtual === 12
+          ? [{ validadeAno: anoAtual + 1, validadeMes: 1 }]
+          : []),
+      ],
+    },
+    select: { contaId: true, bandeira: true, ultimosDigitos: true, validadeMes: true, validadeAno: true },
+  });
+
+  let enviados = 0;
+  for (const c of cartoes) {
+    const usuarios = await destinatariosDaConta(c.contaId);
+    for (const u of usuarios) {
+      const msg =
+        `💳 *Seu cartão do CP System vence em breve*\n\n` +
+        `${primeiroNome(u.nome)}, o ${c.bandeira || "cartão"} final *${c.ultimosDigitos}* vence em ${String(c.validadeMes).padStart(2, "0")}/${c.validadeAno}.\n\n` +
+        `Atualize antes pra sua assinatura não ser interrompida:\n` +
+        `https://cpsystem.app.br/conta/assinatura`;
+      const r = await dispararNotificacao({
+        usuarioId: u.id,
+        tipo: "CARTAO_EXPIRANDO",
+        referenciaId: `cartao-${c.ultimosDigitos}-${c.validadeMes}-${c.validadeAno}`,
+        mensagem: msg,
+      });
+      if (r.enviado) enviados++;
+    }
+  }
+  return { enviados };
+}
+
+// Garantia contratual vencendo em ate 60 dias.
+export async function notificarGarantiaVencendo(hoje: Date = new Date()): Promise<{ enviados: number }> {
+  const inicioHoje = new Date(hoje);
+  inicioHoje.setHours(0, 0, 0, 0);
+  const em60d = new Date(inicioHoje.getTime() + 60 * 86400000);
+  const em30d = new Date(inicioHoje.getTime() + 30 * 86400000);
+  const em31d = new Date(inicioHoje.getTime() + 31 * 86400000);
+  const em61d = new Date(inicioHoje.getTime() + 61 * 86400000);
+  const hojeStr = inicioHoje.toISOString().slice(0, 10);
+
+  // Notifica em 60d e 30d (2 alertas). Campo real do schema: `dataFim`.
+  const garantias60 = await prisma.garantia.findMany({
+    where: { dataFim: { gte: em60d, lt: em61d } },
+    select: {
+      id: true,
+      modalidade: true,
+      dataFim: true,
+      empenho: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
+      contrato: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
+    },
+  });
+  const garantias30 = await prisma.garantia.findMany({
+    where: { dataFim: { gte: em30d, lt: em31d } },
+    select: {
+      id: true,
+      modalidade: true,
+      dataFim: true,
+      empenho: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
+      contrato: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
+    },
+  });
+
+  let enviados = 0;
+  async function disparar(garantias: typeof garantias60, dias: 60 | 30) {
+    for (const g of garantias) {
+      const doc = g.empenho ?? g.contrato;
+      if (!doc || !g.dataFim) continue;
+      const usuarios = await destinatariosDaConta(doc.empresa.contaId);
+      for (const u of usuarios) {
+        const emoji = dias === 30 ? "⚠️" : "🛡️";
+        const msg =
+          `${emoji} *Garantia vencendo em ${dias} dias*\n\n` +
+          `${primeiroNome(u.nome)}, a garantia (${g.modalidade}) do documento *${doc.numero}* (${doc.orgaoNome}) vence em ${g.dataFim.toLocaleDateString("pt-BR")}.\n\n` +
+          `${dias === 30 ? "Renove urgente pra evitar aditivo emergencial." : "Programe renovação junto ao órgão."}`;
+        const r = await dispararNotificacao({
+          usuarioId: u.id,
+          tipo: "GARANTIA_VENCENDO",
+          referenciaId: `gar-${dias}d-${g.id}-${hojeStr}`,
+          mensagem: msg,
+        });
+        if (r.enviado) enviados++;
+      }
+    }
+  }
+  await disparar(garantias60, 60);
+  await disparar(garantias30, 30);
+  return { enviados };
+}
+
+// ==================== FASE 2 — EVENT-DRIVEN ====================
+
+// Novo procedimento apuratorio aberto (multa/penalidade a possivel).
+export async function notificarProcedimentoApuratorio(opts: {
+  contaId: string;
+  procedimentoId: string;
+  assunto: string;
+  orgao: string;
+  prazoDefesaDias: number | null;
+}) {
+  const usuarios = await destinatariosDaConta(opts.contaId);
+  for (const u of usuarios) {
+    const prazo = opts.prazoDefesaDias ? `\n\n⏱️ Prazo de defesa: *${opts.prazoDefesaDias} dias*` : "";
+    const msg =
+      `🚨 *Procedimento administrativo aberto*\n\n` +
+      `${primeiroNome(u.nome)}, um procedimento apuratório foi registrado contra sua empresa:\n\n` +
+      `Assunto: *${opts.assunto}*\n` +
+      `Órgão: ${opts.orgao}${prazo}\n\n` +
+      `Acesse pra apresentar defesa: https://cpsystem.app.br/procedimentos/${opts.procedimentoId}`;
+    await dispararNotificacao({
+      usuarioId: u.id,
+      tipo: "PROCEDIMENTO_APURATORIO",
+      referenciaId: `proc-${opts.procedimentoId}`,
+      mensagem: msg,
+    });
+  }
+}
+
+// Novo parecer juridico gerado (via IA ou manual).
+export async function notificarParecerJuridico(opts: {
+  contaId: string;
+  parecerId: string;
+  titulo: string;
+  documentoTipo: "ATA" | "CONTRATO" | "EMPENHO" | "GERAL";
+}) {
+  const usuarios = await destinatariosDaConta(opts.contaId);
+  for (const u of usuarios) {
+    const msg =
+      `⚖️ *Novo parecer jurídico disponível*\n\n` +
+      `${primeiroNome(u.nome)}, um parecer jurídico foi gerado:\n\n` +
+      `*${opts.titulo}*\n` +
+      `Categoria: ${opts.documentoTipo.toLowerCase()}\n\n` +
+      `Confira no /juridico: https://cpsystem.app.br/juridico/${opts.parecerId}`;
+    await dispararNotificacao({
+      usuarioId: u.id,
+      tipo: "PARECER_JURIDICO",
+      referenciaId: `parecer-${opts.parecerId}`,
+      mensagem: msg,
+    });
+  }
+}
+
+// Analista vinculou-se a uma empresa (ficou ATIVO).
+export async function notificarAnalistaVinculado(opts: {
+  contaId: string;
+  vinculoId: string;
+  nomeAnalista: string;
+}) {
+  const usuarios = await destinatariosDaConta(opts.contaId);
+  for (const u of usuarios) {
+    const msg =
+      `🤝 *Analista vinculado à sua conta*\n\n` +
+      `${primeiroNome(u.nome)}, o analista *${opts.nomeAnalista}* está agora vinculado como responsável pelos seus contratos públicos.\n\n` +
+      `Gerencie o vínculo em: https://cpsystem.app.br/vinculos`;
+    await dispararNotificacao({
+      usuarioId: u.id,
+      tipo: "ANALISTA_VINCULADO",
+      referenciaId: `vinc-${opts.vinculoId}`,
+      mensagem: msg,
+    });
+  }
+}
+
+// Reajuste aprovado (mês de vigência começa).
+export async function notificarReajusteAprovado(opts: {
+  contaId: string;
+  reajusteId: string;
+  empenhoNumero: string;
+  orgao: string;
+  percentual: number;
+  mesInicio: string; // YYYY-MM
+}) {
+  const usuarios = await destinatariosDaConta(opts.contaId);
+  const [ano, mes] = opts.mesInicio.split("-");
+  const nomeMes = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][Number(mes)-1];
+  for (const u of usuarios) {
+    const msg =
+      `📈 *Reajuste aprovado*\n\n` +
+      `${primeiroNome(u.nome)}, o empenho *${opts.empenhoNumero}* (${opts.orgao}) teve reajuste de *${opts.percentual.toFixed(2)}%* aprovado.\n\n` +
+      `Vigência a partir de: ${nomeMes}/${ano}\n\n` +
+      `Detalhes: https://cpsystem.app.br/reajustes/${opts.reajusteId}`;
+    await dispararNotificacao({
+      usuarioId: u.id,
+      tipo: "REAJUSTE_APROVADO",
+      referenciaId: `reaj-${opts.reajusteId}`,
+      mensagem: msg,
+    });
+  }
+}
+
 // ==================== ORQUESTRADOR DIARIO ====================
 
 // Chamado pela regua diaria (que ja roda no cron da Vercel).
@@ -521,6 +776,9 @@ export async function executarNotificacoesDiarias(): Promise<{
   empenhos: Awaited<ReturnType<typeof notificarPrazosEmpenho>>;
   carteira: Awaited<ReturnType<typeof notificarVencimentosCarteira>>;
   planos: Awaited<ReturnType<typeof notificarVencimentosPlano>>;
+  nfPendente: Awaited<ReturnType<typeof notificarNfSemPagamento30d>>;
+  cartaoExpira: Awaited<ReturnType<typeof notificarCartaoExpirando>>;
+  garantia: Awaited<ReturnType<typeof notificarGarantiaVencendo>>;
 }> {
   const hoje = new Date();
   const empenhos = await notificarPrazosEmpenho(hoje).catch((e) => {
@@ -535,5 +793,17 @@ export async function executarNotificacoesDiarias(): Promise<{
     console.error("[notif] erro em vencimentos plano:", e);
     return { em3d: 0, atrasado: 0 };
   });
-  return { empenhos, carteira, planos };
+  const nfPendente = await notificarNfSemPagamento30d(hoje).catch((e) => {
+    console.error("[notif] erro em NF sem pagamento:", e);
+    return { enviados: 0 };
+  });
+  const cartaoExpira = await notificarCartaoExpirando(hoje).catch((e) => {
+    console.error("[notif] erro em cartao expirando:", e);
+    return { enviados: 0 };
+  });
+  const garantia = await notificarGarantiaVencendo(hoje).catch((e) => {
+    console.error("[notif] erro em garantia vencendo:", e);
+    return { enviados: 0 };
+  });
+  return { empenhos, carteira, planos, nfPendente, cartaoExpira, garantia };
 }

@@ -1687,6 +1687,26 @@ export async function criarProcedimentoAction(_p: Result | null, formData: FormD
     if (ataId) revalidatePath(`/atas/${ataId}`);
     if (contratoId) revalidatePath(`/contratos/${contratoId}`);
     if (empenhoId) revalidatePath(`/execucao/${empenhoId}`);
+
+    // Notifica WhatsApp — procedimento aberto (best-effort).
+    try {
+      const orgao =
+        (empenhoId && (await prisma.empenho.findUnique({ where: { id: empenhoId }, select: { orgaoNome: true } }))?.orgaoNome) ||
+        (contratoId && (await prisma.contrato.findUnique({ where: { id: contratoId }, select: { orgaoNome: true } }))?.orgaoNome) ||
+        (ataId && (await prisma.ata.findUnique({ where: { id: ataId }, select: { orgaoNome: true } }))?.orgaoNome) ||
+        "Órgão";
+      const { notificarProcedimentoApuratorio } = await import("@/lib/notificacoesWhatsapp");
+      await notificarProcedimentoApuratorio({
+        contaId: usuario.contaId,
+        procedimentoId: p.id,
+        assunto: p.assunto,
+        orgao,
+        prazoDefesaDias: p.prazoDefesaDias,
+      });
+    } catch (e) {
+      console.error("[notif procedimento]", e);
+    }
+
     return { ok: true };
   } catch (err) {
     return { erro: err instanceof Error ? err.message : "Erro ao abrir procedimento." };

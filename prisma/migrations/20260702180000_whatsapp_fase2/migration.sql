@@ -1,0 +1,11 @@
+-- Fase 2 WhatsApp: novos tipos de notificacao (Regina 02/07)
+
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'SALDO_ATA_BAIXO';
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'NF_SEM_PAGAMENTO_30D';
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'CARTAO_EXPIRANDO';
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'GARANTIA_VENCENDO';
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'PROCEDIMENTO_APURATORIO';
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'PARECER_JURIDICO';
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'ANALISTA_VINCULADO';
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'COMISSAO_LIBERADA';
+ALTER TYPE "TipoNotificacaoWhatsApp" ADD VALUE 'REAJUSTE_APROVADO';

@@ -150,7 +150,7 @@ export async function analisarDocumentoJuridicoAction(
     // histórico. Falha silenciosa — se gravar der ruim, ainda retornamos
     // a análise pro usuário (degrada graciosamente).
     try {
-      await prisma.parecerJuridico.create({
+      const parecer = await prisma.parecerJuridico.create({
         data: {
           tipo,
           analise: analise as unknown as object,
@@ -162,6 +162,18 @@ export async function analisarDocumentoJuridicoAction(
           criadoPorId: usuario.id,
         },
       });
+      // Notifica WhatsApp — novo parecer disponivel (best-effort).
+      try {
+        const { notificarParecerJuridico } = await import("@/lib/notificacoesWhatsapp");
+        await notificarParecerJuridico({
+          contaId: usuario.contaId,
+          parecerId: parecer.id,
+          titulo: `Análise de ${tipo.toLowerCase()}`,
+          documentoTipo: tipo,
+        });
+      } catch (e) {
+        console.error("[notif parecer]", e);
+      }
     } catch (errSalvar) {
       console.warn("[analisarDocumentoJuridicoAction] falha ao salvar parecer:", errSalvar);
     }
