@@ -92,6 +92,10 @@ model Usuario {
   perfil            PerfilUsuario @default(ADMIN)
   superAdmin        Boolean       @default(false) // gestor da plataforma (Igor) — vê tudo
   emailVerificadoEm DateTime?
+  // Notificacoes WhatsApp (Regina 02/07): opt-in por usuario. Telefone
+  // em E.164 sem "+" (ex: 5521997209623). optIn ausente = sem envio.
+  telefoneWhatsApp  String?
+  optInWhatsApp     Boolean       @default(false)
   criadoEm          DateTime      @default(now())
   atualizadoEm      DateTime      @updatedAt
 
@@ -109,8 +113,51 @@ model Usuario {
   pareceresCriados ParecerJuridico[] @relation("ParecresCriados")
   reajustesRetroativosCriados ReajusteRetroativo[] @relation("ReajustesRetroativosCriados")
   contaGoogle      GoogleAccount?
+  notificacoesWhats NotificacaoWhatsApp[]
 
   @@index([contaId])
+}
+
+// Historico de notificacoes WhatsApp enviadas (Regina 02/07).
+// Serve pra:
+//   1. Idempotencia: unique(tipo, referenciaId) evita disparar 2x
+//   2. Auditoria: rastreio de o que foi enviado e quando
+//   3. Debug: registro do erro se Z-API falhar
+enum TipoNotificacaoWhatsApp {
+  VENCIMENTO_EMPENHO
+  ENTREGA_HOJE
+  ENTREGA_AMANHA
+  VENCIMENTO_PLANO
+  PLANO_ATRASADO
+  RELATORIO_SEMANAL
+  TESTE_MANUAL
+}
+
+enum StatusNotificacaoWhatsApp {
+  PENDENTE
+  ENVIADA
+  FALHOU
+}
+
+model NotificacaoWhatsApp {
+  id           String  @id @default(cuid())
+  usuarioId    String
+  usuario      Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo         TipoNotificacaoWhatsApp
+  // ID do recurso ao qual a notificacao se refere (empenhoId, cobrancaId,
+  // etc.). Combinado com `tipo` da chave de idempotencia. null pra tipos
+  // sem referencia (relatorio_semanal usa competencia YYYY-WW).
+  referenciaId String?
+  telefone     String  // E.164 sem "+"
+  mensagem     String  @db.Text
+  status       StatusNotificacaoWhatsApp @default(PENDENTE)
+  enviadaEm    DateTime?
+  erro         String?
+  criadoEm     DateTime @default(now())
+
+  @@unique([usuarioId, tipo, referenciaId])
+  @@index([usuarioId, criadoEm])
+  @@index([status])
 }
 
 // Conta Google conectada via OAuth (Igor 26/06). 1 conta Google por

@@ -71,6 +71,7 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
     titulo: "Conta",
     itens: [
       { href: "/notificacoes", label: "Notificações", icon: Bell },
+      { href: "/conta/notificacoes", label: "Notificações WhatsApp", icon: Bell },
       { href: "/conta/assinatura", label: "Assinatura", icon: CreditCard },
       { href: "/conta/integracoes", label: "Integrações", icon: Plug },
       { href: "/conta/indicar", label: "Indique e ganhe", icon: Gift },
