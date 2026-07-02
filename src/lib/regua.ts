@@ -25,6 +25,9 @@ export type ResumoRegua = {
   comissoesAtrasadas: number;
   fixosGerados: number;
   fixosAtrasados: number;
+  whatsAppEmpenhos: { em3dias: number; hoje: number; atrasado: number };
+  whatsAppCarteira: { em30d: number; em7d: number };
+  whatsAppPlanos: { em3d: number; atrasado: number };
 };
 
 export async function executarRegua(): Promise<ResumoRegua> {
@@ -118,6 +121,11 @@ export async function executarRegua(): Promise<ResumoRegua> {
   const fixosGerados = await gerarLinhasComissaoFixaDoMes();
   const fixosAtrasados = await marcarFixosAtrasados();
 
+  // 7. Notificações WhatsApp diárias (Regina 02/07). Dispara pra todos os
+  // usuarios com telefone cadastrado + opt-in ligado. Best-effort.
+  const { executarNotificacoesDiarias } = await import("@/lib/notificacoesWhatsapp");
+  const notifs = await executarNotificacoesDiarias();
+
   return {
     renovacoesGeradas: renov.geradas,
     renovacoesIgnoradas: renov.ignoradas,
@@ -129,5 +137,8 @@ export async function executarRegua(): Promise<ResumoRegua> {
     comissoesAtrasadas,
     fixosGerados,
     fixosAtrasados,
+    whatsAppEmpenhos: notifs.empenhos,
+    whatsAppCarteira: notifs.carteira,
+    whatsAppPlanos: notifs.planos,
   };
 }

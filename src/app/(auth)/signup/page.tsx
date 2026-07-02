@@ -354,6 +354,17 @@ function FormEmpresa() {
       </p>
       <Field label="Senha (mín. 6 caracteres)" name="senha" type="password" required erro={e.senha} span={2} />
       <Field label="Confirmação de senha" name="confirmacaoSenha" type="password" required erro={e.confirmacaoSenha} span={2} />
+      <Field
+        label="Seu WhatsApp (com DDD)"
+        name="telefoneWhatsApp"
+        type="tel"
+        required
+        placeholder="(21) 99999-9999"
+        defaultValue={v.telefoneWhatsApp ?? ""}
+        erro={e.telefoneWhatsApp}
+        span={4}
+        helper="Você vai receber prazos, avanços de execução e resumo semanal aqui — direto no WhatsApp. Pode desligar depois em Conta → Notificações."
+      />
 
       {/* 3) ANALISTA VINCULADO (opcional) */}
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">

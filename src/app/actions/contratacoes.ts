@@ -34,6 +34,10 @@ import {
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import { sincronizarEmpenho } from "@/lib/googleCalendar";
+import {
+  notificarNovoDocumento,
+  notificarMudancaStatus,
+} from "@/lib/notificacoesWhatsapp";
 
 type ActionResult = {
   erro?: string;
@@ -448,6 +452,21 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
         // Não bloqueia o save da Ata — usuário pode re-anexar manualmente.
         console.warn("[criarAtaAction] falha ao criar Anexo do PDF:", errAnexo);
       }
+    }
+
+    // Notifica WhatsApp — nova Ata cadastrada (best-effort).
+    const empresaAta = await prisma.empresa.findUnique({
+      where: { id: v.empresaId },
+      select: { contaId: true },
+    });
+    if (empresaAta) {
+      await notificarNovoDocumento({
+        contaId: empresaAta.contaId,
+        tipo: "ATA",
+        documentoId: ata.id,
+        numero: v.numero,
+        orgao: v.orgaoNome,
+      }).catch((e) => console.error("[notif ata]", e));
     }
 
     revalidatePath("/atas");
@@ -913,6 +932,21 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
       } catch (errAnexo) {
         console.warn("[criarContratoAction] falha ao criar Anexo do PDF:", errAnexo);
       }
+    }
+
+    // Notifica WhatsApp — novo Contrato cadastrado (best-effort).
+    const empresaContrato = await prisma.empresa.findUnique({
+      where: { id: v.empresaId },
+      select: { contaId: true },
+    });
+    if (empresaContrato) {
+      await notificarNovoDocumento({
+        contaId: empresaContrato.contaId,
+        tipo: "CONTRATO",
+        documentoId: contrato.id,
+        numero: v.numero,
+        orgao: v.orgaoNome,
+      }).catch((e) => console.error("[notif contrato]", e));
     }
 
     revalidatePath("/contratos");
@@ -1537,6 +1571,21 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     // Sync best-effort com Google Calendar (Igor 26/06).
     await sincronizarEmpenho(empenho.id, "upsert");
 
+    // Notifica WhatsApp — novo Empenho cadastrado (best-effort).
+    const empresaEmp = await prisma.empresa.findUnique({
+      where: { id: v.empresaId },
+      select: { contaId: true },
+    });
+    if (empresaEmp) {
+      await notificarNovoDocumento({
+        contaId: empresaEmp.contaId,
+        tipo: "EMPENHO",
+        documentoId: empenho.id,
+        numero: v.numero,
+        orgao: v.orgaoNome,
+      }).catch((e) => console.error("[notif empenho]", e));
+    }
+
     revalidatePath("/execucao");
     revalidatePath("/contratos");
     revalidatePath("/atas");
@@ -2130,6 +2179,25 @@ export async function avancarStatusAction(empenhoId: string, marco: string, data
   }
 
   await prisma.empenho.update({ where: { id: empenhoId }, data: update });
+
+  // Notifica WhatsApp — mudanca de status (best-effort).
+  // Marcos importantes: ENTREGUE, NF_EMITIDA, NF_ENCAMINHADA, PAGO
+  {
+    const empresa = await prisma.empresa.findFirst({
+      where: { id: empenho.empresaId },
+      select: { contaId: true },
+    });
+    if (empresa) {
+      await notificarMudancaStatus({
+        contaId: empresa.contaId,
+        empenhoId,
+        numeroEmpenho: empenho.numero,
+        instrumento: empenho.instrumento,
+        orgao: empenho.orgaoNome,
+        novoStatus: update.status as "ENTREGUE" | "NF_EMITIDA" | "NF_ENCAMINHADA" | "PAGO" | "PEDIDO_RECEBIDO" | "EM_TRANSITO" | "EMPENHADO",
+      }).catch((e) => console.error("[notif status]", e));
+    }
+  }
 
   if (marco === "PAGO") {
     const empenhoCompleto = await prisma.empenho.findUnique({

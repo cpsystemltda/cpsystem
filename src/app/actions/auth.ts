@@ -158,6 +158,10 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
           email: emailNorm,
           senhaHash,
           perfil: "ADMIN",
+          // Regina 02/07: WhatsApp obrigatorio no cadastro. Recebe
+          // notificacoes automaticas (opt-out em /conta/notificacoes).
+          telefoneWhatsApp: v.telefoneWhatsApp.replace(/\D/g, ""),
+          optInWhatsApp: true,
         },
       },
       empresas: {

@@ -29,6 +29,10 @@ export const signupSchema = z
     // Usuário
     nome: z.string().min(2, "Nome muito curto"),
     email: z.string().email("E-mail inválido"),
+    // WhatsApp obrigatorio (Regina 02/07): sistema notifica prazos,
+    // vencimentos, resumo semanal via WhatsApp automatico. Cliente
+    // recebe por padrao (pode desligar depois em /conta/notificacoes).
+    telefoneWhatsApp: z.string().min(10, "Informe seu WhatsApp com DDD"),
     senha: z.string().min(6, "Mínimo 6 caracteres"),
     confirmacaoSenha: z.string().min(1, "Confirme a senha"),
 
