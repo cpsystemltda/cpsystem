@@ -217,8 +217,40 @@ export class GatewayAsaas implements GatewayPagamento {
       const data = JSON.parse(rawBody) as {
         event?: string;
         payment?: { id?: string; status?: string; value?: number; paymentDate?: string };
+        invoice?: {
+          id?: string;
+          number?: string;
+          status?: string;
+          pdfUrl?: string;
+          xmlUrl?: string;
+          effectiveDate?: string;
+          payment?: string;
+        };
       };
-      if (!data.event || !data.payment?.id) return null;
+      if (!data.event) return null;
+
+      // Eventos de INVOICE (NFSe). Regina 03/07 — Asaas emite NF
+      // automaticamente e nos avisa via webhook INVOICE_CREATED/SYNCHRONIZED.
+      if (data.event.startsWith("INVOICE_") && data.invoice?.id) {
+        return {
+          evento: data.event,
+          chargeId: data.invoice.payment, // paymentId pra achar a cobranca
+          nfse: {
+            nfseId: data.invoice.id,
+            numero: data.invoice.number,
+            status: data.invoice.status,
+            pdfUrl: data.invoice.pdfUrl,
+            xmlUrl: data.invoice.xmlUrl,
+            emitidaEm: data.invoice.effectiveDate
+              ? new Date(data.invoice.effectiveDate)
+              : undefined,
+            paymentIdRelacionado: data.invoice.payment,
+          },
+        };
+      }
+
+      // Eventos de PAYMENT (cobranca)
+      if (!data.payment?.id) return null;
       const status =
         data.payment.status === "CONFIRMED" || data.payment.status === "RECEIVED"
           ? "PAGA"

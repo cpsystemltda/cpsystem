@@ -321,6 +321,71 @@ export async function processarEventoGateway(opts: {
   }
 }
 
+// Webhook → NFSe emitida pelo Asaas (Regina 03/07). Grava dados da nota
+// na cobranca correspondente + dispara WhatsApp pro cliente com link do PDF.
+// Best-effort — falha no envio nao bloqueia gravacao.
+export async function processarNfseGateway(opts: {
+  paymentId: string;
+  nfseId: string;
+  numero?: string;
+  status?: string;
+  pdfUrl?: string;
+  xmlUrl?: string;
+  emitidaEm?: Date;
+}) {
+  const cobranca = await prisma.cobranca.findFirst({
+    where: { gatewayChargeId: opts.paymentId },
+    select: { id: true, contaId: true, valor: true, competencia: true },
+  });
+  if (!cobranca) return;
+
+  await prisma.cobranca.update({
+    where: { id: cobranca.id },
+    data: {
+      nfseId: opts.nfseId,
+      nfseNumero: opts.numero || null,
+      nfseStatus: opts.status || null,
+      nfsePdfUrl: opts.pdfUrl || null,
+      nfseXmlUrl: opts.xmlUrl || null,
+      nfseEmitidaEm: opts.emitidaEm || new Date(),
+    },
+  });
+
+  // So dispara WhatsApp se a NF ja foi emitida com PDF disponivel
+  if (!opts.pdfUrl || opts.status === "SCHEDULED" || opts.status === "SYNCHRONIZED") {
+    // SYNCHRONIZED = ainda em processo com a prefeitura. Espera o
+    // ISSUED (proximo webhook) pra notificar o cliente.
+    if (opts.status !== "AUTHORIZED" && !opts.pdfUrl) return;
+  }
+
+  try {
+    const { dispararNotificacao } = await import("@/lib/whatsapp");
+    const usuarios = await prisma.usuario.findMany({
+      where: { contaId: cobranca.contaId, optInWhatsApp: true, telefoneWhatsApp: { not: null } },
+      select: { id: true, nome: true },
+    });
+    const valor = cobranca.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+    for (const u of usuarios) {
+      const primeiroNome = u.nome.split(" ")[0] || u.nome;
+      const linkPdf = opts.pdfUrl!;
+      const mensagem =
+        `📄 *Nota Fiscal emitida — CP System*\n\n` +
+        `${primeiroNome}, sua NF referente à mensalidade *${cobranca.competencia}* (${valor}) foi emitida e está disponível pra download.\n\n` +
+        (opts.numero ? `Nº da NF: *${opts.numero}*\n` : "") +
+        `\n🧾 Baixar PDF: ${linkPdf}\n\n` +
+        `Você também recebe uma cópia por email. Guarde pra sua contabilidade.`;
+      await dispararNotificacao({
+        usuarioId: u.id,
+        tipo: "NF_EMITIDA_CLIENTE",
+        referenciaId: `nfse-${opts.nfseId}`,
+        mensagem,
+      });
+    }
+  } catch (e) {
+    console.error("[processarNfseGateway] erro ao notificar WhatsApp:", e);
+  }
+}
+
 function detectarBandeira(numero: string): string {
   const n = numero.replace(/\D/g, "");
   if (/^4/.test(n)) return "Visa";

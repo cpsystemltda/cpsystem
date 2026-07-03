@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getGateway } from "@/lib/gateway";
-import { processarEventoGateway } from "@/app/actions/assinatura";
+import { processarEventoGateway, processarNfseGateway } from "@/app/actions/assinatura";
 
 export async function POST(req: Request, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
@@ -38,6 +38,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
       chargeId: evento.chargeId,
       status: evento.status,
       pagaEm: evento.pagaEm,
+    });
+  }
+
+  // Evento de NF (INVOICE_CREATED / INVOICE_SYNCHRONIZED / INVOICE_AUTHORIZED)
+  // Regina 03/07: Asaas emite NF automaticamente e chama esse webhook.
+  if (evento.nfse && evento.nfse.paymentIdRelacionado) {
+    await processarNfseGateway({
+      paymentId: evento.nfse.paymentIdRelacionado,
+      nfseId: evento.nfse.nfseId,
+      numero: evento.nfse.numero,
+      status: evento.nfse.status,
+      pdfUrl: evento.nfse.pdfUrl,
+      xmlUrl: evento.nfse.xmlUrl,
+      emitidaEm: evento.nfse.emitidaEm,
     });
   }
 

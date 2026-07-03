@@ -150,6 +150,7 @@ enum TipoNotificacaoWhatsApp {
   COMISSAO_LIBERADA
   REAJUSTE_APROVADO
   ANIVERSARIO
+  NF_EMITIDA_CLIENTE
 }
 
 enum StatusNotificacaoWhatsApp {
@@ -1717,6 +1718,16 @@ model Cobranca {
   observacoes       String?
   criadaEm          DateTime       @default(now())
   atualizadoEm      DateTime       @updatedAt
+
+  // Nota Fiscal de Servico (Regina 03/07): emitida automaticamente pelo
+  // Asaas quando a cobranca vira PAGA (config no dashboard Asaas). Sistema
+  // recebe webhook INVOICE_CREATED/SYNCHRONIZED e grava aqui.
+  nfseId            String?
+  nfseNumero        String?
+  nfseStatus        String?         // ISSUED, SYNCHRONIZED, CANCELED, ERROR
+  nfsePdfUrl        String?
+  nfseXmlUrl        String?
+  nfseEmitidaEm     DateTime?
 
   eventos           EventoGateway[]
 

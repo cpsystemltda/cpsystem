@@ -53,6 +53,20 @@ export type EventoWebhook = {
   // valor pago (pode diferir do esperado)
   valorPago?: number;
   pagaEm?: Date;
+  // NFSe emitida (Regina 03/07): Asaas dispara webhook INVOICE_CREATED/
+  // INVOICE_SYNCHRONIZED com dados da nota. Quando presente, o handler
+  // grava na Cobranca + envia link do PDF por WhatsApp.
+  nfse?: {
+    nfseId: string;
+    numero?: string;
+    status?: string;
+    pdfUrl?: string;
+    xmlUrl?: string;
+    emitidaEm?: Date;
+    // paymentId do Asaas quando o webhook e de INVOICE_* (usar pra
+    // localizar a cobranca ja que chargeId nao vem no evento de invoice)
+    paymentIdRelacionado?: string;
+  };
 };
 
 // === Subscription Asaas (cartão recorrente automático — Regina 23/06) ===
