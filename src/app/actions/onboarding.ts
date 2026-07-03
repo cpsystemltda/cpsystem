@@ -26,6 +26,7 @@ export async function salvarDadosPessoaisAction(
   const dataNascimento = String(formData.get("dataNascimento") || "").trim();
   const senha = String(formData.get("senha") || "");
   const confirmacao = String(formData.get("confirmacaoSenha") || "");
+  const aceite = String(formData.get("aceiteTermos") || "") === "1";
 
   const campos: Record<string, string> = {};
   if (nome.length < 2) campos.nome = "Nome muito curto";
@@ -34,6 +35,7 @@ export async function salvarDadosPessoaisAction(
   if (!dataNascimento) campos.dataNascimento = "Informe sua data de nascimento";
   if (senha.length < 6) campos.senha = "Senha mínima de 6 caracteres";
   if (senha !== confirmacao) campos.confirmacaoSenha = "Senhas não conferem";
+  if (!aceite) campos.aceiteTermos = "Você precisa aceitar os termos pra continuar";
   let telefone: string;
   try {
     telefone = formatarTelefone(telefoneRaw);
@@ -54,6 +56,13 @@ export async function salvarDadosPessoaisAction(
       optInWhatsApp: true,
       senhaHash: await hashSenha(senha),
     },
+  });
+
+  // Grava o aceite eletronico na conta (idempotente — só marca se ainda
+  // nao foi aceito). MP 2.200-2/2001 art. 10 §2º.
+  await prisma.conta.update({
+    where: { id: usuario.contaId },
+    data: { termosAceitosEm: new Date() },
   });
 
   revalidatePath("/onboarding");

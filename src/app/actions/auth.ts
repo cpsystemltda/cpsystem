@@ -150,6 +150,10 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       plano: v.plano,
       statusAssinatura: "TRIAL",
       trialAteEm,
+      // Aceite eletronico do contrato v2.0 no momento do cadastro
+      // (Regina 03/07). MP 2.200-2/2001 art. 10, §2º equipara aceite
+      // eletronico a assinatura fisica.
+      termosAceitosEm: new Date(),
       embaixadorId: embaixadorIdValido,
       indicadoPorContaId: indicadoPorContaIdValido,
       usuarios: {

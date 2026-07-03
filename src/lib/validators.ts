@@ -61,6 +61,9 @@ export const signupSchema = z
     emailEmpresa: z.string().email("E-mail da empresa inválido"),
     telefones: z.string().min(8, "Informe ao menos um telefone"),
     responsavel: z.string().min(2, "Informe o responsável"),
+    // Aceite obrigatorio do contrato (Regina 03/07). Checkbox HTML manda
+    // "1" quando marcado, ausente quando desmarcado.
+    aceiteTermos: z.literal("1", { message: "Você precisa aceitar os termos pra continuar" }),
   })
   .superRefine((v, ctx) => {
     if (v.senha !== v.confirmacaoSenha) {

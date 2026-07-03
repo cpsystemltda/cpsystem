@@ -147,6 +147,41 @@ export function DadosPessoaisForm({
         </div>
       </div>
 
+      {/* Aceite obrigatório do contrato — Regina 03/07 */}
+      <div
+        className="mt-4 rounded-xl px-4 py-3"
+        style={{ background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.4)" }}
+      >
+        <label className="flex items-start gap-2.5 text-[13px]" style={{ color: "var(--text)" }}>
+          <input
+            type="checkbox"
+            name="aceiteTermos"
+            value="1"
+            required
+            className="mt-0.5"
+          />
+          <span>
+            Li e aceito o{" "}
+            <a
+              href="/termos"
+              target="_blank"
+              rel="noreferrer"
+              className="font-bold underline"
+              style={{ color: "var(--primary-deep)" }}
+            >
+              Contrato de Prestação de Serviços & Termos de Uso
+            </a>
+            , autorizando notificações por WhatsApp e e-mail e o tratamento de
+            dados pessoais conforme LGPD.
+          </span>
+        </label>
+        {campos.aceiteTermos && (
+          <p className="mt-2 text-[11px] font-semibold" style={{ color: "#BE123C" }}>
+            {campos.aceiteTermos}
+          </p>
+        )}
+      </div>
+
       {state?.erro && !campos && (
         <p className="text-sm font-semibold" style={{ color: "#BE123C" }}>
           {state.erro}

@@ -440,6 +440,32 @@ function FormEmpresa() {
         </>
       )}
 
+      {/* Aceite obrigatório do contrato — Regina 03/07 */}
+      <div className="col-span-4 mt-4 rounded-xl px-4 py-3" style={{ background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.4)" }}>
+        <label className="flex items-start gap-2.5 text-[13px]" style={{ color: "#2D3340" }}>
+          <input
+            type="checkbox"
+            name="aceiteTermos"
+            value="1"
+            required
+            className="mt-0.5"
+          />
+          <span>
+            Li e aceito o{" "}
+            <a href="/termos" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: "#9C7A2D" }}>
+              Contrato de Prestação de Serviços & Termos de Uso
+            </a>
+            , incluindo autorização para recebimento de notificações por e-mail e WhatsApp
+            e tratamento de dados pessoais conforme LGPD.
+          </span>
+        </label>
+        {e.aceiteTermos && (
+          <p className="mt-2 text-[11px] font-semibold" style={{ color: "#BE123C" }}>
+            {e.aceiteTermos}
+          </p>
+        )}
+      </div>
+
       <div className="col-span-4 mt-2">
         {plano ? (
           <SubmitButton>Criar conta de empresa · Trial 14 dias</SubmitButton>
