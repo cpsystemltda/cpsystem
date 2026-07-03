@@ -1,12 +1,13 @@
 // Contrato de Prestação de Serviços & Termos de Uso do CP System
-// Versão 2.0 — 03/07/2026 (Regina/Igor aprovarão antes de plugar aceite)
+// Versão 2.1 — 03/07/2026
 //
-// Este componente é a fonte única do texto: usado tanto na rota pública
-// /legal/termos (pré-cadastro) quanto na rota interna /(app)/termos
-// (usuário logado, com botão de aceite). Qualquer atualização do texto
-// deve incrementar VERSAO_TERMOS e VIGENCIA_TERMOS.
+// Componente único (fonte da verdade do texto). Aceita props opcionais
+// com dados do CONTRATANTE — quando presentes, o contrato fica
+// PERSONALIZADO em nome do cliente (razão social, CNPJ, nome do
+// representante, CPF). Sem dados: mostra placeholder pra visitantes
+// anônimos.
 
-export const VERSAO_TERMOS = "2.0";
+export const VERSAO_TERMOS = "2.1";
 export const VIGENCIA_TERMOS = "03/07/2026";
 
 const CONTRATADA = {
@@ -19,24 +20,77 @@ const CONTRATADA = {
 
 const FORO = "Brasília — Distrito Federal";
 
-export function ContratoTermosUso() {
+const PLACEHOLDER = "[a ser preenchido no cadastro]";
+
+export type DadosContratante = {
+  razaoSocial?: string | null;
+  cnpj?: string | null;
+  enderecoEmpresa?: string | null;
+  nomeRepresentante?: string | null;
+  cpfRepresentante?: string | null;
+  emailRepresentante?: string | null;
+};
+
+function formatarCnpj(cnpj: string | null | undefined): string {
+  if (!cnpj) return PLACEHOLDER;
+  const n = cnpj.replace(/\D/g, "");
+  if (n.length !== 14) return cnpj;
+  return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8, 12)}-${n.slice(12, 14)}`;
+}
+
+function formatarCpf(cpf: string | null | undefined): string {
+  if (!cpf) return PLACEHOLDER;
+  const n = cpf.replace(/\D/g, "");
+  if (n.length !== 11) return cpf;
+  return `${n.slice(0, 3)}.${n.slice(3, 6)}.${n.slice(6, 9)}-${n.slice(9, 11)}`;
+}
+
+export function ContratoTermosUso({ contratante }: { contratante?: DadosContratante }) {
+  const razao = contratante?.razaoSocial || PLACEHOLDER;
+  const cnpj = formatarCnpj(contratante?.cnpj);
+  const endereco = contratante?.enderecoEmpresa || PLACEHOLDER;
+  const representante = contratante?.nomeRepresentante || PLACEHOLDER;
+  const cpfRep = formatarCpf(contratante?.cpfRepresentante);
+  const emailRep = contratante?.emailRepresentante || PLACEHOLDER;
   return (
     <article className="text-[13px] leading-[1.75]" style={{ color: "var(--text)" }}>
       <p className="mb-6 text-xs" style={{ color: "var(--text-mute)" }}>
         Versão <strong>{VERSAO_TERMOS}</strong> · Em vigor desde <strong>{VIGENCIA_TERMOS}</strong>
       </p>
 
+      {/* Qualificação das Partes */}
+      <div
+        className="mb-8 rounded-xl px-5 py-4 text-[12px]"
+        style={{ background: "rgba(15,14,12,0.03)", border: "0.5px solid var(--hairline)" }}
+      >
+        <p className="mb-3">
+          <strong>Pelo presente instrumento particular, celebram entre si:</strong>
+        </p>
+        <p className="mb-3">
+          <strong>CONTRATADA</strong>: <strong>{CONTRATADA.razao}</strong>, pessoa jurídica
+          de direito privado inscrita no CNPJ/MF sob nº <strong>{CONTRATADA.cnpj}</strong>,
+          com sede em {CONTRATADA.endereco}, e-mail de contato{" "}
+          <code>{CONTRATADA.email}</code>, doravante denominada apenas{" "}
+          <strong>&ldquo;CONTRATADA&rdquo;</strong> ou <strong>&ldquo;CP System&rdquo;</strong>; e
+        </p>
+        <p>
+          <strong>CONTRATANTE</strong>: <strong>{razao}</strong>, pessoa jurídica de direito
+          privado inscrita no CNPJ/MF sob nº <strong>{cnpj}</strong>, com sede em{" "}
+          <strong>{endereco}</strong>, neste ato representada por{" "}
+          <strong>{representante}</strong>, portador do CPF nº <strong>{cpfRep}</strong>,
+          e-mail <code>{emailRep}</code>, doravante denominada apenas{" "}
+          <strong>&ldquo;CONTRATANTE&rdquo;</strong> ou <strong>&ldquo;Cliente&rdquo;</strong>.
+        </p>
+      </div>
+
       <p className="mb-8">
-        <strong>{CONTRATADA.razao}</strong>, pessoa jurídica de direito privado inscrita no
-        CNPJ/MF sob nº <strong>{CONTRATADA.cnpj}</strong>, com sede em {CONTRATADA.endereco},
-        doravante denominada <strong>&ldquo;CONTRATADA&rdquo;</strong> ou <strong>&ldquo;CP System&rdquo;</strong>, e o
-        Cliente pessoa jurídica ou pessoa física representando pessoa jurídica que se cadastra
-        para uso da plataforma (o <strong>&ldquo;CONTRATANTE&rdquo;</strong> ou <strong>&ldquo;Cliente&rdquo;</strong>),
-        celebram o presente <strong>Contrato de Prestação de Serviços por Adesão &amp; Termos de Uso</strong>,
-        que se regerá pelas cláusulas e condições a seguir, cuja aceitação eletrônica
-        (marcação de <em>checkbox</em>, uso da plataforma ou pagamento) equivale à assinatura
-        física para todos os efeitos legais, nos termos do art. 10, §2º da MP 2.200-2/2001 e
-        do art. 442 do Código Civil.
+        As Partes acima qualificadas celebram o presente{" "}
+        <strong>Contrato de Prestação de Serviços por Adesão &amp; Termos de Uso</strong>, que
+        se regerá pelas cláusulas e condições a seguir, cuja aceitação eletrônica pelo
+        CONTRATANTE (marcação de <em>checkbox</em>, uso da plataforma ou pagamento) equivale
+        à assinatura física para todos os efeitos legais, nos termos do art. 10, §2º da MP
+        2.200-2/2001 e do art. 442 do Código Civil, registrando-se o endereço IP, o horário
+        (<em>timestamp</em>) e a versão do documento aceitos.
       </p>
 
       <Section num="1" title="Definições">
@@ -577,13 +631,37 @@ export function ContratoTermosUso() {
         </p>
       </Section>
 
-      <div className="mt-10 rounded-xl px-5 py-4 text-xs" style={{ background: "rgba(15,14,12,0.04)", border: "0.5px solid var(--hairline)", color: "var(--text-soft)" }}>
-        <p><strong>CONTRATADA</strong>: {CONTRATADA.razao} · CNPJ {CONTRATADA.cnpj}</p>
-        <p><strong>Sede</strong>: {CONTRATADA.endereco}</p>
-        <p><strong>Contato jurídico e DPO</strong>: {CONTRATADA.email}</p>
-        <p><strong>WhatsApp business</strong>: {CONTRATADA.wa}</p>
-        <p className="mt-3">
-          <em>Documento em vigor desde {VIGENCIA_TERMOS} · Versão {VERSAO_TERMOS} · Aceite eletrônico com valor de assinatura conforme MP 2.200-2/2001.</em>
+      <div
+        className="mt-10 grid gap-4 rounded-xl px-5 py-4 text-xs md:grid-cols-2"
+        style={{ background: "rgba(15,14,12,0.04)", border: "0.5px solid var(--hairline)", color: "var(--text-soft)" }}
+      >
+        <div>
+          <p className="mb-1 font-bold uppercase" style={{ letterSpacing: "0.12em", color: "var(--text)" }}>
+            CONTRATADA
+          </p>
+          <p><strong>{CONTRATADA.razao}</strong></p>
+          <p>CNPJ: {CONTRATADA.cnpj}</p>
+          <p>Sede: {CONTRATADA.endereco}</p>
+          <p>DPO / e-mail: {CONTRATADA.email}</p>
+          <p>WhatsApp business: {CONTRATADA.wa}</p>
+        </div>
+        <div>
+          <p className="mb-1 font-bold uppercase" style={{ letterSpacing: "0.12em", color: "var(--text)" }}>
+            CONTRATANTE
+          </p>
+          <p><strong>{razao}</strong></p>
+          <p>CNPJ: {cnpj}</p>
+          <p>Sede: {endereco}</p>
+          <p>Representante: {representante}</p>
+          <p>CPF do representante: {cpfRep}</p>
+          <p>E-mail: {emailRep}</p>
+        </div>
+        <p className="md:col-span-2 pt-2" style={{ borderTop: "0.5px solid var(--hairline)" }}>
+          <em>
+            Documento em vigor desde {VIGENCIA_TERMOS} · Versão {VERSAO_TERMOS} · Aceite
+            eletrônico com valor de assinatura conforme MP 2.200-2/2001. O sistema registra
+            IP e horário no momento do aceite pelo CONTRATANTE.
+          </em>
         </p>
       </div>
     </article>

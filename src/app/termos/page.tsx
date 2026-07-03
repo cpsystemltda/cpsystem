@@ -2,19 +2,44 @@ import Link from "next/link";
 import { ScrollText } from "lucide-react";
 import { getUsuarioAtual } from "@/lib/auth";
 import { aceitarTermosAction } from "@/app/actions/equipe";
+import { prisma } from "@/lib/prisma";
 import { Logo } from "@/components/Logo";
 import {
   ContratoTermosUso,
   VERSAO_TERMOS,
   VIGENCIA_TERMOS,
+  type DadosContratante,
 } from "@/components/legal/ContratoTermosUso";
 
 // Rota unica dos termos (Regina 03/07): mesmo texto pra logado e nao-logado.
-// Sem login: CTA "Cadastrar". Logado sem aceite: botao formal de aceite.
-// Logado com aceite: mostra timestamp.
+// Sem login: CTA "Cadastrar" e placeholders [a preencher no cadastro].
+// Logado sem aceite: botao formal de aceite + dados reais do CONTRATANTE.
+// Logado com aceite: mostra timestamp + dados reais.
 export default async function TermosPage() {
   const usuario = await getUsuarioAtual();
   const jaAceito = usuario?.conta?.termosAceitosEm ?? null;
+
+  // Carrega dados do CONTRATANTE pra personalizar o contrato quando logado.
+  let contratante: DadosContratante | undefined;
+  if (usuario) {
+    const empresa = await prisma.empresa.findFirst({
+      where: { contaId: usuario.contaId },
+      orderBy: { criadoEm: "asc" },
+      select: { razaoSocial: true, cnpj: true, endereco: true },
+    });
+    const dadosUsuario = await prisma.usuario.findUnique({
+      where: { id: usuario.id },
+      select: { nome: true, email: true, cpf: true },
+    });
+    contratante = {
+      razaoSocial: empresa?.razaoSocial ?? null,
+      cnpj: empresa?.cnpj ?? null,
+      enderecoEmpresa: empresa?.endereco ?? null,
+      nomeRepresentante: dadosUsuario?.nome ?? null,
+      cpfRepresentante: dadosUsuario?.cpf ?? null,
+      emailRepresentante: dadosUsuario?.email ?? null,
+    };
+  }
 
   return (
     <div className="min-h-screen" style={{ background: "#FFFFFF" }}>
@@ -61,7 +86,7 @@ export default async function TermosPage() {
         )}
 
         <div className="mt-10">
-          <ContratoTermosUso />
+          <ContratoTermosUso contratante={contratante} />
         </div>
 
         {/* Rodapé condicional */}
