@@ -68,10 +68,9 @@ export function ContratoTermosUso({ contratante }: { contratante?: DadosContrata
           <strong>Pelo presente instrumento particular, celebram entre si:</strong>
         </p>
         <p className="mb-3">
-          <strong>CONTRATADA</strong>: <strong>{CONTRATADA.nome}</strong>, marca comercial
-          de titularidade de <strong>{CONTRATADA.razao}</strong>, pessoa jurídica de direito
-          privado inscrita no CNPJ/MF sob nº <strong>{CONTRATADA.cnpj}</strong>, com sede em{" "}
-          {CONTRATADA.endereco}, e-mail de contato <code>{CONTRATADA.email}</code>, doravante
+          <strong>CONTRATADA</strong>: <strong>{CONTRATADA.nome}</strong>, pessoa jurídica de
+          direito privado inscrita no CNPJ/MF sob nº <strong>{CONTRATADA.cnpj}</strong>, com sede
+          em {CONTRATADA.endereco}, e-mail de contato <code>{CONTRATADA.email}</code>, doravante
           denominada apenas <strong>&ldquo;CONTRATADA&rdquo;</strong> ou{" "}
           <strong>&ldquo;CP System&rdquo;</strong>; e
         </p>
@@ -642,7 +641,6 @@ export function ContratoTermosUso({ contratante }: { contratante?: DadosContrata
             CONTRATADA
           </p>
           <p><strong>{CONTRATADA.nome}</strong></p>
-          <p>Razão social: {CONTRATADA.razao}</p>
           <p>CNPJ: {CONTRATADA.cnpj}</p>
           <p>Sede: {CONTRATADA.endereco}</p>
           <p>DPO / e-mail: {CONTRATADA.email}</p>
