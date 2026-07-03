@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { salvarDadosPessoaisAction } from "@/app/actions/onboarding";
 
 export function DadosPessoaisForm({
@@ -18,6 +18,19 @@ export function DadosPessoaisForm({
 }) {
   const [state, formAction, isPending] = useActionState(salvarDadosPessoaisAction, null);
   const campos = state?.campos ?? {};
+
+  // Feedback ao vivo da confirmação de senha (positivo verde quando confere)
+  // — evita o "Senhas não conferem" ficar gritando enquanto o usuário digita
+  // (bug UX que confundiu o César no 1º acesso).
+  const [senha, setSenha] = useState("");
+  const [confirmacao, setConfirmacao] = useState("");
+  const confereClientSide = senha.length >= 6 && senha === confirmacao;
+  const confereFeedback =
+    senha.length > 0 && confirmacao.length > 0
+      ? senha === confirmacao
+        ? "match"
+        : "diff"
+      : "vazio";
 
   return (
     <form action={formAction} className="space-y-4">
@@ -65,21 +78,73 @@ export function DadosPessoaisForm({
         required
       />
       <div className="grid gap-4 md:grid-cols-2">
-        <Field
-          label="Nova senha"
-          name="senha"
-          type="password"
-          erro={campos.senha}
-          helper="Mínimo 6 caracteres"
-          required
-        />
-        <Field
-          label="Confirmar senha"
-          name="confirmacaoSenha"
-          type="password"
-          erro={campos.confirmacaoSenha}
-          required
-        />
+        <div>
+          <label
+            className="mb-1 block text-[10px] font-bold uppercase"
+            style={{ letterSpacing: "0.12em", color: "var(--text-soft)" }}
+          >
+            Nova senha <span style={{ color: "#BE123C" }}>*</span>
+          </label>
+          <input
+            type="password"
+            name="senha"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            required
+            minLength={6}
+            className="w-full rounded-xl px-4 py-2.5 text-sm"
+            style={{
+              background: "rgba(255,255,255,0.85)",
+              border: campos.senha ? "1px solid #BE123C" : "0.5px solid var(--hairline)",
+              color: "var(--text)",
+            }}
+          />
+          {campos.senha ? (
+            <p className="mt-1 text-[10px] font-semibold" style={{ color: "#BE123C" }}>
+              {campos.senha}
+            </p>
+          ) : (
+            <p className="mt-1 text-[10px]" style={{ color: "var(--text-mute)" }}>
+              Mínimo 6 caracteres
+            </p>
+          )}
+        </div>
+        <div>
+          <label
+            className="mb-1 block text-[10px] font-bold uppercase"
+            style={{ letterSpacing: "0.12em", color: "var(--text-soft)" }}
+          >
+            Confirmar senha <span style={{ color: "#BE123C" }}>*</span>
+          </label>
+          <input
+            type="password"
+            name="confirmacaoSenha"
+            value={confirmacao}
+            onChange={(e) => setConfirmacao(e.target.value)}
+            required
+            className="w-full rounded-xl px-4 py-2.5 text-sm"
+            style={{
+              background: "rgba(255,255,255,0.85)",
+              border:
+                confereFeedback === "match"
+                  ? "1px solid #2F8F4C"
+                  : confereFeedback === "diff" && confirmacao.length >= senha.length
+                    ? "1px solid #BE123C"
+                    : "0.5px solid var(--hairline)",
+              color: "var(--text)",
+            }}
+          />
+          {confereFeedback === "match" && (
+            <p className="mt-1 text-[10px] font-semibold" style={{ color: "#2F8F4C" }}>
+              ✓ Senhas conferem
+            </p>
+          )}
+          {confereFeedback === "diff" && confirmacao.length >= senha.length && (
+            <p className="mt-1 text-[10px] font-semibold" style={{ color: "#BE123C" }}>
+              Senhas não conferem
+            </p>
+          )}
+        </div>
       </div>
 
       {state?.erro && !campos && (
@@ -91,8 +156,8 @@ export function DadosPessoaisForm({
       <div className="pt-4">
         <button
           type="submit"
-          disabled={isPending}
-          className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-[13px] font-bold uppercase transition hover:scale-[1.02] disabled:opacity-50"
+          disabled={isPending || !confereClientSide}
+          className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-[13px] font-bold uppercase transition hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
             color: "#0A0A0A",
