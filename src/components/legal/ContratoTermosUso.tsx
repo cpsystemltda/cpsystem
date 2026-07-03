@@ -11,6 +11,7 @@ export const VERSAO_TERMOS = "2.1";
 export const VIGENCIA_TERMOS = "03/07/2026";
 
 const CONTRATADA = {
+  nome: "CP SYSTEM",
   razao: "REGINA LUIZA DA SILVA FERNANDES",
   cnpj: "42.736.317/0001-30",
   endereco: "Rio de Janeiro/RJ",
@@ -67,11 +68,12 @@ export function ContratoTermosUso({ contratante }: { contratante?: DadosContrata
           <strong>Pelo presente instrumento particular, celebram entre si:</strong>
         </p>
         <p className="mb-3">
-          <strong>CONTRATADA</strong>: <strong>{CONTRATADA.razao}</strong>, pessoa jurídica
-          de direito privado inscrita no CNPJ/MF sob nº <strong>{CONTRATADA.cnpj}</strong>,
-          com sede em {CONTRATADA.endereco}, e-mail de contato{" "}
-          <code>{CONTRATADA.email}</code>, doravante denominada apenas{" "}
-          <strong>&ldquo;CONTRATADA&rdquo;</strong> ou <strong>&ldquo;CP System&rdquo;</strong>; e
+          <strong>CONTRATADA</strong>: <strong>{CONTRATADA.nome}</strong>, marca comercial
+          de titularidade de <strong>{CONTRATADA.razao}</strong>, pessoa jurídica de direito
+          privado inscrita no CNPJ/MF sob nº <strong>{CONTRATADA.cnpj}</strong>, com sede em{" "}
+          {CONTRATADA.endereco}, e-mail de contato <code>{CONTRATADA.email}</code>, doravante
+          denominada apenas <strong>&ldquo;CONTRATADA&rdquo;</strong> ou{" "}
+          <strong>&ldquo;CP System&rdquo;</strong>; e
         </p>
         <p>
           <strong>CONTRATANTE</strong>: <strong>{razao}</strong>, pessoa jurídica de direito
@@ -639,7 +641,8 @@ export function ContratoTermosUso({ contratante }: { contratante?: DadosContrata
           <p className="mb-1 font-bold uppercase" style={{ letterSpacing: "0.12em", color: "var(--text)" }}>
             CONTRATADA
           </p>
-          <p><strong>{CONTRATADA.razao}</strong></p>
+          <p><strong>{CONTRATADA.nome}</strong></p>
+          <p>Razão social: {CONTRATADA.razao}</p>
           <p>CNPJ: {CONTRATADA.cnpj}</p>
           <p>Sede: {CONTRATADA.endereco}</p>
           <p>DPO / e-mail: {CONTRATADA.email}</p>
