@@ -12,9 +12,9 @@ export const VIGENCIA_TERMOS = "03/07/2026";
 
 const CONTRATADA = {
   nome: "CP SYSTEM",
-  razao: "REGINA LUIZA DA SILVA FERNANDES",
-  cnpj: "42.736.317/0001-30",
-  endereco: "Rio de Janeiro/RJ",
+  razao: "CONTRATOS PUBLICOS SYSTEM LTDA",
+  cnpj: "67.266.466/0001-04",
+  endereco: "SRTVS Qd. 701, Bloco B, Sala 616, Asa Sul, Brasília/DF, CEP 70.340-906",
   email: "contato@cpsystem.app.br",
   wa: "+55 11 97061-9434",
 };
