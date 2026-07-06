@@ -140,22 +140,75 @@ export async function notificarMudancaStatus(opts: {
 
 // ==================== CRON DIARIO ====================
 
-// Varre empenhos com prazo de entrega em 3 dias, hoje, atrasado.
-export async function notificarPrazosEmpenho(hoje: Date = new Date()): Promise<{
-  em3dias: number;
-  hoje: number;
-  atrasado: number;
+// Cadencia escalonada de alertas (Igor 03/07):
+// 90d → planejamento estratégico
+// 60d → preparação de documentação
+// 30d → ação intermediária
+// 15d → ação prioritária
+// 10d → última chance de manobra
+//  5d → crítico, agora ou nunca
+const CADENCIA_DIAS = [90, 60, 30, 15, 10, 5] as const;
+
+function tomPorDias(dias: number): { emoji: string; urgencia: string; cta: string } {
+  if (dias >= 90) return { emoji: "🗓️", urgencia: "Planejamento", cta: "Comece a organizar a renovação/aditivo desde já." };
+  if (dias >= 60) return { emoji: "📋", urgencia: "Preparar documentação", cta: "Reúna os documentos necessários e alinhe com o órgão." };
+  if (dias >= 30) return { emoji: "📆", urgencia: "Ação intermediária", cta: "Programe renovação, aditivo ou uso do saldo." };
+  if (dias >= 15) return { emoji: "⚠️", urgencia: "Ação prioritária", cta: "Formalize a próxima etapa esta semana." };
+  if (dias >= 10) return { emoji: "🔔", urgencia: "Última chance de manobra", cta: "Se ainda não iniciou o processo, comece hoje." };
+  return { emoji: "🚨", urgencia: "Crítico — agora ou nunca", cta: "Regularize hoje pra evitar interrupção contratual." };
+}
+
+// Cron consolidado (Regina 06/07): antes eram 3 funcoes separadas
+// (notificarPrazosEmpenho + notificarVencimentosCarteira + notificarGarantiaVencendo),
+// cada uma disparando 1 msg por documento. Com cadencia 6x (90/60/30/15/10/5)
+// vira flood se o usuario tem varios docs vencendo. Agora: UMA msg diaria
+// por usuario por janela consolidando TODOS os documentos (empenhos + atas +
+// contratos + garantias) daquela janela.
+//
+// Empenhos ATRASADOS e ENTREGAS DE HOJE continuam individuais — sao criticos
+// e merecem destaque, nao devem se perder numa lista.
+type ItemPorConta = {
+  empenhos: { id: string; numero: string; orgao: string; label: string; data: Date }[];
+  atas: { id: string; numero: string; orgao: string; data: Date }[];
+  contratos: { id: string; numero: string; orgao: string; data: Date }[];
+  garantias: { id: string; numero: string; orgao: string; modalidade: string; data: Date }[];
+};
+
+function novaConta(): ItemPorConta {
+  return { empenhos: [], atas: [], contratos: [], garantias: [] };
+}
+
+function totalConta(c: ItemPorConta): number {
+  return c.empenhos.length + c.atas.length + c.contratos.length + c.garantias.length;
+}
+
+function formatarSecao<T>(
+  emoji: string,
+  titulo: string,
+  itens: T[],
+  formatar: (item: T) => string,
+): string {
+  if (!itens.length) return "";
+  return `${emoji} *${titulo}*\n${itens.map((i) => `• ${formatar(i)}`).join("\n")}\n\n`;
+}
+
+export async function notificarPrazosConsolidado(hoje: Date = new Date()): Promise<{
+  porDias: Record<number, number>; // msgs consolidadas enviadas por janela
+  hoje: number; // entregas de empenho hoje
+  atrasado: number; // empenhos atrasados
 }> {
   const inicioHoje = new Date(hoje);
   inicioHoje.setHours(0, 0, 0, 0);
-  const em3dias = new Date(inicioHoje.getTime() + 3 * 86400000);
-  const em4dias = new Date(inicioHoje.getTime() + 4 * 86400000);
-  const amanha = new Date(inicioHoje.getTime() + 1 * 86400000);
+  const amanha = new Date(inicioHoje.getTime() + 86400000);
+  const hojeStr = inicioHoje.toISOString().slice(0, 10);
 
-  const empenhos = await prisma.empenho.findMany({
-    where: {
-      status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] },
-    },
+  const porDias: Record<number, number> = Object.fromEntries(CADENCIA_DIAS.map((d) => [d, 0]));
+  let hojeCount = 0;
+  let atrasadoCount = 0;
+
+  // === 1. HOJE + ATRASADO (empenhos) — msgs individuais, criticas ===
+  const empenhosAtivos = await prisma.empenho.findMany({
+    where: { status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] } },
     select: {
       id: true,
       numero: true,
@@ -175,23 +228,16 @@ export async function notificarPrazosEmpenho(hoje: Date = new Date()): Promise<{
     },
   });
 
-  let em3diasCount = 0;
-  let hojeCount = 0;
-  let atrasadoCount = 0;
-
-  for (const e of empenhos) {
+  for (const e of empenhosAtivos) {
     const janela = janelaExecucao(e);
-    const limite = janela.fim; // data mais tarde do range
+    const limite = janela.fim;
     const contaId = e.empresa.contaId;
-    const usuarios = await destinatariosDaConta(contaId);
-    if (!usuarios.length) continue;
-
     const label = LABEL_INSTRUMENTO[e.instrumento];
     const url = `https://cpsystem.app.br/execucao/${e.id}`;
 
-    // Ja passou (atrasado)
     if (limite < inicioHoje) {
       const diasAtraso = Math.floor((inicioHoje.getTime() - limite.getTime()) / 86400000);
+      const usuarios = await destinatariosDaConta(contaId);
       for (const u of usuarios) {
         const msg =
           `🚨 *EMPENHO ATRASADO*\n\n` +
@@ -200,7 +246,7 @@ export async function notificarPrazosEmpenho(hoje: Date = new Date()): Promise<{
         const r = await dispararNotificacao({
           usuarioId: u.id,
           tipo: "VENCIMENTO_EMPENHO",
-          referenciaId: `atrasado-${e.id}-${inicioHoje.toISOString().slice(0, 10)}`,
+          referenciaId: `atrasado-${e.id}-${hojeStr}`,
           mensagem: msg,
         });
         if (r.enviado) atrasadoCount++;
@@ -208,8 +254,8 @@ export async function notificarPrazosEmpenho(hoje: Date = new Date()): Promise<{
       continue;
     }
 
-    // Hoje
     if (limite >= inicioHoje && limite < amanha) {
+      const usuarios = await destinatariosDaConta(contaId);
       for (const u of usuarios) {
         const msg =
           `⏰ *ENTREGA HOJE*\n\n` +
@@ -218,104 +264,120 @@ export async function notificarPrazosEmpenho(hoje: Date = new Date()): Promise<{
         const r = await dispararNotificacao({
           usuarioId: u.id,
           tipo: "ENTREGA_HOJE",
-          referenciaId: `hoje-${e.id}-${inicioHoje.toISOString().slice(0, 10)}`,
+          referenciaId: `hoje-${e.id}-${hojeStr}`,
           mensagem: msg,
         });
         if (r.enviado) hojeCount++;
       }
-      continue;
+    }
+  }
+
+  // === 2. CADENCIA ESCALONADA — msg CONSOLIDADA por (conta, janela) ===
+  for (const dias of CADENCIA_DIAS) {
+    const inicio = new Date(inicioHoje.getTime() + dias * 86400000);
+    const fim = new Date(inicioHoje.getTime() + (dias + 1) * 86400000);
+
+    const porConta = new Map<string, ItemPorConta>();
+    function push(contaId: string): ItemPorConta {
+      let c = porConta.get(contaId);
+      if (!c) {
+        c = novaConta();
+        porConta.set(contaId, c);
+      }
+      return c;
     }
 
-    // Em 3 dias
-    if (limite >= em3dias && limite < em4dias) {
+    // Empenhos: precisa iterar todos (janelaExecucao nao e query SQL)
+    for (const e of empenhosAtivos) {
+      const limite = janelaExecucao(e).fim;
+      if (limite < inicio || limite >= fim) continue;
+      push(e.empresa.contaId).empenhos.push({
+        id: e.id,
+        numero: e.numero,
+        orgao: e.orgaoNome,
+        label: LABEL_INSTRUMENTO[e.instrumento],
+        data: limite,
+      });
+    }
+
+    const atas = await prisma.ata.findMany({
+      where: { vigenciaFim: { gte: inicio, lt: fim } },
+      select: { id: true, numero: true, orgaoNome: true, vigenciaFim: true, empresa: { select: { contaId: true } } },
+    });
+    for (const a of atas) {
+      push(a.empresa.contaId).atas.push({ id: a.id, numero: a.numero, orgao: a.orgaoNome, data: a.vigenciaFim });
+    }
+
+    const contratos = await prisma.contrato.findMany({
+      where: { vigenciaFim: { gte: inicio, lt: fim } },
+      select: { id: true, numero: true, orgaoNome: true, vigenciaFim: true, empresa: { select: { contaId: true } } },
+    });
+    for (const c of contratos) {
+      push(c.empresa.contaId).contratos.push({ id: c.id, numero: c.numero, orgao: c.orgaoNome, data: c.vigenciaFim });
+    }
+
+    const garantias = await prisma.garantia.findMany({
+      where: { dataFim: { gte: inicio, lt: fim } },
+      select: {
+        id: true,
+        modalidade: true,
+        dataFim: true,
+        empenho: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
+        contrato: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
+      },
+    });
+    for (const g of garantias) {
+      const doc = g.empenho ?? g.contrato;
+      if (!doc || !g.dataFim) continue;
+      push(doc.empresa.contaId).garantias.push({
+        id: g.id,
+        numero: doc.numero,
+        orgao: doc.orgaoNome,
+        modalidade: g.modalidade,
+        data: g.dataFim,
+      });
+    }
+
+    const t = tomPorDias(dias);
+    for (const [contaId, itens] of porConta) {
+      if (totalConta(itens) === 0) continue;
+      const usuarios = await destinatariosDaConta(contaId);
       for (const u of usuarios) {
-        const msg =
-          `📅 *Empenho vence em 3 dias*\n\n` +
-          `${primeiroNome(u.nome)}, o ${label} *${e.numero}* (${e.orgaoNome}) tem prazo de entrega em ${limite.toLocaleDateString("pt-BR")}.\n\n` +
-          `Detalhes: ${url}`;
+        const total = totalConta(itens);
+        const cabecalho =
+          `${t.emoji} *Vencimentos em ${dias} dia${dias > 1 ? "s" : ""}*\n\n` +
+          `${primeiroNome(u.nome)}, você tem *${total} ${total === 1 ? "item" : "itens"}* vencendo em ${dias} dia${dias > 1 ? "s" : ""}:\n\n`;
+
+        const secoes =
+          formatarSecao("📦", "Empenhos/Instrumentos", itens.empenhos, (i) =>
+            `${i.label} ${i.numero} — ${i.orgao} (${i.data.toLocaleDateString("pt-BR")})`,
+          ) +
+          formatarSecao("📄", "Atas", itens.atas, (i) =>
+            `${i.numero} — ${i.orgao} (${i.data.toLocaleDateString("pt-BR")})`,
+          ) +
+          formatarSecao("📋", "Contratos", itens.contratos, (i) =>
+            `${i.numero} — ${i.orgao} (${i.data.toLocaleDateString("pt-BR")})`,
+          ) +
+          formatarSecao("🛡️", "Garantias", itens.garantias, (i) =>
+            `${i.numero} — ${i.orgao} · ${i.modalidade} (${i.data.toLocaleDateString("pt-BR")})`,
+          );
+
+        const rodape =
+          `_${t.urgencia}_ — ${t.cta}\n\n` +
+          `Ver tudo: https://cpsystem.app.br/dashboard`;
+
         const r = await dispararNotificacao({
           usuarioId: u.id,
           tipo: "VENCIMENTO_EMPENHO",
-          referenciaId: `3d-${e.id}-${inicioHoje.toISOString().slice(0, 10)}`,
-          mensagem: msg,
+          referenciaId: `consolidado-d${dias}-${u.id}-${hojeStr}`,
+          mensagem: cabecalho + secoes + rodape,
         });
-        if (r.enviado) em3diasCount++;
+        if (r.enviado) porDias[dias]++;
       }
     }
   }
 
-  return { em3dias: em3diasCount, hoje: hojeCount, atrasado: atrasadoCount };
-}
-
-// Notifica atas/contratos vencendo em 30 dias e 7 dias.
-export async function notificarVencimentosCarteira(hoje: Date = new Date()): Promise<{
-  em30d: number;
-  em7d: number;
-}> {
-  const inicioHoje = new Date(hoje);
-  inicioHoje.setHours(0, 0, 0, 0);
-  const em30d = new Date(inicioHoje.getTime() + 30 * 86400000);
-  const em31d = new Date(inicioHoje.getTime() + 31 * 86400000);
-  const em7d = new Date(inicioHoje.getTime() + 7 * 86400000);
-  const em8d = new Date(inicioHoje.getTime() + 8 * 86400000);
-
-  const atas30 = await prisma.ata.findMany({
-    where: { vigenciaFim: { gte: em30d, lt: em31d } },
-    select: { id: true, numero: true, orgaoNome: true, vigenciaFim: true, empresa: { select: { contaId: true } } },
-  });
-  const atas7 = await prisma.ata.findMany({
-    where: { vigenciaFim: { gte: em7d, lt: em8d } },
-    select: { id: true, numero: true, orgaoNome: true, vigenciaFim: true, empresa: { select: { contaId: true } } },
-  });
-  const contratos30 = await prisma.contrato.findMany({
-    where: { vigenciaFim: { gte: em30d, lt: em31d } },
-    select: { id: true, numero: true, orgaoNome: true, vigenciaFim: true, empresa: { select: { contaId: true } } },
-  });
-  const contratos7 = await prisma.contrato.findMany({
-    where: { vigenciaFim: { gte: em7d, lt: em8d } },
-    select: { id: true, numero: true, orgaoNome: true, vigenciaFim: true, empresa: { select: { contaId: true } } },
-  });
-
-  let em30dCount = 0;
-  let em7dCount = 0;
-  const hojeStr = inicioHoje.toISOString().slice(0, 10);
-
-  async function disparar(
-    rotulo: "Ata" | "Contrato",
-    docs: typeof atas30,
-    dias: 30 | 7,
-    urlPrefix: string,
-  ) {
-    for (const d of docs) {
-      const usuarios = await destinatariosDaConta(d.empresa.contaId);
-      const urgencia = dias === 7 ? "⚠️" : "📆";
-      const janela = dias === 7 ? "7 dias" : "30 dias";
-      for (const u of usuarios) {
-        const msg =
-          `${urgencia} *${rotulo} vence em ${janela}*\n\n` +
-          `${primeiroNome(u.nome)}, ${rotulo.toLowerCase()} *${d.numero}* (${d.orgaoNome}) vence em ${d.vigenciaFim.toLocaleDateString("pt-BR")}.\n\n` +
-          `${dias === 7 ? "Verifique se há saldo pendente ou renovação necessária." : "Programe renovação, aditivo ou uso do saldo."}\n\n` +
-          `Detalhes: https://cpsystem.app.br${urlPrefix}/${d.id}`;
-        const r = await dispararNotificacao({
-          usuarioId: u.id,
-          tipo: "VENCIMENTO_EMPENHO",
-          referenciaId: `${rotulo}-${dias}d-${d.id}-${hojeStr}`,
-          mensagem: msg,
-        });
-        if (r.enviado) {
-          if (dias === 30) em30dCount++;
-          else em7dCount++;
-        }
-      }
-    }
-  }
-
-  await disparar("Ata", atas30, 30, "/atas");
-  await disparar("Ata", atas7, 7, "/atas");
-  await disparar("Contrato", contratos30, 30, "/contratos");
-  await disparar("Contrato", contratos7, 7, "/contratos");
-
-  return { em30d: em30dCount, em7d: em7dCount };
+  return { porDias, hoje: hojeCount, atrasado: atrasadoCount };
 }
 
 // Notifica cobranças CP System (assinatura Asaas) vencendo em 3 dias ou em atraso.
@@ -610,63 +672,8 @@ export async function notificarCartaoExpirando(hoje: Date = new Date()): Promise
 }
 
 // Garantia contratual vencendo em ate 60 dias.
-export async function notificarGarantiaVencendo(hoje: Date = new Date()): Promise<{ enviados: number }> {
-  const inicioHoje = new Date(hoje);
-  inicioHoje.setHours(0, 0, 0, 0);
-  const em60d = new Date(inicioHoje.getTime() + 60 * 86400000);
-  const em30d = new Date(inicioHoje.getTime() + 30 * 86400000);
-  const em31d = new Date(inicioHoje.getTime() + 31 * 86400000);
-  const em61d = new Date(inicioHoje.getTime() + 61 * 86400000);
-  const hojeStr = inicioHoje.toISOString().slice(0, 10);
-
-  // Notifica em 60d e 30d (2 alertas). Campo real do schema: `dataFim`.
-  const garantias60 = await prisma.garantia.findMany({
-    where: { dataFim: { gte: em60d, lt: em61d } },
-    select: {
-      id: true,
-      modalidade: true,
-      dataFim: true,
-      empenho: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
-      contrato: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
-    },
-  });
-  const garantias30 = await prisma.garantia.findMany({
-    where: { dataFim: { gte: em30d, lt: em31d } },
-    select: {
-      id: true,
-      modalidade: true,
-      dataFim: true,
-      empenho: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
-      contrato: { select: { numero: true, orgaoNome: true, empresa: { select: { contaId: true } } } },
-    },
-  });
-
-  let enviados = 0;
-  async function disparar(garantias: typeof garantias60, dias: 60 | 30) {
-    for (const g of garantias) {
-      const doc = g.empenho ?? g.contrato;
-      if (!doc || !g.dataFim) continue;
-      const usuarios = await destinatariosDaConta(doc.empresa.contaId);
-      for (const u of usuarios) {
-        const emoji = dias === 30 ? "⚠️" : "🛡️";
-        const msg =
-          `${emoji} *Garantia vencendo em ${dias} dias*\n\n` +
-          `${primeiroNome(u.nome)}, a garantia (${g.modalidade}) do documento *${doc.numero}* (${doc.orgaoNome}) vence em ${g.dataFim.toLocaleDateString("pt-BR")}.\n\n` +
-          `${dias === 30 ? "Renove urgente pra evitar aditivo emergencial." : "Programe renovação junto ao órgão."}`;
-        const r = await dispararNotificacao({
-          usuarioId: u.id,
-          tipo: "GARANTIA_VENCENDO",
-          referenciaId: `gar-${dias}d-${g.id}-${hojeStr}`,
-          mensagem: msg,
-        });
-        if (r.enviado) enviados++;
-      }
-    }
-  }
-  await disparar(garantias60, 60);
-  await disparar(garantias30, 30);
-  return { enviados };
-}
+// notificarGarantiaVencendo foi consolidada em notificarPrazosConsolidado
+// (Regina 06/07 — todos os prazos por janela viram 1 msg unica por usuario).
 
 // ==================== FASE 2 — EVENT-DRIVEN ====================
 
@@ -810,22 +817,17 @@ export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ 
 // Chamado pela regua diaria (que ja roda no cron da Vercel).
 // Best-effort — falha em uma nao bloqueia as outras.
 export async function executarNotificacoesDiarias(): Promise<{
-  empenhos: Awaited<ReturnType<typeof notificarPrazosEmpenho>>;
-  carteira: Awaited<ReturnType<typeof notificarVencimentosCarteira>>;
+  prazos: Awaited<ReturnType<typeof notificarPrazosConsolidado>>;
   planos: Awaited<ReturnType<typeof notificarVencimentosPlano>>;
   nfPendente: Awaited<ReturnType<typeof notificarNfSemPagamento30d>>;
   cartaoExpira: Awaited<ReturnType<typeof notificarCartaoExpirando>>;
-  garantia: Awaited<ReturnType<typeof notificarGarantiaVencendo>>;
   aniversario: Awaited<ReturnType<typeof notificarAniversarios>>;
 }> {
   const hoje = new Date();
-  const empenhos = await notificarPrazosEmpenho(hoje).catch((e) => {
-    console.error("[notif] erro em prazos empenho:", e);
-    return { em3dias: 0, hoje: 0, atrasado: 0 };
-  });
-  const carteira = await notificarVencimentosCarteira(hoje).catch((e) => {
-    console.error("[notif] erro em vencimentos carteira:", e);
-    return { em30d: 0, em7d: 0 };
+  const cadenciaVazia = Object.fromEntries(CADENCIA_DIAS.map((d) => [d, 0]));
+  const prazos = await notificarPrazosConsolidado(hoje).catch((e) => {
+    console.error("[notif] erro em prazos consolidado:", e);
+    return { porDias: cadenciaVazia, hoje: 0, atrasado: 0 };
   });
   const planos = await notificarVencimentosPlano(hoje).catch((e) => {
     console.error("[notif] erro em vencimentos plano:", e);
@@ -839,13 +841,9 @@ export async function executarNotificacoesDiarias(): Promise<{
     console.error("[notif] erro em cartao expirando:", e);
     return { enviados: 0 };
   });
-  const garantia = await notificarGarantiaVencendo(hoje).catch((e) => {
-    console.error("[notif] erro em garantia vencendo:", e);
-    return { enviados: 0 };
-  });
   const aniversario = await notificarAniversarios(hoje).catch((e) => {
     console.error("[notif] erro em aniversarios:", e);
     return { enviados: 0 };
   });
-  return { empenhos, carteira, planos, nfPendente, cartaoExpira, garantia, aniversario };
+  return { prazos, planos, nfPendente, cartaoExpira, aniversario };
 }

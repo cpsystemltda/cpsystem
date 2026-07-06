@@ -25,12 +25,10 @@ export type ResumoRegua = {
   comissoesAtrasadas: number;
   fixosGerados: number;
   fixosAtrasados: number;
-  whatsAppEmpenhos: { em3dias: number; hoje: number; atrasado: number };
-  whatsAppCarteira: { em30d: number; em7d: number };
+  whatsAppPrazos: { porDias: Record<number, number>; hoje: number; atrasado: number };
   whatsAppPlanos: { em3d: number; atrasado: number };
   whatsAppNfPendente: number;
   whatsAppCartaoExpira: number;
-  whatsAppGarantia: number;
   whatsAppAniversarios: number;
 };
 
@@ -141,12 +139,10 @@ export async function executarRegua(): Promise<ResumoRegua> {
     comissoesAtrasadas,
     fixosGerados,
     fixosAtrasados,
-    whatsAppEmpenhos: notifs.empenhos,
-    whatsAppCarteira: notifs.carteira,
+    whatsAppPrazos: notifs.prazos,
     whatsAppPlanos: notifs.planos,
     whatsAppNfPendente: notifs.nfPendente.enviados,
     whatsAppCartaoExpira: notifs.cartaoExpira.enviados,
-    whatsAppGarantia: notifs.garantia.enviados,
     whatsAppAniversarios: notifs.aniversario.enviados,
   };
 }
