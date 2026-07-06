@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { Crown, Sparkles, ArrowRight, TrendingUp, Coins, Users } from "lucide-react";
+import { Crown, Sparkles, ArrowRight, TrendingUp, Coins, Users, Infinity as InfinityIcon } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
 // Landing publica do Programa de Embaixador. Sem auth — qualquer um
 // pode abrir. CTA principal: cadastrar-se como Analista (que automaticamente
 // vira elegivel pra ganhar comissao indicando empresas).
+//
+// Modelo de comissao (Regina 03/07/2026): R$ 29,90 FIXO por vinculo ativo,
+// recorrente vitalicio. Nao e mais % escalonado.
 export default function SejaEmbaixadorPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#FAF6EC] via-white to-[#FFF8E1]">
@@ -46,8 +49,7 @@ export default function SejaEmbaixadorPage() {
             className="mt-4 text-[44px] font-extrabold leading-[1.05] text-[#2D3340]"
             style={{ letterSpacing: "-0.04em" }}
           >
-            Indique empresas e receba
-            <br />
+            Ganhe{" "}
             <span
               style={{
                 background: "linear-gradient(135deg, #B8860B, #D4AF37)",
@@ -55,15 +57,18 @@ export default function SejaEmbaixadorPage() {
                 WebkitTextFillColor: "transparent",
               }}
             >
-              até 6% por mês — vitalício.
+              R$ 29,90 por cliente
             </span>
+            <br />
+            todo mês. Pra sempre.
           </h1>
           <p
             className="mx-auto mt-5 max-w-2xl text-[16px] leading-relaxed text-[#3D434C]"
           >
             Se você é analista de licitação ou consultor de empresas que vendem ao
-            governo, indique o CP System pros seus clientes — e ganhe comissão
-            recorrente <strong>enquanto eles continuarem assinando</strong>.
+            governo, indique o CP System pros seus clientes e receba{" "}
+            <strong>R$ 29,90 por cada empresa vinculada</strong> — todo mês, enquanto ela continuar
+            assinando. Sem tiers, sem metas, sem letra miúda.
           </p>
 
           <div className="mt-8 flex items-center justify-center gap-3">
@@ -99,38 +104,108 @@ export default function SejaEmbaixadorPage() {
           <Passo
             n="3"
             icon={Coins}
-            titulo="Receba todo mês"
-            desc="A partir da 1ª fatura paga pela empresa, você recebe % do MRR todo mês. Vitalício."
+            titulo="Receba R$ 29,90/mês por vínculo"
+            desc="A partir da 1ª fatura paga pela empresa, R$ 29,90 caem na sua conta todo mês. Enquanto ela pagar."
           />
         </section>
 
-        {/* Tiers — quanto mais empresas, maior o % */}
+        {/* Projeções — escalabilidade */}
         <section className="mt-20">
           <p
             className="text-center text-[11px] font-bold uppercase"
             style={{ letterSpacing: "0.22em", color: "#9C7A2D" }}
           >
-            Quanto mais empresas, maior a sua comissão
+            Renda passiva escalável
           </p>
           <h2
             className="mt-3 text-center text-[32px] font-extrabold text-[#2D3340]"
             style={{ letterSpacing: "-0.03em" }}
           >
-            Suba de tier e ganhe mais
+            Quanto mais empresas indica,
+            <br />mais você fatura sem esforço extra
           </h2>
-          <div className="mt-8 grid gap-4 md:grid-cols-4">
-            <Tier nome="Bronze" pct="5%" range="1–2 contas ativas" cor="#A88947" />
-            <Tier nome="Prata" pct="7%" range="3–7 contas ativas" cor="#8B9BA8" />
-            <Tier nome="Ouro" pct="10%" range="8–14 contas ativas" cor="#D4AF37" destaque />
-            <Tier nome="Diamante" pct="15%" range="15+ contas ativas" cor="#6F8BAA" />
+          <p className="mx-auto mt-4 max-w-2xl text-center text-[14px] text-[#5D6470]">
+            R$ 29,90 por cada cliente ativo, todo mês. Simples de calcular, simples de escalar.
+          </p>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-5">
+            <Projecao clientes={5} valor="149,50" rotulo="Comissão inicial" />
+            <Projecao clientes={10} valor="299,00" rotulo="Renda extra sólida" />
+            <Projecao clientes={25} valor="747,50" rotulo="Meio salário passivo" destaque />
+            <Projecao clientes={50} valor="1.495,00" rotulo="1 salário mínimo" />
+            <Projecao clientes={100} valor="2.990,00" rotulo="Renda profissional" />
           </div>
-          <p className="mt-6 text-center text-xs text-[#5D6470]">
-            % aplicado sobre o valor da mensalidade de cada empresa indicada (Básico R$ 397 / Premium R$ 997).
-            Em <strong>Diamante</strong>, 15 empresas Premium = <strong>R$ 2.244/mês recorrente</strong> + <strong>bônus de R$ 5.000/ano</strong>.
+
+          <p className="mt-6 text-center text-[12px] text-[#5D6470]">
+            <InfinityIcon className="mr-1 inline-block h-3.5 w-3.5" />
+            <strong>Recorrente vitalício</strong> — enquanto o cliente permanecer assinante do CP System, você recebe.
           </p>
-          <p className="mt-2 text-center text-xs text-[#5D6470]">
-            ✨ <strong>Bônus de início:</strong> R$ 500 fixos pra você na 1ª fatura paga de cada empresa indicada — independente do tier.
-          </p>
+        </section>
+
+        {/* Bônus destaque */}
+        <section className="mt-20 rounded-3xl bg-gradient-to-br from-[#FFF8E1] via-white to-[#FAF6EC] p-10 ring-1 ring-[#D4AF37]/30">
+          <div className="grid gap-8 md:grid-cols-2 md:items-center">
+            <div>
+              <p
+                className="text-[11px] font-bold uppercase"
+                style={{ letterSpacing: "0.22em", color: "#9C7A2D" }}
+              >
+                Bônus de ativação
+              </p>
+              <h2
+                className="mt-3 text-[28px] font-extrabold text-[#2D3340]"
+                style={{ letterSpacing: "-0.03em" }}
+              >
+                <span
+                  style={{
+                    background: "linear-gradient(135deg, #B8860B, #D4AF37)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                  }}
+                >
+                  + R$ 500 fixos
+                </span>
+                <br />
+                na 1ª fatura paga de cada indicação
+              </h2>
+              <p className="mt-3 text-[14px] leading-relaxed text-[#3D434C]">
+                Além dos R$ 29,90 recorrentes, você recebe um bônus de <strong>R$ 500 no primeiro
+                pagamento</strong> de cada empresa que se cadastrar pelo seu link. Independe do plano
+                que ela contrate.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white p-6 shadow-md">
+              <p className="text-[10px] font-bold uppercase" style={{ letterSpacing: "0.2em", color: "#9C7A2D" }}>
+                Exemplo · 1 cliente novo
+              </p>
+              <ul className="mt-4 space-y-2 text-[13px] text-[#3D434C]">
+                <li className="flex items-baseline justify-between border-b border-slate-100 pb-2">
+                  <span>Bônus de ativação (1x)</span>
+                  <strong className="text-[#2D3340]">R$ 500,00</strong>
+                </li>
+                <li className="flex items-baseline justify-between border-b border-slate-100 pb-2">
+                  <span>Comissão recorrente (12 meses)</span>
+                  <strong className="text-[#2D3340]">R$ 358,80</strong>
+                </li>
+                <li className="flex items-baseline justify-between pt-1">
+                  <span className="font-bold">1º ano · total</span>
+                  <strong
+                    className="text-[16px]"
+                    style={{
+                      background: "linear-gradient(135deg, #B8860B, #D4AF37)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                    }}
+                  >
+                    R$ 858,80
+                  </strong>
+                </li>
+              </ul>
+              <p className="mt-3 text-[10px] text-[#5D6470]">
+                E os R$ 29,90 continuam nos meses seguintes, ano após ano.
+              </p>
+            </div>
+          </div>
         </section>
 
         {/* Pra quem é */}
@@ -148,7 +223,7 @@ export default function SejaEmbaixadorPage() {
             />
             <ParaQuem
               titulo="Consultores e advogados de Direito Administrativo"
-              desc="Quem trabalha com Lei 14.133 conhece empresas que precisam de gestão pós-licitação. Ganhe comissão sobre cada uma."
+              desc="Quem trabalha com Lei 14.133 conhece empresas que precisam de gestão pós-licitação. Ganhe R$ 29,90/mês por cada uma."
             />
             <ParaQuem
               titulo="Contadores especializados em empresas B2G"
@@ -218,47 +293,47 @@ function Passo({
   );
 }
 
-function Tier({
-  nome,
-  pct,
-  range,
-  cor,
+function Projecao({
+  clientes,
+  valor,
+  rotulo,
   destaque,
 }: {
-  nome: string;
-  pct: string;
-  range: string;
-  cor: string;
+  clientes: number;
+  valor: string;
+  rotulo: string;
   destaque?: boolean;
 }) {
   return (
     <div
-      className="relative overflow-hidden rounded-2xl bg-white p-5 text-center shadow"
+      className="relative overflow-hidden rounded-2xl bg-white p-5 text-center"
       style={
         destaque
-          ? { boxShadow: `0 0 0 2px ${cor}, 0 10px 30px rgba(0,0,0,0.05)` }
+          ? { boxShadow: "0 0 0 2px #D4AF37, 0 10px 30px rgba(212,175,55,0.15)" }
           : { boxShadow: "0 2px 6px rgba(0,0,0,0.04)" }
       }
     >
       {destaque && (
         <span
-          className="absolute right-3 top-3 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white"
-          style={{ background: cor, letterSpacing: "0.16em" }}
+          className="absolute right-3 top-3 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase text-white"
+          style={{ background: "linear-gradient(135deg, #B8860B, #D4AF37)", letterSpacing: "0.16em" }}
         >
-          Top
+          Foco
         </span>
       )}
-      <div
-        className="mx-auto h-10 w-10 rounded-full"
-        style={{ background: `linear-gradient(135deg, ${cor}, ${cor}cc)` }}
-      />
-      <p className="mt-4 text-[10px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "#5D6470" }}>
-        {nome}
+      <p className="text-[10px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "#5D6470" }}>
+        {clientes} clientes
       </p>
-      <p className="mt-1 text-[36px] font-extrabold leading-none text-[#2D3340]" style={{ letterSpacing: "-0.04em" }}>
-        {pct}
+      <p className="mt-3 text-[11px] uppercase text-[#9C7A2D]" style={{ letterSpacing: "0.14em" }}>
+        R$
       </p>
-      <p className="mt-2 text-[11px] text-[#5D6470]">{range}</p>
+      <p className="text-[26px] font-extrabold leading-none text-[#2D3340]" style={{ letterSpacing: "-0.03em" }}>
+        {valor}
+      </p>
+      <p className="mt-1 text-[10px] uppercase text-[#5D6470]" style={{ letterSpacing: "0.14em" }}>
+        /mês
+      </p>
+      <p className="mt-3 text-[11px] leading-tight text-[#5D6470]">{rotulo}</p>
     </div>
   );
 }
