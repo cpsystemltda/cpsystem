@@ -6,10 +6,14 @@ import { prisma } from "@/lib/prisma";
 import {
   analisarContratoIA,
   analisarDocumentoIA,
+  analisarPdfIA,
+  compararDocumentosIA,
   type AnaliseJuridica,
+  type ComparacaoJuridica,
   type DocumentoEntrada,
   type TipoDocJuridico,
 } from "@/lib/iaJuridica";
+import { salvarArquivo } from "@/lib/uploads";
 
 const MODELO_ATUAL = "claude-sonnet-4-6";
 
@@ -306,9 +310,10 @@ export async function listarDocumentosParaAnalise(): Promise<{
   atas: { id: string; rotulo: string }[];
   contratos: { id: string; rotulo: string }[];
   empenhos: { id: string; rotulo: string }[];
+  avulsos: { id: string; rotulo: string; pdfUrl: string; tipo: string }[];
 }> {
   const usuario = await exigirUsuario();
-  const [atas, contratos, empenhos] = await Promise.all([
+  const [atas, contratos, empenhos, avulsos] = await Promise.all([
     prisma.ata.findMany({
       where: { empresa: { contaId: usuario.contaId } },
       orderBy: { criadoEm: "desc" },
@@ -327,6 +332,12 @@ export async function listarDocumentosParaAnalise(): Promise<{
       take: 50,
       select: { id: true, numero: true, orgaoNome: true, instrumento: true },
     }),
+    prisma.documentoAvulsoJuridico.findMany({
+      where: { empresa: { contaId: usuario.contaId } },
+      orderBy: { criadoEm: "desc" },
+      take: 50,
+      select: { id: true, nome: true, tipo: true, pdfUrl: true },
+    }),
   ]);
   return {
     atas: atas.map((a) => ({ id: a.id, rotulo: `Ata ${a.numero} — ${a.orgaoNome}` })),
@@ -335,5 +346,156 @@ export async function listarDocumentosParaAnalise(): Promise<{
       id: e.id,
       rotulo: `${e.instrumento} ${e.numero} — ${e.orgaoNome}`,
     })),
+    avulsos: avulsos.map((a) => ({
+      id: a.id,
+      rotulo: `${rotuloAvulso(a.tipo)} · ${a.nome}`,
+      pdfUrl: a.pdfUrl,
+      tipo: a.tipo,
+    })),
   };
+}
+
+function rotuloAvulso(tipo: string): string {
+  switch (tipo) {
+    case "TERMO_COOPERACAO": return "Termo de Cooperação";
+    case "MINUTA": return "Minuta";
+    case "ADITIVO": return "Aditivo";
+    default: return "Documento avulso";
+  }
+}
+
+// ============================================================
+// UPLOAD + ANALISE DE PDF AVULSO (Regina 06/07)
+// Suporta TC (Termo de Cooperação), minutas, aditivos — qualquer
+// PDF que não é modelado como entidade no sistema.
+// ============================================================
+
+export type UploadAvulsoResult =
+  | { ok: true; id: string; nome: string; tipo: string; pdfUrl: string }
+  | { ok: false; erro: string };
+
+// Recebe FormData com { arquivo: File, tipo: string, empresaId?: string }.
+// Salva PDF no Vercel Blob + cria registro DocumentoAvulsoJuridico.
+export async function uploadDocumentoAvulsoAction(form: FormData): Promise<UploadAvulsoResult> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+
+  const arquivo = form.get("arquivo");
+  const tipo = String(form.get("tipo") ?? "OUTRO");
+  const empresaIdInput = form.get("empresaId");
+
+  if (!(arquivo instanceof File)) return { ok: false, erro: "Nenhum arquivo enviado." };
+  if (arquivo.type !== "application/pdf") return { ok: false, erro: "Apenas PDFs são aceitos aqui." };
+  const tiposValidos = ["TERMO_COOPERACAO", "MINUTA", "ADITIVO", "OUTRO"];
+  if (!tiposValidos.includes(tipo)) return { ok: false, erro: "Tipo inválido." };
+
+  let empresaId = empresaIdInput ? String(empresaIdInput) : null;
+  if (!empresaId) {
+    const primeira = await prisma.empresa.findFirst({
+      where: { contaId: usuario.contaId },
+      select: { id: true },
+      orderBy: { criadoEm: "asc" },
+    });
+    if (!primeira) return { ok: false, erro: "Nenhuma empresa cadastrada. Cadastre uma empresa antes." };
+    empresaId = primeira.id;
+  } else {
+    const pertence = await prisma.empresa.count({
+      where: { id: empresaId, contaId: usuario.contaId },
+    });
+    if (!pertence) return { ok: false, erro: "Empresa não pertence à sua conta." };
+  }
+
+  const salvo = await salvarArquivo(arquivo);
+  const registro = await prisma.documentoAvulsoJuridico.create({
+    data: {
+      empresaId,
+      tipo,
+      nome: salvo.nome,
+      pdfUrl: salvo.url,
+      tamanhoBytes: salvo.tamanhoBytes,
+      criadoPorId: usuario.id,
+    },
+  });
+  return { ok: true, id: registro.id, nome: registro.nome, tipo: registro.tipo, pdfUrl: registro.pdfUrl };
+}
+
+// Analisa PDF avulso (previamente uploadado) via IA. Persiste parecer.
+export async function analisarAvulsoAction(avulsoId: string): Promise<AnalisarDocumentoResult> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+
+  const avulso = await prisma.documentoAvulsoJuridico.findFirst({
+    where: { id: avulsoId, empresa: { contaId: usuario.contaId } },
+    select: { id: true, tipo: true, nome: true, pdfUrl: true },
+  });
+  if (!avulso) return { ok: false, erro: "Documento não encontrado." };
+
+  const demo = !process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.trim() === "";
+  try {
+    const analise = await analisarPdfIA({
+      pdfUrl: avulso.pdfUrl,
+      nomeDocumento: avulso.nome,
+      tipoDeclarado: avulso.tipo,
+    });
+    await prisma.parecerJuridico.create({
+      data: {
+        tipo: "AVULSO",
+        analise: analise as unknown as object,
+        modelo: MODELO_ATUAL,
+        demo,
+        avulsoId: avulso.id,
+        criadoPorId: usuario.id,
+      },
+    });
+    return { ok: true, analise, demo };
+  } catch (err) {
+    return { ok: false, erro: err instanceof Error ? err.message : "Falha na análise do PDF." };
+  }
+}
+
+// ============================================================
+// COMPARACAO DE 2 DOCUMENTOS (Regina 06/07)
+// Recebe 2 avulsoIds e retorna análise de diferenças.
+// Não persiste (comparação é pontual, não parecer arquivado).
+// ============================================================
+
+export type CompararResult =
+  | { ok: true; comparacao: ComparacaoJuridica; demo: boolean }
+  | { ok: false; erro: string };
+
+export async function compararAvulsosAction(
+  avulsoIdOriginal: string,
+  avulsoIdAlterado: string,
+): Promise<CompararResult> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+
+  if (avulsoIdOriginal === avulsoIdAlterado) {
+    return { ok: false, erro: "Escolha 2 documentos diferentes." };
+  }
+
+  const [orig, alt] = await Promise.all([
+    prisma.documentoAvulsoJuridico.findFirst({
+      where: { id: avulsoIdOriginal, empresa: { contaId: usuario.contaId } },
+      select: { id: true, nome: true, pdfUrl: true },
+    }),
+    prisma.documentoAvulsoJuridico.findFirst({
+      where: { id: avulsoIdAlterado, empresa: { contaId: usuario.contaId } },
+      select: { id: true, nome: true, pdfUrl: true },
+    }),
+  ]);
+  if (!orig || !alt) return { ok: false, erro: "Um dos documentos não foi encontrado." };
+
+  const demo = !process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.trim() === "";
+  try {
+    const comparacao = await compararDocumentosIA({
+      pdfUrlOriginal: orig.pdfUrl,
+      nomeOriginal: orig.nome,
+      pdfUrlAlterado: alt.pdfUrl,
+      nomeAlterado: alt.nome,
+    });
+    return { ok: true, comparacao, demo };
+  } catch (err) {
+    return { ok: false, erro: err instanceof Error ? err.message : "Falha na comparação." };
+  }
 }

@@ -64,7 +64,7 @@ Analisa instrumentos contratuais — Atas de Registro de Preços, Contratos Admi
 4. Janelas críticas de prazo (eventos com data fixa que disparam consequência legal — vigência, reajuste, garantia, marco de prazo, etc.).
 Seja específica, jurídica, prática. Cite artigos da Lei 14.133/2021 quando aplicável. Considere o tipo do documento (ARP tem regras de carona/limite, Empenho tem fluxo de execução, etc.).`;
 
-export type TipoDocJuridico = "ATA" | "CONTRATO" | "EMPENHO" | "TERMO_COOPERACAO";
+export type TipoDocJuridico = "ATA" | "CONTRATO" | "EMPENHO" | "TERMO_COOPERACAO" | "AVULSO";
 
 export type DocumentoEntrada = {
   tipo: TipoDocJuridico;
@@ -111,6 +111,7 @@ const ROTULO_TIPO: Record<TipoDocJuridico, string> = {
   CONTRATO: "CONTRATO ADMINISTRATIVO",
   EMPENHO: "EMPENHO/INSTRUMENTO CONTRATUAL (art. 95)",
   TERMO_COOPERACAO: "TERMO DE COOPERAÇÃO",
+  AVULSO: "DOCUMENTO AVULSO",
 };
 
 // Análise generalizada — aceita Ata, Contrato, Empenho ou Termo de Cooperação.
@@ -168,6 +169,189 @@ export async function analisarDocumentoIA(doc: DocumentoEntrada): Promise<Analis
   const block = response.content.find((c) => c.type === "text");
   if (!block || block.type !== "text") throw new Error("Resposta vazia da IA.");
   return JSON.parse(block.text) as AnaliseJuridica;
+}
+
+// Analisa PDF de documento juridico via URL (Vercel Blob publica).
+// Usado pra TC (Termo de Cooperacao), minutas, aditivos — documentos que
+// nao sao entidade no schema mas o usuario upload pra receber parecer.
+//
+// Anthropic API aceita PDF nativo via content type "document" com source.url
+// (a URL precisa ser publicamente acessivel — Vercel Blob public URL serve).
+// Regina 06/07/2026.
+export async function analisarPdfIA(opts: {
+  pdfUrl: string;
+  nomeDocumento: string;
+  tipoDeclarado: string; // "TERMO_COOPERACAO" | "MINUTA" | "ADITIVO" | "OUTRO"
+  contextoAdicional?: string;
+}): Promise<AnaliseJuridica> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey.trim() === "") {
+    return {
+      resumoExecutivo: `[MODO DEMO] Análise real do PDF "${opts.nomeDocumento}" (${opts.tipoDeclarado}) requer ANTHROPIC_API_KEY configurada. Configure a chave no Vercel pra receber parecer completo via Claude Sonnet 4.6.`,
+      pontosCriticos: [
+        { titulo: "Modo demonstração", descricao: "Configure ANTHROPIC_API_KEY no servidor para análise real do PDF.", severidade: "baixa" },
+      ],
+      checklistGestao: [{ item: "Configurar a chave da API Anthropic no Vercel", concluido: false }],
+      janelasCriticas: [],
+    };
+  }
+
+  const linhas: string[] = [
+    `Analise o PDF em anexo — um documento jurídico do tipo ${opts.tipoDeclarado.replace(/_/g, " ")}.`,
+    `Nome do arquivo: ${opts.nomeDocumento}`,
+    "",
+    "Extraia do próprio PDF: número/identificação, órgão, objeto, vigência, valores,",
+    "prazos, cláusulas críticas. Depois entregue análise estruturada conforme schema:",
+    "resumo executivo, pontos críticos, checklist de gestão e janelas críticas de prazo.",
+    "Perspectiva: empresa fornecedora que está executando ou vai executar o contrato/termo.",
+  ];
+  if (opts.contextoAdicional) {
+    linhas.push("", "Contexto adicional:", opts.contextoAdicional);
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 4096,
+    system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
+    output_config: { format: { type: "json_schema", schema: SCHEMA } },
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "document", source: { type: "url", url: opts.pdfUrl } },
+          { type: "text", text: linhas.join("\n") },
+        ],
+      },
+    ],
+  });
+
+  const block = response.content.find((c) => c.type === "text");
+  if (!block || block.type !== "text") throw new Error("Resposta vazia da IA.");
+  return JSON.parse(block.text) as AnaliseJuridica;
+}
+
+// Compara 2 documentos juridicos (ex: minuta vs contrato assinado) e retorna
+// analise focada em diferencas juridicamente relevantes.
+// Regina 06/07/2026.
+export type ComparacaoJuridica = {
+  resumoDiferencas: string;
+  diferencasCriticas: { titulo: string; original: string; alterado: string; impacto: string; severidade: "alta" | "media" | "baixa" }[];
+  clausulasNovas: { clausula: string; risco: string }[];
+  clausulasRemovidas: { clausula: string; consequencia: string }[];
+  recomendacao: string;
+};
+
+const COMPARACAO_SCHEMA = {
+  type: "object",
+  properties: {
+    resumoDiferencas: { type: "string" },
+    diferencasCriticas: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          titulo: { type: "string" },
+          original: { type: "string" },
+          alterado: { type: "string" },
+          impacto: { type: "string" },
+          severidade: { type: "string", enum: ["alta", "media", "baixa"] },
+        },
+        required: ["titulo", "original", "alterado", "impacto", "severidade"],
+        additionalProperties: false,
+      },
+    },
+    clausulasNovas: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          clausula: { type: "string" },
+          risco: { type: "string" },
+        },
+        required: ["clausula", "risco"],
+        additionalProperties: false,
+      },
+    },
+    clausulasRemovidas: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          clausula: { type: "string" },
+          consequencia: { type: "string" },
+        },
+        required: ["clausula", "consequencia"],
+        additionalProperties: false,
+      },
+    },
+    recomendacao: { type: "string" },
+  },
+  required: ["resumoDiferencas", "diferencasCriticas", "clausulasNovas", "clausulasRemovidas", "recomendacao"],
+  additionalProperties: false,
+} as const;
+
+const SYSTEM_COMPARACAO = `Você é um especialista em Direito Administrativo brasileiro comparando 2 versões de um documento contratual (ex: minuta pré-negociação vs. contrato assinado, ou versão original vs. aditivo).
+Sua análise entrega:
+1. Resumo curto do que mudou de fato (até 4 linhas).
+2. Diferenças críticas com impacto jurídico/econômico para a empresa fornecedora — cite a cláusula original, a versão alterada e o impacto.
+3. Cláusulas novas (que não estavam no primeiro documento) e seu risco.
+4. Cláusulas removidas (que estavam no primeiro e sumiram) e a consequência.
+5. Recomendação prática pra empresa (aceitar, contestar, renegociar).
+Seja objetiva, jurídica, prática. Ignore diferenças meramente estilísticas.`;
+
+export async function compararDocumentosIA(opts: {
+  pdfUrlOriginal: string;
+  nomeOriginal: string;
+  pdfUrlAlterado: string;
+  nomeAlterado: string;
+  contexto?: string;
+}): Promise<ComparacaoJuridica> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey.trim() === "") {
+    return {
+      resumoDiferencas: `[MODO DEMO] Comparação real entre "${opts.nomeOriginal}" e "${opts.nomeAlterado}" requer ANTHROPIC_API_KEY. Configure no Vercel.`,
+      diferencasCriticas: [],
+      clausulasNovas: [],
+      clausulasRemovidas: [],
+      recomendacao: "Configure a API pra receber recomendação real.",
+    };
+  }
+
+  const linhas: string[] = [
+    `Compare os 2 PDFs em anexo.`,
+    `Documento ORIGINAL: ${opts.nomeOriginal}`,
+    `Documento ALTERADO: ${opts.nomeAlterado}`,
+    "",
+    "O primeiro PDF é a versão original (ex: minuta) e o segundo é a versão alterada",
+    "(ex: contrato assinado ou aditivo). Foque em diferenças com impacto jurídico/econômico.",
+  ];
+  if (opts.contexto) {
+    linhas.push("", "Contexto:", opts.contexto);
+  }
+
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 4096,
+    system: [{ type: "text", text: SYSTEM_COMPARACAO, cache_control: { type: "ephemeral" } }],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    output_config: { format: { type: "json_schema", schema: COMPARACAO_SCHEMA as any } },
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "document", source: { type: "url", url: opts.pdfUrlOriginal } },
+          { type: "document", source: { type: "url", url: opts.pdfUrlAlterado } },
+          { type: "text", text: linhas.join("\n") },
+        ],
+      },
+    ],
+  });
+
+  const block = response.content.find((c) => c.type === "text");
+  if (!block || block.type !== "text") throw new Error("Resposta vazia da IA.");
+  return JSON.parse(block.text) as ComparacaoJuridica;
 }
 
 function analiseMockGenerico(doc: DocumentoEntrada): AnaliseJuridica {

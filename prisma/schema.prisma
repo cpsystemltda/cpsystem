@@ -119,6 +119,7 @@ model Usuario {
   contratosCriados Contrato[] @relation("ContratosCriados")
   empenhosCriados  Empenho[]  @relation("EmpenhosCriados")
   pareceresCriados ParecerJuridico[] @relation("ParecresCriados")
+  avulsosJuridicosCriados DocumentoAvulsoJuridico[] @relation("AvulsosCriados")
   reajustesRetroativosCriados ReajusteRetroativo[] @relation("ReajustesRetroativosCriados")
   contaGoogle      GoogleAccount?
   notificacoesWhats NotificacaoWhatsApp[]
@@ -268,6 +269,7 @@ model Empresa {
   atas      Ata[]
   contratos Contrato[]
   empenhos  Empenho[]
+  documentosAvulsosJuridicos DocumentoAvulsoJuridico[]
 
   @@index([contaId])
 }
@@ -1153,7 +1155,7 @@ model Vigencia {
 // novo aditivo, mudança de vigência, etc.).
 model ParecerJuridico {
   id              String          @id @default(cuid())
-  tipo            String          // "ATA" | "CONTRATO" | "EMPENHO" — TipoDocJuridico
+  tipo            String          // "ATA" | "CONTRATO" | "EMPENHO" | "TERMO_COOPERACAO" | "AVULSO" — TipoDocJuridico
   analise         Json            // payload AnaliseJuridica completo
   modelo          String          // ex: "claude-sonnet-4-6"
   demo            Boolean         @default(false) // true se análise mockada (sem API key)
@@ -1164,6 +1166,8 @@ model ParecerJuridico {
   contrato        Contrato?       @relation(fields: [contratoId], references: [id], onDelete: Cascade)
   empenhoId       String?
   empenho         Empenho?        @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  avulsoId        String?
+  avulso          DocumentoAvulsoJuridico? @relation(fields: [avulsoId], references: [id], onDelete: Cascade)
 
   criadoPorId     String?
   criadoPor       Usuario?        @relation("ParecresCriados", fields: [criadoPorId], references: [id])
@@ -1173,6 +1177,33 @@ model ParecerJuridico {
   @@index([ataId, criadoEm])
   @@index([contratoId, criadoEm])
   @@index([empenhoId, criadoEm])
+  @@index([avulsoId, criadoEm])
+  @@index([criadoPorId])
+}
+
+// Documento avulso (PDF) submetido pelo usuário pra análise jurídica.
+// Suporta TC (Termo de Cooperação), minutas, aditivos e qualquer PDF
+// que não é modelado como entidade própria no sistema.
+// Regina 06/07/2026.
+model DocumentoAvulsoJuridico {
+  id            String   @id @default(cuid())
+  empresaId     String
+  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  tipo          String   // "TERMO_COOPERACAO" | "MINUTA" | "ADITIVO" | "OUTRO"
+  nome          String   // nome legível do arquivo
+  pdfUrl        String   // URL pública no Vercel Blob
+  blobPathname  String?  // caminho interno pra deletar depois
+  tamanhoBytes  Int?
+
+  pareceres     ParecerJuridico[]
+
+  criadoPorId   String?
+  criadoPor     Usuario? @relation("AvulsosCriados", fields: [criadoPorId], references: [id])
+
+  criadoEm      DateTime @default(now())
+
+  @@index([empresaId, criadoEm])
   @@index([criadoPorId])
 }
 

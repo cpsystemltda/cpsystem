@@ -77,7 +77,7 @@ export default async function JuridicoPage() {
   }
 
   // PREMIUM — painel rico de análise jurídica
-  const { atas, contratos, empenhos } = await listarDocumentosParaAnalise();
+  const { atas, contratos, empenhos, avulsos } = await listarDocumentosParaAnalise();
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
@@ -103,7 +103,7 @@ export default async function JuridicoPage() {
 
       {/* Análise jurídica por IA */}
       <div className="mt-8">
-        <AnaliseJuridicaPanel atas={atas} contratos={contratos} empenhos={empenhos} />
+        <AnaliseJuridicaPanel atas={atas} contratos={contratos} empenhos={empenhos} avulsos={avulsos} />
       </div>
 
       {/* Franquia humana */}
