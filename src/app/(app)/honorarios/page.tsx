@@ -2,19 +2,11 @@ import Link from "next/link";
 import { Wallet, AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { brl, tierPorAtivos } from "@/lib/validators";
+import { brl } from "@/lib/validators";
+import { COMISSAO_FIXA_POR_VINCULO } from "@/lib/comissaoEmbaixador";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { HonorariosAnalistaBloco } from "@/components/HonorariosAnalistaBloco";
 import { LinkIndicacaoCard } from "@/components/LinkIndicacaoCard";
-
-// Quantos clientes ativos faltam pra subir de tier. null = ja esta no
-// tier maximo (DIAMOND).
-function faltaParaProximoTier(ativos: number): { proximo: string; faltam: number } | null {
-  if (ativos < 6) return { proximo: "Prata", faltam: 6 - ativos };
-  if (ativos < 11) return { proximo: "Ouro", faltam: 11 - ativos };
-  if (ativos < 16) return { proximo: "Diamante", faltam: 16 - ativos };
-  return null;
-}
 
 export default async function HonorariosPage() {
   const usuario = await exigirUsuario();
@@ -66,8 +58,6 @@ export default async function HonorariosPage() {
   const ativos = contasIndicadas.filter((c) => c.statusAssinatura === "ATIVA");
   const trial = contasIndicadas.filter((c) => c.statusAssinatura === "TRIAL");
 
-  const { tier, percentual } = tierPorAtivos(ativos.length);
-
   // Comissões
   const comissoes = await prisma.comissao.findMany({
     where: { analistaId },
@@ -77,26 +67,23 @@ export default async function HonorariosPage() {
 
   const totalRecebido = comissoes.filter((c) => c.paga).reduce((s, c) => s + c.valor, 0);
   const totalAReceber = comissoes.filter((c) => !c.paga).reduce((s, c) => s + c.valor, 0);
+  const recorrenteMes = ativos.length * COMISSAO_FIXA_POR_VINCULO;
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
       <PageHeader
         eyebrow="Painel · Comissões SaaS"
         titulo="Honorários"
-        destaque={tier}
+        destaque="Analista Parceiro"
         subtitulo={`Olá ${conta.analista.nomeCompleto} — controle suas comissões e clientes ativos.`}
       />
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
         <Card titulo="Clientes ativos" valor={String(ativos.length)} sub={`${trial.length} em trial`} />
         <Card
-          titulo="Tier atual"
-          valor={tier}
-          sub={
-            faltaParaProximoTier(ativos.length)
-              ? `Comissão ${percentual}% · faltam ${faltaParaProximoTier(ativos.length)!.faltam} pra ${faltaParaProximoTier(ativos.length)!.proximo}`
-              : `Comissão ${percentual}% · tier máximo`
-          }
+          titulo="Recorrente/mês"
+          valor={brl(recorrenteMes)}
+          sub={`R$ 29,90 × ${ativos.length} vínculo(s) ativo(s)`}
         />
         <Card titulo="A receber" valor={brl(totalAReceber)} sub={`${comissoes.filter((c) => !c.paga).length} comissões`} cor="amber" />
         <Card titulo="Já recebido" valor={brl(totalRecebido)} sub={`${comissoes.filter((c) => c.paga).length} pagamentos`} cor="emerald" />

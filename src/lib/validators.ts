@@ -513,19 +513,13 @@ export function formatarMoeda(valor: number, moeda: Moeda = "BRL"): string {
   return valor.toLocaleString(locale, { style: "currency", currency: moeda });
 }
 
-// Tier do programa de embaixadores (Regina 08/06 — plano marketing v7).
-// Bronze 1-2: 5%   (tier inicial mais atrativo — pega embaixador novo)
-// Prata  3-7: 7%   (atingivel em 60 dias com esforco)
-// Ouro   8-14: 10% (compensa virar 'indicador profissional')
-// Diamante 15+: 15% + bonus R$ 5k/ano (figura aspiracional real)
-//
-// Alem disso ha bonus FIXO de R$ 500 na 1a Cobranca paga de cada conta
-// indicada (resolvido na action de pagamento — nao na funcao de tier).
-export function tierPorAtivos(qtdAtivos: number): { tier: "BRONZE" | "PRATA" | "OURO" | "DIAMOND"; percentual: number } {
-  if (qtdAtivos >= 15) return { tier: "DIAMOND", percentual: 15 };
-  if (qtdAtivos >= 8) return { tier: "OURO", percentual: 10 };
-  if (qtdAtivos >= 3) return { tier: "PRATA", percentual: 7 };
-  return { tier: "BRONZE", percentual: 5 };
+// Tier legacy do programa de embaixadores. Regina 03/07/2026 substituiu
+// o modelo % escalonado por R$ 29,90 FIXO por vinculo ativo (recorrente
+// vitalicio) — SEM bonus, SEM tier, SEM %. Ver src/lib/comissaoEmbaixador.ts.
+// Esta funcao é mantida temporariamente porque o schema `Comissao.tier`
+// ainda exige o enum — retorna sempre BRONZE como dummy.
+export function tierPorAtivos(_qtdAtivos: number): { tier: "BRONZE" | "PRATA" | "OURO" | "DIAMOND"; percentual: number } {
+  return { tier: "BRONZE", percentual: 0 };
 }
 
 // Limites de carona Lei 14.133/2021 art. 86

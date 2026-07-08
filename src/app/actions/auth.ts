@@ -267,9 +267,7 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
           const mensagem =
             `🎉 *Novo cliente vinculado a você — CP System*\n\n` +
             `${primeiro}, parabéns! *${primeiroNomeCliente}* (${v.razaoSocial}) acabou de se cadastrar no CP System pelo seu link pessoal.\n\n` +
-            `A partir da 1ª fatura paga:\n` +
-            `• Comissão recorrente de *R$ 29,90/mês* (enquanto o cliente permanecer)\n` +
-            `• Bônus de *R$ 500* fixo\n\n` +
+            `A partir da 1ª fatura paga, você recebe *R$ 29,90/mês* enquanto o cliente permanecer assinante.\n\n` +
             `Acompanhe em https://cpsystem.app.br/painel-analista`;
           await dispararNotificacao({
             usuarioId: u.id,

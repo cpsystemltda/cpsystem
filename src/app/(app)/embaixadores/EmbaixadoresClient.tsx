@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { brl, formatarCpf, tierPorAtivos } from "@/lib/validators";
+import { brl, formatarCpf } from "@/lib/validators";
 import {
   cadastrarAnalistaAction,
   vincularEmbaixadorAction,
@@ -121,31 +121,24 @@ export function EmbaixadoresClient({
                   <th className="px-3 py-2 text-left">Nome</th>
                   <th className="px-3 py-2 text-left">CPF</th>
                   <th className="px-3 py-2 text-left">Contato</th>
-                  <th className="px-3 py-2 text-right">Ativos</th>
-                  <th className="px-3 py-2 text-left">Tier</th>
-                  <th className="px-3 py-2 text-right">%</th>
+                  <th className="px-3 py-2 text-right">Vínculos ativos</th>
+                  <th className="px-3 py-2 text-right">Recorrente/mês</th>
                 </tr>
               </thead>
               <tbody>
-                {analistas.map((a) => {
-                  const { tier, percentual } = tierPorAtivos(a.totalAtivos);
-                  return (
-                    <tr key={a.id} className="border-t border-slate-100">
-                      <td className="px-3 py-2 font-medium">{a.nomeCompleto}</td>
-                      <td className="px-3 py-2 text-xs text-slate-500">{formatarCpf(a.cpf)}</td>
-                      <td className="px-3 py-2 text-xs text-slate-600">
-                        {a.email}
-                        <br />
-                        {a.telefone}
-                      </td>
-                      <td className="px-3 py-2 text-right">{a.totalAtivos}</td>
-                      <td className="px-3 py-2">
-                        <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${COR_TIER[tier]}`}>{tier}</span>
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium">{percentual}%</td>
-                    </tr>
-                  );
-                })}
+                {analistas.map((a) => (
+                  <tr key={a.id} className="border-t border-slate-100">
+                    <td className="px-3 py-2 font-medium">{a.nomeCompleto}</td>
+                    <td className="px-3 py-2 text-xs text-slate-500">{formatarCpf(a.cpf)}</td>
+                    <td className="px-3 py-2 text-xs text-slate-600">
+                      {a.email}
+                      <br />
+                      {a.telefone}
+                    </td>
+                    <td className="px-3 py-2 text-right">{a.totalAtivos}</td>
+                    <td className="px-3 py-2 text-right font-medium">{brl(a.totalAtivos * 29.9)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

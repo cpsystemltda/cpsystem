@@ -6,7 +6,7 @@ import { Copy, Share2, Check, Sparkles } from "lucide-react";
 // Bloco do painel do analista com o link pessoal de indicacao.
 // Cada analista tem uma URL propria (?ref=<analistaId>). Compartilha com
 // cliente, e quando ele se cadastra por ali, fica vinculado automaticamente.
-// Regina 07/07: R$ 29,90 fixo por vinculo ativo + R$ 500 na 1a fatura.
+// Regina 07/07: R$ 29,90 fixo por vinculo ativo (recorrente vitalicio).
 export function LinkIndicacaoBloco({
   analistaId,
   nomeAnalista,
@@ -67,7 +67,7 @@ export function LinkIndicacaoBloco({
       </div>
       <p className="mt-1 text-[13px]" style={{ color: "var(--text-soft)" }}>
         Compartilhe com empresas. Quando alguém se cadastra por esse link, você recebe
-        <strong> R$ 29,90/mês</strong> por cliente ativo + <strong>bônus de R$ 500</strong> na 1ª fatura paga.
+        <strong> R$ 29,90/mês</strong> por cliente ativo, todo mês, enquanto ele permanecer assinante.
       </p>
 
       <div

@@ -30,7 +30,7 @@ export type ResumoRegua = {
   whatsAppNfPendente: number;
   whatsAppCartaoExpira: number;
   whatsAppAniversarios: number;
-  comissoesEmbaixador: { competencia: string; vinculos: number; bonusIniciais: number; totalGeradoBRL: number };
+  comissoesEmbaixador: { competencia: string; vinculos: number; totalGeradoBRL: number };
 };
 
 export async function executarRegua(): Promise<ResumoRegua> {
@@ -129,13 +129,13 @@ export async function executarRegua(): Promise<ResumoRegua> {
   const { executarNotificacoesDiarias } = await import("@/lib/notificacoesWhatsapp");
   const notifs = await executarNotificacoesDiarias();
 
-  // 8. Comissoes do Programa Analista Parceiro — R$ 29,90/vinculo + bonus
-  // R$ 500 na 1a fatura. Idempotente (upsert por competencia), pode rodar
-  // todo dia sem duplicar. Regina 07/07.
+  // 8. Comissoes do Programa Analista Parceiro — R$ 29,90/vinculo ativo
+  // (recorrente vitalicio). Idempotente (upsert por competencia), pode
+  // rodar todo dia sem duplicar. Regina 07/07.
   const { calcularComissoesDoMes } = await import("@/lib/comissaoEmbaixador");
   const comissEmb = await calcularComissoesDoMes().catch((e) => {
     console.error("[regua] erro em comissoes embaixador:", e);
-    return { competencia: "", vinculos: 0, bonusIniciais: 0, totalGeradoBRL: 0 };
+    return { competencia: "", vinculos: 0, totalGeradoBRL: 0 };
   });
 
   return {

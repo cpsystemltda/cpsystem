@@ -40,7 +40,7 @@ export default async function EmbaixadoresPage() {
         eyebrow="Conta · Programa de parceiros"
         titulo="Programa de"
         destaque="embaixadores"
-        subtitulo="Analistas de licitação parceiros · comissão recorrente por tier (Bronze 5% / Prata 7% / Ouro 10% / Diamante 15%) + R$ 500 fixo na 1ª paga + R$ 5k/ano Diamante."
+        subtitulo="Analistas parceiros · R$ 29,90 recorrente por vínculo ativo (enquanto o cliente permanecer assinante)."
       />
 
       <div className="mt-8">
