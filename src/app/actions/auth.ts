@@ -245,6 +245,45 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     }
   }
 
+  // Notifica o embaixador via WhatsApp quando a conta veio por link
+  // pessoal (?ref=<analistaId>). Regina 07/07: cada analista tem seu link
+  // proprio e precisa saber na hora quando um cliente novo cadastrou.
+  // Best-effort — falha aqui nao bloqueia o signup.
+  if (embaixadorIdValido) {
+    try {
+      const emb = await prisma.analista.findUnique({
+        where: { id: embaixadorIdValido },
+        select: { id: true, nomeCompleto: true, contaId: true },
+      });
+      if (emb?.contaId) {
+        const usuariosDoEmb = await prisma.usuario.findMany({
+          where: { contaId: emb.contaId, optInWhatsApp: true, telefoneWhatsApp: { not: null } },
+          select: { id: true, nome: true },
+        });
+        const { dispararNotificacao } = await import("@/lib/whatsapp");
+        const primeiroNomeCliente = v.nome.split(" ")[0] || v.nome;
+        for (const u of usuariosDoEmb) {
+          const primeiro = u.nome.split(" ")[0] || u.nome;
+          const mensagem =
+            `🎉 *Novo cliente vinculado a você — CP System*\n\n` +
+            `${primeiro}, parabéns! *${primeiroNomeCliente}* (${v.razaoSocial}) acabou de se cadastrar no CP System pelo seu link pessoal.\n\n` +
+            `A partir da 1ª fatura paga:\n` +
+            `• Comissão recorrente de *R$ 29,90/mês* (enquanto o cliente permanecer)\n` +
+            `• Bônus de *R$ 500* fixo\n\n` +
+            `Acompanhe em https://cpsystem.app.br/painel-analista`;
+          await dispararNotificacao({
+            usuarioId: u.id,
+            tipo: "ANALISTA_VINCULADO",
+            referenciaId: `emb-vinc-${conta.id}`,
+            mensagem,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[signup] erro ao notificar embaixador via WA:", e);
+    }
+  }
+
   await criarSessao(conta.usuarios[0].id);
   redirect("/dashboard");
 }

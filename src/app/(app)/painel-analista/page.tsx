@@ -14,6 +14,7 @@ import { brl, formatarCnpj } from "@/lib/validators";
 import { PercentualForm } from "./PercentualForm";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { KPI } from "@/components/ui/KPI";
+import { LinkIndicacaoBloco } from "@/components/LinkIndicacaoBloco";
 
 // Formato compacto pra valores grandes — evita corte no KPI ("R$ 1,2 Mi" em vez de "R$ 1.234.567,89")
 function brlCompacto(n: number): string {
@@ -344,6 +345,8 @@ export default async function PainelAnalistaPage({
         titulo={`Olá, ${analista.nomeCompleto.split(" ")[0]}.`}
         subtitulo={`${consolidado.totalEmpresas} empresa(s) vinculada(s) — comissões, carteira e atividade consolidada.`}
       />
+
+      <LinkIndicacaoBloco analistaId={analista.id} nomeAnalista={analista.nomeCompleto} />
 
       {/* KPIs do painel do analista — ordem definida pela Regina (24/05):
           1. Carteira contratada
