@@ -359,26 +359,31 @@ export async function processarNfseGateway(opts: {
   }
 
   try {
-    const { dispararNotificacao } = await import("@/lib/whatsapp");
+    // Regina 07/07: NF vai como PDF ANEXADO no WhatsApp (nao link).
+    // O Z-API baixa o pdfUrl publico do Asaas e reenviar como documento.
+    const { dispararNotificacaoComPdf } = await import("@/lib/whatsapp");
     const usuarios = await prisma.usuario.findMany({
       where: { contaId: cobranca.contaId, optInWhatsApp: true, telefoneWhatsApp: { not: null } },
       select: { id: true, nome: true },
     });
     const valor = cobranca.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+    const nomeArquivo = opts.numero
+      ? `NF-${opts.numero.replace(/[^\w-]/g, "")}.pdf`
+      : `NFSe-${opts.nfseId.slice(0, 12)}.pdf`;
     for (const u of usuarios) {
       const primeiroNome = u.nome.split(" ")[0] || u.nome;
-      const linkPdf = opts.pdfUrl!;
-      const mensagem =
+      const caption =
         `📄 *Nota Fiscal emitida — CP System*\n\n` +
-        `${primeiroNome}, sua NF referente à mensalidade *${cobranca.competencia}* (${valor}) foi emitida e está disponível pra download.\n\n` +
-        (opts.numero ? `Nº da NF: *${opts.numero}*\n` : "") +
-        `\n🧾 Baixar PDF: ${linkPdf}\n\n` +
+        `${primeiroNome}, sua NF referente à mensalidade *${cobranca.competencia}* (${valor}) foi emitida.\n\n` +
+        (opts.numero ? `Nº da NF: *${opts.numero}*\n\n` : "") +
         `Você também recebe uma cópia por email. Guarde pra sua contabilidade.`;
-      await dispararNotificacao({
+      await dispararNotificacaoComPdf({
         usuarioId: u.id,
         tipo: "NF_EMITIDA_CLIENTE",
         referenciaId: `nfse-${opts.nfseId}`,
-        mensagem,
+        pdfUrl: opts.pdfUrl!,
+        fileName: nomeArquivo,
+        caption,
       });
     }
   } catch (e) {

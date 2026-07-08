@@ -40,14 +40,59 @@ export function formatarTelefone(raw: string): string {
 }
 
 type ZapiResponse = { messageId?: string; zaapId?: string; id?: string };
+type ZapiStatus = { connected?: boolean; smartphoneConnected?: boolean; error?: string };
+
+// Guarda-chuva CRITICO (Regina 07/07): a Z-API aceita send-text e retorna
+// HTTP 200 + messageId MESMO com a instancia desconectada — a mensagem
+// so vai pra fila. Ao reconectar, a Z-API retransmite TUDO da fila, muitas
+// vezes com retry policy proprio — o resultado e spam pro cliente.
+//
+// Este helper CHECA /status antes de enviar. Se desconectado, lanca erro
+// imediato — nao enfileira. Cache curto pra evitar consulta a cada msg
+// dentro do mesmo batch (cron diario, por exemplo).
+let statusCache: { conectado: boolean; consultadoEm: number } | null = null;
+const STATUS_TTL_MS = 20 * 1000; // 20s
+
+async function checarConexaoZapi(): Promise<void> {
+  if (statusCache && Date.now() - statusCache.consultadoEm < STATUS_TTL_MS) {
+    if (!statusCache.conectado) {
+      throw new Error("Z-API desconectada — reconecte a instancia antes de disparar msgs.");
+    }
+    return;
+  }
+  if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
+  const r = await fetch(`${getBaseUrl()}/status`, {
+    headers: { "Client-Token": CLIENT_TOKEN },
+  });
+  if (!r.ok) {
+    throw new Error(`Z-API /status ${r.status}`);
+  }
+  const s = (await r.json()) as ZapiStatus;
+  const conectado = !!(s.connected && s.smartphoneConnected);
+  statusCache = { conectado, consultadoEm: Date.now() };
+  if (!conectado) {
+    throw new Error(
+      `Z-API desconectada (connected=${s.connected}, smartphoneConnected=${s.smartphoneConnected}). ` +
+        `Reconecte a instancia via QR Code antes de disparar msgs.`,
+    );
+  }
+}
+
+// Invalida o cache — util quando o admin acabou de reconectar e quer
+// forcar nova verificacao antes do proximo envio.
+export function invalidarCacheStatusZapi(): void {
+  statusCache = null;
+}
 
 // Envia mensagem de texto via Z-API. Retorna o messageId.
 // Lanca erro se falhar — o caller decide se propaga ou log-e-segue.
+// SEMPRE checa status de conexao antes (nao enfileira em instancia offline).
 export async function enviarTexto(
   telefone: string,
   mensagem: string,
 ): Promise<{ messageId: string }> {
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
+  await checarConexaoZapi();
   const phone = formatarTelefone(telefone);
   const r = await fetch(`${getBaseUrl()}/send-text`, {
     method: "POST",
@@ -153,4 +198,118 @@ export async function enviarTesteManual(
   mensagem: string,
 ): Promise<{ messageId: string }> {
   return enviarTexto(telefone, mensagem);
+}
+
+// Envia um DOCUMENTO (PDF) via Z-API. A URL precisa ser publicamente
+// acessivel — o Z-API baixa do URL e reenviar como documento nativo do
+// WhatsApp (aparece como PDF anexado, nao link).
+// Regina 07/07: NF deve chegar como PDF anexado, nao link do Asaas.
+export async function enviarDocumentoPdf(
+  telefone: string,
+  pdfUrl: string,
+  fileName: string,
+  caption?: string,
+): Promise<{ messageId: string }> {
+  if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
+  await checarConexaoZapi();
+  const phone = formatarTelefone(telefone);
+  // Endpoint Z-API: /send-document/{extension}
+  const r = await fetch(`${getBaseUrl()}/send-document/pdf`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Client-Token": CLIENT_TOKEN,
+    },
+    body: JSON.stringify({
+      phone,
+      document: pdfUrl,
+      fileName,
+      caption: caption ?? undefined,
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`Z-API ${r.status}: ${txt.slice(0, 300)}`);
+  }
+  const data = (await r.json()) as ZapiResponse;
+  const messageId = data.messageId || data.zaapId || data.id || "";
+  return { messageId };
+}
+
+// Variante de dispararNotificacao que envia PDF anexado em vez de texto.
+// Usada pelo fluxo de NF (processarNfseGateway) — Regina 07/07.
+// A `caption` vai como legenda embaixo do PDF no WhatsApp.
+export async function dispararNotificacaoComPdf(opts: {
+  usuarioId: string;
+  tipo: TipoNotificacaoWhatsApp;
+  referenciaId: string;
+  pdfUrl: string;
+  fileName: string;
+  caption: string;
+}): Promise<{ enviado: boolean; motivo?: string; messageId?: string }> {
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: opts.usuarioId },
+    select: { id: true, telefoneWhatsApp: true, optInWhatsApp: true },
+  });
+  if (!usuario) return { enviado: false, motivo: "usuario_nao_encontrado" };
+  if (!usuario.optInWhatsApp) return { enviado: false, motivo: "sem_opt_in" };
+  if (!usuario.telefoneWhatsApp) return { enviado: false, motivo: "sem_telefone" };
+
+  const existente = await prisma.notificacaoWhatsApp.findUnique({
+    where: {
+      usuarioId_tipo_referenciaId: {
+        usuarioId: opts.usuarioId,
+        tipo: opts.tipo,
+        referenciaId: opts.referenciaId,
+      },
+    },
+    select: { id: true, status: true },
+  });
+  if (existente?.status === "ENVIADA") {
+    return { enviado: false, motivo: "ja_enviada" };
+  }
+
+  const registro = await prisma.notificacaoWhatsApp.upsert({
+    where: {
+      usuarioId_tipo_referenciaId: {
+        usuarioId: opts.usuarioId,
+        tipo: opts.tipo,
+        referenciaId: opts.referenciaId,
+      },
+    },
+    create: {
+      usuarioId: opts.usuarioId,
+      tipo: opts.tipo,
+      referenciaId: opts.referenciaId,
+      telefone: formatarTelefone(usuario.telefoneWhatsApp),
+      mensagem: `[PDF] ${opts.fileName}\n\n${opts.caption}`.slice(0, 4000),
+      status: "PENDENTE",
+    },
+    update: {
+      mensagem: `[PDF] ${opts.fileName}\n\n${opts.caption}`.slice(0, 4000),
+      status: "PENDENTE",
+      erro: null,
+    },
+  });
+
+  try {
+    const r = await enviarDocumentoPdf(
+      usuario.telefoneWhatsApp,
+      opts.pdfUrl,
+      opts.fileName,
+      opts.caption,
+    );
+    await prisma.notificacaoWhatsApp.update({
+      where: { id: registro.id },
+      data: { status: "ENVIADA", enviadaEm: new Date(), erro: null },
+    });
+    return { enviado: true, messageId: r.messageId };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await prisma.notificacaoWhatsApp.update({
+      where: { id: registro.id },
+      data: { status: "FALHOU", erro: msg.slice(0, 500) },
+    });
+    return { enviado: false, motivo: "erro_zapi" };
+  }
 }
