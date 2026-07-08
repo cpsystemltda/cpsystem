@@ -24,6 +24,14 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/resumo-tarde",
+      "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/resumo-noite",
+      "schedule": "0 22 * * *"
+    },
+    {
       "path": "/api/cron/whatsapp-semanal",
       "schedule": "0 12 * * 5"
     }

@@ -814,36 +814,21 @@ export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ 
 
 // ==================== ORQUESTRADOR DIARIO ====================
 
-// Chamado pela regua diaria (que ja roda no cron da Vercel).
-// Best-effort — falha em uma nao bloqueia as outras.
+// Chamado pela regua diaria (cron matinal 9h BRT). Regina 08/07: substituido
+// pelo novo orquestrador de janelas (MANHA/TARDE/NOITE) — cada uma consolida
+// UMA msg por usuario. As funcoes individuais (notificarPrazosConsolidado,
+// notificarNfSemPagamento30d, notificarCartaoExpirando, etc) FICAM no arquivo
+// pra compat mas NAO sao mais chamadas pelo cron — o novo helper em
+// src/lib/notificacoesResumo.ts substitui todas.
 export async function executarNotificacoesDiarias(): Promise<{
-  prazos: Awaited<ReturnType<typeof notificarPrazosConsolidado>>;
-  planos: Awaited<ReturnType<typeof notificarVencimentosPlano>>;
-  nfPendente: Awaited<ReturnType<typeof notificarNfSemPagamento30d>>;
-  cartaoExpira: Awaited<ReturnType<typeof notificarCartaoExpirando>>;
-  aniversario: Awaited<ReturnType<typeof notificarAniversarios>>;
+  janela: "MANHA";
+  usuariosNotificados: number;
+  capAtingido: number;
+  semItems: number;
 }> {
-  const hoje = new Date();
-  const cadenciaVazia = Object.fromEntries(CADENCIA_DIAS.map((d) => [d, 0]));
-  const prazos = await notificarPrazosConsolidado(hoje).catch((e) => {
-    console.error("[notif] erro em prazos consolidado:", e);
-    return { porDias: cadenciaVazia, hoje: 0, atrasado: 0 };
+  const { executarResumoDaJanela } = await import("@/lib/notificacoesResumo");
+  return executarResumoDaJanela("MANHA", new Date()).catch((e) => {
+    console.error("[notif] erro no resumo MANHA:", e);
+    return { janela: "MANHA" as const, usuariosNotificados: 0, capAtingido: 0, semItems: 0 };
   });
-  const planos = await notificarVencimentosPlano(hoje).catch((e) => {
-    console.error("[notif] erro em vencimentos plano:", e);
-    return { em3d: 0, atrasado: 0 };
-  });
-  const nfPendente = await notificarNfSemPagamento30d(hoje).catch((e) => {
-    console.error("[notif] erro em NF sem pagamento:", e);
-    return { enviados: 0 };
-  });
-  const cartaoExpira = await notificarCartaoExpirando(hoje).catch((e) => {
-    console.error("[notif] erro em cartao expirando:", e);
-    return { enviados: 0 };
-  });
-  const aniversario = await notificarAniversarios(hoje).catch((e) => {
-    console.error("[notif] erro em aniversarios:", e);
-    return { enviados: 0 };
-  });
-  return { prazos, planos, nfPendente, cartaoExpira, aniversario };
 }

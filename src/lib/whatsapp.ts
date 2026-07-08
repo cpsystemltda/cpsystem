@@ -120,12 +120,37 @@ export async function enviarTexto(
 // referenciaId sempre string (nao-nulo) pra formar chave de idempotencia
 // consistente. Callers usam ids naturais (empenhoId, cobrancaId) ou
 // sentinelas semanticas (ex: "2026-27" pra semana 27 de 2026).
+// KILL SWITCH universal — Regina 08/07/2026, apos flood do Leo.
+// Setar env WHATSAPP_KILL_SWITCH=1 pra bloquear TODOS os disparos automaticos
+// sem precisar de deploy. Ideal pra parar hemorragia em segundos: muda no
+// Vercel e roda redeploy vazio, ou usa runtime env se preview enable.
+function killSwitchAtivo(): boolean {
+  return process.env.WHATSAPP_KILL_SWITCH === "1";
+}
+
+// CAP diario por usuario — Regina 08/07: no maximo 4 msgs por dia por
+// destinatario, contando TUDO (cron + event-driven). Se atingiu 4, para.
+export const LIMITE_MSGS_DIARIAS_POR_USUARIO = 4;
+
+async function contarEnviadasHoje(usuarioId: string): Promise<number> {
+  const inicioHoje = new Date();
+  inicioHoje.setHours(0, 0, 0, 0);
+  return prisma.notificacaoWhatsApp.count({
+    where: {
+      usuarioId,
+      status: "ENVIADA",
+      enviadaEm: { gte: inicioHoje },
+    },
+  });
+}
+
 export async function dispararNotificacao(opts: {
   usuarioId: string;
   tipo: TipoNotificacaoWhatsApp;
   referenciaId: string;
   mensagem: string;
 }): Promise<{ enviado: boolean; motivo?: string; messageId?: string }> {
+  if (killSwitchAtivo()) return { enviado: false, motivo: "kill_switch" };
   const usuario = await prisma.usuario.findUnique({
     where: { id: opts.usuarioId },
     select: { id: true, telefoneWhatsApp: true, optInWhatsApp: true },
@@ -133,6 +158,11 @@ export async function dispararNotificacao(opts: {
   if (!usuario) return { enviado: false, motivo: "usuario_nao_encontrado" };
   if (!usuario.optInWhatsApp) return { enviado: false, motivo: "sem_opt_in" };
   if (!usuario.telefoneWhatsApp) return { enviado: false, motivo: "sem_telefone" };
+  // Cap diario — protege cliente de flood mesmo se tiver bug no cron.
+  const enviadasHoje = await contarEnviadasHoje(opts.usuarioId);
+  if (enviadasHoje >= LIMITE_MSGS_DIARIAS_POR_USUARIO) {
+    return { enviado: false, motivo: "cap_diario_atingido" };
+  }
 
   // Idempotencia — se ja foi enviada com sucesso, no-op.
   const existente = await prisma.notificacaoWhatsApp.findUnique({
