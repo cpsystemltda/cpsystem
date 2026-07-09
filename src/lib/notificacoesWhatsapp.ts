@@ -821,7 +821,7 @@ export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ 
 // pra compat mas NAO sao mais chamadas pelo cron — o novo helper em
 // src/lib/notificacoesResumo.ts substitui todas.
 export async function executarNotificacoesDiarias(): Promise<{
-  janela: "MANHA";
+  janela: string;
   usuariosNotificados: number;
   capAtingido: number;
   semItems: number;
@@ -829,6 +829,6 @@ export async function executarNotificacoesDiarias(): Promise<{
   const { executarResumoDaJanela } = await import("@/lib/notificacoesResumo");
   return executarResumoDaJanela("MANHA", new Date()).catch((e) => {
     console.error("[notif] erro no resumo MANHA:", e);
-    return { janela: "MANHA" as const, usuariosNotificados: 0, capAtingido: 0, semItems: 0 };
+    return { janela: "MANHA", usuariosNotificados: 0, capAtingido: 0, semItems: 0 };
   });
 }
