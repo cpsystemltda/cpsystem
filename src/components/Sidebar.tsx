@@ -27,7 +27,7 @@ import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
 import { HelpButtonsInline } from "@/components/HelpButtonsInline";
 import { Logo } from "@/components/Logo";
 import type { Visao } from "@/lib/visao";
-import { Crown, Users2, Activity, Gift } from "lucide-react";
+import { Crown, Users2, Activity, Gift, Ticket } from "lucide-react";
 
 type Item = { href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> };
 type Grupo = { titulo: string; itens: Item[] };
@@ -113,6 +113,7 @@ const GRUPOS_ADMIN_PLATAFORMA: Grupo[] = [
       { href: "/painel-analista", label: "Painel do analista", icon: LayoutDashboard },
       { href: "/admin-plataforma/financeiro", label: "Financeiro · MRR", icon: Wallet },
       { href: "/admin-plataforma/atividade", label: "Atividade", icon: Activity },
+      { href: "/admin/cupons", label: "Cupons promocionais", icon: Ticket },
     ],
   },
   {

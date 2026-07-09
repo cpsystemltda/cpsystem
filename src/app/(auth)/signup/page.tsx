@@ -231,12 +231,40 @@ function FormEmpresa() {
   // analista que indicou como embaixadorId da conta nova. Comissao
   // mensal (3-6% MRR) flui pra esse analista enquanto a conta paga.
   const [embaixadorIdRef, setEmbaixadorIdRef] = useState<string>("");
+  // Cupom (Regina 09/07) — pode vir via ?cupom=XXX ou digitado no form
+  const [cupomCodigo, setCupomCodigo] = useState<string>(String(v.cupomCodigo ?? ""));
+  const [cupomInfo, setCupomInfo] = useState<
+    | null
+    | { ok: true; codigo: string; diasTrial: number; analistaNome: string | null; descricao: string | null }
+    | { ok: false; motivo: string }
+  >(null);
+  const [validandoCupom, setValidandoCupom] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref") || "";
     if (ref) setEmbaixadorIdRef(ref);
+    const cupomUrl = params.get("cupom") || "";
+    if (cupomUrl) setCupomCodigo(cupomUrl.toUpperCase());
   }, []);
+  // Valida cupom on-blur (chama server action publica)
+  async function validarCupomAgora() {
+    const cod = cupomCodigo.trim().toUpperCase();
+    if (!cod) {
+      setCupomInfo(null);
+      return;
+    }
+    setValidandoCupom(true);
+    try {
+      const { validarCupomPublico } = await import("@/app/actions/cupom");
+      const r = await validarCupomPublico(cod);
+      setCupomInfo(r);
+    } catch {
+      setCupomInfo({ ok: false, motivo: "Erro ao validar" });
+    } finally {
+      setValidandoCupom(false);
+    }
+  }
 
   // Rola até o resumo de erros e dá foco no primeiro campo problemático
   useEffect(() => {
@@ -254,11 +282,58 @@ function FormEmpresa() {
       {/* Hidden: id do analista que indicou (link /signup?ref=ID). A
           server action valida + grava em Conta.embaixadorId. */}
       <input type="hidden" name="embaixadorIdRef" value={embaixadorIdRef} />
-      {embaixadorIdRef && (
+      {embaixadorIdRef && !cupomInfo?.ok && (
         <div className="col-span-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-800">
           ✓ Indicação registrada. O analista que te trouxe ganha comissão automática enquanto sua conta estiver ativa.
         </div>
       )}
+
+      {/* Cupom (Regina 09/07) — pode vir via ?cupom= ou digitado */}
+      <input type="hidden" name="cupomCodigo" value={cupomCodigo} />
+      <div className="col-span-4">
+        <details open={!!cupomCodigo} className="group rounded-lg border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm">
+          <summary className="cursor-pointer font-semibold text-slate-700">
+            🎟️ Tem um código promocional?
+          </summary>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-start">
+            <input
+              type="text"
+              value={cupomCodigo}
+              onChange={(ev) => {
+                setCupomCodigo(ev.target.value.toUpperCase());
+                setCupomInfo(null);
+              }}
+              onBlur={validarCupomAgora}
+              placeholder="Ex: IGOR60"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm uppercase outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 sm:max-w-xs"
+              maxLength={32}
+            />
+            <button
+              type="button"
+              onClick={validarCupomAgora}
+              disabled={validandoCupom || !cupomCodigo.trim()}
+              className="rounded-md bg-slate-800 px-4 py-2 text-xs font-bold text-white transition hover:bg-slate-900 disabled:opacity-40"
+            >
+              {validandoCupom ? "Validando…" : "Aplicar"}
+            </button>
+          </div>
+          {cupomInfo?.ok && (
+            <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              ✓ Cupom <strong>{cupomInfo.codigo}</strong> aplicado — <strong>{cupomInfo.diasTrial} dias grátis</strong> em vez dos 14 padrão.
+              {cupomInfo.analistaNome && (
+                <> Analista responsável: <strong>{cupomInfo.analistaNome}</strong>.</>
+              )}
+              {cupomInfo.descricao && <div className="mt-1 opacity-80">{cupomInfo.descricao}</div>}
+            </div>
+          )}
+          {cupomInfo && !cupomInfo.ok && (
+            <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+              ✗ {cupomInfo.motivo}
+            </div>
+          )}
+        </details>
+      </div>
+
       {/* Resumo de erros no topo, com lista clicável */}
       {(state?.erro || errosResumo.length > 0) && (
         <div

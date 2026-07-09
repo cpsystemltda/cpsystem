@@ -95,7 +95,36 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   }
 
   const senhaHash = await hashSenha(v.senha);
-  const trialAteEm = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+  // Cupom (Regina 09/07) — se aplicado, dias de trial personalizado + vincula
+  // analista automaticamente. Prioridade: cupom > ?ref= > autocomplete.
+  // Reserva o slot em transacao (evita 2 signups pegarem o ultimo uso).
+  const cupomCodigoRaw = String(formData.get("cupomCodigo") || "").trim().toUpperCase();
+  let cupomAplicadoId: string | null = null;
+  let diasTrial = 14;
+  let analistaViaCupomId: string | null = null;
+  if (cupomCodigoRaw) {
+    const { aplicarCupomInterno } = await import("@/app/actions/cupom");
+    const r = await aplicarCupomInterno(cupomCodigoRaw);
+    if (!r.ok) {
+      const msgs: Record<string, string> = {
+        nao_encontrado: "Cupom não encontrado.",
+        desativado: "Cupom desativado.",
+        expirado: "Cupom expirado.",
+        esgotado: "Cupom já foi usado o número máximo de vezes.",
+        vazio: "Cupom vazio.",
+      };
+      return {
+        erro: msgs[r.motivo] || "Cupom inválido.",
+        campos: { cupomCodigo: msgs[r.motivo] || "Inválido" },
+        valores,
+      };
+    }
+    cupomAplicadoId = r.cupomId;
+    diasTrial = r.diasTrial;
+    analistaViaCupomId = r.analistaVinculadoId;
+  }
+  const trialAteEm = new Date(Date.now() + diasTrial * 24 * 60 * 60 * 1000);
 
   // Vínculo opcional com analista (vem do autocomplete no signup)
   const analistaIdRaw = String(formData.get("analistaId") || "").trim();
@@ -154,7 +183,9 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       // (Regina 03/07). MP 2.200-2/2001 art. 10, §2º equipara aceite
       // eletronico a assinatura fisica.
       termosAceitosEm: new Date(),
-      embaixadorId: embaixadorIdValido,
+      // Prioridade: cupom > ?ref= > autocomplete do signup.
+      embaixadorId: analistaViaCupomId ?? embaixadorIdValido,
+      cupomAplicadoId,
       indicadoPorContaId: indicadoPorContaIdValido,
       usuarios: {
         create: {

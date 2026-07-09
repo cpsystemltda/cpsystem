@@ -39,6 +39,9 @@ model Conta {
   trialAteEm        DateTime?
   proximoVencimento DateTime?
   termosAceitosEm   DateTime?
+  // Cupom aplicado no signup (trial estendido + analista vinculado). Regina 09/07.
+  cupomAplicadoId   String?
+  cupomAplicado     Cupom?           @relation(fields: [cupomAplicadoId], references: [id])
   embaixadorId      String? // analista que indicou esta conta (programa de embaixadores SaaS — não confundir com VinculoAnalista B2G)
   // Programa de referral cliente-indica-cliente (Regina 08/06, plano marketing v7).
   // Quando cliente atual compartilha link `/conta/indicar` e outra empresa
@@ -123,6 +126,7 @@ model Usuario {
   reajustesRetroativosCriados ReajusteRetroativo[] @relation("ReajustesRetroativosCriados")
   contaGoogle      GoogleAccount?
   notificacoesWhats NotificacaoWhatsApp[]
+  cuponsCriados    Cupom[]          @relation("CuponsCriados")
 
   @@index([contaId])
 }
@@ -321,6 +325,35 @@ model Analista {
   comissoes       Comissao[]
   vinculos        VinculoAnalista[]
   comissoesExecucao ComissaoExecucao[]
+  cuponsGerados   Cupom[]           @relation("CuponsGerados")
+}
+
+// ============================================================
+// CUPOM (Regina 09/07) — trial estendido + vínculo analista automático
+// ============================================================
+// Cupom criado por admin (você) e passado pra cliente novo. Ao aplicar no
+// signup: (1) trial de N dias em vez dos 14 padrão; (2) se analistaVinculadoId
+// preenchido, vincula automaticamente esse analista como embaixador da conta.
+model Cupom {
+  id                    String    @id @default(cuid())
+  codigo                String    @unique
+  descricao             String?   // interno — pra você lembrar por que criou
+  diasTrial             Int       @default(60)
+  analistaVinculadoId   String?   // se setado, vira Conta.embaixadorId ao usar
+  analistaVinculado     Analista? @relation("CuponsGerados", fields: [analistaVinculadoId], references: [id])
+  validoAte             DateTime? // opcional — depois disso não aceita
+  usosMaximos           Int?      // null = ilimitado
+  usosAtuais            Int       @default(0)
+  ativo                 Boolean   @default(true)
+  criadoPorId           String?
+  criadoPor             Usuario?  @relation("CuponsCriados", fields: [criadoPorId], references: [id])
+  criadoEm              DateTime  @default(now())
+
+  contasAplicadas       Conta[]
+
+  @@index([codigo])
+  @@index([ativo])
+  @@index([analistaVinculadoId])
 }
 
 // ============================================================
