@@ -512,6 +512,62 @@ function FormEmpresa() {
               cartaoNome: e.cartaoNome,
             }}
           />
+
+          {/* CPF do titular do cartão (Regina 13/07) — Asaas exige pra tokenização.
+              Pode ser diferente do CNPJ da empresa (representante legal). */}
+          <div className="col-span-4 sm:col-span-2">
+            <label className="text-xs font-semibold text-slate-700">
+              CPF do titular do cartão <span className="text-red-500">*</span>
+              <input
+                name="cpfTitularCartao"
+                type="text"
+                required
+                defaultValue={String(v.cpfTitularCartao ?? "")}
+                inputMode="numeric"
+                maxLength={14}
+                placeholder="000.000.000-00"
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-violet-400"
+                onChange={(ev) => {
+                  const d = ev.target.value.replace(/\D/g, "").slice(0, 11);
+                  const f =
+                    d.length > 9 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+                    : d.length > 6 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`
+                    : d.length > 3 ? `${d.slice(0, 3)}.${d.slice(3)}` : d;
+                  ev.target.value = f;
+                }}
+              />
+              {e.cpfTitularCartao && (
+                <p className="mt-1 text-[11px] font-semibold text-rose-700">{e.cpfTitularCartao}</p>
+              )}
+            </label>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Geralmente o CPF do responsável legal da empresa.
+            </p>
+          </div>
+
+          {/* Dia de vencimento — Regina 13/07 */}
+          <div className="col-span-4 sm:col-span-2">
+            <label className="text-xs font-semibold text-slate-700">
+              Dia de vencimento das mensalidades <span className="text-red-500">*</span>
+              <select
+                name="diaVencimento"
+                required
+                defaultValue={String(v.diaVencimento ?? "")}
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-violet-400"
+              >
+                <option value="">— Escolha —</option>
+                <option value="10">Dia 10 do mês</option>
+                <option value="15">Dia 15 do mês</option>
+                <option value="20">Dia 20 do mês</option>
+              </select>
+              {e.diaVencimento && (
+                <p className="mt-1 text-[11px] font-semibold text-rose-700">{e.diaVencimento}</p>
+              )}
+            </label>
+            <p className="mt-1 text-[11px] text-slate-500">
+              A primeira cobrança acontece no dia escolhido logo após o fim do seu período de trial.
+            </p>
+          </div>
         </>
       )}
 

@@ -64,6 +64,11 @@ export const signupSchema = z
     // Aceite obrigatorio do contrato (Regina 03/07). Checkbox HTML manda
     // "1" quando marcado, ausente quando desmarcado.
     aceiteTermos: z.literal("1", { message: "Você precisa aceitar os termos pra continuar" }),
+    // Regina 13/07: CPF do titular do cartão + dia de vencimento fixo.
+    cpfTitularCartao: z.string()
+      .transform((s) => s.replace(/\D/g, ""))
+      .refine((s) => s.length === 11, "CPF do titular deve ter 11 dígitos"),
+    diaVencimento: z.enum(["10", "15", "20"], { message: "Escolha o dia de vencimento (10, 15 ou 20)" }),
   })
   .superRefine((v, ctx) => {
     if (v.senha !== v.confirmacaoSenha) {

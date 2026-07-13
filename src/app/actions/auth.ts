@@ -232,9 +232,109 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
           ativo: true,
         },
       },
+      // Regina 13/07: dia de vencimento fixo + CPF titular pra Asaas.
+      diaVencimento: Number(v.diaVencimento),
+      cpfTitularCartao: v.cpfTitularCartao,
     },
-    include: { usuarios: true },
+    include: { usuarios: true, empresas: { take: 1 } },
   });
+
+  // Regina 13/07: já cria Customer + Subscription no Asaas no signup, com
+  // nextDueDate = próximo dia {10|15|20} APÓS o fim do trial. Asaas guarda
+  // o cartão tokenizado e cobra sozinho quando o trial acabar. Cliente não
+  // precisa voltar em /conta/checkout. Best-effort — se falhar (ex: cartão
+  // recusado, gateway offline), signup continua e conta fica sem subscription
+  // pra ser resolvida em /conta/completar-cadastro depois.
+  try {
+    const { calcularValorMensal } = await import("@/lib/precos");
+    const { getGateway } = await import("@/lib/gateway");
+    const gateway = await getGateway();
+
+    if (gateway.criarAssinatura) {
+      const breakdown = await calcularValorMensal(conta.id, v.plano);
+      const empresa = conta.empresas[0]!;
+      // Calcula próximo dia diaVencimento APÓS trialAteEm
+      const diaEscolhido = Number(v.diaVencimento);
+      const nextDueDate = new Date(trialAteEm);
+      nextDueDate.setDate(diaEscolhido);
+      if (nextDueDate <= trialAteEm) {
+        nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+      }
+
+      // Cria customer no Asaas
+      const { customerId } = await gateway.criarCliente({
+        contaId: conta.id,
+        nome: empresa.razaoSocial,
+        email: emailNorm,
+        cpfCnpj: normalizarCnpj(empresa.cnpj),
+        telefone: empresa.telefones,
+        endereco: empresa.endereco,
+      });
+
+      // Cria cobranca interna referente ao primeiro mes pos-trial
+      const competencia = `${nextDueDate.getFullYear()}-${String(nextDueDate.getMonth() + 1).padStart(2, "0")}`;
+      const cobrancaInterna = await prisma.cobranca.create({
+        data: {
+          contaId: conta.id,
+          competencia,
+          plano: v.plano,
+          forma: "CARTAO_CREDITO",
+          valor: breakdown.valorTotal,
+          vencimento: nextDueDate,
+          status: "PENDENTE",
+        },
+      });
+
+      // Cria subscription — Asaas tokeniza cartão e passa a cobrar todo mes.
+      // Dados sensíveis do cartão vêm direto do formData (nao guardados em disco).
+      const cartaoNumero = v.cartaoNumero.replace(/\s/g, "");
+      const cartaoNome = v.cartaoNome;
+      const cartaoCvv = v.cartaoCvv;
+      const sub = await gateway.criarAssinatura({
+        customerId,
+        cobrancaIdInterno: cobrancaInterna.id,
+        valor: breakdown.valorTotal,
+        proximoVencimento: nextDueDate,
+        descricao: `CP System — Plano ${v.plano} (${competencia})`,
+        cartao: {
+          numero: cartaoNumero,
+          nome: cartaoNome,
+          validadeMes: cartao.validadeMes,
+          validadeAno: cartao.validadeAno,
+          cvv: cartaoCvv,
+        },
+        titular: {
+          nome: cartaoNome,
+          email: emailNorm,
+          cpfCnpj: v.cpfTitularCartao,
+          telefone: empresa.telefones || undefined,
+          cep: empresa.cep || undefined,
+          numeroEndereco: empresa.endereco.match(/,\s*(\d+[A-Za-z]?)\b/)?.[1] || "S/N",
+        },
+      });
+
+      await prisma.conta.update({
+        where: { id: conta.id },
+        data: {
+          gatewayCustomerId: customerId,
+          gatewaySubscriptionId: sub.subscriptionId,
+          gatewayProvider: gateway.nome,
+          proximoVencimento: nextDueDate,
+        },
+      });
+      await prisma.cobranca.update({
+        where: { id: cobrancaInterna.id },
+        data: {
+          gatewayChargeId: sub.primeiraCobranca.chargeId,
+          gatewayInvoiceUrl: sub.primeiraCobranca.invoiceUrl || null,
+          status: sub.primeiraCobranca.status,
+        },
+      });
+    }
+  } catch (err) {
+    // Best-effort — signup continua mesmo se gateway falhar
+    console.error("[signup] falha ao criar subscription no gateway:", err);
+  }
 
   // Cria o vínculo + notifica o analista
   if (analistaValido) {

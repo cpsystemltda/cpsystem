@@ -55,6 +55,13 @@ model Conta {
   gatewaySubscriptionId String?      // subscription_id no gateway
   ultimaTentativaCobranca DateTime?
   bloqueadoEm       DateTime?
+  // Regina 13/07: cliente escolhe dia de vencimento fixo pra cobrança mensal
+  // (10, 15 ou 20). Primeiro nextDueDate = próximo dia escolhido APÓS trial.
+  // Asaas renova mensalmente respeitando esse dia.
+  diaVencimento     Int?             // 10, 15 ou 20
+  // CPF do titular do cartão (obrigatório pra tokenização Asaas).
+  // Pode ser diferente do CNPJ da empresa (representante legal).
+  cpfTitularCartao  String?          // apenas dígitos, 11 chars
   criadoEm          DateTime         @default(now())
   atualizadoEm      DateTime         @updatedAt
 
