@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Proposta — Layout CP System (intercalado dark/claro)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+
+  /* ---------- HEADER (claro) ---------- */
+  .header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+  }
+  .header-inner {
+    max-width: 1320px; margin: 0 auto; padding: 18px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    font-family: "Cinzel", serif; font-weight: 700; font-size: 18px; color: #A88947;
+    letter-spacing: 0.2em;
+  }
+  .nav { display: flex; gap: 32px; }
+  .nav a {
+    text-decoration: none; color: #3A3A3A; font-size: 13px; font-weight: 600;
+    transition: opacity 0.2s;
+  }
+  .nav a:hover { opacity: 0.7; }
+  .header-cta {
+    display: flex; gap: 12px; align-items: center;
+  }
+  .btn-link { text-decoration: none; color: #3A3A3A; font-size: 13px; font-weight: 600; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%);
+    color: #1A1A1F; padding: 10px 22px; border-radius: 100px;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+    box-shadow: 0 8px 22px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5);
+    text-decoration: none; transition: transform 0.2s;
+  }
+  .btn-primary:hover { transform: scale(1.02); }
+  .btn-secondary {
+    background: white; border: 0.5px solid rgba(168, 137, 71, 0.35);
+    padding: 14px 30px; border-radius: 100px;
+    color: #1A1A1F; font-size: 13px; font-weight: 700; letter-spacing: 0.22em;
+    text-transform: uppercase; text-decoration: none;
+    box-shadow: 0 8px 22px -8px rgba(20, 16, 8, 0.12);
+  }
+
+  /* ---------- HERO DARK ---------- */
+  .hero-dark {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(ellipse 700px 500px at 20% 20%, rgba(212, 175, 55, 0.3), transparent 55%),
+      radial-gradient(ellipse 800px 600px at 80% 80%, rgba(244, 211, 116, 0.18), transparent 55%),
+      linear-gradient(135deg, #0C1019 0%, #1A1F2E 50%, #0C1019 100%);
+    color: white; padding: 100px 32px 120px; text-align: center;
+  }
+  .hero-eyebrow {
+    color: #D4AF37; font-size: 12px; font-weight: 700; letter-spacing: 0.34em; text-transform: uppercase;
+  }
+  .hero-h1 {
+    font-size: 72px; line-height: 1.04; font-weight: 800; letter-spacing: -0.03em;
+    margin-top: 18px; max-width: 1100px; margin-left: auto; margin-right: auto;
+  }
+  .hero-h1 .gold {
+    background: linear-gradient(135deg, #F4D374, #D4AF37, #B8860B);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero-sub {
+    color: #C0C0C0; font-size: 17px; line-height: 1.65;
+    max-width: 720px; margin: 24px auto 0;
+  }
+  .hero-cta-group { display: flex; gap: 12px; justify-content: center; margin-top: 36px; }
+  .btn-outline-dark {
+    background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white; padding: 14px 30px; border-radius: 100px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.22em;
+    text-transform: uppercase; text-decoration: none;
+    backdrop-filter: blur(10px);
+  }
+
+  /* ---------- 5 CARDS (claro) ---------- */
+  .features-claro {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 240'%3E%3Cg fill='none' stroke='%23D4AF37' stroke-width='0.6' opacity='0.08'%3E%3Ccircle cx='120' cy='120' r='40'/%3E%3Ccircle cx='120' cy='80' r='40'/%3E%3Ccircle cx='120' cy='160' r='40'/%3E%3Ccircle cx='85.36' cy='100' r='40'/%3E%3Ccircle cx='85.36' cy='140' r='40'/%3E%3Ccircle cx='154.64' cy='100' r='40'/%3E%3Ccircle cx='154.64' cy='140' r='40'/%3E%3C/g%3E%3C/svg%3E"),
+      linear-gradient(180deg, #FFFFFF 0%, #FAF6EB 60%, #F5EFDD 100%);
+    background-size: 240px 240px, auto;
+    background-repeat: repeat, no-repeat;
+    padding: 80px 32px;
+  }
+  .features-inner { max-width: 1320px; margin: 0 auto; }
+  .features-grid {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px;
+    margin-top: 16px;
+  }
+  .feature-card {
+    position: relative; overflow: hidden;
+    border-radius: 22px; padding: 32px 26px;
+    color: white;
+    box-shadow: 0 20px 44px -16px rgba(20, 16, 8, 0.32), 0 6px 14px -6px rgba(20, 16, 8, 0.18);
+    min-height: 240px;
+    transition: transform 0.25s;
+  }
+  .feature-card:hover { transform: translateY(-4px); }
+  .feature-card.c-dourado {
+    background: linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%);
+  }
+  .feature-card.c-verde {
+    background: linear-gradient(135deg, #4CAF6C 0%, #3FA85F 50%, #2F8F4C 100%);
+  }
+  .feature-card.c-escuro {
+    background: linear-gradient(135deg, #2A2A33 0%, #1A1A1F 100%);
+  }
+  .feature-card.c-bronze {
+    background: linear-gradient(135deg, #B8860B 0%, #8B6914 50%, #5A4622 100%);
+  }
+  .feature-card.c-vinho {
+    background: linear-gradient(135deg, #6B2D5C 0%, #4A1F40 50%, #2D0E26 100%);
+  }
+  .feature-icon-box {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: rgba(255, 255, 255, 0.18);
+    display: grid; place-items: center;
+    color: white;
+    backdrop-filter: blur(10px);
+    border: 0.5px solid rgba(255, 255, 255, 0.25);
+  }
+  .feature-icon-decor {
+    position: absolute; right: -16px; bottom: -16px;
+    color: rgba(255, 255, 255, 0.10);
+    pointer-events: none;
+  }
+  .feature-title {
+    font-size: 18px; font-weight: 800; color: white; margin-top: 22px;
+    line-height: 1.2; letter-spacing: -0.015em;
+    position: relative; z-index: 1;
+  }
+  .feature-desc {
+    font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, 0.85); margin-top: 12px;
+    position: relative; z-index: 1;
+  }
+
+  /* ---------- INSTITUCIONAL + VÍDEO (dark) ---------- */
+  .institucional-dark {
+    background:
+      radial-gradient(ellipse 600px 400px at 80% 20%, rgba(212, 175, 55, 0.20), transparent 55%),
+      linear-gradient(180deg, #0C1019 0%, #14181F 100%);
+    color: white; padding: 100px 32px;
+  }
+  .institucional-inner {
+    max-width: 1320px; margin: 0 auto;
+    display: grid; grid-template-columns: 1.1fr 1fr; gap: 60px; align-items: center;
+  }
+  .inst-eyebrow {
+    color: #F4D374; font-size: 12px; font-weight: 700; letter-spacing: 0.34em; text-transform: uppercase;
+  }
+  .inst-h2 {
+    font-size: 42px; line-height: 1.1; font-weight: 800; letter-spacing: -0.025em;
+    margin-top: 16px;
+  }
+  .inst-p {
+    font-size: 16px; line-height: 1.7; color: #C0C0C0; margin-top: 20px;
+  }
+  .inst-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 32px;
+  }
+  .stat-block {
+    background: rgba(255, 255, 255, 0.04); border: 0.5px solid rgba(212, 175, 55, 0.25);
+    border-radius: 14px; padding: 14px 8px; text-align: center;
+  }
+  .stat-numero {
+    font-size: 24px; font-weight: 800; letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #F4D374, #D4AF37);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .stat-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55); margin-top: 6px; line-height: 1.2;
+  }
+  .video-frame {
+    aspect-ratio: 16/9; background: #1A1F2E; border-radius: 22px;
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.5), 0 0 0 1px rgba(212, 175, 55, 0.15);
+    position: relative; overflow: hidden;
+    display: grid; place-items: center;
+  }
+  .video-play {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: linear-gradient(135deg, #E8C875, #D4AF37, #A88947);
+    display: grid; place-items: center;
+    box-shadow: 0 14px 36px -8px rgba(168, 137, 71, 0.55);
+  }
+
+  /* ---------- ANALISTA (claro) ---------- */
+  .analista-claro {
+    background:
+      linear-gradient(180deg, #F5EFDD 0%, #FFFEF9 50%, #FAF6EB 100%);
+    padding: 80px 32px;
+  }
+  .analista-inner {
+    max-width: 1320px; margin: 0 auto;
+    background: rgba(255, 255, 255, 0.62);
+    border-radius: 28px; padding: 48px 56px;
+    border: 0.5px solid rgba(168, 137, 71, 0.2);
+    backdrop-filter: blur(36px);
+    box-shadow: 0 28px 72px -18px rgba(20,16,8,0.18);
+  }
+  .analista-header { max-width: 840px; margin: 0 auto; text-align: center; }
+  .analista-h2 {
+    font-size: 36px; line-height: 1.15; font-weight: 800; letter-spacing: -0.025em;
+    margin-top: 12px; color: #1A1A1F;
+  }
+  .analista-h2 .gold {
+    background: linear-gradient(135deg, #A88947, #D4AF37);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .analista-sub {
+    font-size: 17px; line-height: 1.65; color: #5A5A5A; margin-top: 20px;
+  }
+  .beneficios-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px;
+  }
+  .beneficio-card {
+    background: linear-gradient(135deg, rgba(212,175,55,0.12), rgba(212,175,55,0.03));
+    border: 0.5px solid rgba(168, 137, 71, 0.3);
+    border-radius: 22px; padding: 28px;
+  }
+  .beneficio-emoji { font-size: 36px; line-height: 1; }
+  .beneficio-titulo {
+    font-size: 17px; font-weight: 800; color: #1A1A1F; margin-top: 20px;
+    line-height: 1.2; letter-spacing: -0.015em;
+  }
+  .beneficio-desc {
+    font-size: 13.5px; line-height: 1.65; color: #5A5A5A; margin-top: 12px;
+  }
+  .timeline-section { margin-top: 48px; }
+  .timeline-eyebrow {
+    text-align: center; color: #A88947;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.34em; text-transform: uppercase;
+  }
+  .timeline {
+    position: relative; margin-top: 28px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
+  }
+  .timeline::before {
+    content: ''; position: absolute; left: 12%; right: 12%; top: 34px; height: 1px;
+    background: linear-gradient(90deg, transparent, #D4AF37, #D4AF37, transparent);
+    opacity: 0.5;
+  }
+  .passo {
+    position: relative; display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .passo-circle {
+    width: 68px; height: 68px; border-radius: 50%; font-size: 26px;
+    background: linear-gradient(135deg, #E8C875, #D4AF37, #A88947);
+    display: grid; place-items: center;
+    box-shadow: 0 10px 24px -6px rgba(168, 137, 71, 0.45), inset 0 1px 0 rgba(255,255,255,0.5);
+    z-index: 1; position: relative;
+  }
+  .passo-label {
+    color: #A88947; font-size: 10px; font-weight: 700; letter-spacing: 0.28em;
+    text-transform: uppercase; margin-top: 12px;
+  }
+  .passo-texto {
+    font-size: 13px; line-height: 1.5; color: #5A5A5A; margin-top: 8px; max-width: 220px;
+  }
+
+  /* ---------- LOGIN (claro) ---------- */
+  .login-claro {
+    background: linear-gradient(180deg, #FAF6EB 0%, #FFFFFF 100%);
+    padding: 80px 32px; text-align: center;
+  }
+  .login-card {
+    max-width: 480px; margin: 0 auto;
+    background: white; border-radius: 24px;
+    padding: 36px;
+    border: 0.5px solid rgba(168, 137, 71, 0.25);
+    box-shadow: 0 24px 60px -20px rgba(20, 16, 8, 0.18);
+  }
+  .login-eyebrow {
+    color: #A88947; font-size: 11px; font-weight: 700; letter-spacing: 0.32em; text-transform: uppercase;
+  }
+  .login-h2 {
+    font-size: 28px; line-height: 1.2; font-weight: 800; margin-top: 14px;
+    color: #1A1A1F; letter-spacing: -0.025em;
+  }
+  .tabs-tipo {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 24px;
+  }
+  .tab-tipo {
+    background: #FAF6EB; border: 0.5px solid rgba(168, 137, 71, 0.25);
+    border-radius: 16px; padding: 16px 12px; text-align: center;
+  }
+  .tab-tipo.ativo {
+    background: linear-gradient(135deg, #E8C875, #D4AF37, #A88947);
+    border-color: rgba(168, 137, 71, 0.6);
+  }
+  .tab-tipo strong { font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #1A1A1F; }
+  .tab-tipo small { font-size: 10px; color: #6B6B6B; display: block; margin-top: 6px; letter-spacing: 0.14em; text-transform: uppercase; }
+
+  /* ---------- CTA FINAL (dark) ---------- */
+  .cta-dark {
+    background:
+      radial-gradient(ellipse 600px 400px at 20% 50%, rgba(212, 175, 55, 0.25), transparent 55%),
+      radial-gradient(ellipse 600px 400px at 80% 50%, rgba(244, 211, 116, 0.2), transparent 55%),
+      linear-gradient(180deg, #14181F 0%, #0C1019 100%);
+    color: white; padding: 100px 32px; text-align: center;
+  }
+  .cta-eyebrow {
+    color: #D4AF37; font-size: 12px; font-weight: 700; letter-spacing: 0.34em; text-transform: uppercase;
+  }
+  .cta-h2 {
+    font-size: 48px; line-height: 1.1; font-weight: 800; letter-spacing: -0.025em;
+    margin-top: 16px; max-width: 800px; margin-left: auto; margin-right: auto;
+  }
+  .cta-h2 .gold {
+    background: linear-gradient(135deg, #F4D374, #D4AF37);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .cta-sub { color: #C0C0C0; font-size: 16px; line-height: 1.7; margin-top: 20px; max-width: 560px; margin-left: auto; margin-right: auto; }
+
+  /* ---------- FOOTER (dark) ---------- */
+  .footer-dark {
+    background: #0C1019; color: rgba(255, 255, 255, 0.55);
+    padding: 36px 32px; border-top: 1px solid rgba(212, 175, 55, 0.15);
+    font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase;
+  }
+  .footer-inner {
+    max-width: 1320px; margin: 0 auto;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  /* ---------- LABEL DE SEÇÃO (só pro preview) ---------- */
+  .section-label {
+    position: absolute; top: 16px; left: 16px;
+    background: #FF3366; color: white;
+    padding: 6px 14px; border-radius: 100px;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase;
+    z-index: 10;
+    box-shadow: 0 6px 14px rgba(255, 51, 102, 0.4);
+  }
+  section, .login-claro, .features-claro, .institucional-dark, .analista-claro, .cta-dark { position: relative; }
+
+  /* preview banner topo */
+  .preview-banner {
+    background: #FFE5A8; color: #6B4E0E; padding: 14px 24px; text-align: center;
+    font-size: 13px; font-weight: 700; border-bottom: 1px solid rgba(168, 137, 71, 0.3);
+  }
+</style>
+</head>
+<body>
+
+<div class="preview-banner">
+  🎨 PROPOSTA DE LAYOUT — alternância dark/claro (Igor 17/06). NÃO ESTÁ EM PRODUÇÃO. Bandeirinhas vermelhas só identificam as seções.
+</div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">CP SYSTEM</div>
+    <nav class="nav">
+      <a href="#">Por que</a>
+      <a href="#">Sistema</a>
+      <a href="#">Planos</a>
+      <a href="#">FAQ</a>
+    </nav>
+    <div class="header-cta">
+      <a href="#" class="btn-link">Entrar</a>
+      <a href="#" class="btn-primary">Assinar</a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO DARK -->
+<section class="hero-dark">
+  <span class="section-label">1 · HERO DARK</span>
+  <span class="hero-eyebrow">Plataforma Premium</span>
+  <h1 class="hero-h1">
+    Gestão e controle de <span class="gold">Contratos, Atas (SRP) e Empenhos</span>
+  </h1>
+  <p class="hero-sub">
+    Assuma o controle total da sua execução pública: elimine gargalos operacionais e proteja o lucro de cada Contrato, Ata e Empenho.
+  </p>
+  <div class="hero-cta-group">
+    <a href="#" class="btn-primary">Solicite demonstração →</a>
+    <a href="#" class="btn-outline-dark">Ver planos</a>
+  </div>
+</section>
+
+<!-- 5 CARDS CLARO -->
+<section class="features-claro">
+  <span class="section-label" style="background: #1A1A1F;">2 · 5 CARDS CLARO</span>
+  <div class="features-inner">
+    <div class="features-grid">
+      <div class="feature-card c-dourado">
+        <div class="feature-icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <svg class="feature-icon-decor" width="160" height="160" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <div class="feature-title">Controle financeiro</div>
+        <div class="feature-desc">Valores contratados, executados, a executar, recebidos e a receber.</div>
+      </div>
+      <div class="feature-card c-verde">
+        <div class="feature-icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15l2 2 4-4"/></svg>
+        </div>
+        <svg class="feature-icon-decor" width="160" height="160" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 15l2 2 4-4"/></svg>
+        <div class="feature-title">Controle de contratações</div>
+        <div class="feature-desc">Contratos, atas e empenhos vigentes, expirados, a expirar.</div>
+      </div>
+      <div class="feature-card c-escuro">
+        <div class="feature-icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 18H3V6h13v12h-3M17 18H9M17 8h4l3 5v5h-7"/><circle cx="7.5" cy="18.5" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/></svg>
+        </div>
+        <svg class="feature-icon-decor" width="160" height="160" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 18H3V6h13v12h-3M17 18H9M17 8h4l3 5v5h-7"/><circle cx="7.5" cy="18.5" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/></svg>
+        <div class="feature-title">Controle logístico</div>
+        <div class="feature-desc">Esteira de entrega/execução com agenda, controle de prazos e alertas.</div>
+      </div>
+      <div class="feature-card c-bronze">
+        <div class="feature-icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M22 11h-6M19 8v6"/></svg>
+        </div>
+        <svg class="feature-icon-decor" width="160" height="160" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M22 11h-6M19 8v6"/></svg>
+        <div class="feature-title">Controle de clientes</div>
+        <div class="feature-desc">Órgãos atendidos, locais de entrega/execução.</div>
+      </div>
+      <div class="feature-card c-vinho">
+        <div class="feature-icon-box">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 7 2.04a2.5 2.5 0 0 1 2.5-.02M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 17 2.04 2.5 2.5 0 0 0 14.5 2"/></svg>
+        </div>
+        <svg class="feature-icon-decor" width="160" height="160" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24A2.5 2.5 0 0 1 7 2.04a2.5 2.5 0 0 1 2.5-.02M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24A2.5 2.5 0 0 0 17 2.04 2.5 2.5 0 0 0 14.5 2"/></svg>
+        <div class="feature-title">Inteligência jurídica nativa</div>
+        <div class="feature-desc">Alimentação de dados, cálculo de reajustes e tira-dúvidas.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INSTITUCIONAL + VÍDEO DARK -->
+<section class="institucional-dark">
+  <span class="section-label">3 · INSTITUCIONAL DARK</span>
+  <div class="institucional-inner">
+    <div>
+      <span class="inst-eyebrow">A empresa por trás</span>
+      <h2 class="inst-h2">Vencer a licitação é apenas o primeiro passo.</h2>
+      <p class="inst-p">
+        Mais do que gestão logística, o CP System nasce da convivência diária com a operação pública. Cada funcionalidade reflete o conhecimento do Grupo Contratos Públicos sobre os bastidores da execução de Atas, Contratos e Empenhos.
+      </p>
+      <p class="inst-p">
+        Inteligência jurídica nativa para que cada decisão sua tenha amparo legal — sem precisar abrir Word, sem precisar de um consultor por fora.
+      </p>
+      <div class="inst-stats">
+        <div class="stat-block"><div class="stat-numero">12+</div><div class="stat-label">Tipos de instrumentos</div></div>
+        <div class="stat-block"><div class="stat-numero">100%</div><div class="stat-label">Auditável</div></div>
+        <div class="stat-block"><div class="stat-numero">IA</div><div class="stat-label">Jurídica nativa</div></div>
+        <div class="stat-block"><div class="stat-numero">∞</div><div class="stat-label">Multi-empresa</div></div>
+      </div>
+    </div>
+    <div class="video-frame">
+      <div class="video-play">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="#1A1A1F"><path d="M8 5v14l11-7z"/></svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ANALISTA (claro) -->
+<section class="analista-claro">
+  <span class="section-label" style="background: #1A1A1F;">4 · ANALISTA CLARO</span>
+  <div class="analista-inner">
+    <div class="analista-header">
+      <span class="login-eyebrow">Para o analista de licitação</span>
+      <h2 class="analista-h2">
+        Módulo <span class="gold">exclusivo</span> para o Analista de Licitação com comissionamento por assinatura
+      </h2>
+      <p class="analista-sub">
+        Analista, para cada cliente seu que assinar o CP System, você terá acesso imediato aos seguintes benefícios:
+      </p>
+    </div>
+    <div class="beneficios-grid">
+      <div class="beneficio-card">
+        <div class="beneficio-emoji">💼</div>
+        <div class="beneficio-titulo">Módulo Exclusivo e Gratuito</div>
+        <div class="beneficio-desc">Acompanhe os contratos, atas e a execução de todos os seus clientes em uma única tela, de forma totalmente gratuita.</div>
+      </div>
+      <div class="beneficio-card">
+        <div class="beneficio-emoji">📊</div>
+        <div class="beneficio-titulo">Controle dos Seus Honorários</div>
+        <div class="beneficio-desc">Área dedicada para você controlar o status de pagamento das suas próprias comissões (fixas e variáveis de êxito).</div>
+      </div>
+      <div class="beneficio-card">
+        <div class="beneficio-emoji">💰</div>
+        <div class="beneficio-titulo">Comissionamento Gamificado</div>
+        <div class="beneficio-desc">Comissão mensal recorrente paga diretamente pela plataforma enquanto o seu cliente for assinante.</div>
+      </div>
+    </div>
+    <div class="timeline-section">
+      <div class="timeline-eyebrow">Como funciona na prática?</div>
+      <div class="timeline">
+        <div class="passo">
+          <div class="passo-circle">📝</div>
+          <div class="passo-label">Passo 1</div>
+          <div class="passo-texto">Cadastre-se gratuitamente como Analista.</div>
+        </div>
+        <div class="passo">
+          <div class="passo-circle">🗣️</div>
+          <div class="passo-label">Passo 2</div>
+          <div class="passo-texto">Indique o CP System aos seus clientes.</div>
+        </div>
+        <div class="passo">
+          <div class="passo-circle">🤝</div>
+          <div class="passo-label">Passo 3</div>
+          <div class="passo-texto">O cliente assina e vincula seu perfil.</div>
+        </div>
+        <div class="passo">
+          <div class="passo-circle">💸</div>
+          <div class="passo-label">Passo 4</div>
+          <div class="passo-texto">Você gera uma nova fonte de renda passiva.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOGIN (claro) -->
+<section class="login-claro">
+  <span class="section-label" style="background: #1A1A1F;">5 · LOGIN CLARO</span>
+  <span class="login-eyebrow">Acessar plataforma</span>
+  <h2 class="login-h2" style="margin-bottom: 24px;">Já é cliente? Entre na sua <span style="background: linear-gradient(135deg, #A88947, #D4AF37); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">conta</span></h2>
+  <div class="login-card">
+    <div class="tabs-tipo">
+      <div class="tab-tipo ativo"><strong>Empresa</strong><small>Vendo ao governo</small></div>
+      <div class="tab-tipo"><strong>Analista</strong><small>Indico clientes</small></div>
+    </div>
+    <div style="margin-top: 24px; text-align: left;">
+      <input type="email" placeholder="E-mail" style="width: 100%; padding: 12px 16px; border: 1px solid rgba(168,137,71,0.25); border-radius: 12px; font-size: 14px; margin-bottom: 12px;">
+      <input type="password" placeholder="Senha" style="width: 100%; padding: 12px 16px; border: 1px solid rgba(168,137,71,0.25); border-radius: 12px; font-size: 14px;">
+      <button style="width: 100%; margin-top: 16px; padding: 14px; border: none; border-radius: 100px; background: linear-gradient(135deg, #E8C875, #D4AF37, #A88947); color: #1A1A1F; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer;">Entrar como Empresa</button>
+    </div>
+  </div>
+</section>
+
+<!-- CTA DARK -->
+<section class="cta-dark">
+  <span class="section-label">6 · CTA FINAL DARK</span>
+  <span class="cta-eyebrow">Pronto pra começar?</span>
+  <h2 class="cta-h2">Se interessou e quer ter o <span class="gold">CP System</span> na sua empresa?</h2>
+  <p class="cta-sub">Teste 14 dias grátis, sem cartão de crédito. Configuração assistida e suporte humano via WhatsApp.</p>
+  <div class="hero-cta-group" style="margin-top: 36px;">
+    <a href="#" class="btn-primary">Solicite demonstração →</a>
+    <a href="#" class="btn-outline-dark">Ver planos</a>
+  </div>
+</section>
+
+<!-- FOOTER DARK -->
+<footer class="footer-dark">
+  <div class="footer-inner">
+    <span>CP System · Plataforma Premium</span>
+    <span>LGPD · Trilha auditável · Conexão segura</span>
+  </div>
+</footer>
+
+</body>
+</html>
