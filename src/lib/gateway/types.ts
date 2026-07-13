@@ -1,11 +1,12 @@
 // Tipos compartilhados entre os providers de pagamento.
 // Mantém o resto do app desacoplado do ASAAS/Stripe específicos.
 
-export type Plano = "BASICO" | "PREMIUM";
+export type Plano = "BASICO" | "INTERMEDIARIO" | "PREMIUM";
 export type FormaPagamento = "CARTAO_CREDITO" | "PIX" | "BOLETO";
 
 export const PRECO_PLANO: Record<Plano, number> = {
   BASICO: 397,
+  INTERMEDIARIO: 597,
   PREMIUM: 997,
 };
 

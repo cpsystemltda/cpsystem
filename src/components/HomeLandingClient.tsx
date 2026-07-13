@@ -224,11 +224,13 @@ export default function HomeLandingClient() {
               </p>
 
               {/* Mini-stats horizontais (substituem números factuais ainda inexistentes) */}
-              <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <StatBlock numero="12+" label="Tipos de instrumentos" />
                 <StatBlock numero="100%" label="Auditável" />
                 <StatBlock numero="IA" label="Jurídica nativa" />
                 <StatBlock numero="∞" label="Multi-empresa" />
+                {/* Igor 13/07: destacar que a plataforma dispensa treinamento */}
+                <StatBlock numero="0h" label="Dispensa treinamento" />
               </div>
 
               <div className="mt-7">
@@ -397,9 +399,8 @@ export default function HomeLandingClient() {
         </section>
 
         {/* ============== SEÇÃO 4.5 — PLANOS (DARK) ============== */}
-        {/* Igor 28/06: tirar pagina /precos separada, embutir aqui na home
-            como ancora #planos. So 2 planos (Basico+Premium) — corporativo
-            nao existe. */}
+        {/* Regina 13/07 (proposta Igor): 3 planos — Básico, Intermediário
+            e Premium. Intermediário no meio (destaque). */}
         <section id="planos" className="section-dark-bleed mt-12">
           <div className="text-center">
             <span className="text-[11px] font-bold uppercase" style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}>
@@ -428,36 +429,46 @@ export default function HomeLandingClient() {
             </p>
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-[1000px] gap-5 md:grid-cols-2">
+          <div className="mx-auto mt-12 grid max-w-[1200px] gap-5 md:grid-cols-3">
             <PlanoCardDark
               nome="Básico"
               preco="R$ 397"
-              descricao="Pra empresa com 1 CNPJ que precisa controlar contratos públicos."
+              descricao="SaaS Essencial — automatiza a operação da MPE."
               cta="Começar trial grátis"
               features={[
                 "1 CNPJ incluso · CNPJ adicional: R$ 39,90/mês cada",
                 "Atas, Contratos e Empenhos ilimitados",
                 "Alertas automáticos de prazo, pagamento e reajuste",
-                "Saldo de Ata por vigência separada (Lei 14.133)",
+                "Inteligência jurídica automatizada (Lei 14.133/2021)",
                 "Histórico de execução com timeline",
-                "Suporte por email e chat (4h dia útil)",
-                "10 perguntas IAsystem / mês",
+                "Suporte técnico por e-mail e chat",
               ]}
             />
             <PlanoCardDark
               destaque
-              nome="Premium"
-              preco="R$ 997"
-              descricao="Pra empresa com múltiplos CNPJs ou que precisa de IA jurídica completa."
+              nome="Intermediário"
+              preco="R$ 597"
+              descricao="Modo multi-empresas + IA nativa + conciliação bancária."
               cta="Começar trial grátis"
               features={[
-                "Múltiplas empresas (CNPJs ilimitados)",
-                "Tudo do Básico, sem limite",
-                "IAsystem ilimitado — parecer jurídico em 30s",
-                "Análise jurídica de PDF (Ata, Contrato, Aditivo, Apostilamento)",
-                "Painel financeiro consolidado multi-empresa",
-                "Programa de vínculo com analista parceiro",
-                "Suporte prioritário (4h dia útil)",
+                "Tudo do Básico",
+                "3 CNPJs inclusos · adicional R$ 39,90/mês cada",
+                "Conciliação bancária automática",
+                "IAsystem nativo — 10 perguntas/mês",
+              ]}
+            />
+            <PlanoCardDark
+              nome="Premium"
+              preco="R$ 997"
+              descricao="Tudo do Intermediário + franquia jurídica anual com o Grupo Contratos Públicos."
+              cta="Começar trial grátis"
+              features={[
+                "Tudo do Intermediário",
+                "CNPJs ilimitados",
+                "Canal VIP com SLA de 4h úteis",
+                "12 consultas jurídicas escritas/ano",
+                "2 peças administrativas/ano (reajuste, defesa, resposta)",
+                "Desconto em serviços jurídicos avulsos",
               ]}
             />
           </div>

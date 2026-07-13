@@ -37,7 +37,7 @@ export const signupSchema = z
     confirmacaoSenha: z.string().min(1, "Confirme a senha"),
 
     // Primeira empresa
-    plano: z.enum(["BASICO", "PREMIUM"], { message: "Escolha um plano" }),
+    plano: z.enum(["BASICO", "INTERMEDIARIO", "PREMIUM"], { message: "Escolha um plano" }),
 
     // Cartão (validado em detalhe pela função validarCartao no auth action)
     cartaoNumero: z.string().min(13, "Informe o número do cartão"),

@@ -134,7 +134,7 @@ function CardPlano({
   features,
   destaque,
 }: {
-  value: "BASICO" | "PREMIUM";
+  value: "BASICO" | "INTERMEDIARIO" | "PREMIUM";
   ativo: boolean;
   onClick: () => void;
   titulo: string;
@@ -223,8 +223,11 @@ function FormEmpresa() {
   const resumoRef = useRef<HTMLDivElement>(null);
   // Plano começa SEM seleção (Regina: usuário precisa escolher ativamente,
   // e a forma de pagamento só aparece depois que ele clica num plano).
-  const [plano, setPlano] = useState<"BASICO" | "PREMIUM" | null>(
-    v.plano === "PREMIUM" ? "PREMIUM" : v.plano === "BASICO" ? "BASICO" : null
+  const [plano, setPlano] = useState<"BASICO" | "INTERMEDIARIO" | "PREMIUM" | null>(
+    v.plano === "PREMIUM" ? "PREMIUM"
+    : v.plano === "INTERMEDIARIO" ? "INTERMEDIARIO"
+    : v.plano === "BASICO" ? "BASICO"
+    : null
   );
 
   // Programa de Embaixador: link pessoal /signup?ref=ANALISTA_ID grava o
@@ -465,14 +468,29 @@ function FormEmpresa() {
         titulo="Básico"
         preco="R$ 397"
         sub="/mês"
-        descricao="Tudo que sua empresa precisa pra profissionalizar a gestão de contratos públicos."
+        descricao="SaaS Essencial — automatiza a operação da MPE."
         features={[
-          "Multi-CNPJ até 4",
-          "8 módulos integrados",
-          "Extração de PDF via IA ilimitada",
-          "Dashboard com mapa interativo",
-          "Notificações no app",
-          "Suporte por chat",
+          "1 CNPJ incluso (adicional R$ 39,90/mês cada)",
+          "Cadastro ilimitado: atas, contratos, empenhos, ordens",
+          "Alertas automatizados de prazo, pagamento e reajuste",
+          "Inteligência jurídica automatizada (Lei 14.133/2021)",
+          "Histórico de execução com timeline",
+          "Suporte técnico por e-mail e chat",
+        ]}
+      />
+      <CardPlano
+        value="INTERMEDIARIO"
+        ativo={plano === "INTERMEDIARIO"}
+        onClick={() => setPlano("INTERMEDIARIO")}
+        titulo="Intermediário"
+        preco="R$ 597"
+        sub="/mês"
+        descricao="Modo multi-empresas + IA nativa + conciliação bancária."
+        features={[
+          "Tudo do Básico",
+          "3 CNPJs inclusos (adicional R$ 39,90/mês cada)",
+          "Conciliação bancária automática",
+          "IA nativa CP System — 10 perguntas/mês",
         ]}
       />
       <CardPlano
@@ -483,18 +501,18 @@ function FormEmpresa() {
         preco="R$ 997"
         sub="/mês"
         destaque
-        descricao="Software + força jurídica de uma das maiores escolas de Direito Administrativo do Brasil."
+        descricao="Tudo do Intermediário + franquia jurídica anual com o Grupo Contratos Públicos."
         features={[
-          "Tudo do Básico, sem limites",
-          "12 consultas jurídicas/ano com especialistas",
-          "2 peças jurídicas/ano (defesa, recurso, parecer)",
-          "Notificações via WhatsApp",
-          "Suporte prioritário com SLA",
-          "Onboarding assistido",
+          "Tudo do Intermediário, sem limites",
+          "CNPJs ilimitados",
+          "Canal VIP de atendimento (SLA 4h úteis)",
+          "12 consultas jurídicas escritas/ano",
+          "2 peças administrativas/ano (reajuste, defesa, resposta)",
+          "Desconto em serviços jurídicos avulsos",
         ]}
       />
       <p className="col-span-4 -mt-2 text-xs text-slate-500">
-        Ambos os planos começam com <strong>14 dias grátis</strong>. A cobrança só acontece após o trial — você
+        Todos os planos começam com <strong>14 dias grátis</strong>. A cobrança só acontece após o trial — você
         pode trocar de plano ou cancelar a qualquer momento.
       </p>
 

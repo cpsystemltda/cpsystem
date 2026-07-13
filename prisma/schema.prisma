@@ -21,6 +21,7 @@ enum TipoConta {
 
 enum Plano {
   BASICO
+  INTERMEDIARIO
   PREMIUM
 }
 
