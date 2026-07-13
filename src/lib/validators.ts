@@ -130,6 +130,9 @@ export const signupAnalistaSchema = z
     enderecoPj: z.string().optional(),
     emailPj: z.string().optional(),
     telefonePj: z.string().optional(),
+
+    // Aceite obrigatorio do CONTRATO DE ANALISTA v1.0 (Regina 13/07).
+    aceiteTermos: z.literal("1", { message: "Você precisa aceitar o contrato do analista pra continuar" }),
   })
   .superRefine((v, ctx) => {
     if (v.senha !== v.confirmacaoSenha) {

@@ -7,8 +7,8 @@
 // representante, CPF). Sem dados: mostra placeholder pra visitantes
 // anônimos.
 
-export const VERSAO_TERMOS = "2.1";
-export const VIGENCIA_TERMOS = "03/07/2026";
+export const VERSAO_TERMOS = "2.2";
+export const VIGENCIA_TERMOS = "13/07/2026";
 
 const CONTRATADA = {
   nome: "CP SYSTEM",
@@ -180,12 +180,30 @@ export function ContratoTermosUso({ contratante }: { contratante?: DadosContrata
         </p>
         <List>
           <li><strong>Plano Básico</strong>: R$ 397,00/mês, com 1 (um) CNPJ incluso; cada CNPJ adicional custa R$ 39,90/mês.</li>
-          <li><strong>Plano Premium</strong>: R$ 997,00/mês, com CNPJs ilimitados e funcionalidades avançadas de IA e multi-empresa.</li>
+          <li><strong>Plano Intermediário</strong>: R$ 597,00/mês, com 3 (três) CNPJs inclusos (adicional a R$ 39,90/mês cada), conciliação bancária e IAsystem nativo com até 10 (dez) perguntas por mês.</li>
+          <li><strong>Plano Premium</strong>: R$ 997,00/mês, com CNPJs ilimitados, IAsystem ilimitado e franquia jurídica anual (canal VIP, consultas escritas e peças administrativas), na forma anunciada na Plataforma.</li>
         </List>
         <p>
-          4.2. Os preços poderão ser <strong>reajustados anualmente</strong> pela variação positiva do
-          IPCA/IBGE dos 12 meses anteriores, mediante aviso prévio de 30 dias, mantida ao
-          CONTRATANTE a faculdade de rescindir sem custo caso não concorde com o novo valor.
+          4.2. Os preços poderão ser <strong>reajustados anualmente</strong>, seguindo o estabelecido abaixo:
+        </p>
+        <p>
+          4.2.1. <strong>Atualização Anual da Tabela</strong>: A CONTRATADA poderá atualizar a sua tabela geral
+          de preços anualmente, sempre no <strong>dia 1º de janeiro</strong> de cada ano. O percentual e o
+          valor do reajuste serão definidos a <strong>exclusivo critério comercial da CONTRATADA</strong>,
+          não estando vinculados a qualquer índice inflacionário ou econômico oficial.
+        </p>
+        <p>
+          4.2.2. <strong>Aplicação para Novas Assinaturas</strong>: A partir do dia 1º de janeiro de cada ano,
+          todas as novas assinaturas contratadas passarão a observar automática e imediatamente
+          a nova tabela de preços vigente.
+        </p>
+        <p>
+          4.2.3. <strong>Aplicação para Assinaturas Vigentes (Ciclo de Renovação)</strong>: Para as assinaturas
+          anuais que já se encontrem vigentes no momento da virada do ano, o reajuste de preços
+          <strong> não será aplicado de forma imediata em janeiro</strong>. O novo valor da assinatura incidirá
+          exclusivamente no mês de renovação do ciclo anual do CONTRATANTE (mês de aniversário
+          da assinatura), garantindo-se a manutenção do preço anterior até o término do período
+          de 12 (doze) meses já contratado e/ou pago.
         </p>
         <p>
           4.3. A troca de plano (upgrade ou downgrade) pode ser feita a qualquer tempo pelo próprio

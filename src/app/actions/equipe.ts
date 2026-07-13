@@ -95,17 +95,27 @@ export async function removerUsuarioAction(formData: FormData) {
 export async function aceitarTermosAction() {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
-  if (usuario.conta.termosAceitosEm) return;
-  await prisma.conta.update({ where: { id: usuario.contaId }, data: { termosAceitosEm: new Date() } });
+  // Versao correta pelo tipo da conta (evita import da UI legal na server action).
+  const { VERSAO_TERMOS } = await import("@/components/legal/ContratoTermosUso");
+  const { VERSAO_CONTRATO_ANALISTA } = await import("@/components/legal/ContratoAnalistaParceiro");
+  const versaoAtual = usuario.conta.tipo === "ANALISTA" ? VERSAO_CONTRATO_ANALISTA : VERSAO_TERMOS;
+  // Se ja aceitou a versao vigente, no-op. Bump de versao (ex.: v2.1→v2.2)
+  // volta o botao pro usuario re-aceitar.
+  if (usuario.conta.termosAceitosVersao === versaoAtual) return;
+  await prisma.conta.update({
+    where: { id: usuario.contaId },
+    data: { termosAceitosEm: new Date(), termosAceitosVersao: versaoAtual },
+  });
   await registrarAuditoria({
     contaId: usuario.contaId,
     usuarioId: usuario.id,
     acao: "ATUALIZAR",
     recurso: "Conta",
-    resumo: "Aceitou termos de uso e política de privacidade",
+    resumo: `Aceitou contrato ${usuario.conta.tipo === "ANALISTA" ? "analista" : "empresa"} versão ${versaoAtual}`,
   });
   revalidatePath("/dashboard");
   revalidatePath("/termos");
+  revalidatePath("/conta/completar-cadastro");
 }
 
 export async function exportarMeusDadosAction() {

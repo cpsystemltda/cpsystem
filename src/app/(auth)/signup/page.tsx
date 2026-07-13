@@ -910,6 +910,32 @@ function FormAnalista() {
         facilitando sua gestão e controle no recebimento de comissões.
       </div>
 
+      {/* Aceite do CONTRATO DO ANALISTA v1.0 — Regina 13/07 */}
+      <div className="col-span-4 mt-4 rounded-xl px-4 py-3" style={{ background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.4)" }}>
+        <label className="flex items-start gap-2.5 text-[13px]" style={{ color: "#2D3340" }}>
+          <input
+            type="checkbox"
+            name="aceiteTermos"
+            value="1"
+            required
+            className="mt-0.5"
+          />
+          <span>
+            Li e aceito o{" "}
+            <a href="/termos?tipo=analista" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: "#9C7A2D" }}>
+              Contrato de Adesão ao Programa de Analista Parceiro
+            </a>
+            , incluindo o regime de comissão vitalícia por R$ 29,90 por vínculo ativo pago no dia 20 do mês seguinte via PIX,
+            vedações e obrigações de conduta, e tratamento de dados conforme LGPD.
+          </span>
+        </label>
+        {e.aceiteTermos && (
+          <p className="mt-2 text-[11px] font-semibold" style={{ color: "#BE123C" }}>
+            {e.aceiteTermos}
+          </p>
+        )}
+      </div>
+
       <div className="col-span-4 mt-2">
         <SubmitButton>Criar conta de analista · gratuito</SubmitButton>
       </div>

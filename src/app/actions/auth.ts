@@ -179,10 +179,12 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       plano: v.plano,
       statusAssinatura: "TRIAL",
       trialAteEm,
-      // Aceite eletronico do contrato v2.0 no momento do cadastro
-      // (Regina 03/07). MP 2.200-2/2001 art. 10, §2º equipara aceite
-      // eletronico a assinatura fisica.
+      // Aceite eletronico do contrato v2.2 no momento do cadastro
+      // (Regina 13/07). MP 2.200-2/2001 art. 10, §2º equipara aceite
+      // eletronico a assinatura fisica. Versao gravada pra forcar re-aceite
+      // em bumps futuros.
       termosAceitosEm: new Date(),
+      termosAceitosVersao: "2.2",
       // Prioridade: cupom > ?ref= > autocomplete do signup.
       embaixadorId: analistaViaCupomId ?? embaixadorIdValido,
       cupomAplicadoId,
@@ -547,6 +549,10 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
       tipo: "ANALISTA",
       plano: "BASICO",
       statusAssinatura: "ATIVA", // analista não paga assinatura — só ganha comissão
+      // Aceite eletronico do CONTRATO DO ANALISTA v1.0 (Regina 13/07).
+      // Analista aceita o contrato de analista, nao o de empresa.
+      termosAceitosEm: new Date(),
+      termosAceitosVersao: "1.0",
       usuarios: {
         create: { nome, email, senhaHash, perfil: "ADMIN" },
       },

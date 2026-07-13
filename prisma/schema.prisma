@@ -40,6 +40,10 @@ model Conta {
   trialAteEm        DateTime?
   proximoVencimento DateTime?
   termosAceitosEm   DateTime?
+  // Versao do contrato aceita (Regina 13/07). Permite forcar re-aceite apos
+  // bump de versao — se termosAceitosVersao != VERSAO atual do contrato do
+  // tipo da conta, o /termos volta a mostrar botao "Li e aceito".
+  termosAceitosVersao String?
   // Cupom aplicado no signup (trial estendido + analista vinculado). Regina 09/07.
   cupomAplicadoId   String?
   cupomAplicado     Cupom?           @relation(fields: [cupomAplicadoId], references: [id])
@@ -122,6 +126,7 @@ model Usuario {
   conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
 
   sessoes              Sessao[]
+  magicLinks           MagicLink[]
   logsAuditoria        LogAuditoria[]
   notificacoesSistema  NotificacaoSistema[]
   mensagensIAsystem    MensagemIAsystem[]
@@ -241,6 +246,28 @@ model Sessao {
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
   @@index([usuarioId])
+}
+
+// MagicLink: login sem senha via link unico enviado por WA/email (Regina 13/07).
+// Usado pra pedir migracao pro Leo — clique cria sessao direto e redireciona.
+// - token = URL-safe rand hex (mesmo padrao de Sessao)
+// - expiraEm = 48h (curto pra reduzir janela de uso indevido)
+// - usadoEm = timestamp da 1a utilizacao (bloqueia reuso)
+// - motivo = string livre pra auditoria ("migracao_leo", "onboarding_igor" etc.)
+model MagicLink {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  usuarioId String
+  motivo    String
+  criadoPor String? // usuarioId do super admin que gerou (auditoria)
+  expiraEm  DateTime
+  usadoEm   DateTime?
+  criadoEm  DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@index([expiraEm])
 }
 
 // ============================================================

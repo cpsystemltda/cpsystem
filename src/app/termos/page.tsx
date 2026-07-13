@@ -10,36 +10,85 @@ import {
   VIGENCIA_TERMOS,
   type DadosContratante,
 } from "@/components/legal/ContratoTermosUso";
+import {
+  ContratoAnalistaParceiro,
+  VERSAO_CONTRATO_ANALISTA,
+  VIGENCIA_CONTRATO_ANALISTA,
+  type DadosAnalista,
+} from "@/components/legal/ContratoAnalistaParceiro";
 
-// Rota unica dos termos (Regina 03/07): mesmo texto pra logado e nao-logado.
-// Sem login: CTA "Cadastrar" e placeholders [a preencher no cadastro].
-// Logado sem aceite: botao formal de aceite + dados reais do CONTRATANTE.
-// Logado com aceite: mostra timestamp + dados reais.
-export default async function TermosPage() {
+// Rota unica dos termos: /termos = contrato empresa, /termos?tipo=analista
+// = contrato analista. Se logado, detecta automaticamente pelo tipo da conta.
+// Logado sem aceite: botao formal de aceite. Logado com aceite: mostra timestamp.
+export default async function TermosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string }>;
+}) {
+  const sp = await searchParams;
   const usuario = await getUsuarioAtual();
-  const jaAceito = usuario?.conta?.termosAceitosEm ?? null;
 
-  // Carrega dados do CONTRATANTE pra personalizar o contrato quando logado.
+  // Determina qual contrato mostrar. Prioridade: (1) tipo do usuario logado,
+  // (2) ?tipo=analista na URL, (3) default = empresa.
+  const tipoContrato: "EMPRESA" | "ANALISTA" =
+    usuario?.conta?.tipo === "ANALISTA"
+      ? "ANALISTA"
+      : sp?.tipo === "analista"
+        ? "ANALISTA"
+        : "EMPRESA";
+
+  // Só considera "já aceito" se o usuario aceitou a versao atual do contrato
+  // do tipo dele. Bump de versao (2.1 → 2.2) volta o botao.
+  const versaoAceita = usuario?.conta?.termosAceitosVersao ?? null;
+  const versaoContratoAtual = tipoContrato === "ANALISTA" ? VERSAO_CONTRATO_ANALISTA : VERSAO_TERMOS;
+  const jaAceito = usuario?.conta?.termosAceitosEm && versaoAceita === versaoContratoAtual
+    ? usuario.conta.termosAceitosEm
+    : null;
+
+  // Carrega dados do CONTRATANTE (empresa) ou do ANALISTA pra personalizar.
   let contratante: DadosContratante | undefined;
+  let analistaDados: DadosAnalista | undefined;
+
   if (usuario) {
-    const empresa = await prisma.empresa.findFirst({
-      where: { contaId: usuario.contaId },
-      orderBy: { criadoEm: "asc" },
-      select: { razaoSocial: true, cnpj: true, endereco: true },
-    });
     const dadosUsuario = await prisma.usuario.findUnique({
       where: { id: usuario.id },
-      select: { nome: true, email: true, cpf: true },
+      select: { nome: true, email: true, cpf: true, telefoneWhatsApp: true },
     });
-    contratante = {
-      razaoSocial: empresa?.razaoSocial ?? null,
-      cnpj: empresa?.cnpj ?? null,
-      enderecoEmpresa: empresa?.endereco ?? null,
-      nomeRepresentante: dadosUsuario?.nome ?? null,
-      cpfRepresentante: dadosUsuario?.cpf ?? null,
-      emailRepresentante: dadosUsuario?.email ?? null,
-    };
+
+    if (tipoContrato === "EMPRESA") {
+      const empresa = await prisma.empresa.findFirst({
+        where: { contaId: usuario.contaId },
+        orderBy: { criadoEm: "asc" },
+        select: { razaoSocial: true, cnpj: true, endereco: true },
+      });
+      contratante = {
+        razaoSocial: empresa?.razaoSocial ?? null,
+        cnpj: empresa?.cnpj ?? null,
+        enderecoEmpresa: empresa?.endereco ?? null,
+        nomeRepresentante: dadosUsuario?.nome ?? null,
+        cpfRepresentante: dadosUsuario?.cpf ?? null,
+        emailRepresentante: dadosUsuario?.email ?? null,
+      };
+    } else {
+      const analista = await prisma.analista.findUnique({
+        where: { contaId: usuario.contaId },
+        select: { nomeCompleto: true, cpf: true, endereco: true, email: true, telefone: true },
+      });
+      analistaDados = {
+        nomeCompleto: analista?.nomeCompleto ?? dadosUsuario?.nome ?? null,
+        cpf: analista?.cpf ?? dadosUsuario?.cpf ?? null,
+        endereco: analista?.endereco ?? null,
+        email: analista?.email ?? dadosUsuario?.email ?? null,
+        telefone: analista?.telefone ?? dadosUsuario?.telefoneWhatsApp ?? null,
+      };
+    }
   }
+
+  const versao = tipoContrato === "ANALISTA" ? VERSAO_CONTRATO_ANALISTA : VERSAO_TERMOS;
+  const vigencia = tipoContrato === "ANALISTA" ? VIGENCIA_CONTRATO_ANALISTA : VIGENCIA_TERMOS;
+  const titulo = tipoContrato === "ANALISTA"
+    ? "Contrato de Adesão ao Programa de Analista Parceiro"
+    : "Contrato de Prestação de Serviços & Termos de Uso";
 
   return (
     <div className="min-h-screen" style={{ background: "#FFFFFF" }}>
@@ -61,11 +110,32 @@ export default async function TermosPage() {
           className="text-3xl font-extrabold"
           style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
         >
-          Contrato de Prestação de Serviços & Termos de Uso
+          {titulo}
         </h1>
         <p className="mt-2 text-sm" style={{ color: "var(--text-soft)" }}>
-          Versão {VERSAO_TERMOS} · Em vigor desde {VIGENCIA_TERMOS}
+          Versão {versao} · Em vigor desde {vigencia}
         </p>
+        {/* Alternador entre os 2 contratos pra usuarios nao logados */}
+        {!usuario && (
+          <div className="mt-3 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">
+            <Link
+              href="/termos"
+              className={`rounded px-3 py-1.5 font-semibold transition ${
+                tipoContrato === "EMPRESA" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Contrato Empresa
+            </Link>
+            <Link
+              href="/termos?tipo=analista"
+              className={`rounded px-3 py-1.5 font-semibold transition ${
+                tipoContrato === "ANALISTA" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Contrato Analista
+            </Link>
+          </div>
+        )}
 
         {/* Status de aceite pra usuário logado */}
         {usuario && jaAceito && (
@@ -86,7 +156,11 @@ export default async function TermosPage() {
         )}
 
         <div className="mt-10">
-          <ContratoTermosUso contratante={contratante} />
+          {tipoContrato === "ANALISTA" ? (
+            <ContratoAnalistaParceiro analista={analistaDados} />
+          ) : (
+            <ContratoTermosUso contratante={contratante} />
+          )}
         </div>
 
         {/* Rodapé condicional */}
@@ -97,7 +171,7 @@ export default async function TermosPage() {
                 Ao criar sua conta no CP System, você aceita este contrato.
               </p>
               <Link
-                href="/signup"
+                href={tipoContrato === "ANALISTA" ? "/signup?tipo=ANALISTA" : "/signup"}
                 className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[12px] font-bold uppercase transition hover:scale-[1.02]"
                 style={{
                   background: "linear-gradient(135deg, #E8C875 0%, #D4AF37 50%, #A88947 100%)",
@@ -105,7 +179,7 @@ export default async function TermosPage() {
                   letterSpacing: "0.18em",
                 }}
               >
-                Cadastrar-se →
+                {tipoContrato === "ANALISTA" ? "Cadastrar-se como analista →" : "Cadastrar-se →"}
               </Link>
             </div>
           )}
@@ -116,10 +190,12 @@ export default async function TermosPage() {
               style={{ background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.5)" }}
             >
               <p className="text-sm" style={{ color: "var(--text)" }}>
-                <strong>Aceitação formal</strong> — declaro que li integralmente o Contrato de Prestação de
-                Serviços & Termos de Uso versão {VERSAO_TERMOS} e concordo com todas as suas cláusulas,
-                incluindo autorização para recebimento de comunicações eletrônicas (e-mail e WhatsApp),
-                tratamento de dados pessoais conforme LGPD e uso da IAsystem como funcionalidade complementar.
+                <strong>Aceitação formal</strong> — declaro que li integralmente o{" "}
+                {tipoContrato === "ANALISTA" ? "Contrato de Adesão ao Programa de Analista Parceiro" : "Contrato de Prestação de Serviços & Termos de Uso"}{" "}
+                versão {versao} e concordo com todas as suas cláusulas,
+                {tipoContrato === "ANALISTA"
+                  ? " incluindo obrigações de conduta, regime de comissão vitalícia por R$ 29,90 por vínculo ativo (dia 20 do mês seguinte via PIX automático), vedações e sigilo."
+                  : " incluindo autorização para recebimento de comunicações eletrônicas (e-mail e WhatsApp), tratamento de dados pessoais conforme LGPD e uso da IAsystem como funcionalidade complementar."}
               </p>
               <button
                 type="submit"

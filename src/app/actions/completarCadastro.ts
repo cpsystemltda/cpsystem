@@ -31,6 +31,12 @@ export async function completarCadastroAction(
   });
   if (!conta) return { erro: "Conta não encontrada." };
   if (conta.gatewaySubscriptionId) redirect("/dashboard");
+  // Regina 13/07: bloqueia server-side pra cliente antigo (Léo) só concluir
+  // cadastro depois de aceitar a nova versao do contrato (v2.2).
+  const { VERSAO_TERMOS } = await import("@/components/legal/ContratoTermosUso");
+  if (conta.termosAceitosVersao !== VERSAO_TERMOS) {
+    return { erro: `Antes de cadastrar o cartão, aceite a nova versão do contrato (v${VERSAO_TERMOS}) em /termos.` };
+  }
 
   const empresa = conta.empresas[0];
   const usuarioConta = conta.usuarios[0];
@@ -67,6 +73,42 @@ export async function completarCadastroAction(
     return { erro: "Escolha um dia de vencimento.", campos: { diaVencimento: "Obrigatório" } };
   }
   const diaVenc = Number(diaVencRaw);
+
+  // Modo migracao (Regina 13/07): se veio razaoSocial/cnpj/endereco/cep/telefones
+  // no form, atualiza empresa antes de criar subscription. Assim o Leo assume
+  // a conta com os dados dele em vez de ficar com os do Igor.
+  const empresaUpdates: {
+    razaoSocial?: string;
+    cnpj?: string;
+    endereco?: string;
+    cep?: string;
+    telefones?: string;
+  } = {};
+  const razaoSocialRaw = String(formData.get("razaoSocial") || "").trim();
+  const cnpjRaw = String(formData.get("cnpj") || "").replace(/\D/g, "");
+  const enderecoRaw = String(formData.get("endereco") || "").trim();
+  const cepRaw = String(formData.get("cep") || "").replace(/\D/g, "");
+  const telefonesRaw = String(formData.get("telefones") || "").trim();
+  if (razaoSocialRaw) {
+    if (razaoSocialRaw.length < 2) return { erro: "Razão social muito curta.", campos: { razaoSocial: "Mínimo 2 caracteres" } };
+    empresaUpdates.razaoSocial = razaoSocialRaw;
+  }
+  if (cnpjRaw) {
+    if (cnpjRaw.length !== 14) return { erro: "CNPJ inválido.", campos: { cnpj: "14 dígitos" } };
+    empresaUpdates.cnpj = cnpjRaw;
+  }
+  if (enderecoRaw) {
+    if (enderecoRaw.length < 5) return { erro: "Endereço muito curto.", campos: { endereco: "Mínimo 5 caracteres" } };
+    empresaUpdates.endereco = enderecoRaw;
+  }
+  if (cepRaw.length === 8) empresaUpdates.cep = cepRaw;
+  if (telefonesRaw) empresaUpdates.telefones = telefonesRaw;
+
+  if (Object.keys(empresaUpdates).length > 0) {
+    await prisma.empresa.update({ where: { id: empresa.id }, data: empresaUpdates });
+    // Reflete no objeto local pra usar nos passos abaixo
+    Object.assign(empresa, empresaUpdates);
+  }
 
   // Calcula nextDueDate = próximo dia {10|15|20} APÓS trialAteEm (ou hoje se trial já expirou)
   const base = conta.trialAteEm && conta.trialAteEm > new Date() ? conta.trialAteEm : new Date();
