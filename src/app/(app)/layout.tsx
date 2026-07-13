@@ -81,6 +81,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const inadimplente = conta.statusAssinatura === "INADIMPLENTE" || conta.statusAssinatura === "CANCELADA";
   const bloqueada = inadimplente || trialExpirado;
 
+  // Regina 13/07: se conta EMPRESA nao tem subscription Asaas (signup antigo),
+  // manda direto pra tela de completar cadastro em vez de mostrar Paywall.
+  // Aplica pra qualquer TRIAL sem subscription, expirado ou nao (assim o Léo
+  // e outros TRIAL antigos ativam recorrencia antes do trial terminar).
+  const precisaCompletarCadastro =
+    tipoConta === "EMPRESA" &&
+    !usuario.superAdmin &&
+    conta.statusAssinatura === "TRIAL" &&
+    !conta.gatewaySubscriptionId;
+  if (precisaCompletarCadastro && !pathname.startsWith("/conta/completar-cadastro") && !pathname.startsWith("/termos") && !pathname.startsWith("/api")) {
+    redirect("/conta/completar-cadastro");
+  }
+
   // Paywall só aplica pra contas EMPRESA (analista não paga assinatura)
   const ROTAS_PERMITIDAS_INADIMPLENTE = ["/conta/", "/empresas", "/equipe", "/termos", "/auditoria", "/admin"];
   const rotaPermitidaPaywall = ROTAS_PERMITIDAS_INADIMPLENTE.some((r) => pathname.startsWith(r));
