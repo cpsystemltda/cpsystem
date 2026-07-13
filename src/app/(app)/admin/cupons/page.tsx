@@ -10,13 +10,13 @@ import { CuponsClient } from "./CuponsClient";
 // Uso típico: Igor pede pra você gerar um cupom pro cliente novo dele.
 export default async function CuponsPage() {
   const usuario = await exigirUsuario();
-  const podeVer = usuario.perfil === "ADMIN" || usuario.superAdmin;
-  if (!podeVer) {
+  // Regina 13/07: só superAdmins (Regina, Igor, Contato CP System).
+  if (!usuario.superAdmin) {
     return (
       <div className="mx-auto max-w-3xl px-8 py-12 text-center">
         <h1 className="text-2xl font-bold text-slate-900">Área restrita</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Apenas administradores podem gerenciar cupons.
+          Apenas super administradores da plataforma podem gerenciar cupons.
         </p>
         <Link href="/dashboard" className="mt-4 inline-block text-sm text-violet-700 underline">
           Voltar

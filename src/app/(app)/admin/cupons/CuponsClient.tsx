@@ -1,8 +1,8 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { Ticket, Plus, Copy, Check, Power, PowerOff } from "lucide-react";
-import { criarCupomAction, toggleCupomAtivoAction } from "@/app/actions/cupom";
+import { Ticket, Plus, Copy, Check, Power, PowerOff, Pencil, X } from "lucide-react";
+import { criarCupomAction, editarCupomAction, toggleCupomAtivoAction } from "@/app/actions/cupom";
 
 type CupomItem = {
   id: string;
@@ -30,6 +30,7 @@ export function CuponsClient({
   const [state, formAction] = useActionState(criarCupomAction, null);
   const [copiado, setCopiado] = useState<string | null>(null);
   const [togglando, startToggle] = useTransition();
+  const [editandoId, setEditandoId] = useState<string | null>(null);
 
   async function copiar(codigo: string) {
     try {
@@ -177,6 +178,7 @@ export function CuponsClient({
         )}
         {cupons.map((c) => {
           const linkSignup = `https://cpsystem.app.br/signup?cupom=${c.codigo}`;
+          const emEdicao = editandoId === c.id;
           return (
             <div
               key={c.id}
@@ -250,6 +252,24 @@ export function CuponsClient({
                   </button>
                   <button
                     type="button"
+                    onClick={() => setEditandoId(emEdicao ? null : c.id)}
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold text-white ${
+                      emEdicao ? "bg-slate-600 hover:bg-slate-700" : "bg-blue-600 hover:bg-blue-700"
+                    }`}
+                    title="Editar cupom"
+                  >
+                    {emEdicao ? (
+                      <>
+                        <X className="h-3 w-3" /> Fechar
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="h-3 w-3" /> Editar
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
                     disabled={togglando}
                     onClick={() =>
                       startToggle(async () => {
@@ -272,10 +292,134 @@ export function CuponsClient({
                   </button>
                 </div>
               </div>
+              {emEdicao && (
+                <FormEditarCupom
+                  cupom={c}
+                  analistas={analistas}
+                  onDone={() => setEditandoId(null)}
+                />
+              )}
             </div>
           );
         })}
       </div>
     </div>
+  );
+}
+
+// Form inline pra editar 1 cupom. Reusa estilos do form de criação.
+// Não permite editar o CÓDIGO (evita quebrar links já compartilhados).
+function FormEditarCupom({
+  cupom,
+  analistas,
+  onDone,
+}: {
+  cupom: CupomItem;
+  analistas: { id: string; nomeCompleto: string }[];
+  onDone: () => void;
+}) {
+  const acao = editarCupomAction.bind(null, cupom.id);
+  const [state, formAction] = useActionState(acao, null);
+  const [salvando, startSalvar] = useTransition();
+
+  // Data de valido ate em formato YYYY-MM-DD (input date)
+  const validoAteDate = cupom.validoAte ? cupom.validoAte.slice(0, 10) : "";
+
+  return (
+    <form
+      action={(fd) => startSalvar(() => formAction(fd))}
+      className="mt-4 rounded-lg border border-blue-200 bg-blue-50/40 p-4 space-y-3"
+    >
+      <p className="text-xs font-bold text-blue-900">Editar cupom {cupom.codigo}</p>
+
+      <label className="block text-xs font-semibold text-slate-700">
+        Descrição (interno)
+        <input
+          name="descricao"
+          type="text"
+          defaultValue={cupom.descricao ?? ""}
+          placeholder="Ex: Cliente novo do Igor — fornecedor de produtos"
+          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+        />
+      </label>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <label className="text-xs font-semibold text-slate-700">
+          Dias de trial (1-365)
+          <input
+            name="diasTrial"
+            type="number"
+            min={1}
+            max={365}
+            defaultValue={cupom.diasTrial}
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+          />
+        </label>
+        <label className="text-xs font-semibold text-slate-700">
+          Válido até (opcional)
+          <input
+            name="validoAte"
+            type="date"
+            defaultValue={validoAteDate}
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+          />
+        </label>
+        <label className="text-xs font-semibold text-slate-700">
+          Usos máximos (vazio = ilimitado)
+          <input
+            name="usosMaximos"
+            type="number"
+            min={cupom.usosAtuais || 1}
+            defaultValue={cupom.usosMaximos ?? ""}
+            placeholder="Ex: 1"
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+          />
+        </label>
+      </div>
+
+      <label className="block text-xs font-semibold text-slate-700">
+        Analista vinculado (Igor não vai ser sempre — pode trocar aqui)
+        <select
+          name="analistaVinculadoId"
+          defaultValue={
+            analistas.find((a) => a.nomeCompleto === cupom.analistaVinculado)?.id ?? ""
+          }
+          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400"
+        >
+          <option value="">— Nenhum (sem analista vinculado) —</option>
+          {analistas.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.nomeCompleto}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {state?.erro && (
+        <div className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-800">{state.erro}</div>
+      )}
+      {state?.ok && (
+        <div className="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          ✓ Cupom atualizado.
+        </div>
+      )}
+
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onDone}
+          className="rounded-md border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={salvando}
+          className="rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-40"
+        >
+          {salvando ? "Salvando…" : "Salvar alterações"}
+        </button>
+      </div>
+    </form>
   );
 }

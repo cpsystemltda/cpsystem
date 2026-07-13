@@ -24,8 +24,10 @@ function gerarCodigoAleatorio(prefixo?: string): string {
 export async function criarCupomAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
-  if (usuario.perfil !== "ADMIN" && !usuario.superAdmin) {
-    return { erro: "Apenas admins podem criar cupons." };
+  // Regina 13/07: só superAdmins (Regina, Igor, Contato CP System) — nunca
+  // ADMIN de conta cliente (evita que cliente com perfil ADMIN vire vilão).
+  if (!usuario.superAdmin) {
+    return { erro: "Apenas super admins da plataforma podem criar cupons." };
   }
 
   const codigoRaw = String(formData.get("codigo") || "").trim().toUpperCase();
@@ -90,12 +92,75 @@ export async function criarCupomAction(_p: Result | null, formData: FormData): P
   }
 }
 
+// Editar cupom existente (Regina 13/07). Não permite alterar CÓDIGO (evita
+// links antigos quebrarem) nem usosAtuais (auditoria). Ajusta o resto:
+// descricao, diasTrial, analistaVinculadoId, validoAte, usosMaximos.
+export async function editarCupomAction(
+  cupomId: string,
+  _p: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  if (!usuario.superAdmin) {
+    return { erro: "Apenas super admins da plataforma podem editar cupons." };
+  }
+
+  const cupomExistente = await prisma.cupom.findUnique({ where: { id: cupomId }, select: { id: true, codigo: true } });
+  if (!cupomExistente) return { erro: "Cupom não encontrado." };
+
+  const descricao = String(formData.get("descricao") || "").trim() || null;
+  const diasTrialRaw = Number(formData.get("diasTrial") || 60);
+  const analistaVinculadoIdRaw = String(formData.get("analistaVinculadoId") || "").trim();
+  const analistaVinculadoId = analistaVinculadoIdRaw || null;
+  const validoAteRaw = String(formData.get("validoAte") || "").trim();
+  const usosMaximosRaw = String(formData.get("usosMaximos") || "").trim();
+
+  const diasTrial = Number.isFinite(diasTrialRaw) && diasTrialRaw >= 1 && diasTrialRaw <= 365
+    ? Math.floor(diasTrialRaw) : 60;
+
+  if (analistaVinculadoId) {
+    const a = await prisma.analista.count({ where: { id: analistaVinculadoId, ativo: true } });
+    if (!a) return { erro: "Analista vinculado não encontrado ou inativo." };
+  }
+
+  const validoAte = validoAteRaw ? new Date(validoAteRaw) : null;
+  if (validoAte && isNaN(validoAte.getTime())) {
+    return { erro: "Data de validade inválida." };
+  }
+  const usosMaximos = usosMaximosRaw ? Number(usosMaximosRaw) : null;
+  if (usosMaximos !== null && (!Number.isFinite(usosMaximos) || usosMaximos < 1)) {
+    return { erro: "Usos máximos inválidos (>= 1 ou vazio pra ilimitado)." };
+  }
+
+  try {
+    const cupom = await prisma.cupom.update({
+      where: { id: cupomId },
+      data: { descricao, diasTrial, analistaVinculadoId, validoAte, usosMaximos },
+    });
+
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "ATUALIZAR",
+      recurso: "Cupom",
+      recursoId: cupom.id,
+      resumo: `Editou cupom ${cupom.codigo} — ${cupom.diasTrial}d${analistaVinculadoId ? " + analista" : ""}`,
+    });
+
+    revalidatePath("/admin/cupons");
+    return { ok: true, cupom };
+  } catch (err) {
+    return { erro: err instanceof Error ? err.message : "Erro ao editar cupom." };
+  }
+}
+
 // Toggle ativo (desativa cupom sem apagar histórico).
 export async function toggleCupomAtivoAction(cupomId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
-  if (usuario.perfil !== "ADMIN" && !usuario.superAdmin) {
-    return { erro: "Apenas admins." };
+  if (!usuario.superAdmin) {
+    return { erro: "Apenas super admins." };
   }
   const c = await prisma.cupom.findUnique({ where: { id: cupomId }, select: { ativo: true } });
   if (!c) return { erro: "Cupom não encontrado." };
