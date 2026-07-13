@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Ticket, Plus, Copy, Check, Power, PowerOff, Pencil, X } from "lucide-react";
 import { criarCupomAction, editarCupomAction, toggleCupomAtivoAction } from "@/app/actions/cupom";
 
@@ -31,6 +32,13 @@ export function CuponsClient({
   const [copiado, setCopiado] = useState<string | null>(null);
   const [togglando, startToggle] = useTransition();
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const router = useRouter();
+
+  // Refresh após criar bem-sucedido (senão a lista fica com dados antigos)
+  useEffect(() => {
+    if (state?.ok) router.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.ok]);
 
   async function copiar(codigo: string) {
     try {
@@ -274,6 +282,7 @@ export function CuponsClient({
                     onClick={() =>
                       startToggle(async () => {
                         await toggleCupomAtivoAction(c.id);
+                        router.refresh();
                       })
                     }
                     className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold text-white ${
@@ -321,9 +330,21 @@ function FormEditarCupom({
   const acao = editarCupomAction.bind(null, cupom.id);
   const [state, formAction] = useActionState(acao, null);
   const [salvando, startSalvar] = useTransition();
+  const router = useRouter();
 
   // Data de valido ate em formato YYYY-MM-DD (input date)
   const validoAteDate = cupom.validoAte ? cupom.validoAte.slice(0, 10) : "";
+
+  // Após save bem-sucedido: refetch a lista + fecha o form (o revalidatePath
+  // do server marca a pagina como stale mas o client precisa router.refresh()
+  // pra puxar de fato os dados novos). Sem isso a UI mostra valor antigo.
+  useEffect(() => {
+    if (state?.ok) {
+      router.refresh();
+      onDone();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.ok]);
 
   return (
     <form
