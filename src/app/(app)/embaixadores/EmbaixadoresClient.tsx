@@ -93,7 +93,7 @@ export function EmbaixadoresClient({
             <Campo label="Banco" name="banco" />
             <Campo label="Agência" name="agencia" />
             <Campo label="Conta" name="contaCorrente" />
-            <Campo label="PIX" name="pix" />
+            <Campo label="Chave PIX (obrigatório)" name="pix" required />
             <Campo label="Razão social (se PJ)" name="razaoSocial" />
             <Campo label="CNPJ (se PJ)" name="cnpj" />
             <Campo label="Link de divulgação" name="divulgacaoUrl" colSpan={2} />

@@ -206,6 +206,31 @@ export class GatewayAsaas implements GatewayPagamento {
     await this.req(`/subscriptions/${subscriptionId}`, { method: "DELETE" });
   }
 
+  // Regina 13/07: PIX out pra pagar analista automaticamente.
+  // Docs: https://docs.asaas.com/reference/transferencias-pix
+  // POST /transfers com operationType=PIX + pixAddressKey.
+  async transferirPix(input: {
+    valor: number;
+    chavePix: string;
+    tipoChave: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP";
+    descricao?: string;
+    referenciaExterna?: string; // externalReference — link com Comissao.id
+  }): Promise<{ transferId: string; status: string }> {
+    type Resp = { id: string; status: string };
+    const data = await this.req<Resp>("/transfers", {
+      method: "POST",
+      body: JSON.stringify({
+        operationType: "PIX",
+        value: input.valor,
+        pixAddressKey: input.chavePix,
+        pixAddressKeyType: input.tipoChave,
+        description: input.descricao,
+        externalReference: input.referenciaExterna,
+      }),
+    });
+    return { transferId: data.id, status: data.status };
+  }
+
   async validarWebhook(headers: Headers, _rawBody: string): Promise<boolean> {
     if (!this.cfg.webhookToken) return true; // se não configurou token, aceita
     const enviado = headers.get("asaas-access-token");

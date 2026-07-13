@@ -109,12 +109,14 @@ export const signupAnalistaSchema = z
     complemento: z.string().optional(),
     cep: z.string().regex(cepRegex, "CEP inválido"),
 
-    // Bancários (opcionais — CNAE também opcional pra não travar)
+    // PIX obrigatório (Regina 13/07): analista recebe comissão via PIX
+    // automático dia 20 de cada mês. Sem PIX cadastrado, não tem como
+    // receber. Outros dados bancários seguem opcionais.
+    pix: z.string().min(4, "Chave PIX obrigatória — CPF, e-mail, celular ou aleatória"),
+    pixTipo: z.string().optional(),
     banco: z.string().optional(),
     agencia: z.string().optional(),
     contaCorrente: z.string().optional(),
-    pix: z.string().optional(),
-    pixTipo: z.string().optional(),
 
     // PJ (controlada por flag temPj)
     temPj: z.string().optional(), // "sim" | "nao" | undefined

@@ -20,6 +20,11 @@ export async function cadastrarAnalistaAction(_p: Result | null, formData: FormD
   const cpf = String(formData.get("cpf") || "").replace(/\D/g, "");
   if (cpf.length !== 11) return { erro: "CPF inválido." };
 
+  // Regina 13/07: PIX obrigatório — analista recebe comissão via PIX
+  // automático dia 20 de cada mês.
+  const pix = String(formData.get("pix") || "").trim();
+  if (pix.length < 4) return { erro: "Chave PIX obrigatória (CPF, e-mail, celular ou aleatória)." };
+
   if (await prisma.analista.findUnique({ where: { cpf } })) return { erro: "CPF já cadastrado." };
 
   try {
@@ -33,7 +38,7 @@ export async function cadastrarAnalistaAction(_p: Result | null, formData: FormD
         banco: String(formData.get("banco") || "") || null,
         agencia: String(formData.get("agencia") || "") || null,
         contaCorrente: String(formData.get("contaCorrente") || "") || null,
-        pix: String(formData.get("pix") || "") || null,
+        pix,
         razaoSocial: String(formData.get("razaoSocial") || "") || null,
         nomeFantasia: String(formData.get("nomeFantasia") || "") || null,
         cnpj: String(formData.get("cnpj") || "") || null,

@@ -884,7 +884,7 @@ function FormAnalista() {
       <Field label="Agência (com dígito, se houver)" name="agencia" placeholder="0000-0" defaultValue={v.agencia ?? ""} erro={e.agencia} span={1} />
       <Field label="Conta corrente (com dígito)" name="contaCorrente" placeholder="00000-0" defaultValue={v.contaCorrente ?? ""} erro={e.contaCorrente} span={1} />
       <Select label="Tipo de chave PIX" name="pixTipo" options={PIX_TIPOS} defaultValue={pixTipo} erro={e.pixTipo} span={2} onChange={(ev) => setPixTipo((ev.target as HTMLSelectElement).value)} />
-      <Field label="Chave PIX" name="pix" placeholder={pixTipo === "EMAIL" ? "voce@dominio.com" : pixTipo === "TELEFONE" ? "(61) 9 9999-9999" : pixTipo === "CPF" ? "000.000.000-00" : pixTipo === "CNPJ" ? "00.000.000/0000-00" : "chave"} defaultValue={v.pix ?? ""} erro={e.pix} span={2} ajuda={AJUDA.pixAnalista} />
+      <Field label="Chave PIX *" name="pix" required placeholder={pixTipo === "EMAIL" ? "voce@dominio.com" : pixTipo === "TELEFONE" ? "(61) 9 9999-9999" : pixTipo === "CPF" ? "000.000.000-00" : pixTipo === "CNPJ" ? "00.000.000/0000-00" : "chave"} defaultValue={v.pix ?? ""} erro={e.pix} span={2} ajuda={AJUDA.pixAnalista} />
 
       <div className="col-span-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
         Prezado analista, no <strong>CP System</strong> você <strong>não paga assinatura</strong>. Seu painel mostrará os dados de

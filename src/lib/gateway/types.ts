@@ -118,4 +118,12 @@ export interface GatewayPagamento {
   criarAssinatura?(input: CriarAssinaturaInput): Promise<CriarAssinaturaResultado>;
   atualizarAssinatura?(input: AtualizarAssinaturaInput): Promise<void>;
   cancelarAssinatura?(subscriptionId: string): Promise<void>;
+  // PIX out pra analista (Regina 13/07). Só Asaas por enquanto.
+  transferirPix?(input: {
+    valor: number;
+    chavePix: string;
+    tipoChave: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP";
+    descricao?: string;
+    referenciaExterna?: string;
+  }): Promise<{ transferId: string; status: string }>;
 }

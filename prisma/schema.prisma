@@ -453,6 +453,9 @@ model Comissao {
   paga         Boolean        @default(false)
   pagaEm       DateTime?
   criadoEm     DateTime       @default(now())
+  // Regina 13/07: rastreio do PIX out automático (cron dia 20).
+  transferenciaId String?     // ID retornado pelo Asaas Transfer API
+  ultimoErroPgto String?      // Última mensagem de erro na tentativa
 
   analista Analista @relation(fields: [analistaId], references: [id], onDelete: Cascade)
   conta    Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
