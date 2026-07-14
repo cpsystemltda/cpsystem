@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { enviarTexto } from "@/lib/whatsapp";
 import { decidirRespostaIA, historicoDoUsuario } from "@/lib/ia-suporte";
+import { interpretarMsgAdmin, idCurto } from "@/lib/ia-decisao-grupo";
 
 // Webhook Z-API — mensagens INBOUND de clientes.
 // Regina 14/07: cliente manda WA -> IA analisa -> responde direto OU
@@ -33,12 +34,22 @@ export async function POST(req: NextRequest) {
 
   // 1) Ignora mensagens do proprio numero (loop)
   if (body.fromMe) return NextResponse.json({ ok: true, skipped: "fromMe" });
-  // 2) Ignora grupos (nao atendemos grupos)
-  if (body.isGroup) return NextResponse.json({ ok: true, skipped: "isGroup" });
 
   const telefone = String(body.phone || "").replace(/\D/g, "");
   const mensagem = String(body.text?.message || body.message || "").trim();
   const messageId = String(body.messageId || "");
+
+  // 2) Grupo: aceita SO se for o grupo de suporte (env SUPORTE_GROUP_ID).
+  //    Outros grupos = ignorados. Regina 14/07: admins decidem no grupo.
+  const SUPORTE_GROUP_ID = process.env.SUPORTE_GROUP_ID || "";
+  if (body.isGroup) {
+    if (!SUPORTE_GROUP_ID || telefone !== SUPORTE_GROUP_ID.replace(/\D/g, "")) {
+      return NextResponse.json({ ok: true, skipped: "grupo_nao_suporte" });
+    }
+    // Msg de admin no grupo — interpreta decisao
+    const nomeAutor = String(body.senderName || "admin");
+    return processarMsgGrupoSuporte(mensagem, nomeAutor);
+  }
 
   if (!telefone || !mensagem) return NextResponse.json({ ok: true, skipped: "no_content" });
 
@@ -128,7 +139,7 @@ export async function POST(req: NextRequest) {
         iaAcaoResumo: "IA falhou ao processar — escalado por default",
       },
     });
-    await notificarAdmin(usuario.nome, telefone, mensagem, "IA falhou — precisa resposta manual");
+    await notificarAdmin(usuario.nome, telefone, mensagem, "IA falhou — precisa resposta manual", chamado.id);
     return NextResponse.json({ ok: true, ia: "erro", escalado: true });
   }
 
@@ -144,7 +155,7 @@ export async function POST(req: NextRequest) {
         where: { id: chamado.id },
         data: { status: "AGUARDANDO_ADMIN", respostaIA: decisao.resposta, iaAcaoResumo: "IA respondeu mas envio WA falhou — escalado" },
       });
-      await notificarAdmin(usuario.nome, telefone, mensagem, `IA gerou resposta mas envio falhou: ${err instanceof Error ? err.message : String(err)}`);
+      await notificarAdmin(usuario.nome, telefone, mensagem, `IA gerou resposta mas envio falhou: ${err instanceof Error ? err.message : String(err)}`, chamado.id);
       return NextResponse.json({ ok: true, ia: "auto_responder_envio_falhou" });
     }
     await prisma.chamadoSuporte.update({
@@ -187,25 +198,38 @@ export async function POST(req: NextRequest) {
   }
 
   // Notifica admin
-  await notificarAdmin(usuario.nome, telefone, mensagem, decisao.resumoParaAdmin);
+  await notificarAdmin(usuario.nome, telefone, mensagem, decisao.resumoParaAdmin, chamado.id);
 
   return NextResponse.json({ ok: true, ia: "escalado_admin" });
 }
 
-// Envia mensagem via WA pros super admins avisando de chamado escalado.
-// So o Igor (5561981537113) por enquanto — Regina 21997209623 tb esta lista
-// mas Regina disse pra usar o WA business como voz institucional.
-async function notificarAdmin(nomeCliente: string, telefoneCliente: string, msgOriginal: string, resumoIA: string): Promise<void> {
+// Notifica admins do chamado escalado. Regina 14/07:
+//   - Se SUPORTE_GROUP_ID setado: manda UMA msg pro grupo (todos admins veem)
+//   - Se nao setado: fallback — msg individual pra cada super admin
+async function notificarAdmin(nomeCliente: string, telefoneCliente: string, msgOriginal: string, resumoIA: string, chamadoId?: string): Promise<void> {
+  const idCurtoStr = chamadoId ? idCurto(chamadoId) : "";
+  const texto =
+    `🚨 *Suporte precisa de decisão* ${idCurtoStr}\n\n` +
+    `Cliente: *${nomeCliente}* (${telefoneCliente})\n\n` +
+    `Msg do cliente:\n"${msgOriginal.slice(0, 300)}"\n\n` +
+    `Resumo IA: ${resumoIA}\n\n` +
+    `Respondam aqui no grupo com a decisão (a IA lê e executa) ou abram em cpsystem.app.br/admin/suporte`;
+
+  const grupoId = process.env.SUPORTE_GROUP_ID || "";
+  if (grupoId) {
+    try {
+      await enviarTexto(grupoId, texto);
+      return;
+    } catch (err) {
+      console.error(`[zapi-inbound] falha ao postar no grupo suporte:`, err);
+      // Cai no fallback de admins individuais abaixo
+    }
+  }
+
   const superAdmins = await prisma.usuario.findMany({
     where: { superAdmin: true, telefoneWhatsApp: { not: null }, optInWhatsApp: true },
     select: { telefoneWhatsApp: true, nome: true },
   });
-  const texto =
-    `🚨 *Suporte precisa da sua atenção*\n\n` +
-    `Cliente: *${nomeCliente}* (${telefoneCliente})\n\n` +
-    `Msg do cliente:\n"${msgOriginal.slice(0, 300)}"\n\n` +
-    `Resumo IA: ${resumoIA}\n\n` +
-    `Abra em cpsystem.app.br/admin/suporte`;
   for (const admin of superAdmins) {
     if (!admin.telefoneWhatsApp) continue;
     try {
@@ -214,6 +238,82 @@ async function notificarAdmin(nomeCliente: string, telefoneCliente: string, msgO
       console.error(`[zapi-inbound] falha ao notificar admin ${admin.nome}:`, err);
     }
   }
+}
+
+// Processa msg vinda do GRUPO DE SUPORTE — IA interpreta a decisao e executa.
+async function processarMsgGrupoSuporte(mensagem: string, autorNome: string): Promise<NextResponse> {
+  let decisao;
+  try {
+    decisao = await interpretarMsgAdmin(mensagem, autorNome);
+  } catch (err) {
+    console.error("[grupo-suporte] IA falhou:", err);
+    return NextResponse.json({ ok: true, ia: "erro" });
+  }
+
+  if (decisao.acao === "ignorar" || decisao.acao === "nao_entendi") {
+    return NextResponse.json({ ok: true, ia: decisao.acao, motivo: decisao.motivoInterno });
+  }
+  if (!decisao.chamadoId) {
+    // IA nao identificou chamado — pergunta educadamente no grupo
+    const grupoId = process.env.SUPORTE_GROUP_ID || "";
+    if (grupoId) {
+      await enviarTexto(grupoId, `⚠️ ${autorNome}, não consegui identificar de qual chamado você está falando. Referencie com o #ID (ex: #CMRJYP) ou me chame no /admin/suporte.`).catch(() => {});
+    }
+    return NextResponse.json({ ok: true, ia: "sem_chamado_identificado" });
+  }
+
+  const chamado = await prisma.chamadoSuporte.findUnique({
+    where: { id: decisao.chamadoId },
+    include: { usuario: { select: { telefoneWhatsApp: true, nome: true } } },
+  });
+  if (!chamado || !chamado.usuario.telefoneWhatsApp) {
+    return NextResponse.json({ ok: true, erro: "chamado ou cliente sem telefone" });
+  }
+
+  const grupoId = process.env.SUPORTE_GROUP_ID || "";
+
+  if (decisao.acao === "responder_cliente" || decisao.acao === "pedir_info") {
+    if (!decisao.textoParaCliente) {
+      if (grupoId) await enviarTexto(grupoId, `⚠️ ${autorNome}, entendi que você quer responder o cliente mas não achei o texto. Reescreva com o que enviar.`).catch(() => {});
+      return NextResponse.json({ ok: true, ia: "sem_texto" });
+    }
+    try {
+      await enviarTexto(chamado.usuario.telefoneWhatsApp, decisao.textoParaCliente);
+    } catch (err) {
+      if (grupoId) await enviarTexto(grupoId, `❌ Falha ao enviar msg pro cliente: ${err instanceof Error ? err.message : String(err)}`).catch(() => {});
+      return NextResponse.json({ ok: true, erro: "envio falhou" });
+    }
+    await prisma.mensagemChamado.create({ data: { chamadoId: chamado.id, autor: "ADMIN", conteudo: decisao.textoParaCliente } });
+    await prisma.chamadoSuporte.update({
+      where: { id: chamado.id },
+      data: {
+        status: decisao.acao === "responder_cliente" ? "EM_IMPLEMENTACAO" : "AGUARDANDO_ADMIN",
+        atualizadoEm: new Date(),
+      },
+    });
+    if (grupoId) await enviarTexto(grupoId, `✅ Mensagem enviada pro ${chamado.usuario.nome} (${idCurto(chamado.id)}).`).catch(() => {});
+    return NextResponse.json({ ok: true, ia: "respondido_cliente" });
+  }
+
+  if (decisao.acao === "resolver") {
+    await prisma.chamadoSuporte.update({
+      where: { id: chamado.id },
+      data: { status: "RESOLVIDO_ADMIN", resolvidoEm: new Date() },
+    });
+    if (grupoId) await enviarTexto(grupoId, `✅ Chamado ${idCurto(chamado.id)} marcado como RESOLVIDO.`).catch(() => {});
+    return NextResponse.json({ ok: true, ia: "resolvido" });
+  }
+
+  if (decisao.acao === "recusar") {
+    await prisma.chamadoSuporte.update({
+      where: { id: chamado.id },
+      data: { status: "RECUSADO", resolvidoEm: new Date() },
+    });
+    if (grupoId) await enviarTexto(grupoId, `❌ Chamado ${idCurto(chamado.id)} marcado como RECUSADO.`).catch(() => {});
+    return NextResponse.json({ ok: true, ia: "recusado" });
+  }
+
+  return NextResponse.json({ ok: true, ia: "acao_desconhecida" });
 }
 
 // GET pra healthcheck / verificacao manual
