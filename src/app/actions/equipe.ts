@@ -118,15 +118,19 @@ export async function aceitarTermosAction() {
   revalidatePath("/termos");
   revalidatePath("/conta/completar-cadastro");
 
-  // Regina 14/07: TRIAL EMPRESA sem subscription (caso Leo) — depois do
-  // aceite, redireciona direto pra completar-cadastro em vez de deixar o
-  // cliente parado na tela de /termos sem saber pra onde ir.
+  // Regina 14/07: depois do aceite, direciona conforme o tipo/estado da conta:
+  //   - EMPRESA TRIAL sem subscription (Leo): completar-cadastro
+  //   - ANALISTA: painel do analista
+  //   - resto: dashboard
   if (
     usuario.conta.tipo === "EMPRESA" &&
     usuario.conta.statusAssinatura === "TRIAL" &&
     !usuario.conta.gatewaySubscriptionId
   ) {
     redirect("/conta/completar-cadastro");
+  }
+  if (usuario.conta.tipo === "ANALISTA") {
+    redirect("/painel-analista");
   }
 }
 

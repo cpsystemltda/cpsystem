@@ -94,6 +94,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/conta/completar-cadastro");
   }
 
+  // Regina 14/07: ANALISTA sem aceite do contrato v1.0 (cadastrado antes do
+  // contrato existir) e forcado pra /termos ate aceitar. Nao pode pular
+  // pra /painel-analista ou qualquer outra tela sem ter aceitado.
+  const VERSAO_CONTRATO_ANALISTA_ATUAL = "1.0";
+  const precisaAceitarContratoAnalista =
+    tipoConta === "ANALISTA" &&
+    !usuario.superAdmin &&
+    conta.termosAceitosVersao !== VERSAO_CONTRATO_ANALISTA_ATUAL;
+  if (
+    precisaAceitarContratoAnalista &&
+    !pathname.startsWith("/termos") &&
+    !pathname.startsWith("/api") &&
+    !pathname.startsWith("/entrar")
+  ) {
+    redirect("/termos");
+  }
+
   // Paywall só aplica pra contas EMPRESA (analista não paga assinatura)
   const ROTAS_PERMITIDAS_INADIMPLENTE = ["/conta/", "/empresas", "/equipe", "/termos", "/auditoria", "/admin"];
   const rotaPermitidaPaywall = ROTAS_PERMITIDAS_INADIMPLENTE.some((r) => pathname.startsWith(r));
