@@ -180,6 +180,10 @@ export async function completarCadastroAction(
     await prisma.conta.update({
       where: { id: conta.id },
       data: {
+        // Regina 14/07: subscription criada com sucesso -> conta vira ATIVA.
+        // Sem isso, conta continua TRIAL/EXPIRADO e o cliente ve "trial
+        // acabou" mesmo com cartao registrado (caso Leo).
+        statusAssinatura: "ATIVA",
         gatewayCustomerId: customerId,
         gatewaySubscriptionId: sub.subscriptionId,
         gatewayProvider: gateway.nome,
