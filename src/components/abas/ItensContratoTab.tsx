@@ -100,15 +100,17 @@ export function ItensContratoTab({
             <div style={{ overflowX: "auto" }}>
               <table
                 className="w-full text-sm"
-                style={{ minWidth: "660px", tableLayout: "fixed" }}
+                style={{ minWidth: "760px", tableLayout: "fixed" }}
               >
                 <colgroup>
                   <col style={{ width: "44px" }} />
-                  <col style={{ width: "auto", minWidth: "200px" }} />
+                  <col style={{ width: "auto", minWidth: "180px" }} />
                   <col style={{ width: "52px" }} />
-                  <col style={{ width: "76px" }} />
-                  <col style={{ width: "76px" }} />
-                  <col style={{ width: "84px" }} />
+                  <col style={{ width: "72px" }} />
+                  <col style={{ width: "72px" }} />
+                  <col style={{ width: "80px" }} />
+                  {/* Regina 14/07: valor unitario visivel. */}
+                  <col style={{ width: "100px" }} />
                   <col style={{ width: "100px" }} />
                   <col style={{ width: "60px" }} />
                 </colgroup>
@@ -120,6 +122,7 @@ export function ItensContratoTab({
                     <th className="px-1 py-2 text-right">Qtd. contr.</th>
                     <th className="px-1 py-2 text-right">Qtd. exec.</th>
                     <th className="px-1 py-2 text-right">A executar</th>
+                    <th className="px-1 py-2 text-right">Valor unit.</th>
                     <th className="px-1 py-2 text-right">Valor a exec.</th>
                     <th className="px-1 py-2 text-center">Ações</th>
                   </tr>
@@ -149,7 +152,7 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
   if (editando) {
     return (
       <tr className="border-t border-slate-100" style={{ background: "rgba(255,205,80,0.10)" }}>
-        <td colSpan={8} className="p-3">
+        <td colSpan={9} className="p-3">
           <form action={formAction} className="grid grid-cols-6 gap-2 text-xs">
             <input type="hidden" name="id" value={it.contratoItemId} />
             <label className="col-span-3 flex flex-col gap-1">
@@ -275,6 +278,7 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
           {it.quantidadeDisponivel}
         </span>
       </td>
+      <td className="px-1 py-2 text-right text-slate-700">{brl(it.valorUnitario)}</td>
       <td className="px-1 py-2 text-right font-medium">{brl(it.valorDisponivel)}</td>
       <td className="px-1 py-2 text-center">
         <div className="inline-flex items-center gap-1">

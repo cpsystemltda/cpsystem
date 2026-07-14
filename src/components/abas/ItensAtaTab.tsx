@@ -129,15 +129,17 @@ export function ItensAtaTab({
             <div style={{ overflowX: "auto" }}>
             <table
               className="table-glass"
-              style={{ width: "100%", minWidth: "780px", tableLayout: "fixed" }}
+              style={{ width: "100%", minWidth: "900px", tableLayout: "fixed" }}
             >
               <colgroup>
                 <col style={{ width: "56px" }} />
-                <col style={{ width: "auto", minWidth: "200px" }} />
-                <col style={{ width: "64px" }} />
+                <col style={{ width: "auto", minWidth: "180px" }} />
+                <col style={{ width: "56px" }} />
+                <col style={{ width: "72px" }} />
+                <col style={{ width: "72px" }} />
                 <col style={{ width: "76px" }} />
-                <col style={{ width: "76px" }} />
-                <col style={{ width: "80px" }} />
+                {/* Regina 14/07: valor unitario visivel na listagem (antes so no tooltip). */}
+                <col style={{ width: "116px" }} />
                 <col style={{ width: "124px" }} />
                 <col style={{ width: "92px" }} />
               </colgroup>
@@ -149,6 +151,7 @@ export function ItensAtaTab({
                   <th className="num" style={padTight}>Qtd. reg.</th>
                   <th className="num" style={padTight}>Qtd. usada</th>
                   <th className="num" style={padTight}>Qtd. disp.</th>
+                  <th className="num" style={padTight}>Valor unit.</th>
                   <th className="num" style={padTight}>Valor disp.</th>
                   <th className="center" style={padTight}>Ações</th>
                 </tr>
@@ -178,7 +181,7 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
   if (editando) {
     return (
       <tr style={{ background: "rgba(255,205,80,0.10)" }}>
-        <td colSpan={8} className="p-3">
+        <td colSpan={9} className="p-3">
           <form action={formAction} className="grid grid-cols-8 gap-2 text-xs">
             <input type="hidden" name="id" value={it.ataItemId} />
             <label className="col-span-1 flex flex-col gap-1">
@@ -319,7 +322,8 @@ function LinhaItem({ item: it }: { item: ItemSaldo }) {
           {it.quantidadeDisponivel}
         </span>
       </td>
-      <td className="num strong" title={`Unitário: ${brl(it.valorUnitario)}`} style={padTight}>
+      <td className="num" style={padTight}>{brl(it.valorUnitario)}</td>
+      <td className="num strong" style={padTight}>
         {brl(it.valorDisponivel)}
       </td>
       <td className="center" style={padTight}>
