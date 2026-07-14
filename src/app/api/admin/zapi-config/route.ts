@@ -83,7 +83,25 @@ export async function POST(req: NextRequest) {
       },
     },
     { method: "PUT", path: "filters", body: { messageFilters: ["FILTER_FROM_PRIVATE_CHAT", "FILTER_TEXT_MESSAGE"], callbackTypeFilters: ["FILTER_RECEIVED_CALLBACK"] } },
-    { method: "PUT", path: "update-filters", body: { messageFilters: [], callbackTypeFilters: [] } }, // desabilita filtros (recebe tudo)
+    // FILTROS ATIVOS — Z-API bloqueia webhook se filters vazio.
+    // Aceita msgs de chats privados E grupos, todos tipos de conteudo,
+    // callback tipo "recebido" (nao enviado).
+    {
+      method: "PUT",
+      path: "update-filters",
+      body: {
+        messageFilters: [
+          "FILTER_FROM_PRIVATE_CHAT",
+          "FILTER_FROM_GROUP",
+          "FILTER_TEXT_MESSAGE",
+          "FILTER_AUDIO_MESSAGE",
+          "FILTER_IMAGE_MESSAGE",
+          "FILTER_VIDEO_MESSAGE",
+          "FILTER_DOCUMENT_MESSAGE",
+        ],
+        callbackTypeFilters: ["FILTER_RECEIVED_CALLBACK"],
+      },
+    },
     { method: "PUT", path: "update-webhook-received", body: { value: targetUrl } },
   ];
 
