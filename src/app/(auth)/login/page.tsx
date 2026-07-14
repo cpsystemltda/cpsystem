@@ -169,6 +169,14 @@ export default function LoginPage() {
                       Entrar como {tipoEscolhido === "EMPRESA" ? "Empresa" : "Analista"}
                     </SubmitButton>
                   </div>
+                  <div className="mt-2 text-center">
+                    <Link
+                      href="/esqueci-senha"
+                      className="text-[12px] font-semibold text-[#A88947] transition hover:opacity-80"
+                    >
+                      Esqueci minha senha
+                    </Link>
+                  </div>
                 </form>
               )}
             </div>
