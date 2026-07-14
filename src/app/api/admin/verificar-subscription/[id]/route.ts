@@ -23,23 +23,35 @@ export async function GET(
   if (!apiKey) return NextResponse.json({ erro: "ASAAS_API_KEY nao configurado" }, { status: 500 });
 
   const base = ambiente === "producao" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
+  const baseSandbox = "https://sandbox.asaas.com/api/v3";
+  const baseProd = "https://api.asaas.com/v3";
 
   try {
-    const [sub, paymentsResp] = await Promise.all([
-      fetch(`${base}/subscriptions/${id}`, {
+    // Tenta em ambos os ambientes pra debugar migracoes de sandbox->prod
+    const [subProd, subSandbox, paymentsResp] = await Promise.all([
+      fetch(`${baseProd}/subscriptions/${id}`, {
+        headers: { access_token: apiKey, "Content-Type": "application/json" },
+      }),
+      fetch(`${baseSandbox}/subscriptions/${id}`, {
         headers: { access_token: apiKey, "Content-Type": "application/json" },
       }),
       fetch(`${base}/subscriptions/${id}/payments`, {
         headers: { access_token: apiKey, "Content-Type": "application/json" },
       }),
     ]);
+    const subProdJson = await subProd.json();
+    const subSandboxJson = await subSandbox.json();
+    // Prefere prod se achou, senao sandbox
+    const sub = subProdJson.id ? { json: async () => subProdJson } : { json: async () => subSandboxJson };
+    const foundIn = subProdJson.id ? "producao" : subSandboxJson.id ? "sandbox" : "nenhum";
 
     const subJson = await sub.json();
     const paymentsJson = await paymentsResp.json();
 
     // Filtra dados sensíveis — mostra só o essencial pra Regina confirmar
     const resumo: Record<string, unknown> = {
-      ambiente,
+      ambienteEnv: ambiente,
+      subscriptionEncontradaEm: foundIn,
       apiKeyPrefix: apiKey.slice(0, 15),
       subscriptionId: subJson.id,
       customer: subJson.customer,
