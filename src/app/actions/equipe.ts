@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario, hashSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
@@ -116,6 +117,17 @@ export async function aceitarTermosAction() {
   revalidatePath("/dashboard");
   revalidatePath("/termos");
   revalidatePath("/conta/completar-cadastro");
+
+  // Regina 14/07: TRIAL EMPRESA sem subscription (caso Leo) — depois do
+  // aceite, redireciona direto pra completar-cadastro em vez de deixar o
+  // cliente parado na tela de /termos sem saber pra onde ir.
+  if (
+    usuario.conta.tipo === "EMPRESA" &&
+    usuario.conta.statusAssinatura === "TRIAL" &&
+    !usuario.conta.gatewaySubscriptionId
+  ) {
+    redirect("/conta/completar-cadastro");
+  }
 }
 
 export async function exportarMeusDadosAction() {
