@@ -26,7 +26,11 @@ export async function GET(req: NextRequest) {
     try {
       const r = await fetch(`${base}/${p}`, { headers: { "Client-Token": client } });
       const txt = await r.text();
-      results.push({ path: p, httpStatus: r.status, body: txt.slice(0, 500) });
+      // Sanitiza: mascara token e id, mostra body completo
+      let sanitized = txt;
+      if (tok) sanitized = sanitized.replaceAll(tok, tok.slice(0,4)+"…");
+      if (inst) sanitized = sanitized.replaceAll(inst, inst.slice(0,4)+"…");
+      results.push({ path: p, httpStatus: r.status, body: sanitized });
     } catch (err) {
       results.push({ path: p, erro: err instanceof Error ? err.message : String(err) });
     }
