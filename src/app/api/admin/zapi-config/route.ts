@@ -62,11 +62,29 @@ export async function POST(req: NextRequest) {
   const base = `https://api.z-api.io/instances/${inst}/token/${tok}`;
   const targetUrl = `${(process.env.NEXT_PUBLIC_BASE_URL || "https://cpsystem.app.br").replace(/\/$/, "")}/api/webhooks/zapi-inbound`;
 
-  // Endpoint CORRETO descoberto na doc: PUT /webhooks (plural) configura
-  // TODOS os webhooks de uma vez. notifySentByMe: false pra nao receber
-  // webhook das msgs que enviamos (evita loop).
+  // Config atualiza FILTROS de tipos de msg (senao Z-API nao dispara nada).
+  // Tenta multiplos formatos porque a doc é vaga sobre o path exato.
   const configs = [
-    { method: "PUT", path: "webhooks", body: { value: targetUrl, notifySentByMe: false } },
+    // Ativa filtros pra receber TODAS as msgs privadas + grupo
+    {
+      method: "PUT",
+      path: "update-message-filters",
+      body: {
+        messageFilters: [
+          "FILTER_FROM_PRIVATE_CHAT",
+          "FILTER_FROM_GROUP",
+          "FILTER_TEXT_MESSAGE",
+          "FILTER_AUDIO_MESSAGE",
+          "FILTER_IMAGE_MESSAGE",
+          "FILTER_VIDEO_MESSAGE",
+          "FILTER_DOCUMENT_MESSAGE",
+        ],
+        callbackTypeFilters: ["FILTER_RECEIVED_CALLBACK"],
+      },
+    },
+    { method: "PUT", path: "filters", body: { messageFilters: ["FILTER_FROM_PRIVATE_CHAT", "FILTER_TEXT_MESSAGE"], callbackTypeFilters: ["FILTER_RECEIVED_CALLBACK"] } },
+    { method: "PUT", path: "update-filters", body: { messageFilters: [], callbackTypeFilters: [] } }, // desabilita filtros (recebe tudo)
+    { method: "PUT", path: "update-webhook-received", body: { value: targetUrl } },
   ];
 
   const results: Record<string, unknown>[] = [];
