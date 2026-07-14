@@ -19,7 +19,8 @@ export default async function MagicLinkLandingPage({
   });
 
   const agora = new Date();
-  const invalido = !link || link.usadoEm || link.expiraEm < agora;
+  // Reutilizavel dentro do TTL (Regina 14/07): so bloqueia se expirado.
+  const invalido = !link || link.expiraEm < agora;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6">
@@ -31,11 +32,9 @@ export default async function MagicLinkLandingPage({
         {invalido ? (
           <>
             <p className="mt-3 text-sm text-slate-600">
-              {link?.usadoEm
-                ? "Este link já foi utilizado. Peça um novo para o administrador."
-                : link
-                  ? "Este link expirou. Peça um novo para o administrador."
-                  : "Este link não existe ou foi revogado."}
+              {link
+                ? "Este link expirou. Peça um novo para o administrador."
+                : "Este link não existe ou foi revogado."}
             </p>
             <Link
               href="/entrar"
@@ -59,7 +58,7 @@ export default async function MagicLinkLandingPage({
               </button>
             </form>
             <p className="mt-4 text-xs text-slate-500">
-              Uso único · válido até {link.expiraEm.toLocaleString("pt-BR")}
+              Válido até {link.expiraEm.toLocaleString("pt-BR")} · pode ser aberto mais de uma vez
             </p>
           </>
         )}

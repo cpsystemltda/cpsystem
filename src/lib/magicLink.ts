@@ -2,8 +2,11 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 
-// MagicLink: token unico URL-safe pra login sem senha (Regina 13/07 — pra Leo
-// migrar). Expira em 48h por default, uso unico.
+// MagicLink: token URL-safe pra login sem senha (Regina 13/07 — pra Leo
+// migrar). Expira em 48h por default. REUTILIZAVEL dentro do TTL — Regina
+// 14/07: cliente pode clicar varias vezes (webview WA vs browser, retry
+// se travou algo, etc). usadoEm guarda a PRIMEIRA ativacao pra auditoria
+// mas nao bloqueia reuso.
 const MAGIC_LINK_TTL_MS = 48 * 60 * 60 * 1000;
 
 export async function gerarMagicLink(opts: {
@@ -26,17 +29,19 @@ export async function gerarMagicLink(opts: {
   return { token, expiraEm };
 }
 
-// Consome um token: valida validade + inutiliza (marca usadoEm). Retorna o
-// usuarioId ou null se invalido/usado/expirado.
+// Ativa o magic link: valida validade e retorna usuario. REUTILIZAVEL —
+// so bloqueia se expirado. Marca usadoEm na PRIMEIRA ativacao (auditoria),
+// mas nao bloqueia usos subsequentes.
 export async function consumirMagicLink(token: string): Promise<{ usuarioId: string; motivo: string } | null> {
   const link = await prisma.magicLink.findUnique({ where: { token } });
   if (!link) return null;
-  if (link.usadoEm) return null;
   if (link.expiraEm < new Date()) return null;
-  await prisma.magicLink.update({
-    where: { id: link.id },
-    data: { usadoEm: new Date() },
-  });
+  if (!link.usadoEm) {
+    await prisma.magicLink.update({
+      where: { id: link.id },
+      data: { usadoEm: new Date() },
+    });
+  }
   return { usuarioId: link.usuarioId, motivo: link.motivo };
 }
 
