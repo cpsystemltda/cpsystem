@@ -20,12 +20,17 @@ export async function POST(req: NextRequest) {
   const base = `https://api.z-api.io/instances/${inst}/token/${tok}`;
   const targetUrl = `${(process.env.NEXT_PUBLIC_BASE_URL || "https://cpsystem.app.br").replace(/\/$/, "")}/api/webhooks/zapi-inbound`;
 
-  // Configura vários webhooks Z-API que a gente quer receber
+  // Configura vários webhooks Z-API que a gente quer receber.
+  // Tenta multiplos formatos porque a Z-API mudou API entre versoes.
   const configs = [
-    { path: "update-webhook-received", body: { value: targetUrl } }, // ao receber msg
-    { path: "update-webhook-message-status", body: { value: targetUrl } }, // status (entregue/lida)
-    { path: "update-webhook-delivery", body: { value: targetUrl } }, // entrega
-    // "update-webhook-chat-presence" — presenca digitando (desnecessario por enquanto)
+    { path: "update-webhook-received", body: { value: targetUrl } }, // formato antigo
+    { path: "update-webhook-message-status", body: { value: targetUrl } },
+    { path: "update-webhook-delivery", body: { value: targetUrl } },
+    // Formato novo — Z-API v3+ usa update-webhook-received-message
+    { path: "update-webhook-received-message", body: { value: targetUrl } },
+    { path: "update-webhook-message-received", body: { value: targetUrl } },
+    // Formato mais generico
+    { path: "webhook", body: { value: targetUrl } },
   ];
 
   const results: Record<string, unknown>[] = [];

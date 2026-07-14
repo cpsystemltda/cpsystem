@@ -29,7 +29,27 @@ type ZapiInbound = {
 };
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => null)) as ZapiInbound | null;
+  const rawText = await req.text();
+  let body: ZapiInbound | null = null;
+  try {
+    body = JSON.parse(rawText) as ZapiInbound;
+  } catch {
+    body = null;
+  }
+
+  // Regina 14/07: log completo de TUDO que cai no endpoint pra debugar
+  // porque webhook nao estava disparando. Grava em EventoGateway com
+  // provider="ZAPI_INBOUND". Se algo cair aqui, aparece no DB.
+  try {
+    await prisma.eventoGateway.create({
+      data: {
+        provider: "ASAAS", // enum ainda nao tem ZAPI — usa ASAAS por enquanto pra nao migrar
+        evento: "ZAPI_INBOUND_DEBUG",
+        payload: rawText.slice(0, 3900),
+      },
+    });
+  } catch {}
+
   if (!body) return NextResponse.json({ ok: true, skipped: "empty" });
 
   // 1) Ignora mensagens do proprio numero (loop)
