@@ -5,7 +5,7 @@ import { enviarTexto } from "@/lib/whatsapp";
 // idempotencyKey OBRIGATORIA — proteção contra reenvio acidental.
 // Cache em memoria por 10min. Se a mesma key for chamada 2x, 2a chamada retorna o resultado cached.
 
-const cache = new Map<string, { ts: number; result: unknown }>();
+const cache = new Map<string, { ts: number; result: Record<string, unknown> }>();
 const CACHE_TTL = 10 * 60 * 1000;
 
 export async function POST(req: NextRequest) {
