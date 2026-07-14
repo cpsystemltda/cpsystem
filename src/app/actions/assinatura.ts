@@ -376,7 +376,7 @@ export async function processarNfseGateway(opts: {
         `📄 *Nota Fiscal emitida — CP System*\n\n` +
         `${primeiroNome}, sua NF referente à mensalidade *${cobranca.competencia}* (${valor}) foi emitida.\n\n` +
         (opts.numero ? `Nº da NF: *${opts.numero}*\n\n` : "") +
-        `Você também recebe uma cópia por email. Guarde pra sua contabilidade.`;
+        `Também enviamos por email. Guarde uma cópia pra sua contabilidade.`;
       await dispararNotificacaoComPdf({
         usuarioId: u.id,
         tipo: "NF_EMITIDA_CLIENTE",
@@ -388,6 +388,48 @@ export async function processarNfseGateway(opts: {
     }
   } catch (e) {
     console.error("[processarNfseGateway] erro ao notificar WhatsApp:", e);
+  }
+
+  // Regina 14/07: envio por EMAIL alem do WA (Google Workspace SMTP).
+  // Best-effort — se SMTP nao configurado ou falhar, so loga.
+  try {
+    const { enviarEmail, statusSmtp } = await import("@/lib/email");
+    if (!statusSmtp().configurado) {
+      console.warn("[processarNfseGateway] SMTP nao configurado, pulando email");
+    } else {
+      const usuariosEmail = await prisma.usuario.findMany({
+        where: { contaId: cobranca.contaId, email: { not: "" } },
+        select: { nome: true, email: true },
+      });
+      const valor = cobranca.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
+      const nomeArquivoEmail = opts.numero
+        ? `NF-${opts.numero.replace(/[^\w-]/g, "")}.pdf`
+        : `NFSe-${opts.nfseId.slice(0, 12)}.pdf`;
+      for (const u of usuariosEmail) {
+        const primeiroNome = u.nome.split(" ")[0] || u.nome;
+        const html = `
+          <div style="font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#1E293B;max-width:560px;margin:0 auto;padding:24px">
+            <h2 style="color:#4C1D95;font-size:18px;margin:0 0 12px">Nota Fiscal emitida — CP System</h2>
+            <p>Olá <strong>${primeiroNome}</strong>,</p>
+            <p>Segue em anexo a Nota Fiscal Eletrônica referente à mensalidade <strong>${cobranca.competencia}</strong> (${valor}).</p>
+            ${opts.numero ? `<p>Nº da NF: <strong>${opts.numero}</strong></p>` : ""}
+            <p style="color:#64748B;font-size:13px;margin-top:24px">Você também recebeu essa NF por WhatsApp. Guarde uma cópia pra sua contabilidade.</p>
+            <hr style="border:none;border-top:0.5px solid #E2E8F0;margin:24px 0" />
+            <p style="color:#94A3B8;font-size:11px">CP System · CNPJ 67.266.466/0001-04 · contato@cpsystem.app.br</p>
+          </div>
+        `.trim();
+        const texto = `Olá ${primeiroNome},\n\nSegue em anexo a Nota Fiscal referente à mensalidade ${cobranca.competencia} (${valor}).${opts.numero ? "\nNº da NF: " + opts.numero : ""}\n\nCP System`;
+        await enviarEmail({
+          para: u.email,
+          assunto: `Nota Fiscal ${opts.numero ?? ""} — CP System (${cobranca.competencia})`.trim(),
+          html,
+          texto,
+          anexos: [{ filename: nomeArquivoEmail, url: opts.pdfUrl! }],
+        }).catch((err) => console.error(`[processarNfseGateway] falha email pra ${u.email}:`, err));
+      }
+    }
+  } catch (e) {
+    console.error("[processarNfseGateway] erro ao enviar email:", e);
   }
 }
 
