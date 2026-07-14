@@ -38,6 +38,10 @@
     {
       "path": "/api/cron/pagar-comissoes",
       "schedule": "0 12 20 * *"
+    },
+    {
+      "path": "/api/cron/resumo-semanal",
+      "schedule": "0 12 * * 1"
     }
   ]
 }

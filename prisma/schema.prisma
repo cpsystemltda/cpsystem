@@ -169,6 +169,10 @@ enum TipoNotificacaoWhatsApp {
   REAJUSTE_APROVADO
   ANIVERSARIO
   NF_EMITIDA_CLIENTE
+  // Regina 14/07: resumos consolidados semanais (cap 1 msg/semana por
+  // destinatario garantido pela chave (usuarioId, tipo, referenciaId=YYYY-Wxx)).
+  RESUMO_SEMANAL_EMPRESA
+  RESUMO_SEMANAL_ANALISTA
 }
 
 enum StatusNotificacaoWhatsApp {
