@@ -79,6 +79,7 @@ model Conta {
   // Contas que esta conta indicou.
   contasIndicadas Conta[]        @relation("ContasIndicadasPorCliente")
   comissoes      Comissao[]
+  chamadosSuporte ChamadoSuporte[]
   logsAuditoria  LogAuditoria[]
   cobrancas      Cobranca[]
   metodosPagamento MetodoPagamento[]
@@ -127,6 +128,7 @@ model Usuario {
 
   sessoes              Sessao[]
   magicLinks           MagicLink[]
+  chamadosSuporte      ChamadoSuporte[]
   logsAuditoria        LogAuditoria[]
   notificacoesSistema  NotificacaoSistema[]
   mensagensIAsystem    MensagemIAsystem[]
@@ -1909,6 +1911,69 @@ model NotificacaoSistema {
 
   @@index([usuarioId, lida])
   @@index([criadoEm])
+}
+
+// Chamado de suporte (Regina 14/07). Cliente abre via botao flutuante, a
+// IA classifica + tenta responder direto. Casos que exigem alteracao de
+// codigo/estrutura sao escalados pra admin. Casos operacionais simples
+// a IA pode agir com ferramenta (opt-in WA, corrigir valor de item, etc)
+// gravando auditoria.
+enum CategoriaChamado {
+  DUVIDA_USO           // "como fazer X?"
+  AJUSTE_DADOS         // "trocar meu WA", "meu PIX ta errado"
+  CORRECAO_OPERACIONAL // "valor unit dessa ata ta errado, o certo eh Y"
+  BUG_SISTEMA          // "clico e nao acontece nada"
+  FEATURE_PEDIDO       // "queria que tivesse tela X"
+  OUTRO
+}
+
+enum StatusChamado {
+  ABERTO
+  IA_ANALISANDO
+  IA_RESOLVEU           // IA respondeu/executou — cliente confirmou
+  AGUARDANDO_ADMIN      // escalado, aguarda validacao Regina/Igor
+  EM_IMPLEMENTACAO      // admin aprovou, dev/IA vai implementar
+  RESOLVIDO_ADMIN
+  RECUSADO
+}
+
+model ChamadoSuporte {
+  id             String           @id @default(cuid())
+  contaId        String
+  conta          Conta            @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  usuarioId      String
+  usuario        Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoria      CategoriaChamado @default(OUTRO)
+  titulo         String
+  descricao      String
+  status         StatusChamado    @default(ABERTO)
+  // Resposta da IA (quando resolveu na hora ou explicou algo)
+  respostaIA     String?
+  iaAgiu         Boolean          @default(false)
+  iaAcaoResumo   String?          // "atualizou opt-in WA para false"
+  // Admin que validou/resolveu
+  resolvidoPorId String?
+  resolvidoEm    DateTime?
+  // Trilha do chamado (respostas seguintes do cliente ou admin)
+  mensagens      MensagemChamado[]
+  criadoEm       DateTime         @default(now())
+  atualizadoEm   DateTime         @updatedAt
+
+  @@index([status])
+  @@index([contaId])
+  @@index([criadoEm])
+}
+
+model MensagemChamado {
+  id         String         @id @default(cuid())
+  chamadoId  String
+  chamado    ChamadoSuporte @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+  autor      String         // "CLIENTE" | "IA" | "ADMIN"
+  autorId    String?        // usuarioId quando CLIENTE/ADMIN
+  conteudo   String
+  criadoEm   DateTime       @default(now())
+
+  @@index([chamadoId])
 }
 
 // Configuração singleton (1 linha por instalação) das credenciais do gateway
