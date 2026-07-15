@@ -1,3 +1,5 @@
+import { asaasBaseUrl } from "@/lib/asaas-env";
+
 // Cliente real do gateway ASAAS.
 // Docs: https://docs.asaas.com/
 // Produção: https://api.asaas.com/v3
@@ -36,7 +38,7 @@ export class GatewayAsaas implements GatewayPagamento {
 
   constructor(private readonly cfg: AsaasConfig) {
     this.baseUrl =
-      cfg.ambiente === "production" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
+      asaasBaseUrl(cfg.ambiente);
   }
 
   private async req<T>(path: string, init: RequestInit = {}): Promise<T> {

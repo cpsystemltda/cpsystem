@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { asaasBaseUrl } from "@/lib/asaas-env";
 
 // Consulta se NFSe foi emitida pra um paymentId no Asaas.
 // GET /v3/invoices?payment={paymentId}
@@ -8,8 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ paym
   if (secret !== process.env.CRON_SECRET) return NextResponse.json({ erro: "unauthorized" }, { status: 401 });
   const { paymentId } = await params;
   const apiKey = process.env.ASAAS_API_KEY;
-  const ambiente = process.env.ASAAS_AMBIENTE || "sandbox";
-  const base = ambiente === "producao" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
+  const base = asaasBaseUrl();
   if (!apiKey) return NextResponse.json({ erro: "sem apikey" }, { status: 500 });
 
   const [invoices, payment] = await Promise.all([

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { asaasBaseUrl, asaasProducao } from "@/lib/asaas-env";
 
 // Lista webhooks configurados no Asaas + status
 export async function GET(req: NextRequest) {
   const secret = new URL(req.url).searchParams.get("secret");
   if (secret !== process.env.CRON_SECRET) return NextResponse.json({ erro: "unauthorized" }, { status: 401 });
   const apiKey = process.env.ASAAS_API_KEY;
-  const ambiente = process.env.ASAAS_AMBIENTE || "sandbox";
-  const base = ambiente === "producao" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
+  const base = asaasBaseUrl();
   if (!apiKey) return NextResponse.json({ erro: "sem apikey" }, { status: 500 });
 
   const [webhooks, myAccount] = await Promise.all([
@@ -15,7 +15,8 @@ export async function GET(req: NextRequest) {
   ]);
   return NextResponse.json({
     apiKeyPrefix: apiKey.slice(0, 15),
-    ambienteEnv: ambiente,
+    ambienteEnv: process.env.ASAAS_AMBIENTE,
+    ambienteResolvido: asaasProducao() ? "producao" : "sandbox",
     baseUrl: base,
     webhooks,
     myAccount: {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { asaasBaseUrl } from "@/lib/asaas-env";
 
 // PUT https://api.asaas.com/v3/customers/{customerId} — atualiza dados do customer.
 // Regina 14/07: NF ia pro email errado do Leo.
@@ -18,8 +19,7 @@ export async function POST(req: NextRequest) {
   if (!conta?.gatewayCustomerId) return NextResponse.json({ erro: "sem customer Asaas" });
 
   const apiKey = process.env.ASAAS_API_KEY;
-  const ambiente = process.env.ASAAS_AMBIENTE || "sandbox";
-  const base = ambiente === "producao" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
+  const base = asaasBaseUrl();
   const emailFinal = body.email ?? conta.usuarios[0]?.email;
   const nomeFinal = body.nome ?? conta.usuarios[0]?.nome;
 
