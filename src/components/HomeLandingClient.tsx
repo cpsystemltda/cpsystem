@@ -136,7 +136,7 @@ export default function HomeLandingClient() {
                 boxShadow: "0 12px 32px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
               }}
             >
-              Solicite demonstração
+              Teste grátis 14 dias
               <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
             </Link>
             <a
@@ -184,8 +184,8 @@ export default function HomeLandingClient() {
             <FeatureCard
               icon={Brain}
               cor="vinho"
-              titulo="Inteligência jurídica nativa"
-              descricao="Alimentação de dados, cálculo de reajustes e tira-dúvidas."
+              titulo="Inteligência nativa"
+              descricao="Alimentação de dados, cálculo de reajustes e tira-dúvidas com IA especializada em Lei 14.133/2021."
             />
           </div>
         </section>
@@ -220,14 +220,14 @@ export default function HomeLandingClient() {
                 Vencer a licitação é apenas o primeiro passo; o seu verdadeiro lucro é garantido na execução. O CP System substitui planilhas amadoras por um painel inteligente que centraliza toda a sua operação governamental. Acompanhe a linha do tempo de empenhos, controle o saldo das suas Atas (SRP) e contratos em tempo real e elimine a desorganização que gera atrasos e multas.
               </p>
               <p className="mt-3 text-[15px] leading-relaxed lg:text-[16px]" style={{ color: "var(--text-soft)" }}>
-                Mais do que gestão logística, nossa plataforma oferece inteligência jurídica nativa. O sistema audita automaticamente os limites legais de aditivos e adesões, avisa o momento exato para solicitar reajustes de preços e emite alertas de prazos parametrizados. Pare de perder dinheiro com falhas operacionais: assuma o controle com o CP System e foque apenas em expandir as suas vendas.
+                Mais do que gestão logística, nossa plataforma oferece inteligência nativa especializada em contratações públicas. O sistema audita automaticamente os limites legais de aditivos e adesões, avisa o momento exato para solicitar reajustes de preços e emite alertas de prazos parametrizados. Pare de perder dinheiro com falhas operacionais: assuma o controle com o CP System e foque apenas em expandir as suas vendas.
               </p>
 
               {/* Mini-stats horizontais (substituem números factuais ainda inexistentes) */}
               <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <StatBlock numero="12+" label="Tipos de instrumentos" />
                 <StatBlock numero="100%" label="Auditável" />
-                <StatBlock numero="IA" label="Jurídica nativa" />
+                <StatBlock numero="IA" label="Nativa especializada" />
                 <StatBlock numero="∞" label="Multi-empresa" />
                 {/* Igor 13/07: destacar que a plataforma dispensa treinamento */}
                 <StatBlock numero="0h" label="Dispensa treinamento" />
@@ -433,13 +433,13 @@ export default function HomeLandingClient() {
             <PlanoCardDark
               nome="Básico"
               preco="R$ 397"
-              descricao="SaaS Essencial — automatiza a operação da MPE."
-              cta="Começar trial grátis"
+              descricao="Essencial — automatiza a operação da MPE."
+              cta="Teste grátis 14 dias"
               features={[
-                "1 CNPJ incluso · CNPJ adicional: R$ 39,90/mês cada",
+                "1 CNPJ incluso · CNPJ adicional: R$ 39,90/mês",
                 "Atas, Contratos e Empenhos ilimitados",
                 "Alertas automáticos de prazo, pagamento e reajuste",
-                "Inteligência jurídica automatizada (Lei 14.133/2021)",
+                "Inteligência nativa especializada em Lei 14.133/2021",
                 "Histórico de execução com timeline",
                 "Suporte técnico por e-mail e chat",
               ]}
@@ -448,11 +448,15 @@ export default function HomeLandingClient() {
               destaque
               nome="Intermediário"
               preco="R$ 597"
-              descricao="Modo multi-empresas + IA nativa + conciliação bancária."
-              cta="Começar trial grátis"
+              descricao="Multi-empresas + IA nativa + conciliação bancária."
+              cta="Teste grátis 14 dias"
               features={[
-                "Tudo do Básico",
-                "3 CNPJs inclusos · adicional R$ 39,90/mês cada",
+                "3 CNPJs inclusos · adicional R$ 39,90/mês",
+                "Atas, Contratos e Empenhos ilimitados",
+                "Alertas automáticos de prazo, pagamento e reajuste",
+                "Inteligência nativa especializada em Lei 14.133/2021",
+                "Histórico de execução com timeline",
+                "Suporte técnico por e-mail e chat",
                 "Conciliação bancária automática",
                 "IAsystem nativo — 10 perguntas/mês",
               ]}
@@ -460,15 +464,20 @@ export default function HomeLandingClient() {
             <PlanoCardDark
               nome="Premium"
               preco="R$ 997"
-              descricao="Tudo do Intermediário + franquia jurídica anual com o Grupo Contratos Públicos."
-              cta="Começar trial grátis"
+              descricao="Multi-empresas ilimitado + canal VIP + consultoria especializada anual."
+              cta="Teste grátis 14 dias"
               features={[
-                "Tudo do Intermediário",
                 "CNPJs ilimitados",
-                "Canal VIP com SLA de 4h úteis",
-                "12 consultas jurídicas escritas/ano",
-                "2 peças administrativas/ano (reajuste, defesa, resposta)",
-                "Desconto em serviços jurídicos avulsos",
+                "Atas, Contratos e Empenhos ilimitados",
+                "Alertas automáticos de prazo, pagamento e reajuste",
+                "Inteligência nativa especializada em Lei 14.133/2021",
+                "Histórico de execução com timeline",
+                "Conciliação bancária automática",
+                "IAsystem nativo — perguntas ilimitadas",
+                "Canal VIP de suporte com SLA de 4h úteis",
+                "12 consultas escritas especializadas por ano",
+                "2 peças técnicas por ano (reajuste, defesa, resposta)",
+                "Desconto em serviços especializados avulsos",
               ]}
             />
           </div>
@@ -659,7 +668,7 @@ export default function HomeLandingClient() {
                   boxShadow: "0 12px 32px -6px rgba(168,137,71,0.45), inset 0 1px 0 rgba(255,255,255,0.5)",
                 }}
               >
-                Solicite demonstração
+                Teste grátis 14 dias
                 <ArrowRight className="h-4 w-4" strokeWidth={2.4} />
               </Link>
               <a
