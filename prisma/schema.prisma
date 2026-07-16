@@ -1893,6 +1893,7 @@ enum TipoNotificacaoSistema {
   VINCULO_ENCERRADO
   COMISSAO_DISPONIVEL      // valor a receber consolidado mensal
   AVISO_VENCIMENTO_FATURA  // assinatura SaaS vencendo
+  NOVO_INDICADO            // Regina 16/07: alguem se cadastrou pelo link ?ref do EMBAIXADOR (nao confundir com VINCULO_CRIADO que e do ANALISTA)
 }
 
 model NotificacaoSistema {

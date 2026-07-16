@@ -378,9 +378,8 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     }
   }
 
-  // Notifica o embaixador via WhatsApp quando a conta veio por link
-  // pessoal (?ref=<analistaId>). Regina 07/07: cada analista tem seu link
-  // proprio e precisa saber na hora quando um cliente novo cadastrou.
+  // Notifica o embaixador via SISTEMA + WhatsApp quando a conta veio por
+  // link pessoal (?ref=<analistaId>). Regina 07/07 (WA) + 16/07 (sistema).
   // Best-effort — falha aqui nao bloqueia o signup.
   if (embaixadorIdValido) {
     try {
@@ -390,28 +389,45 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       });
       if (emb?.contaId) {
         const usuariosDoEmb = await prisma.usuario.findMany({
-          where: { contaId: emb.contaId, optInWhatsApp: true, telefoneWhatsApp: { not: null } },
-          select: { id: true, nome: true },
+          where: { contaId: emb.contaId },
+          select: { id: true, nome: true, telefoneWhatsApp: true, optInWhatsApp: true },
         });
-        const { dispararNotificacao } = await import("@/lib/whatsapp");
         const primeiroNomeCliente = v.nome.split(" ")[0] || v.nome;
+        const { dispararNotificacao } = await import("@/lib/whatsapp");
+        const { notificar } = await import("@/lib/notificacoes");
         for (const u of usuariosDoEmb) {
-          const primeiro = u.nome.split(" ")[0] || u.nome;
-          const mensagem =
-            `🎉 *Novo cliente vinculado a você — CP System*\n\n` +
-            `${primeiro}, parabéns! *${primeiroNomeCliente}* (${v.razaoSocial}) acabou de se cadastrar no CP System pelo seu link pessoal.\n\n` +
-            `A partir da 1ª fatura paga, você recebe *R$ 29,90/mês* enquanto o cliente permanecer assinante.\n\n` +
-            `Acompanhe em https://cpsystem.app.br/painel-analista`;
-          await dispararNotificacao({
+          // 1) Notificação no sistema (todos usuarios da conta do embaixador).
+          // Tipo NOVO_INDICADO — nao confundir com VINCULO_CRIADO (que e do
+          // analista B2G). Embaixador != Analista (memoria Regina 16/07).
+          await notificar({
             usuarioId: u.id,
-            tipo: "ANALISTA_VINCULADO",
-            referenciaId: `emb-vinc-${conta.id}`,
-            mensagem,
-          });
+            tipo: "NOVO_INDICADO",
+            titulo: `Novo cliente indicado: ${v.razaoSocial}`,
+            descricao: `${primeiroNomeCliente} acabou de se cadastrar pelo seu link de indicação. A comissão de R$ 29,90/mês começa a correr a partir da 1ª fatura paga.`,
+            link: "/painel-analista",
+            recursoTipo: "Conta",
+            recursoId: conta.id,
+          }).catch((e) => console.error("[signup] notificar sistema falhou:", e));
+
+          // 2) Notificação via WhatsApp (só usuarios com opt-in + telefone)
+          if (u.optInWhatsApp && u.telefoneWhatsApp) {
+            const primeiro = u.nome.split(" ")[0] || u.nome;
+            const mensagem =
+              `🎉 *Novo cliente indicado — CP System*\n\n` +
+              `${primeiro}, parabéns! *${primeiroNomeCliente}* (${v.razaoSocial}) acabou de se cadastrar pelo seu link de indicação.\n\n` +
+              `A partir da 1ª fatura paga, você recebe *R$ 29,90/mês* enquanto o cliente permanecer assinante.\n\n` +
+              `Acompanhe em https://cpsystem.app.br/painel-analista`;
+            await dispararNotificacao({
+              usuarioId: u.id,
+              tipo: "ANALISTA_VINCULADO",
+              referenciaId: `emb-vinc-${conta.id}`,
+              mensagem,
+            }).catch((e) => console.error("[signup] WA embaixador falhou:", e));
+          }
         }
       }
     } catch (e) {
-      console.error("[signup] erro ao notificar embaixador via WA:", e);
+      console.error("[signup] erro ao notificar embaixador:", e);
     }
   }
 

@@ -180,7 +180,7 @@ export function ContratoTermosUso({ contratante }: { contratante?: DadosContrata
         </p>
         <List>
           <li><strong>Plano Básico</strong>: R$ 397,00/mês, com 1 (um) CNPJ incluso; cada CNPJ adicional custa R$ 39,90/mês.</li>
-          <li><strong>Plano Intermediário</strong>: R$ 597,00/mês, com 3 (três) CNPJs inclusos (adicional a R$ 39,90/mês cada), conciliação bancária e IAsystem nativo com até 10 (dez) perguntas por mês.</li>
+          <li><strong>Plano Intermediário</strong>: R$ 697,00/mês, com 3 (três) CNPJs inclusos (adicional a R$ 39,90/mês cada), conciliação bancária e IAsystem nativo com até 10 (dez) perguntas por mês.</li>
           <li><strong>Plano Premium</strong>: R$ 997,00/mês, com CNPJs ilimitados, IAsystem ilimitado e franquia jurídica anual (canal VIP, consultas escritas e peças administrativas), na forma anunciada na Plataforma.</li>
         </List>
         <p>

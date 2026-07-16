@@ -447,7 +447,7 @@ export default function HomeLandingClient() {
             <PlanoCardDark
               destaque
               nome="Intermediário"
-              preco="R$ 597"
+              preco="R$ 697"
               descricao="Multi-empresas + IA nativa + conciliação bancária."
               cta="Teste grátis 14 dias"
               features={[

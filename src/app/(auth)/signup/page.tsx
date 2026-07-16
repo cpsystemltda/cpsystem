@@ -286,8 +286,8 @@ function FormEmpresa() {
           server action valida + grava em Conta.embaixadorId. */}
       <input type="hidden" name="embaixadorIdRef" value={embaixadorIdRef} />
       {embaixadorIdRef && !cupomInfo?.ok && (
-        <div className="col-span-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-800">
-          ✓ Indicação registrada. O analista que te trouxe ganha comissão automática enquanto sua conta estiver ativa.
+        <div className="col-span-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-800">
+          ✓ Analista indicado
         </div>
       )}
 
@@ -483,7 +483,7 @@ function FormEmpresa() {
         ativo={plano === "INTERMEDIARIO"}
         onClick={() => setPlano("INTERMEDIARIO")}
         titulo="Intermediário"
-        preco="R$ 597"
+        preco="R$ 697"
         sub="/mês"
         descricao="Modo multi-empresas + IA nativa + conciliação bancária."
         features={[
@@ -666,7 +666,8 @@ function SeletorAnalista() {
       <div className="space-y-3 rounded-lg border border-emerald-300 bg-emerald-50 p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-900">{escolhido.nome}</p>
+            <p className="text-[11px] font-bold uppercase text-emerald-700">✓ Analista indicado</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{escolhido.nome}</p>
             <p className="text-xs text-slate-600">CPF {escolhido.cpfMascarado} · {escolhido.email}</p>
           </div>
           <input type="hidden" name="analistaId" value={escolhido.id} />
@@ -722,6 +723,7 @@ function SeletorAnalista() {
 
   return (
     <div className="relative">
+      <p className="mb-1.5 text-[11px] font-bold uppercase text-slate-500">Sem analista indicado</p>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input

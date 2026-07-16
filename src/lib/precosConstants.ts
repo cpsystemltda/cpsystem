@@ -5,7 +5,7 @@ import type { Plano } from "@/lib/gateway";
  *
  * Política (Regina 13/07 — proposta Igor com 3 planos):
  * - BÁSICO R$ 397/mês: 1 CNPJ + R$ 39,90 por CNPJ adicional.
- * - INTERMEDIÁRIO R$ 597/mês: 3 CNPJs inclusos + R$ 39,90 por adicional +
+ * - INTERMEDIÁRIO R$ 697/mês: 3 CNPJs inclusos + R$ 39,90 por adicional +
  *   conciliação bancária + IA nativa (10 perguntas/mês).
  * - PREMIUM R$ 997/mês: CNPJs ilimitados + IA ilimitada + franquia jurídica.
  *
@@ -15,7 +15,7 @@ import type { Plano } from "@/lib/gateway";
  */
 export const PRECO_BASE: Record<Plano, number> = {
   BASICO: 397,
-  INTERMEDIARIO: 597,
+  INTERMEDIARIO: 697,
   PREMIUM: 997,
 };
 

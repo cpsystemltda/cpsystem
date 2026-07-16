@@ -6,7 +6,7 @@ export type FormaPagamento = "CARTAO_CREDITO" | "PIX" | "BOLETO";
 
 export const PRECO_PLANO: Record<Plano, number> = {
   BASICO: 397,
-  INTERMEDIARIO: 597,
+  INTERMEDIARIO: 697,
   PREMIUM: 997,
 };
 
