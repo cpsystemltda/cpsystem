@@ -41,9 +41,22 @@ export default async function AdminPage() {
         empresas: { select: { id: true, nomeFantasia: true, razaoSocial: true, cnpj: true } },
         // Última cobrança paga (pra próxima renovação) + próxima pendente
         cobrancas: {
-          select: { id: true, status: true, valor: true, vencimento: true, pagaEm: true, competencia: true },
+          select: {
+            id: true, status: true, valor: true, vencimento: true, pagaEm: true, competencia: true,
+            // Forma de pagamento (Igor 16/07): admin quer ver se cliente
+            // pagou/paga por cartão, boleto ou PIX direto na tabela.
+            forma: true,
+            nfseNumero: true,
+            nfsePdfUrl: true,
+          },
           orderBy: { vencimento: "desc" },
           take: 6,
+        },
+        // Método de pagamento salvo (cartão tokenizado, etc)
+        metodosPagamento: {
+          where: { ativo: true, padrao: true },
+          select: { forma: true, bandeira: true, ultimosDigitos: true },
+          take: 1,
         },
       },
       orderBy: { criadoEm: "desc" },
@@ -328,6 +341,14 @@ type ContaResumo = {
     vencimento: Date;
     pagaEm: Date | null;
     competencia: string;
+    forma: string;
+    nfseNumero: string | null;
+    nfsePdfUrl: string | null;
+  }[];
+  metodosPagamento: {
+    forma: string;
+    bandeira: string | null;
+    ultimosDigitos: string | null;
   }[];
 };
 
@@ -395,6 +416,8 @@ function TabelaEmpresas({ contas }: { contas: ContaResumo[] }) {
             <th className="px-5 py-2 text-left">Plano</th>
             <th className="px-5 py-2 text-left">Status</th>
             <th className="px-5 py-2 text-left">Vigência do plano</th>
+            <th className="px-5 py-2 text-left">Forma pgto</th>
+            <th className="px-5 py-2 text-left">NF</th>
             <th className="px-5 py-2 text-right">CNPJs</th>
             <th className="px-5 py-2 text-right">Criada</th>
           </tr>
@@ -456,6 +479,39 @@ function TabelaEmpresas({ contas }: { contas: ContaResumo[] }) {
                   {vig.rotulo}
                 </div>
                 <div className="text-[11px] text-slate-500">{vig.detalhe}</div>
+              </td>
+              <td className="px-5 py-3 text-xs">
+                {(() => {
+                  const met = c.metodosPagamento[0];
+                  const cobRef = c.cobrancas.find((x) => x.status === "PAGA") ?? c.cobrancas[0];
+                  const forma = met?.forma ?? cobRef?.forma;
+                  if (!forma) return <span className="text-slate-400">—</span>;
+                  const label = forma === "CARTAO_CREDITO" ? "Cartão" : forma === "PIX" ? "PIX" : "Boleto";
+                  const detalhe = met?.bandeira && met?.ultimosDigitos
+                    ? `${met.bandeira} · final ${met.ultimosDigitos}`
+                    : cobRef?.competencia
+                      ? `ref ${cobRef.competencia}`
+                      : "";
+                  return (
+                    <div>
+                      <div className="font-semibold text-slate-800">{label}</div>
+                      {detalhe && <div className="text-[11px] text-slate-500">{detalhe}</div>}
+                    </div>
+                  );
+                })()}
+              </td>
+              <td className="px-5 py-3 text-xs">
+                {(() => {
+                  const cobComNf = c.cobrancas.find((x) => x.nfseNumero);
+                  if (!cobComNf) return <span className="text-slate-400">—</span>;
+                  return cobComNf.nfsePdfUrl ? (
+                    <a href={cobComNf.nfsePdfUrl} target="_blank" rel="noreferrer" className="font-semibold text-blue-700 underline">
+                      NF {cobComNf.nfseNumero}
+                    </a>
+                  ) : (
+                    <span className="text-slate-700">NF {cobComNf.nfseNumero}</span>
+                  );
+                })()}
               </td>
               <td className="px-5 py-3 text-right tabular-nums">{c.empresas.length}</td>
               <td className="px-5 py-3 text-right text-xs text-slate-500">
