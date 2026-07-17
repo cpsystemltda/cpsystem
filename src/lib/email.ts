@@ -1,36 +1,26 @@
 import "server-only";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-// Envio de email via SMTP (Regina 14/07). Padrao Google Workspace:
-//   SMTP_HOST=smtp.gmail.com
-//   SMTP_PORT=465
-//   SMTP_USER=contato@cpsystem.app.br  (email do workspace)
-//   SMTP_PASS=<App Password gerado em myaccount.google.com/apppasswords>
-//   EMAIL_FROM="CP System <contato@cpsystem.app.br>"
+// Envio de email via Resend (Regina 17/07). Migrado de Google Workspace SMTP
+// por Workspace admin bloquear SMTP externo.
 //
-// Requisitos: Google exige App Password (2FA ligado). Nao use a senha
-// normal da conta — nao funciona.
+// Env vars:
+//   RESEND_API_KEY = re_...
+//   EMAIL_FROM     = "CP System <contato@cpsystem.app.br>" (dominio verificado)
+//
+// Requisitos:
+//   - Dominio cpsystem.app.br verificado em resend.com/domains (SPF + DKIM)
+//   - API key com permissao de send
 
-const HOST = process.env.SMTP_HOST || "smtp.gmail.com";
-const PORT = Number(process.env.SMTP_PORT || 465);
-const USER = process.env.SMTP_USER || "";
-const PASS = process.env.SMTP_PASS || "";
+const API_KEY = process.env.RESEND_API_KEY || "";
 const FROM = process.env.EMAIL_FROM || "CP System <contato@cpsystem.app.br>";
 
-let transporter: nodemailer.Transporter | null = null;
-
-function getTransporter(): nodemailer.Transporter {
-  if (transporter) return transporter;
-  if (!USER || !PASS) {
-    throw new Error("SMTP nao configurado — defina SMTP_USER e SMTP_PASS.");
-  }
-  transporter = nodemailer.createTransport({
-    host: HOST,
-    port: PORT,
-    secure: PORT === 465, // 465 = SSL, 587 = STARTTLS
-    auth: { user: USER, pass: PASS },
-  });
-  return transporter;
+let client: Resend | null = null;
+function getClient(): Resend {
+  if (client) return client;
+  if (!API_KEY) throw new Error("RESEND_API_KEY nao configurado");
+  client = new Resend(API_KEY);
+  return client;
 }
 
 export type EnvioEmailOpts = {
@@ -42,16 +32,17 @@ export type EnvioEmailOpts = {
   responder?: string; // Reply-To
 };
 
-// Retorna { ok, messageId } ou throw. Caller decide se propaga.
+// Retorna { messageId } ou throw.
 export async function enviarEmail(opts: EnvioEmailOpts): Promise<{ messageId: string }> {
-  const t = getTransporter();
+  const c = getClient();
 
-  // Baixa anexos por URL (quando fornecido `url` no lugar de `content`)
-  // O Nodemailer aceita `path` (URL) diretamente, mas alguns servidores nao
-  // gostam de streaming — melhor baixar antes.
-  const anexosProntos = await Promise.all(
+  // Resolve anexos: se veio URL, baixa; senao usa content direto
+  const attachments = await Promise.all(
     (opts.anexos ?? []).map(async (a) => {
-      if (a.content) return { filename: a.filename, content: a.content };
+      if (a.content) {
+        const content = typeof a.content === "string" ? Buffer.from(a.content) : a.content;
+        return { filename: a.filename, content };
+      }
       if (a.url) {
         const r = await fetch(a.url);
         if (!r.ok) throw new Error(`falha ao baixar anexo ${a.url}: ${r.status}`);
@@ -62,23 +53,25 @@ export async function enviarEmail(opts: EnvioEmailOpts): Promise<{ messageId: st
     }),
   );
 
-  const info = await t.sendMail({
+  const { data, error } = await c.emails.send({
     from: FROM,
     to: opts.para,
     subject: opts.assunto,
-    text: opts.texto,
     html: opts.html,
-    attachments: anexosProntos,
+    text: opts.texto,
     replyTo: opts.responder || FROM,
+    attachments: attachments.length > 0 ? attachments : undefined,
   });
-  return { messageId: info.messageId ?? "" };
+
+  if (error) throw new Error(`Resend: ${error.name} — ${error.message}`);
+  return { messageId: data?.id ?? "" };
 }
 
-// Helper de status pra UI de admin
+// Helper de status pra UI de admin (mantem nome antigo pra nao quebrar callers)
 export function statusSmtp(): { configurado: boolean; host: string; user: string } {
   return {
-    configurado: !!(USER && PASS),
-    host: HOST,
-    user: USER ? `${USER.slice(0, 3)}...${USER.slice(-4)}` : "(nao configurado)",
+    configurado: !!API_KEY,
+    host: "resend.com",
+    user: API_KEY ? `${API_KEY.slice(0, 8)}...${API_KEY.slice(-4)}` : "(nao configurado)",
   };
 }
