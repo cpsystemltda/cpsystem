@@ -16,7 +16,15 @@ export type ClienteInput = {
   email: string;
   cpfCnpj: string;
   telefone?: string;
+  // Endereço estruturado — obrigatório pra emissão de NFSe (prefeituras
+  // exigem tomador com city/state/postalCode preenchidos, senão bloqueia).
   endereco?: string;
+  addressNumber?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string; // sigla UF (DF, SP, RJ...)
+  cep?: string;
 };
 
 export type CriarClienteResultado = { customerId: string };

@@ -59,6 +59,9 @@ export class GatewayAsaas implements GatewayPagamento {
 
   async criarCliente(input: ClienteInput): Promise<CriarClienteResultado> {
     type Resp = { id: string };
+    // NFSe exige endereco estruturado (address/addressNumber/city/state/postalCode).
+    // Regina 17/07: sem esses campos, botao "Emitir NF" fica desabilitado no
+    // painel Asaas e emissao automatica nao funciona.
     const data = await this.req<Resp>("/customers", {
       method: "POST",
       body: JSON.stringify({
@@ -67,6 +70,15 @@ export class GatewayAsaas implements GatewayPagamento {
         cpfCnpj: input.cpfCnpj.replace(/\D/g, ""),
         phone: input.telefone,
         address: input.endereco,
+        addressNumber: input.addressNumber ?? "S/N",
+        complement: input.complemento,
+        province: input.bairro,
+        // city precisa ser codigo IBGE — o Asaas resolve por postalCode
+        // (auto-resolucao via ViaCEP no lado deles), entao mandamos CEP
+        // estruturado e ele preenche city/state se vier vazio.
+        postalCode: input.cep?.replace(/\D/g, ""),
+        // Se front informar UF explicitamente, honra
+        state: input.estado,
         externalReference: input.contaId,
       }),
     });

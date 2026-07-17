@@ -263,7 +263,7 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
         nextDueDate.setMonth(nextDueDate.getMonth() + 1);
       }
 
-      // Cria customer no Asaas
+      // Cria customer no Asaas (endereco estruturado — obrigatorio p/ NFSe)
       const { customerId } = await gateway.criarCliente({
         contaId: conta.id,
         nome: empresa.razaoSocial,
@@ -271,6 +271,8 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
         cpfCnpj: normalizarCnpj(empresa.cnpj),
         telefone: empresa.telefones,
         endereco: empresa.endereco,
+        addressNumber: empresa.endereco.match(/,\s*(\d+[A-Za-z]?)\b/)?.[1] || "S/N",
+        cep: empresa.cep ?? undefined,
       });
 
       // Cria cobranca interna referente ao primeiro mes pos-trial

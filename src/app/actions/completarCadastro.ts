@@ -136,6 +136,8 @@ export async function completarCadastroAction(
         cpfCnpj: normalizarCnpj(empresa.cnpj),
         telefone: empresa.telefones,
         endereco: empresa.endereco,
+        addressNumber: empresa.endereco.match(/,\s*(\d+[A-Za-z]?)\b/)?.[1] || "S/N",
+        cep: empresa.cep ?? undefined,
       });
       customerId = c.customerId;
     }
