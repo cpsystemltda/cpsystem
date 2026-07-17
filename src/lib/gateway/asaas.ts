@@ -59,9 +59,31 @@ export class GatewayAsaas implements GatewayPagamento {
 
   async criarCliente(input: ClienteInput): Promise<CriarClienteResultado> {
     type Resp = { id: string };
-    // NFSe exige endereco estruturado (address/addressNumber/city/state/postalCode).
-    // Regina 17/07: sem esses campos, botao "Emitir NF" fica desabilitado no
-    // painel Asaas e emissao automatica nao funciona.
+    // NFSe exige endereco estruturado batendo com ViaCEP. Regina 17/07:
+    // buscamos os campos oficiais no ViaCEP com o CEP e usamos como fonte
+    // canonica (address=logradouro, province=bairro). O texto livre que o
+    // cliente digitou (input.endereco) vai pra complement porque geralmente
+    // contem "Sala X, Bloco Y" ou similares que a prefeitura rejeita se
+    // vier no address.
+    const cepLimpo = input.cep?.replace(/\D/g, "");
+    let addressCanonico = input.endereco;
+    let provinceCanonica = input.bairro;
+    let complementoFinal = input.complemento || input.endereco;
+    if (cepLimpo && cepLimpo.length === 8) {
+      try {
+        const via = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`).then((r) => r.json());
+        if (via && !via.erro && via.logradouro) {
+          addressCanonico = via.logradouro;
+          provinceCanonica = via.bairro || provinceCanonica;
+          // Se input.endereco eh diferente do logradouro oficial, coloca ele em complement
+          if (input.endereco && input.endereco !== via.logradouro && !complementoFinal?.includes(input.endereco)) {
+            complementoFinal = [complementoFinal, input.endereco].filter(Boolean).join(" - ");
+          }
+        }
+      } catch {
+        // Se ViaCEP falhar, cai no que veio do input mesmo
+      }
+    }
     const data = await this.req<Resp>("/customers", {
       method: "POST",
       body: JSON.stringify({
@@ -69,15 +91,11 @@ export class GatewayAsaas implements GatewayPagamento {
         email: input.email,
         cpfCnpj: input.cpfCnpj.replace(/\D/g, ""),
         phone: input.telefone,
-        address: input.endereco,
+        address: addressCanonico,
         addressNumber: input.addressNumber ?? "S/N",
-        complement: input.complemento,
-        province: input.bairro,
-        // city precisa ser codigo IBGE — o Asaas resolve por postalCode
-        // (auto-resolucao via ViaCEP no lado deles), entao mandamos CEP
-        // estruturado e ele preenche city/state se vier vazio.
-        postalCode: input.cep?.replace(/\D/g, ""),
-        // Se front informar UF explicitamente, honra
+        complement: complementoFinal,
+        province: provinceCanonica,
+        postalCode: cepLimpo,
         state: input.estado,
         externalReference: input.contaId,
       }),
