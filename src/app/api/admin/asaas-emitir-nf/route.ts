@@ -26,6 +26,15 @@ export async function POST(req: NextRequest) {
     municipalServiceCode: "6203100",
     municipalServiceName: "6203100 | 01.05 - Licenciamento ou cessão de direito de uso de programas de computação.",
     nbsCode: "1.1103.22.00",
+    taxes: {
+      retainIss: false,
+      iss: 5,
+      cofins: 0,
+      csll: 0,
+      inss: 0,
+      ir: 0,
+      pis: 0,
+    },
   };
   if (svcDefault?.id) body.municipalServiceId = svcDefault.id;
 
