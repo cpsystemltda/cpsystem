@@ -313,11 +313,31 @@ export async function processarEventoGateway(opts: {
 
   if (opts.status === "PAGA") {
     await ativarPlano(cobranca.contaId, cobranca.plano);
+    // Regina 19/07: notifica embaixador via WA (Igor quer receber msg quando
+    // Léo pagar mensalidade). Best-effort — falha nao bloqueia processamento.
+    try {
+      const { notificarEmbaixadorSobreCliente } = await import("@/lib/notifEmbaixador");
+      await notificarEmbaixadorSobreCliente({
+        contaClienteId: cobranca.contaId,
+        evento: { tipo: "PAGAMENTO_RECEBIDO", valor: cobranca.valor, competencia: cobranca.competencia },
+      });
+    } catch (e) {
+      console.error("[processarEventoGateway] notif embaixador pgto falhou:", e);
+    }
   } else if (opts.status === "ATRASADA") {
     await prisma.conta.update({
       where: { id: cobranca.contaId },
       data: { statusAssinatura: "INADIMPLENTE" },
     });
+    try {
+      const { notificarEmbaixadorSobreCliente } = await import("@/lib/notifEmbaixador");
+      await notificarEmbaixadorSobreCliente({
+        contaClienteId: cobranca.contaId,
+        evento: { tipo: "INADIMPLENTE", valor: cobranca.valor, competencia: cobranca.competencia },
+      });
+    } catch (e) {
+      console.error("[processarEventoGateway] notif embaixador atraso falhou:", e);
+    }
   }
 }
 
@@ -385,6 +405,16 @@ export async function processarNfseGateway(opts: {
         fileName: nomeArquivo,
         caption,
       });
+    }
+    // Regina 19/07: notifica embaixador (Igor) que a NF do cliente saiu.
+    try {
+      const { notificarEmbaixadorSobreCliente } = await import("@/lib/notifEmbaixador");
+      await notificarEmbaixadorSobreCliente({
+        contaClienteId: cobranca.contaId,
+        evento: { tipo: "NF_EMITIDA", numero: opts.numero || opts.nfseId.slice(0, 12), competencia: cobranca.competencia },
+      });
+    } catch (e) {
+      console.error("[processarNfseGateway] notif embaixador NF falhou:", e);
     }
   } catch (e) {
     console.error("[processarNfseGateway] erro ao notificar WhatsApp:", e);
