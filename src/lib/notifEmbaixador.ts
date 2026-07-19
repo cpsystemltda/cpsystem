@@ -88,39 +88,60 @@ function mapTipo(t: EventoEmbaixador["tipo"]) {
 function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
   const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const dt = (d: Date) => d.toLocaleDateString("pt-BR");
+  // Tom: analista/consultor gerenciando portfolio — visão de gestão, não
+  // "cópia da msg do cliente". Foco em: (1) o que mudou no cliente,
+  // (2) impacto na sua carteira, (3) ação recomendada como analista.
   switch (ev.tipo) {
     case "PAGAMENTO_RECEBIDO":
       return (
-        `💰 *Pagamento confirmado — cliente vinculado a você*\n\n` +
-        `*${nomeCliente}* pagou a mensalidade de ${ev.competencia} (${brl(ev.valor)}).\n\n` +
-        `Sua comissão por esse cliente continua correndo. O próximo PIX de comissão sai no dia 20 do mês seguinte.\n\n` +
-        `Acompanhe em cpsystem.app.br/painel-analista`
+        `📊 *Atualização de carteira — CP System*\n\n` +
+        `Seu cliente *${nomeCliente}* teve a mensalidade de ${ev.competencia} liquidada (${brl(ev.valor)}). Assinatura ativa confirmada.\n\n` +
+        `*Impacto na sua carteira:*\n` +
+        `• Cliente segue elegível pra comissão vitalícia enquanto permanecer ativo\n` +
+        `• Sua comissão referente a este mês é apurada no fechamento e paga via PIX no dia 20 do mês seguinte\n\n` +
+        `Detalhes do portfólio: cpsystem.app.br/painel-analista`
       );
     case "NF_EMITIDA":
       return (
-        `📄 *Nota Fiscal emitida — cliente vinculado a você*\n\n` +
-        `A NF *${ev.numero}* referente à mensalidade *${ev.competencia}* do cliente *${nomeCliente}* foi emitida com sucesso.\n\n` +
-        `Ciclo mensal completo — comissão referente a este mês entra no seu próximo PIX.`
+        `📊 *Fechamento fiscal do mês — cliente da sua carteira*\n\n` +
+        `A NF ${ev.numero} do cliente *${nomeCliente}* foi autorizada pela prefeitura (competência ${ev.competencia}).\n\n` +
+        `*O que isso significa pra você como analista:*\n` +
+        `• Ciclo mensal do cliente encerrado com sucesso\n` +
+        `• Comissão apurada e liberada pra pagamento no próximo dia 20\n` +
+        `• Cliente segue com pipeline financeiro em dia — sem risco imediato de churn\n\n` +
+        `Painel: cpsystem.app.br/painel-analista`
       );
     case "INADIMPLENTE":
       return (
-        `⚠️ *Cliente em atraso — atenção*\n\n` +
-        `O cliente *${nomeCliente}* está com a mensalidade *${ev.competencia}* (${brl(ev.valor)}) em atraso.\n\n` +
-        `Enquanto o pagamento não for regularizado, sua comissão referente a esse cliente também fica suspensa. Vale entrar em contato com ele.`
+        `🚨 *Alerta de risco na carteira — CP System*\n\n` +
+        `Seu cliente *${nomeCliente}* ficou inadimplente (mensalidade ${ev.competencia}, ${brl(ev.valor)}).\n\n` +
+        `*Ação recomendada como analista:*\n` +
+        `• Entrar em contato com o cliente hoje pra entender a causa (esquecimento, restrição no cartão, disputa)\n` +
+        `• Reforçar o valor entregue pra evitar churn\n` +
+        `• A comissão referente a este cliente fica suspensa até regularização\n\n` +
+        `Se precisar de suporte da equipe CP System, chama aqui.`
       );
     case "CONTRATO_VENCENDO":
       return (
-        `⚠️ *Contrato do seu cliente vencendo*\n\n` +
+        `📋 *Movimento na operação do cliente — atenção do analista*\n\n` +
         `Cliente: *${nomeCliente}*\n` +
         `Contrato *${ev.numero}* vence em *${dt(ev.venceEm)}*.\n\n` +
-        `Se houver interesse em prorrogar, vale alinhar com o cliente pra não perder o prazo.`
+        `*Ação recomendada como analista:*\n` +
+        `• Verificar interesse em prorrogação com o cliente\n` +
+        `• Se o órgão for tocar aditivo, alinhar a documentação\n` +
+        `• Se for encerrar, checar entregas pendentes e saldos\n\n` +
+        `Painel do cliente: cpsystem.app.br/painel-analista`
       );
     case "EMPENHO_VENCENDO":
       return (
-        `⚠️ *Empenho do seu cliente vencendo*\n\n` +
+        `📋 *Movimento na operação do cliente — atenção do analista*\n\n` +
         `Cliente: *${nomeCliente}*\n` +
         `Empenho *${ev.numero}* vence em *${dt(ev.venceEm)}*.\n\n` +
-        `Recomendável verificar entrega/execução com o cliente.`
+        `*Ação recomendada como analista:*\n` +
+        `• Confirmar com o cliente se a execução/entrega está no prazo\n` +
+        `• Verificar saldo não executado — pode virar prejuízo se prescrever\n` +
+        `• Se necessário, orientar o cliente a solicitar prorrogação ao órgão\n\n` +
+        `Painel: cpsystem.app.br/painel-analista`
       );
     case "CUSTOM":
       return `${ev.titulo}\n\n${ev.corpo}`;
