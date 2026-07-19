@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
     value: pay.value,
     deductions: 0,
     effectiveDate: new Date().toISOString().slice(0, 10),
+    // Codigo do servico municipal DF pra Licenciamento (01.05 LC 116)
+    municipalServiceCode: "6203100",
+    municipalServiceName: "6203100 | 01.05 - Licenciamento ou cessão de direito de uso de programas de computação.",
+    nbsCode: "1.1103.22.00",
   };
   if (svcDefault?.id) body.municipalServiceId = svcDefault.id;
 
