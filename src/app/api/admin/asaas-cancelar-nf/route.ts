@@ -9,7 +9,11 @@ export async function POST(req: NextRequest) {
   const base = "https://api.asaas.com/v3";
   const h = { access_token: apiKey };
 
-  const del = await fetch(`${base}/invoices/${invoiceId}`, { method: "DELETE", headers: h });
+  const del = await fetch(`${base}/invoices/${invoiceId}/cancel`, {
+    method: "POST",
+    headers: { ...h, "Content-Type": "application/json" },
+    body: JSON.stringify({ cancelOnlyOnAsaas: true }),
+  });
   const body = await del.json().catch(() => ({}));
   return NextResponse.json({ status: del.status, response: body });
 }
