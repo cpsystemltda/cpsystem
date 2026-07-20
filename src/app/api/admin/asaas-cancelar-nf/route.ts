@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   const del = await fetch(`${base}/invoices/${invoiceId}/cancel`, {
     method: "POST",
     headers: { ...h, "Content-Type": "application/json" },
-    body: JSON.stringify({ cancelOnlyOnAsaas: true }),
+    body: JSON.stringify({}),
   });
   const body = await del.json().catch(() => ({}));
   return NextResponse.json({ status: del.status, response: body });
