@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { enviarTexto } from "@/lib/whatsapp";
 import { decidirRespostaIA, historicoDoUsuario } from "@/lib/ia-suporte";
 import { interpretarMsgAdmin, idCurto } from "@/lib/ia-decisao-grupo";
+import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
+import { processarExtrato } from "@/lib/conciliacao/processar";
 
 // Webhook Z-API — mensagens INBOUND de clientes.
 // Regina 14/07: cliente manda WA -> IA analisa -> responde direto OU
@@ -26,6 +28,14 @@ type ZapiInbound = {
   text?: { message?: string };
   // Alguns eventos vem em outros formatos — normalizamos
   message?: string;
+  // Documento anexado (PDF de extrato bancario, principalmente)
+  document?: {
+    documentUrl?: string;
+    mimeType?: string;
+    title?: string;
+    fileName?: string;
+    caption?: string;
+  };
 };
 
 export async function POST(req: NextRequest) {
@@ -58,6 +68,7 @@ export async function POST(req: NextRequest) {
   const telefone = String(body.phone || "").replace(/\D/g, "");
   const mensagem = String(body.text?.message || body.message || "").trim();
   const messageId = String(body.messageId || "");
+  const documento = body.document;
 
   // 2) Grupo: aceita SO se for o grupo de suporte (env SUPORTE_GROUP_ID).
   //    Outros grupos = ignorados. Regina 14/07: admins decidem no grupo.
@@ -71,7 +82,22 @@ export async function POST(req: NextRequest) {
     return processarMsgGrupoSuporte(mensagem, nomeAutor);
   }
 
-  if (!telefone || !mensagem) return NextResponse.json({ ok: true, skipped: "no_content" });
+  // Se veio um documento PDF anexado, roteia pra conciliacao (antes do fluxo de suporte).
+  // Cliente pode mandar so o PDF, ou PDF + msg — em ambos os casos trata como extrato.
+  if (!telefone) return NextResponse.json({ ok: true, skipped: "no_phone" });
+  const ehPdf = !!documento?.documentUrl &&
+    (documento.mimeType === "application/pdf" ||
+      (documento.fileName ?? documento.title ?? "").toLowerCase().endsWith(".pdf"));
+  if (ehPdf) {
+    return processarExtratoBancarioViaWhatsApp({
+      telefone,
+      documentUrl: documento!.documentUrl!,
+      nomeArquivo: documento!.fileName || documento!.title || "extrato-whatsapp.pdf",
+      messageId,
+    });
+  }
+
+  if (!mensagem) return NextResponse.json({ ok: true, skipped: "no_content" });
 
   // Kill switch
   if (process.env.WHATSAPP_KILL_SWITCH === "1") {
@@ -339,4 +365,106 @@ async function processarMsgGrupoSuporte(mensagem: string, autorNome: string): Pr
 // GET pra healthcheck / verificacao manual
 export async function GET() {
   return NextResponse.json({ msg: "Z-API inbound webhook OK. Use POST." });
+}
+
+// Cliente mandou PDF pelo WhatsApp — trata como upload de extrato bancario.
+// Regina 21/07: "ele manda pelo proprio WhatsApp que voce esta notificando ele,
+// voce extrai de la e ja joga no sistema". Feature so pra INTERMEDIARIO+PREMIUM.
+async function processarExtratoBancarioViaWhatsApp(input: {
+  telefone: string;
+  documentUrl: string;
+  nomeArquivo: string;
+  messageId: string;
+}): Promise<NextResponse> {
+  const usuario = await prisma.usuario.findFirst({
+    where: { telefoneWhatsApp: input.telefone },
+    include: { conta: { select: { id: true, plano: true } } },
+  });
+  if (!usuario) {
+    return NextResponse.json({ ok: true, skipped: "usuario_nao_cadastrado", telefone: input.telefone });
+  }
+
+  if (!contaTemAcessoConciliacao(usuario.conta.plano)) {
+    await enviarTexto(
+      input.telefone,
+      `Recebi o PDF, mas a conciliação bancária automática está disponível a partir do plano *Intermediário*. Seu plano atual: *${usuario.conta.plano}*.\n\nVer planos: https://cpsystem.app.br/conta/assinatura`,
+    ).catch(() => {});
+    return NextResponse.json({ ok: true, skipped: "plano_sem_conciliacao" });
+  }
+
+  // Baixa o PDF do Z-API
+  let pdfBuffer: Buffer;
+  try {
+    const resp = await fetch(input.documentUrl);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} baixando PDF`);
+    const arr = await resp.arrayBuffer();
+    pdfBuffer = Buffer.from(arr);
+  } catch (err) {
+    console.error("[zapi-inbound] falha ao baixar PDF:", err);
+    await enviarTexto(
+      input.telefone,
+      "Recebi o arquivo mas não consegui baixar pra processar. Pode tentar de novo? Se persistir, sobe pelo site: https://cpsystem.app.br/conciliacao",
+    ).catch(() => {});
+    return NextResponse.json({ ok: false, erro: "download_falhou" });
+  }
+
+  if (pdfBuffer.length > 20 * 1024 * 1024) {
+    await enviarTexto(
+      input.telefone,
+      "Esse PDF é maior que 20 MB — não consigo processar por aqui. Sobe pelo site em https://cpsystem.app.br/conciliacao (aceita PDFs maiores).",
+    ).catch(() => {});
+    return NextResponse.json({ ok: false, erro: "pdf_grande" });
+  }
+
+  // Aviso imediato — extracao leva ~30s, evita cliente achar que sumiu
+  await enviarTexto(
+    input.telefone,
+    `📄 Recebi o extrato! Estou processando com IA agora — em ~30 segundos te mando o resultado da conciliação.`,
+  ).catch(() => {});
+
+  const resultado = await processarExtrato({
+    contaId: usuario.conta.id,
+    fonte: "WHATSAPP_INBOUND",
+    nomeArquivo: input.nomeArquivo,
+    pdfBuffer,
+  });
+
+  if (!resultado.ok) {
+    await enviarTexto(
+      input.telefone,
+      `❌ Não consegui processar esse PDF: ${resultado.erro}\n\nTenta subir pelo site: https://cpsystem.app.br/conciliacao`,
+    ).catch(() => {});
+    return NextResponse.json({ ok: false, erro: resultado.erro });
+  }
+
+  if (resultado.jaProcessado) {
+    await enviarTexto(
+      input.telefone,
+      `Esse extrato já tinha sido processado antes. Ver resultado em https://cpsystem.app.br/conciliacao`,
+    ).catch(() => {});
+    return NextResponse.json({ ok: true, jaProcessado: true, extratoId: resultado.extratoId });
+  }
+
+  // Busca o resumo do extrato pra reportar ao cliente
+  const extrato = await prisma.extrato.findUnique({
+    where: { id: resultado.extratoId },
+    select: {
+      totalCreditos: true, totalTransacoes: true,
+      qtdMatchAlto: true, qtdMatchMedio: true, qtdSemMatch: true,
+    },
+  });
+  const totalCred = extrato?.totalCreditos ?? 0;
+  const brl = totalCred.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  await enviarTexto(
+    input.telefone,
+    `✅ *Extrato processado!*\n\n` +
+      `💰 Créditos: *${brl}* em ${extrato?.totalTransacoes ?? 0} transações\n` +
+      `✓ Casados automaticamente: *${extrato?.qtdMatchAlto ?? 0}*\n` +
+      `? Precisam sua confirmação: *${extrato?.qtdMatchMedio ?? 0}*\n` +
+      `– Sem correspondência: *${extrato?.qtdSemMatch ?? 0}*\n\n` +
+      `🔗 Ver detalhes: https://cpsystem.app.br/conciliacao`,
+  ).catch(() => {});
+
+  return NextResponse.json({ ok: true, extratoId: resultado.extratoId });
 }
