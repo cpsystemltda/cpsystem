@@ -87,6 +87,17 @@ export async function vincularEmbaixadorAction(_p: Result | null, formData: Form
     resumo: `Vinculou embaixador ${a.nomeCompleto}`,
   });
 
+  // Regina 21/07: notifica o analista que ganhou cliente novo na carteira
+  try {
+    const { notificarEmbaixadorSobreCliente } = await import("@/lib/notifEmbaixador");
+    await notificarEmbaixadorSobreCliente({
+      contaClienteId: usuario.contaId,
+      evento: { tipo: "NOVO_CLIENTE_VINCULADO" },
+    });
+  } catch (e) {
+    console.error("[vincularEmbaixador] notif embaixador falhou:", e);
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/embaixadores");
   return { ok: true };

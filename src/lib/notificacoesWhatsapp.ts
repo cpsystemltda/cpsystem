@@ -374,6 +374,39 @@ export async function notificarPrazosConsolidado(hoje: Date = new Date()): Promi
         });
         if (r.enviado) porDias[dias]++;
       }
+
+      // Regina 21/07: notifica embaixador da conta cliente sobre os vencimentos
+      // dela, pra ele acompanhar/apoiar. Idempotente por (dias, contaId, data) —
+      // 1 msg por analista por cliente por janela por dia.
+      try {
+        const { notificarEmbaixadorSobreCliente } = await import("@/lib/notifEmbaixador");
+        // Escolhe UM item representativo da janela pra mensagem (o primeiro
+        // empenho, senão contrato, senão ata). O template mostra 1 item por vez;
+        // o volume completo o analista vê no painel próprio.
+        const primeiroEmpenho = itens.empenhos[0];
+        const primeiroContrato = itens.contratos[0];
+        if (primeiroEmpenho) {
+          await notificarEmbaixadorSobreCliente({
+            contaClienteId: contaId,
+            evento: {
+              tipo: "EMPENHO_VENCENDO",
+              numero: primeiroEmpenho.numero,
+              venceEm: primeiroEmpenho.data,
+            },
+          }).catch((e) => console.error("[prazosConsolidado] notif embaixador empenho falhou:", e));
+        } else if (primeiroContrato) {
+          await notificarEmbaixadorSobreCliente({
+            contaClienteId: contaId,
+            evento: {
+              tipo: "CONTRATO_VENCENDO",
+              numero: primeiroContrato.numero,
+              venceEm: primeiroContrato.data,
+            },
+          }).catch((e) => console.error("[prazosConsolidado] notif embaixador contrato falhou:", e));
+        }
+      } catch (e) {
+        console.error("[prazosConsolidado] notif embaixador (janela) falhou:", e);
+      }
     }
   }
 

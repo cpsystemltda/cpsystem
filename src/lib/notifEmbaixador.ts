@@ -13,6 +13,8 @@ export type EventoEmbaixador =
   | { tipo: "INADIMPLENTE"; competencia: string; valor: number }
   | { tipo: "CONTRATO_VENCENDO"; numero: string; venceEm: Date }
   | { tipo: "EMPENHO_VENCENDO"; numero: string; venceEm: Date }
+  | { tipo: "CANCELAMENTO_ASSINATURA"; motivo?: string }
+  | { tipo: "NOVO_CLIENTE_VINCULADO" }
   | { tipo: "CUSTOM"; titulo: string; corpo: string };
 
 export async function notificarEmbaixadorSobreCliente(opts: {
@@ -76,10 +78,13 @@ function mapTipo(t: EventoEmbaixador["tipo"]) {
     case "NF_EMITIDA":
       return "COMISSAO_LIBERADA" as const;
     case "INADIMPLENTE":
+    case "CANCELAMENTO_ASSINATURA":
       return "PLANO_ATRASADO" as const;
     case "CONTRATO_VENCENDO":
     case "EMPENHO_VENCENDO":
       return "VENCIMENTO_EMPENHO" as const;
+    case "NOVO_CLIENTE_VINCULADO":
+      return "ANALISTA_VINCULADO" as const;
     default:
       return "ANALISTA_VINCULADO" as const;
   }
@@ -141,6 +146,33 @@ function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
         `• Confirmar com o cliente se a execução/entrega está no prazo\n` +
         `• Verificar saldo não executado — pode virar prejuízo se prescrever\n` +
         `• Se necessário, orientar o cliente a solicitar prorrogação ao órgão\n\n` +
+        `Painel: cpsystem.app.br/painel-analista`
+      );
+    case "CANCELAMENTO_ASSINATURA":
+      return (
+        `🚨 *Cliente cancelou a assinatura — sua carteira perdeu 1 recorrência*\n\n` +
+        `O cliente *${nomeCliente}* cancelou a assinatura CP System.\n` +
+        (ev.motivo ? `Motivo informado: ${ev.motivo}\n` : ``) +
+        `\n*Impacto na sua carteira:*\n` +
+        `• Comissão vitalícia deste cliente encerrada a partir do próximo ciclo\n` +
+        `• Momento crítico pra reengajar antes do bloqueio efetivo\n\n` +
+        `*Ação recomendada como analista:*\n` +
+        `• Ligar em até 24h pra entender a causa real (preço, produto, atendimento, mudança de estratégia)\n` +
+        `• Se for insatisfação pontual, ofereça suporte direto\n` +
+        `• Se decidido, encerre com dignidade e mantenha porta aberta\n\n` +
+        `Painel: cpsystem.app.br/painel-analista`
+      );
+    case "NOVO_CLIENTE_VINCULADO":
+      return (
+        `🤝 *Novo cliente na sua carteira*\n\n` +
+        `*${nomeCliente}* acabou de vincular você como analista responsável pela conta.\n\n` +
+        `*O que isso significa:*\n` +
+        `• Você passa a ser referência técnica desse cliente pra questões de contratos públicos\n` +
+        `• Comissão vitalícia começa a valer assim que a 1ª fatura for paga\n\n` +
+        `*Ação recomendada como analista:*\n` +
+        `• Contato em até 48h pra apresentação e alinhamento inicial\n` +
+        `• Mapear os contratos ativos + prioridades imediatas do cliente\n` +
+        `• Combinar cadência de reuniões e canal de suporte\n\n` +
         `Painel: cpsystem.app.br/painel-analista`
       );
     case "CUSTOM":

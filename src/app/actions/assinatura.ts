@@ -258,6 +258,17 @@ export async function cancelarAssinaturaAction(_p: Result | null, _formData: For
     resumo: "Cancelada pelo cliente",
   });
 
+  // Regina 21/07: notificar analista/embaixador que perde recorrência da carteira
+  try {
+    const { notificarEmbaixadorSobreCliente } = await import("@/lib/notifEmbaixador");
+    await notificarEmbaixadorSobreCliente({
+      contaClienteId: usuario.contaId,
+      evento: { tipo: "CANCELAMENTO_ASSINATURA" },
+    });
+  } catch (e) {
+    console.error("[cancelarAssinatura] notif embaixador falhou:", e);
+  }
+
   revalidatePath("/conta/assinatura");
   redirect("/conta/assinatura");
 }
