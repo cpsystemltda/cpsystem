@@ -20,6 +20,7 @@ import {
   Sparkles,
   Wallet,
   Plug,
+  Banknote,
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { SeletorVisao } from "@/components/SeletorVisao";
@@ -49,6 +50,7 @@ const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
       { href: "/contratos", label: "Contratos", icon: ClipboardList },
       { href: "/execucao", label: "Fornecimento/Execução", icon: Truck },
       { href: "/juridico", label: "Consultoria jurídica", icon: Scale },
+      { href: "/conciliacao", label: "Conciliação bancária", icon: Banknote },
       { href: "/honorarios", label: "Honorários do analista", icon: Sparkles },
       { href: "/relatorios", label: "Relatórios", icon: BarChart3 },
     ],
