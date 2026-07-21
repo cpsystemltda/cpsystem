@@ -31,6 +31,8 @@ import { filtroEmpresaWhere, lerEmpresaSelecionada } from "@/lib/empresaContexto
 import { prazoLimiteOuVigencia, janelaExecucao, type PrazoEntregaModo, type PrazoEntregaUnidade } from "@/lib/prazoEntrega";
 import { SerieHistoricaColapsavel } from "@/components/KpisSaldoVigencia";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
+import { BannerConciliacaoOnboarding } from "@/components/BannerConciliacaoOnboarding";
+import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
 import { Block } from "@/components/ui/Block";
 import { KPI, CurrencyValue } from "@/components/ui/KPI";
 import { ChartCard } from "@/components/ui/ChartCard";
@@ -76,6 +78,15 @@ export default async function DashboardPage({
 }) {
   const usuario = await exigirUsuario();
   const contaId = usuario.contaId;
+  const conta = await prisma.conta.findUnique({
+    where: { id: contaId },
+    select: { plano: true, conciliacaoDiaMes: true, conciliacaoOptIn: true },
+  });
+  const mostrarBannerConciliacao =
+    !!conta &&
+    contaTemAcessoConciliacao(conta.plano) &&
+    conta.conciliacaoOptIn &&
+    conta.conciliacaoDiaMes === null;
   const filtroEmpresa = await filtroEmpresaWhere(contaId);
   const empresaIdSelecionada = await lerEmpresaSelecionada();
   const hoje = new Date();
@@ -645,6 +656,7 @@ export default async function DashboardPage({
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-6">
       <BannerEmpresaEmFoco contaId={contaId} />
+      {mostrarBannerConciliacao ? <BannerConciliacaoOnboarding /> : null}
 
       {/* === Header / Topbar === */}
       <header className="glass mb-[18px] flex items-end justify-between gap-6 rounded-[28px] px-9 py-7">
