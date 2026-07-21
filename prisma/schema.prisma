@@ -33,55 +33,61 @@ enum StatusAssinatura {
 }
 
 model Conta {
-  id                String           @id @default(cuid())
-  tipo              TipoConta        @default(EMPRESA)
-  plano             Plano            @default(BASICO)
-  statusAssinatura  StatusAssinatura @default(TRIAL)
-  trialAteEm        DateTime?
-  proximoVencimento DateTime?
-  termosAceitosEm   DateTime?
+  id                      String           @id @default(cuid())
+  tipo                    TipoConta        @default(EMPRESA)
+  plano                   Plano            @default(BASICO)
+  statusAssinatura        StatusAssinatura @default(TRIAL)
+  trialAteEm              DateTime?
+  proximoVencimento       DateTime?
+  termosAceitosEm         DateTime?
   // Versao do contrato aceita (Regina 13/07). Permite forcar re-aceite apos
   // bump de versao — se termosAceitosVersao != VERSAO atual do contrato do
   // tipo da conta, o /termos volta a mostrar botao "Li e aceito".
-  termosAceitosVersao String?
+  termosAceitosVersao     String?
   // Cupom aplicado no signup (trial estendido + analista vinculado). Regina 09/07.
-  cupomAplicadoId   String?
-  cupomAplicado     Cupom?           @relation(fields: [cupomAplicadoId], references: [id])
-  embaixadorId      String? // analista que indicou esta conta (programa de embaixadores SaaS — não confundir com VinculoAnalista B2G)
+  cupomAplicadoId         String?
+  cupomAplicado           Cupom?           @relation(fields: [cupomAplicadoId], references: [id])
+  embaixadorId            String? // analista que indicou esta conta (programa de embaixadores SaaS — não confundir com VinculoAnalista B2G)
   // Programa de referral cliente-indica-cliente (Regina 08/06, plano marketing v7).
   // Quando cliente atual compartilha link `/conta/indicar` e outra empresa
   // se cadastra via ?ref=conta-<id>, fica vinculada aqui. A cada indicacao
   // que paga 1a fatura, o cliente que indicou ganha 1 mes gratis (creditado
   // como Cobranca de valor 0 no proximo ciclo).
-  indicadoPorContaId String?
+  indicadoPorContaId      String?
   // Gateway de pagamento (ASAAS por padrão)
-  gatewayProvider   GatewayProvider?
-  gatewayCustomerId String?          // customer_id no gateway
-  gatewaySubscriptionId String?      // subscription_id no gateway
+  gatewayProvider         GatewayProvider?
+  gatewayCustomerId       String? // customer_id no gateway
+  gatewaySubscriptionId   String? // subscription_id no gateway
   ultimaTentativaCobranca DateTime?
-  bloqueadoEm       DateTime?
+  bloqueadoEm             DateTime?
   // Regina 13/07: cliente escolhe dia de vencimento fixo pra cobrança mensal
   // (10, 15 ou 20). Primeiro nextDueDate = próximo dia escolhido APÓS trial.
   // Asaas renova mensalmente respeitando esse dia.
-  diaVencimento     Int?             // 10, 15 ou 20
+  diaVencimento           Int? // 10, 15 ou 20
   // CPF do titular do cartão (obrigatório pra tokenização Asaas).
   // Pode ser diferente do CNPJ da empresa (representante legal).
-  cpfTitularCartao  String?          // apenas dígitos, 11 chars
-  criadoEm          DateTime         @default(now())
-  atualizadoEm      DateTime         @updatedAt
+  cpfTitularCartao        String? // apenas dígitos, 11 chars
+  // Conciliação bancária (Regina 21/07): feature INTERMEDIARIO+PREMIUM.
+  // Cliente escolhe janela mensal (dia 1-31) — cron dispara lembretes 5d/1d/no dia.
+  // null = não configurado (opt-out). Se plano BASICO, ignorar mesmo se preenchido.
+  conciliacaoDiaMes       Int?
+  conciliacaoOptIn        Boolean          @default(true)
+  criadoEm                DateTime         @default(now())
+  atualizadoEm            DateTime         @updatedAt
 
-  usuarios       Usuario[]
-  empresas       Empresa[]
-  analista       Analista?
-  embaixador     Analista?       @relation("ContasIndicadas", fields: [embaixadorId], references: [id])
+  usuarios         Usuario[]
+  empresas         Empresa[]
+  analista         Analista?
+  extratos         Extrato[]
+  embaixador       Analista?         @relation("ContasIndicadas", fields: [embaixadorId], references: [id])
   // Cliente que indicou esta conta (referral C2C).
-  indicadoPor    Conta?          @relation("ContasIndicadasPorCliente", fields: [indicadoPorContaId], references: [id], onDelete: SetNull)
+  indicadoPor      Conta?            @relation("ContasIndicadasPorCliente", fields: [indicadoPorContaId], references: [id], onDelete: SetNull)
   // Contas que esta conta indicou.
-  contasIndicadas Conta[]        @relation("ContasIndicadasPorCliente")
-  comissoes      Comissao[]
-  chamadosSuporte ChamadoSuporte[]
-  logsAuditoria  LogAuditoria[]
-  cobrancas      Cobranca[]
+  contasIndicadas  Conta[]           @relation("ContasIndicadasPorCliente")
+  comissoes        Comissao[]
+  chamadosSuporte  ChamadoSuporte[]
+  logsAuditoria    LogAuditoria[]
+  cobrancas        Cobranca[]
   metodosPagamento MetodoPagamento[]
   vinculosAnalista VinculoAnalista[]
 
@@ -91,7 +97,7 @@ model Conta {
 enum GatewayProvider {
   ASAAS
   STRIPE
-  DEMO   // sem gateway real, simulação local
+  DEMO // sem gateway real, simulação local
 }
 
 enum PerfilUsuario {
@@ -101,47 +107,47 @@ enum PerfilUsuario {
 }
 
 model Usuario {
-  id                String        @id @default(cuid())
-  nome              String
-  email             String        @unique
-  senhaHash         String
-  perfil            PerfilUsuario @default(ADMIN)
-  superAdmin        Boolean       @default(false) // gestor da plataforma (Igor) — vê tudo
-  emailVerificadoEm DateTime?
+  id                  String        @id @default(cuid())
+  nome                String
+  email               String        @unique
+  senhaHash           String
+  perfil              PerfilUsuario @default(ADMIN)
+  superAdmin          Boolean       @default(false) // gestor da plataforma (Igor) — vê tudo
+  emailVerificadoEm   DateTime?
   // Notificacoes WhatsApp (Regina 02/07): opt-in por usuario. Telefone
   // em E.164 sem "+" (ex: 5521997209623). optIn ausente = sem envio.
-  telefoneWhatsApp  String?
-  optInWhatsApp     Boolean       @default(false)
+  telefoneWhatsApp    String?
+  optInWhatsApp       Boolean       @default(false)
   // Dados pessoais completados no onboarding do 1o login (Regina 02/07).
   // Contas migradas (ex: Igor -> Leo) chegam com dados null e usuario
   // preenche antes de acessar o sistema. dataNascimento tambem serve
   // pra CP System mandar mensagem de aniversario no dia.
-  cpf               String?
-  cargo             String?
-  dataNascimento    DateTime?
-  onboardingConcluido Boolean     @default(true)
-  criadoEm          DateTime      @default(now())
-  atualizadoEm      DateTime      @updatedAt
+  cpf                 String?
+  cargo               String?
+  dataNascimento      DateTime?
+  onboardingConcluido Boolean       @default(true)
+  criadoEm            DateTime      @default(now())
+  atualizadoEm        DateTime      @updatedAt
 
   contaId String
   conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
 
-  sessoes              Sessao[]
-  magicLinks           MagicLink[]
-  chamadosSuporte      ChamadoSuporte[]
-  logsAuditoria        LogAuditoria[]
-  notificacoesSistema  NotificacaoSistema[]
-  mensagensIAsystem    MensagemIAsystem[]
+  sessoes                     Sessao[]
+  magicLinks                  MagicLink[]
+  chamadosSuporte             ChamadoSuporte[]
+  logsAuditoria               LogAuditoria[]
+  notificacoesSistema         NotificacaoSistema[]
+  mensagensIAsystem           MensagemIAsystem[]
   // Quem criou cada documento — base da regra "só edita criador + admin"
-  atasCriadas      Ata[]      @relation("AtasCriadas")
-  contratosCriados Contrato[] @relation("ContratosCriados")
-  empenhosCriados  Empenho[]  @relation("EmpenhosCriados")
-  pareceresCriados ParecerJuridico[] @relation("ParecresCriados")
-  avulsosJuridicosCriados DocumentoAvulsoJuridico[] @relation("AvulsosCriados")
-  reajustesRetroativosCriados ReajusteRetroativo[] @relation("ReajustesRetroativosCriados")
-  contaGoogle      GoogleAccount?
-  notificacoesWhats NotificacaoWhatsApp[]
-  cuponsCriados    Cupom[]          @relation("CuponsCriados")
+  atasCriadas                 Ata[]                     @relation("AtasCriadas")
+  contratosCriados            Contrato[]                @relation("ContratosCriados")
+  empenhosCriados             Empenho[]                 @relation("EmpenhosCriados")
+  pareceresCriados            ParecerJuridico[]         @relation("ParecresCriados")
+  avulsosJuridicosCriados     DocumentoAvulsoJuridico[] @relation("AvulsosCriados")
+  reajustesRetroativosCriados ReajusteRetroativo[]      @relation("ReajustesRetroativosCriados")
+  contaGoogle                 GoogleAccount?
+  notificacoesWhats           NotificacaoWhatsApp[]
+  cuponsCriados               Cupom[]                   @relation("CuponsCriados")
 
   @@index([contaId])
 }
@@ -184,20 +190,20 @@ enum StatusNotificacaoWhatsApp {
 }
 
 model NotificacaoWhatsApp {
-  id           String  @id @default(cuid())
+  id           String                    @id @default(cuid())
   usuarioId    String
-  usuario      Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuario      Usuario                   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   tipo         TipoNotificacaoWhatsApp
   // ID do recurso ao qual a notificacao se refere (empenhoId, cobrancaId,
   // etc.). Combinado com `tipo` da chave de idempotencia. null pra tipos
   // sem referencia (relatorio_semanal usa competencia YYYY-WW).
   referenciaId String?
-  telefone     String  // E.164 sem "+"
-  mensagem     String  @db.Text
+  telefone     String // E.164 sem "+"
+  mensagem     String                    @db.Text
   status       StatusNotificacaoWhatsApp @default(PENDENTE)
   enviadaEm    DateTime?
   erro         String?
-  criadoEm     DateTime @default(now())
+  criadoEm     DateTime                  @default(now())
 
   @@unique([usuarioId, tipo, referenciaId])
   @@index([usuarioId, criadoEm])
@@ -226,12 +232,12 @@ model GoogleAccount {
 // usuário (cada login tem seu próprio histórico, não compartilha mesmo no
 // mesmo navegador). Onde role = "user" (pergunta) ou "assistant" (resposta).
 model MensagemIAsystem {
-  id        String   @id @default(cuid())
-  usuarioId String
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  role      String   // "user" | "assistant"
-  content   String   @db.Text
-  criadoEm  DateTime @default(now())
+  id         String    @id @default(cuid())
+  usuarioId  String
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  role       String // "user" | "assistant"
+  content    String    @db.Text
+  criadoEm   DateTime  @default(now())
   // Soft delete — quando o usuario limpa o historico, marca esse campo
   // em vez de deletar a linha. Isso preserva a contagem de cota diaria
   // do plano Basico (2 perguntas/dia) mesmo apos 'Limpar historico'
@@ -300,10 +306,10 @@ model Empresa {
   endereco         String
   complemento      String?
   cep              String
-  email            String   // primário (legado mantido pra not break queries existentes)
-  emails           String[] @default([])
-  telefones        String   // primário (legado)
-  telefonesLista   String[] @default([])
+  email            String // primário (legado mantido pra not break queries existentes)
+  emails           String[]     @default([])
+  telefones        String // primário (legado)
+  telefonesLista   String[]     @default([])
   responsavel      String
   criadoEm         DateTime     @default(now())
   atualizadoEm     DateTime     @updatedAt
@@ -311,9 +317,9 @@ model Empresa {
   contaId String
   conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
 
-  atas      Ata[]
-  contratos Contrato[]
-  empenhos  Empenho[]
+  atas                       Ata[]
+  contratos                  Contrato[]
+  empenhos                   Empenho[]
   documentosAvulsosJuridicos DocumentoAvulsoJuridico[]
 
   @@index([contaId])
@@ -324,49 +330,49 @@ model Empresa {
 // ============================================================
 
 enum TierEmbaixador {
-  BRONZE   // 1-5 ativos = 3%
-  PRATA    // 6-10 ativos = 4%
-  OURO     // 11-15 ativos = 5%
-  DIAMOND  // 15+ ativos = 6%
+  BRONZE // 1-5 ativos = 3%
+  PRATA // 6-10 ativos = 4%
+  OURO // 11-15 ativos = 5%
+  DIAMOND // 15+ ativos = 6%
 }
 
 model Analista {
-  id            String   @id @default(cuid())
-  nomeCompleto  String
-  cpf           String   @unique
-  telefone      String
-  endereco      String
-  cep           String?
-  complemento   String?
-  email         String
-  banco         String?
-  agencia       String?
-  contaCorrente String?
-  pix           String?
-  razaoSocial   String?
-  nomeFantasia  String?
-  cnpj          String?
+  id               String        @id @default(cuid())
+  nomeCompleto     String
+  cpf              String        @unique
+  telefone         String
+  endereco         String
+  cep              String?
+  complemento      String?
+  email            String
+  banco            String?
+  agencia          String?
+  contaCorrente    String?
+  pix              String?
+  razaoSocial      String?
+  nomeFantasia     String?
+  cnpj             String?
   // Pessoa jurídica adicional (opcional — preenchido se o analista emite nota como PJ)
-  porte             PorteEmpresa?
-  cnaePrincipal     String?
-  cnaesSecundarios  String?
-  naturezaJuridica  String?
-  enderecoPj        String?
-  emailPj           String?
-  telefonePj        String?
-  divulgacaoUrl String? // link da bio com o programa
-  ativo         Boolean  @default(true)
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  porte            PorteEmpresa?
+  cnaePrincipal    String?
+  cnaesSecundarios String?
+  naturezaJuridica String?
+  enderecoPj       String?
+  emailPj          String?
+  telefonePj       String?
+  divulgacaoUrl    String? // link da bio com o programa
+  ativo            Boolean       @default(true)
+  criadoEm         DateTime      @default(now())
+  atualizadoEm     DateTime      @updatedAt
 
   contaId String? @unique
   conta   Conta?  @relation(fields: [contaId], references: [id], onDelete: Cascade)
 
-  contasIndicadas Conta[]           @relation("ContasIndicadas")
-  comissoes       Comissao[]
-  vinculos        VinculoAnalista[]
+  contasIndicadas   Conta[]            @relation("ContasIndicadas")
+  comissoes         Comissao[]
+  vinculos          VinculoAnalista[]
   comissoesExecucao ComissaoExecucao[]
-  cuponsGerados   Cupom[]           @relation("CuponsGerados")
+  cuponsGerados     Cupom[]            @relation("CuponsGerados")
 }
 
 // ============================================================
@@ -376,21 +382,21 @@ model Analista {
 // signup: (1) trial de N dias em vez dos 14 padrão; (2) se analistaVinculadoId
 // preenchido, vincula automaticamente esse analista como embaixador da conta.
 model Cupom {
-  id                    String    @id @default(cuid())
-  codigo                String    @unique
-  descricao             String?   // interno — pra você lembrar por que criou
-  diasTrial             Int       @default(60)
-  analistaVinculadoId   String?   // se setado, vira Conta.embaixadorId ao usar
-  analistaVinculado     Analista? @relation("CuponsGerados", fields: [analistaVinculadoId], references: [id])
-  validoAte             DateTime? // opcional — depois disso não aceita
-  usosMaximos           Int?      // null = ilimitado
-  usosAtuais            Int       @default(0)
-  ativo                 Boolean   @default(true)
-  criadoPorId           String?
-  criadoPor             Usuario?  @relation("CuponsCriados", fields: [criadoPorId], references: [id])
-  criadoEm              DateTime  @default(now())
+  id                  String    @id @default(cuid())
+  codigo              String    @unique
+  descricao           String? // interno — pra você lembrar por que criou
+  diasTrial           Int       @default(60)
+  analistaVinculadoId String? // se setado, vira Conta.embaixadorId ao usar
+  analistaVinculado   Analista? @relation("CuponsGerados", fields: [analistaVinculadoId], references: [id])
+  validoAte           DateTime? // opcional — depois disso não aceita
+  usosMaximos         Int? // null = ilimitado
+  usosAtuais          Int       @default(0)
+  ativo               Boolean   @default(true)
+  criadoPorId         String?
+  criadoPor           Usuario?  @relation("CuponsCriados", fields: [criadoPorId], references: [id])
+  criadoEm            DateTime  @default(now())
 
-  contasAplicadas       Conta[]
+  contasAplicadas Conta[]
 
   @@index([codigo])
   @@index([ativo])
@@ -413,19 +419,19 @@ enum StatusVinculoAnalista {
 }
 
 model VinculoAnalista {
-  id                  String                @id @default(cuid())
-  contaId             String
-  conta               Conta                 @relation(fields: [contaId], references: [id], onDelete: Cascade)
-  analistaId          String
-  analista            Analista              @relation(fields: [analistaId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  contaId    String
+  conta      Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  analistaId String
+  analista   Analista @relation(fields: [analistaId], references: [id], onDelete: Cascade)
 
-  dataInicio          DateTime              @default(now())
-  percentualComissao  Float                 @default(0)
-  fixoMensal          Float                 @default(0)
-  diaVencimentoFixo   Int                   @default(5)
-  status              StatusVinculoAnalista @default(ATIVO)
-  encerradoEm         DateTime?
-  observacoes         String?
+  dataInicio         DateTime              @default(now())
+  percentualComissao Float                 @default(0)
+  fixoMensal         Float                 @default(0)
+  diaVencimentoFixo  Int                   @default(5)
+  status             StatusVinculoAnalista @default(ATIVO)
+  encerradoEm        DateTime?
+  observacoes        String?
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
@@ -452,23 +458,23 @@ enum StatusComissaoFixa {
 // Uma linha por VinculoAnalista × competência (YYYY-MM). Geradas automaticamente
 // pelo cron diário na primeira passagem após a virada do mês.
 model PagamentoFixoMensal {
-  id          String          @id @default(cuid())
-  vinculoId   String
-  vinculo     VinculoAnalista @relation(fields: [vinculoId], references: [id], onDelete: Cascade)
-  competencia String          // YYYY-MM
-  valor       Float
+  id             String             @id @default(cuid())
+  vinculoId      String
+  vinculo        VinculoAnalista    @relation(fields: [vinculoId], references: [id], onDelete: Cascade)
+  competencia    String // YYYY-MM
+  valor          Float
   // Vencimento por linha (editável) — snapshot de diaVencimentoFixo no momento
   // da criação. Mudanças posteriores no vínculo não afetam linhas já geradas.
-  vencimento  DateTime?
+  vencimento     DateTime?
   status         StatusComissaoFixa @default(A_RECEBER)
   valorRecebido  Float              @default(0)
   comprovanteUrl String?
   // Campos legados — mantidos pra compatibilidade. `paga` espelha status === PAGO.
-  paga        Boolean         @default(false)
-  pagaEm      DateTime?
-  observacoes String?
-  criadoEm    DateTime        @default(now())
-  atualizadoEm DateTime       @updatedAt @default(now())
+  paga           Boolean            @default(false)
+  pagaEm         DateTime?
+  observacoes    String?
+  criadoEm       DateTime           @default(now())
+  atualizadoEm   DateTime           @default(now()) @updatedAt
 
   @@unique([vinculoId, competencia])
   @@index([vinculoId])
@@ -476,20 +482,20 @@ model PagamentoFixoMensal {
 }
 
 model Comissao {
-  id           String         @id @default(cuid())
-  analistaId   String
-  contaId      String
-  competencia  String         // YYYY-MM
-  valorBase    Float          // MRR da conta
-  tier         TierEmbaixador
-  percentual   Float          // 3, 4, 5 ou 6
-  valor        Float
-  paga         Boolean        @default(false)
-  pagaEm       DateTime?
-  criadoEm     DateTime       @default(now())
+  id              String         @id @default(cuid())
+  analistaId      String
+  contaId         String
+  competencia     String // YYYY-MM
+  valorBase       Float // MRR da conta
+  tier            TierEmbaixador
+  percentual      Float // 3, 4, 5 ou 6
+  valor           Float
+  paga            Boolean        @default(false)
+  pagaEm          DateTime?
+  criadoEm        DateTime       @default(now())
   // Regina 13/07: rastreio do PIX out automático (cron dia 20).
-  transferenciaId String?     // ID retornado pelo Asaas Transfer API
-  ultimoErroPgto String?      // Última mensagem de erro na tentativa
+  transferenciaId String? // ID retornado pelo Asaas Transfer API
+  ultimoErroPgto  String? // Última mensagem de erro na tentativa
 
   analista Analista @relation(fields: [analistaId], references: [id], onDelete: Cascade)
   conta    Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
@@ -602,11 +608,11 @@ model Ata {
   numeroLicitacao        String?
 
   // Órgão GERENCIADOR (sempre 1, snapshot legado pra compatibilidade)
-  orgaoNome      String
-  orgaoCnpj      String
-  orgaoEndereco  String
-  orgaoEmail     String?
-  orgaoTelefone  String?
+  orgaoNome     String
+  orgaoCnpj     String
+  orgaoEndereco String
+  orgaoEmail    String?
+  orgaoTelefone String?
 
   objeto                 String
   dataAssinatura         DateTime
@@ -614,8 +620,8 @@ model Ata {
   vigenciaInicio         DateTime
   vigenciaFim            DateTime
   prazoEntregaDias       Int?
-  prazoEntregaUnidade    PrazoEntregaUnidade @default(DIAS)
-  prazoEntregaNaoAplica  Boolean   @default(false)
+  prazoEntregaUnidade    PrazoEntregaUnidade  @default(DIAS)
+  prazoEntregaNaoAplica  Boolean              @default(false)
   prazoPagamentoDias     Int?
   marcoOrcamentoEstimado DateTime?
   // Origem do marco de reajuste (briefing PDF — Cadastro Ata 2.4)
@@ -637,21 +643,21 @@ model Ata {
   criadoPorId String?
   criadoPor   Usuario? @relation("AtasCriadas", fields: [criadoPorId], references: [id])
 
-  itens                AtaItem[]
-  contratos             Contrato[]
-  empenhos              Empenho[]
-  orgaos                OrgaoNaAta[]
-  enderecosEntrega      EnderecoEntrega[]
-  pontosFocais          PontoFocal[]
-  notificacoes          Notificacao[]
-  procedimentos         ProcedimentoApuratorio[]
-  anexos                Anexo[]
-  anotacoes             Anotacao[]
-  termosAditivos        TermoAditivo[]
-  apostilamentos        Apostilamento[]
-  vigencias             Vigencia[]
-  pareceres             ParecerJuridico[]
-  atestados             AtestadoCapacidade[]
+  itens            AtaItem[]
+  contratos        Contrato[]
+  empenhos         Empenho[]
+  orgaos           OrgaoNaAta[]
+  enderecosEntrega EnderecoEntrega[]
+  pontosFocais     PontoFocal[]
+  notificacoes     Notificacao[]
+  procedimentos    ProcedimentoApuratorio[]
+  anexos           Anexo[]
+  anotacoes        Anotacao[]
+  termosAditivos   TermoAditivo[]
+  apostilamentos   Apostilamento[]
+  vigencias        Vigencia[]
+  pareceres        ParecerJuridico[]
+  atestados        AtestadoCapacidade[]
 
   @@index([empresaId])
   @@index([criadoPorId])
@@ -689,18 +695,18 @@ model AtaItem {
 }
 
 model OrgaoNaAta {
-  id            String         @id @default(cuid())
-  ataId         String
-  ata           Ata            @relation(fields: [ataId], references: [id], onDelete: Cascade)
-  tipo          TipoOrgaoNaAta
-  nome          String
-  cnpj          String
-  endereco      String
-  email         String?
-  telefone      String?
+  id          String         @id @default(cuid())
+  ataId       String
+  ata         Ata            @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  tipo        TipoOrgaoNaAta
+  nome        String
+  cnpj        String
+  endereco    String
+  email       String?
+  telefone    String?
   // Carona: limites de adesão
-  limiteValor   Float?         // valor monetário máximo permitido a esse carona
-  limitePct     Float?         // % do total da Ata (default sistema: 50% por órgão)
+  limiteValor Float? // valor monetário máximo permitido a esse carona
+  limitePct   Float? // % do total da Ata (default sistema: 50% por órgão)
 
   enderecosEntrega EnderecoEntrega[]
   pontosFocais     PontoFocal[]
@@ -709,15 +715,15 @@ model OrgaoNaAta {
 }
 
 model EnderecoEntrega {
-  id        String  @id @default(cuid())
-  rotulo    String?
-  endereco  String
-  ataId     String?
-  ata       Ata?    @relation(fields: [ataId], references: [id], onDelete: Cascade)
-  contratoId String?
-  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
-  empenhoId  String?
-  empenho    Empenho?  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  id           String      @id @default(cuid())
+  rotulo       String?
+  endereco     String
+  ataId        String?
+  ata          Ata?        @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId   String?
+  contrato     Contrato?   @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId    String?
+  empenho      Empenho?    @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
   orgaoNaAtaId String?
   orgaoNaAta   OrgaoNaAta? @relation(fields: [orgaoNaAtaId], references: [id], onDelete: Cascade)
 
@@ -728,21 +734,21 @@ model EnderecoEntrega {
 }
 
 model PontoFocal {
-  id        String           @id @default(cuid())
-  funcao    FuncaoPontoFocal
+  id              String           @id @default(cuid())
+  funcao          FuncaoPontoFocal
   // Descrição livre quando funcao = OUTRO (briefing PDF — Cadastro Ata 2.6)
   funcaoDescricao String?
-  nome      String
-  email     String?
-  telefone  String?
-  ataId     String?
-  ata       Ata?             @relation(fields: [ataId], references: [id], onDelete: Cascade)
-  contratoId String?
-  contrato   Contrato?       @relation(fields: [contratoId], references: [id], onDelete: Cascade)
-  empenhoId  String?
-  empenho    Empenho?        @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
-  orgaoNaAtaId String?
-  orgaoNaAta   OrgaoNaAta?   @relation(fields: [orgaoNaAtaId], references: [id], onDelete: Cascade)
+  nome            String
+  email           String?
+  telefone        String?
+  ataId           String?
+  ata             Ata?             @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId      String?
+  contrato        Contrato?        @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId       String?
+  empenho         Empenho?         @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  orgaoNaAtaId    String?
+  orgaoNaAta      OrgaoNaAta?      @relation(fields: [orgaoNaAtaId], references: [id], onDelete: Cascade)
 
   @@index([ataId])
   @@index([contratoId])
@@ -759,11 +765,11 @@ model Contrato {
   procedimentoSelecao    ProcedimentoSelecao
   numeroLicitacao        String?
 
-  orgaoNome      String
-  orgaoCnpj      String
-  orgaoEndereco  String
-  orgaoEmail     String?
-  orgaoTelefone  String?
+  orgaoNome     String
+  orgaoCnpj     String
+  orgaoEndereco String
+  orgaoEmail    String?
+  orgaoTelefone String?
 
   objeto                 String
   dataAssinatura         DateTime
@@ -771,10 +777,10 @@ model Contrato {
   vigenciaInicio         DateTime
   vigenciaFim            DateTime
   prazoEntregaDias       Int?
-  prazoEntregaUnidade    PrazoEntregaUnidade @default(DIAS)
+  prazoEntregaUnidade    PrazoEntregaUnidade  @default(DIAS)
   // Modo de prazo de entrega: RELATIVO usa qtd+unidade (prazoEntregaDias),
   // DATA_CERTA usa dataEntregaCerta (ex.: locação de evento com data fixa).
-  prazoEntregaModo       PrazoEntregaModo    @default(RELATIVO)
+  prazoEntregaModo       PrazoEntregaModo     @default(RELATIVO)
   dataEntregaCerta       DateTime?
   prazoPagamentoDias     Int?
   marcoOrcamentoEstimado DateTime?
@@ -783,13 +789,13 @@ model Contrato {
   // Valor inicial do contrato (somatório de itens no momento da criação).
   // Preservado pra exibir "Valor Inicial" mesmo após aditivos com reajuste.
   // null em contratos pré-M3-aditivo (backfill aplica o valor corrente).
-  valorInicial           Float?
+  valorInicial Float?
 
   // Fluxograma da contratação — Lei 14.133 (contratos não-continuados):
   // como o quantitativo é entregue e qual o marco inicial do prazo.
   modalidadeEntrega     ModalidadeEntrega         @default(INTEGRAL)
   marcoInicialPrazo     MarcoInicialPrazoEntrega? // null quando SOB_DEMANDA (não há prazo único)
-  marcoInicialDescricao String?                   // só preenchido quando marcoInicialPrazo = OUTRO
+  marcoInicialDescricao String? // só preenchido quando marcoInicialPrazo = OUTRO
 
   // M5 Garantia — tri-estado: null = não declarado, true = há previsão,
   // false = explicitamente sem previsão (usuário marcou "Não" e salvou).
@@ -813,22 +819,22 @@ model Contrato {
   criadoPorId String?
   criadoPor   Usuario? @relation("ContratosCriados", fields: [criadoPorId], references: [id])
 
-  itens             ContratoItem[]
-  parcelas          ParcelaContrato[]
-  empenhos          Empenho[]
-  enderecosEntrega  EnderecoEntrega[]
-  pontosFocais      PontoFocal[]
-  termosAditivos    TermoAditivo[]
-  apostilamentos    Apostilamento[]
-  reajustes         Reajuste[]
-  notificacoes      Notificacao[]
-  procedimentos     ProcedimentoApuratorio[]
-  garantias         Garantia[]
-  anexos            Anexo[]
-  anotacoes         Anotacao[]
-  vigencias         Vigencia[]
-  pareceres         ParecerJuridico[]
-  atestados         AtestadoCapacidade[]
+  itens            ContratoItem[]
+  parcelas         ParcelaContrato[]
+  empenhos         Empenho[]
+  enderecosEntrega EnderecoEntrega[]
+  pontosFocais     PontoFocal[]
+  termosAditivos   TermoAditivo[]
+  apostilamentos   Apostilamento[]
+  reajustes        Reajuste[]
+  notificacoes     Notificacao[]
+  procedimentos    ProcedimentoApuratorio[]
+  garantias        Garantia[]
+  anexos           Anexo[]
+  anotacoes        Anotacao[]
+  vigencias        Vigencia[]
+  pareceres        ParecerJuridico[]
+  atestados        AtestadoCapacidade[]
 
   @@index([empresaId])
   @@index([ataId])
@@ -840,8 +846,8 @@ model Contrato {
 model ParcelaContrato {
   id            String   @id @default(cuid())
   numero        Int
-  prazoDias     Int      // dias após o marco inicial do contrato
-  descricao     String?  // ex: "primeiros 50 computadores DELL Inspiron"
+  prazoDias     Int // dias após o marco inicial do contrato
+  descricao     String? // ex: "primeiros 50 computadores DELL Inspiron"
   valorEstimado Float?
   criadoEm      DateTime @default(now())
 
@@ -919,11 +925,11 @@ enum InstrumentoContratual {
 // Bug histórico: o sistema considerava Linha A como Linha B, marcando comissão
 // como recebida automaticamente. Hoje os dois fluxos são independentes.
 enum StatusComissaoExecucao {
-  AGUARDANDO_ORGAO  // Empenho ainda não foi pago pelo órgão à empresa
-  A_RECEBER         // Órgão pagou; comissão liberada para cobrança pelo analista
-  ATRASADO          // A_RECEBER e passou da data combinada (controle do analista)
-  PAGO              // Empresa pagou a comissão ao analista
-  PAGO_PARCIAL      // Empresa pagou parcialmente a comissão
+  AGUARDANDO_ORGAO // Empenho ainda não foi pago pelo órgão à empresa
+  A_RECEBER // Órgão pagou; comissão liberada para cobrança pelo analista
+  ATRASADO // A_RECEBER e passou da data combinada (controle do analista)
+  PAGO // Empresa pagou a comissão ao analista
+  PAGO_PARCIAL // Empresa pagou parcialmente a comissão
 }
 
 model ComissaoExecucao {
@@ -945,10 +951,10 @@ model ComissaoExecucao {
   observacaoOverride String?
 
   // Valores monetários
-  valorBaseEmpenho Float           // snapshot do total empenhado (sem alterações)
-  valorBasePago    Float  @default(0) // quanto o órgão efetivamente pagou (Linha A)
-  valorCalculado   Float           // percentual × valorBasePago (a comissão devida)
-  valorRecebido    Float  @default(0) // quanto o analista já recebeu da empresa
+  valorBaseEmpenho Float // snapshot do total empenhado (sem alterações)
+  valorBasePago    Float @default(0) // quanto o órgão efetivamente pagou (Linha A)
+  valorCalculado   Float // percentual × valorBasePago (a comissão devida)
+  valorRecebido    Float @default(0) // quanto o analista já recebeu da empresa
 
   status         StatusComissaoExecucao @default(AGUARDANDO_ORGAO)
   dataPagamento  DateTime?
@@ -965,14 +971,14 @@ model ComissaoExecucao {
 }
 
 model Empenho {
-  id                     String              @id @default(cuid())
+  id                     String                @id @default(cuid())
   tipo                   TipoObjeto
   // Natureza jurídica do registro (art. 95, Lei 14.133/2021). Default cobre
   // legado: empenhos cadastrados antes da feature continuam aparecendo como
   // "Nota de Empenho" sem regressão.
   instrumento            InstrumentoContratual @default(NOTA_EMPENHO)
   numero                 String
-  identificador          String?             // ex: "1ª parcela", "Solicitação 042/2026"
+  identificador          String? // ex: "1ª parcela", "Solicitação 042/2026"
   processoAdministrativo String
   // Opcional pro Empenho (M3.3, decisão Igor): info redundante quando o
   // Empenho deriva de Ata/Contrato. Continua obrigatório em Ata/Contrato.
@@ -981,64 +987,64 @@ model Empenho {
 
   // Campos específicos por instrumento (todos opcionais — só preenchidos
   // quando o instrumento correspondente exige).
-  classificacaoOrcamentaria String?        // Nota de Empenho
-  signatario                String?        // Carta-Contrato
-  dataAssinatura            DateTime?      // Carta-Contrato
-  departamentoEmissor       String?        // Autorização de Compra
-  pontoColeta               String?        // Autorização de Entrega (origem)
-  contatoRecebedor          String?        // Autorização de Entrega (nome/contato)
-  fiscalResponsavel         String?        // Ordem de Execução de Serviço
+  classificacaoOrcamentaria String? // Nota de Empenho
+  signatario                String? // Carta-Contrato
+  dataAssinatura            DateTime? // Carta-Contrato
+  departamentoEmissor       String? // Autorização de Compra
+  pontoColeta               String? // Autorização de Entrega (origem)
+  contatoRecebedor          String? // Autorização de Entrega (nome/contato)
+  fiscalResponsavel         String? // Ordem de Execução de Serviço
 
   // M5 Garantia — tri-estado igual ao Contrato.
-  temGarantia               Boolean?
+  temGarantia Boolean?
 
-  orgaoNome      String
-  orgaoCnpj      String
-  orgaoEndereco  String
-  orgaoEmail     String?
-  orgaoTelefone  String?
+  orgaoNome     String
+  orgaoCnpj     String
+  orgaoEndereco String
+  orgaoEmail    String?
+  orgaoTelefone String?
 
-  objeto                  String
-  dataEmissao             DateTime
-  dataPrevistaExecucao    DateTime?           // pra alerta de prazo no painel do analista
-  dataPrevistaPagamento   DateTime?
-  vigenciaInicio          DateTime
-  vigenciaFim             DateTime
-  prazoEntregaDias        Int?
-  prazoEntregaUnidade     PrazoEntregaUnidade @default(DIAS)
+  objeto                String
+  dataEmissao           DateTime
+  dataPrevistaExecucao  DateTime? // pra alerta de prazo no painel do analista
+  dataPrevistaPagamento DateTime?
+  vigenciaInicio        DateTime
+  vigenciaFim           DateTime
+  prazoEntregaDias      Int?
+  prazoEntregaUnidade   PrazoEntregaUnidade @default(DIAS)
   // Módulo 3.3 — modo do prazo: relativo (qtd+unidade) ou data fixa.
   // Mesmo enum compartilhado com Contrato (PrazoEntregaModo).
-  prazoEntregaModo        PrazoEntregaModo    @default(RELATIVO)
-  dataEntregaCerta        DateTime?
+  prazoEntregaModo      PrazoEntregaModo    @default(RELATIVO)
+  dataEntregaCerta      DateTime?
   // Modo PRAZO_CERTO — janela com inicio e fim.
-  dataEntregaInicio       DateTime?
-  dataEntregaFim          DateTime?
+  dataEntregaInicio     DateTime?
+  dataEntregaFim        DateTime?
   // Horario da execucao (Igor 26/06): pra servicos/locacoes que tem
   // horario marcado. Strings "HH:MM" (24h). Opcionais — empenhos de
   // fornecimento normalmente nao tem horario.
-  horaInicio              String?
-  horaFim                 String?
+  horaInicio            String?
+  horaFim               String?
   // ID do evento sincronizado no Google Calendar (Igor 26/06). Quando
   // preenchido, ediçoes/exclusoes propagam pro Google. null = nao
   // sincronizado (usuario sem GoogleAccount ou empenho criado antes
   // da integracao).
-  googleEventId           String?
-  prazoPagamentoDias      Int?
+  googleEventId         String?
+  prazoPagamentoDias    Int?
 
   status StatusExecucao @default(EMPENHADO)
 
-  dataPedidoRecebido      DateTime?
-  arquivoPedidoRecebido   String?
-  dataDespacho            DateTime?
-  arquivoDespacho         String?
-  dataEntrega             DateTime?
-  arquivoEntrega          String?
-  dataNfEmitida           DateTime?
-  arquivoNfEmitida        String?
-  dataNfEncaminhada       DateTime?
-  arquivoNfEncaminhada    String?
-  dataPagamento           DateTime?
-  arquivoPagamento        String?
+  dataPedidoRecebido    DateTime?
+  arquivoPedidoRecebido String?
+  dataDespacho          DateTime?
+  arquivoDespacho       String?
+  dataEntrega           DateTime?
+  arquivoEntrega        String?
+  dataNfEmitida         DateTime?
+  arquivoNfEmitida      String?
+  dataNfEncaminhada     DateTime?
+  arquivoNfEncaminhada  String?
+  dataPagamento         DateTime?
+  arquivoPagamento      String?
 
   // Ordem de Fornecimento/Execução
   numeroOrdemFornecimento String?
@@ -1067,19 +1073,19 @@ model Empenho {
   criadoPorId String?
   criadoPor   Usuario? @relation("EmpenhosCriados", fields: [criadoPorId], references: [id])
 
-  itens             EmpenhoItem[]
-  enderecosEntrega  EnderecoEntrega[]
-  pontosFocais      PontoFocal[]
-  termosAditivos    TermoAditivo[]
-  apostilamentos    Apostilamento[]
-  reajustes         Reajuste[]
-  notificacoes      Notificacao[]
-  procedimentos     ProcedimentoApuratorio[]
-  garantias         Garantia[]
-  anexos            Anexo[]
-  anotacoes         Anotacao[]
-  comissoes         ComissaoExecucao[]
-  pareceres         ParecerJuridico[]
+  itens              EmpenhoItem[]
+  enderecosEntrega   EnderecoEntrega[]
+  pontosFocais       PontoFocal[]
+  termosAditivos     TermoAditivo[]
+  apostilamentos     Apostilamento[]
+  reajustes          Reajuste[]
+  notificacoes       Notificacao[]
+  procedimentos      ProcedimentoApuratorio[]
+  garantias          Garantia[]
+  anexos             Anexo[]
+  anotacoes          Anotacao[]
+  comissoes          ComissaoExecucao[]
+  pareceres          ParecerJuridico[]
   reajusteRetroativo ReajusteRetroativo?
 
   @@index([empresaId])
@@ -1124,51 +1130,51 @@ enum NaturezaAlteracao {
 }
 
 model TermoAditivo {
-  id              String              @id @default(cuid())
-  numero          String
-  objeto          String
-  dataAssinatura  DateTime
-  natureza        String              // CSV de NaturezaAlteracao (legado)
+  id             String   @id @default(cuid())
+  numero         String
+  objeto         String
+  dataAssinatura DateTime
+  natureza       String // CSV de NaturezaAlteracao (legado)
 
   // ---- Bloco Valor ----
   alteraValor        Boolean             @default(false)
   tipoAlteracaoValor TipoAlteracaoValor?
-  novoValor          Float?              // delta do aditivo (positivo p/ acréscimo, pode ser negativo p/ supressão)
+  novoValor          Float? // delta do aditivo (positivo p/ acréscimo, pode ser negativo p/ supressão)
 
   // ---- Bloco Vigência ----
-  alteraPrazoVigencia Boolean             @default(false)
+  alteraPrazoVigencia Boolean              @default(false)
   novaVigenciaInicio  DateTime?
   novaVigenciaFim     DateTime?
   novaVigenciaPrazo   Int?
   novaVigenciaUnidade PrazoEntregaUnidade?
 
   // ---- Bloco Entrega ----
-  alteraPrazoEntrega       Boolean              @default(false)
-  novoPrazoEntregaDias     Int?
-  novoPrazoEntregaUnidade  PrazoEntregaUnidade?
+  alteraPrazoEntrega      Boolean              @default(false)
+  novoPrazoEntregaDias    Int?
+  novoPrazoEntregaUnidade PrazoEntregaUnidade?
 
   // ---- Bloco Reajuste (aplica em todos os itens do contrato/ata) ----
-  aplicaReajuste        Boolean         @default(false)
-  reajusteIndice        IndiceReajuste?
-  reajusteIndiceOutro   String?         // texto livre quando indice=OUTRO
-  reajustePeriodoInicio DateTime?
-  reajustePeriodoFim    DateTime?
-  reajustePercentual    Float?
+  aplicaReajuste             Boolean         @default(false)
+  reajusteIndice             IndiceReajuste?
+  reajusteIndiceOutro        String? // texto livre quando indice=OUTRO
+  reajustePeriodoInicio      DateTime?
+  reajustePeriodoFim         DateTime?
+  reajustePercentual         Float?
   // Data a partir da qual o reajuste tem efeitos financeiros no contrato.
   // Execucoes (Empenhos) com dataEmissao >= esta data usam valor reajustado;
   // anteriores ficam com valor original. Default = data de assinatura do
   // aditivo quando nao informado (comportamento legado).
   reajusteEfeitosFinanceiros DateTime?
 
-  observacoes     String?
-  arquivoPdfUrl   String?
+  observacoes   String?
+  arquivoPdfUrl String?
 
   // Snapshot dos valores anteriores (JSON) pra reverter no excluir/editar:
   // { valor, vigenciaFim, prazoEntregaDias, prazoEntregaUnidade, itens: [{id, valorUnitario, valorTotal}] }
   dadosAnteriores Json?
 
-  criadoEm        DateTime            @default(now())
-  atualizadoEm    DateTime            @default(now()) @updatedAt
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
 
   contratoId String?
   contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -1196,28 +1202,28 @@ model TermoAditivo {
 // "Iniciar nova vigência". A relação termoAditivoId é única — um aditivo
 // só pode originar uma vigência.
 model Vigencia {
-  id              String        @id @default(cuid())
-  ordem           Int
-  dataInicio      DateTime
-  dataFim         DateTime
-  valorTotal      Float
-  observacao      String?
+  id         String   @id @default(cuid())
+  ordem      Int
+  dataInicio DateTime
+  dataFim    DateTime
+  valorTotal Float
+  observacao String?
 
-  termoAditivoId  String?       @unique
-  termoAditivo    TermoAditivo? @relation(fields: [termoAditivoId], references: [id], onDelete: SetNull)
+  termoAditivoId String?       @unique
+  termoAditivo   TermoAditivo? @relation(fields: [termoAditivoId], references: [id], onDelete: SetNull)
 
-  contratoId      String?
-  contrato        Contrato?     @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
 
-  ataId           String?
-  ata             Ata?          @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  ataId String?
+  ata   Ata?    @relation(fields: [ataId], references: [id], onDelete: Cascade)
 
-  contratoItens   ContratoItem[]
-  ataItens        AtaItem[]
-  empenhos        Empenho[]
+  contratoItens ContratoItem[]
+  ataItens      AtaItem[]
+  empenhos      Empenho[]
 
-  criadoEm        DateTime      @default(now())
-  atualizadoEm    DateTime      @default(now()) @updatedAt
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
 
   @@unique([contratoId, ordem])
   @@unique([ataId, ordem])
@@ -1231,25 +1237,25 @@ model Vigencia {
 // gerados em datas diferentes (útil quando o contexto do documento muda:
 // novo aditivo, mudança de vigência, etc.).
 model ParecerJuridico {
-  id              String          @id @default(cuid())
-  tipo            String          // "ATA" | "CONTRATO" | "EMPENHO" | "TERMO_COOPERACAO" | "AVULSO" — TipoDocJuridico
-  analise         Json            // payload AnaliseJuridica completo
-  modelo          String          // ex: "claude-sonnet-4-6"
-  demo            Boolean         @default(false) // true se análise mockada (sem API key)
+  id      String  @id @default(cuid())
+  tipo    String // "ATA" | "CONTRATO" | "EMPENHO" | "TERMO_COOPERACAO" | "AVULSO" — TipoDocJuridico
+  analise Json // payload AnaliseJuridica completo
+  modelo  String // ex: "claude-sonnet-4-6"
+  demo    Boolean @default(false) // true se análise mockada (sem API key)
 
-  ataId           String?
-  ata             Ata?            @relation(fields: [ataId], references: [id], onDelete: Cascade)
-  contratoId      String?
-  contrato        Contrato?       @relation(fields: [contratoId], references: [id], onDelete: Cascade)
-  empenhoId       String?
-  empenho         Empenho?        @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
-  avulsoId        String?
-  avulso          DocumentoAvulsoJuridico? @relation(fields: [avulsoId], references: [id], onDelete: Cascade)
+  ataId      String?
+  ata        Ata?                     @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  contratoId String?
+  contrato   Contrato?                @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  empenhoId  String?
+  empenho    Empenho?                 @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  avulsoId   String?
+  avulso     DocumentoAvulsoJuridico? @relation(fields: [avulsoId], references: [id], onDelete: Cascade)
 
-  criadoPorId     String?
-  criadoPor       Usuario?        @relation("ParecresCriados", fields: [criadoPorId], references: [id])
+  criadoPorId String?
+  criadoPor   Usuario? @relation("ParecresCriados", fields: [criadoPorId], references: [id])
 
-  criadoEm        DateTime        @default(now())
+  criadoEm DateTime @default(now())
 
   @@index([ataId, criadoEm])
   @@index([contratoId, criadoEm])
@@ -1263,22 +1269,22 @@ model ParecerJuridico {
 // que não é modelado como entidade própria no sistema.
 // Regina 06/07/2026.
 model DocumentoAvulsoJuridico {
-  id            String   @id @default(cuid())
-  empresaId     String
-  empresa       Empresa  @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
-  tipo          String   // "TERMO_COOPERACAO" | "MINUTA" | "ADITIVO" | "OUTRO"
-  nome          String   // nome legível do arquivo
-  pdfUrl        String   // URL pública no Vercel Blob
-  blobPathname  String?  // caminho interno pra deletar depois
-  tamanhoBytes  Int?
+  tipo         String // "TERMO_COOPERACAO" | "MINUTA" | "ADITIVO" | "OUTRO"
+  nome         String // nome legível do arquivo
+  pdfUrl       String // URL pública no Vercel Blob
+  blobPathname String? // caminho interno pra deletar depois
+  tamanhoBytes Int?
 
-  pareceres     ParecerJuridico[]
+  pareceres ParecerJuridico[]
 
-  criadoPorId   String?
-  criadoPor     Usuario? @relation("AvulsosCriados", fields: [criadoPorId], references: [id])
+  criadoPorId String?
+  criadoPor   Usuario? @relation("AvulsosCriados", fields: [criadoPorId], references: [id])
 
-  criadoEm      DateTime @default(now())
+  criadoEm DateTime @default(now())
 
   @@index([empresaId, criadoEm])
   @@index([criadoPorId])
@@ -1296,85 +1302,85 @@ model DocumentoAvulsoJuridico {
 // individual e é a "aplicação" do reajuste contratual numa execução que
 // já estava paga. Usuário marca um por vez, por execução.
 model ReajusteRetroativo {
-  id                String   @id @default(cuid())
+  id String @id @default(cuid())
 
   // Snapshot dos valores no momento da aplicação:
-  valorOriginal     Float    // soma dos itens do empenho ANTES (congelado)
-  valorReajustado   Float    // soma com valorUnitario atual do contrato/ata
-  diferenca         Float    // valorReajustado - valorOriginal (NF complementar)
-  observacao        String?
+  valorOriginal   Float // soma dos itens do empenho ANTES (congelado)
+  valorReajustado Float // soma com valorUnitario atual do contrato/ata
+  diferenca       Float // valorReajustado - valorOriginal (NF complementar)
+  observacao      String?
 
-  dataAplicacao     DateTime @default(now())
+  dataAplicacao DateTime @default(now())
 
   // Marcos da NF complementar (timeline estendida)
-  dataNfEmitida           DateTime?
-  arquivoNfEmitida        String?
-  dataNfEncaminhada       DateTime?
-  arquivoNfEncaminhada    String?
-  dataPagamento           DateTime?
-  arquivoPagamento        String?
+  dataNfEmitida        DateTime?
+  arquivoNfEmitida     String?
+  dataNfEncaminhada    DateTime?
+  arquivoNfEncaminhada String?
+  dataPagamento        DateTime?
+  arquivoPagamento     String?
 
   // 1:1 com Empenho — cada execução tem no máximo um reajuste retroativo
-  empenhoId         String   @unique
-  empenho           Empenho  @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  empenhoId String  @unique
+  empenho   Empenho @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
 
-  criadoPorId       String?
-  criadoPor         Usuario? @relation("ReajustesRetroativosCriados", fields: [criadoPorId], references: [id])
+  criadoPorId String?
+  criadoPor   Usuario? @relation("ReajustesRetroativosCriados", fields: [criadoPorId], references: [id])
 
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @default(now()) @updatedAt
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
 
   @@index([empenhoId])
   @@index([criadoPorId])
 }
 
 model Apostilamento {
-  id                  String   @id @default(cuid())
-  numero              String
-  objeto              String
-  dataAssinatura      DateTime
-  natureza            String
+  id             String   @id @default(cuid())
+  numero         String
+  objeto         String
+  dataAssinatura DateTime
+  natureza       String
 
   // M3 — Comprasnet layout
-  finalidade          FinalidadeApostilamento?
-  motivo              String?
+  finalidade FinalidadeApostilamento?
+  motivo     String?
 
   // ---- Bloco Valor ----
-  alteraValor         Boolean             @default(false)
-  tipoAlteracaoValor  TipoAlteracaoValor?
-  novoValor           Float?
+  alteraValor        Boolean             @default(false)
+  tipoAlteracaoValor TipoAlteracaoValor?
+  novoValor          Float?
 
   // ---- Bloco Vigência ----
-  alteraPrazoVigencia Boolean             @default(false)
+  alteraPrazoVigencia Boolean              @default(false)
   novaVigenciaInicio  DateTime?
   novaVigenciaFim     DateTime?
   novaVigenciaPrazo   Int?
   novaVigenciaUnidade PrazoEntregaUnidade?
 
   // ---- Bloco Entrega ----
-  alteraPrazoEntrega       Boolean              @default(false)
-  novoPrazoEntregaDias     Int?
-  novoPrazoEntregaUnidade  PrazoEntregaUnidade?
+  alteraPrazoEntrega      Boolean              @default(false)
+  novoPrazoEntregaDias    Int?
+  novoPrazoEntregaUnidade PrazoEntregaUnidade?
 
   // ---- Bloco Reajuste ----
-  aplicaReajuste        Boolean         @default(false)
-  reajusteIndice        IndiceReajuste?
-  reajusteIndiceOutro   String?
-  reajustePeriodoInicio DateTime?
-  reajustePeriodoFim    DateTime?
-  reajustePercentual    Float?
+  aplicaReajuste             Boolean         @default(false)
+  reajusteIndice             IndiceReajuste?
+  reajusteIndiceOutro        String?
+  reajustePeriodoInicio      DateTime?
+  reajustePeriodoFim         DateTime?
+  reajustePercentual         Float?
   // Data a partir da qual o reajuste tem efeitos financeiros no contrato
   // (mesmo significado do campo em TermoAditivo).
   reajusteEfeitosFinanceiros DateTime?
 
-  observacoes         String?
-  arquivoPdfUrl       String?
+  observacoes   String?
+  arquivoPdfUrl String?
 
   // Snapshot do estado anterior pra reverter (mesmo formato do aditivo)
-  dadosAnteriores     Json?
+  dadosAnteriores Json?
 
-  criadoEm            DateTime @default(now())
-  atualizadoEm        DateTime @default(now()) @updatedAt
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @default(now()) @updatedAt
 
   contratoId String?
   contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -1461,16 +1467,16 @@ enum StatusNotificacao {
 }
 
 model Notificacao {
-  id             String            @id @default(cuid())
-  numero         String?
-  assunto        String
-  descricao      String
+  id              String            @id @default(cuid())
+  numero          String?
+  assunto         String
+  descricao       String
   dataRecebimento DateTime
-  prazoResposta  Int?              // dias
-  status         StatusNotificacao @default(RECEBIDA)
-  arquivoPdfUrl  String?
-  criadoEm       DateTime          @default(now())
-  atualizadoEm   DateTime          @updatedAt
+  prazoResposta   Int? // dias
+  status          StatusNotificacao @default(RECEBIDA)
+  arquivoPdfUrl   String?
+  criadoEm        DateTime          @default(now())
+  atualizadoEm    DateTime          @updatedAt
 
   ataId      String?
   ata        Ata?      @relation(fields: [ataId], references: [id], onDelete: Cascade)
@@ -1537,7 +1543,7 @@ model ProcedimentoApuratorio {
   // `comissao` (CSV legado) mantido pra retrocompatibilidade.
   comissao          String?
   comissaoMembros   String[] @default([])
-  autoridade        String?  // autoridade competente
+  autoridade        String? // autoridade competente
   dataAbertura      DateTime
   // Prazos da Lei 14.133 contados em DIAS ÚTEIS.
   // Defesa: art. 157 — 15 dias úteis (padrão).
@@ -1565,28 +1571,28 @@ model ProcedimentoApuratorio {
 }
 
 model AndamentoProcedimento {
-  id              String           @id @default(cuid())
-  procedimentoId  String
-  procedimento    ProcedimentoApuratorio @relation(fields: [procedimentoId], references: [id], onDelete: Cascade)
-  fase            FaseProcedimento
-  descricao       String
-  dataEvento      DateTime
-  arquivoPdfUrl   String?
-  criadoEm        DateTime         @default(now())
+  id             String                 @id @default(cuid())
+  procedimentoId String
+  procedimento   ProcedimentoApuratorio @relation(fields: [procedimentoId], references: [id], onDelete: Cascade)
+  fase           FaseProcedimento
+  descricao      String
+  dataEvento     DateTime
+  arquivoPdfUrl  String?
+  criadoEm       DateTime               @default(now())
 
   @@index([procedimentoId])
 }
 
 model Penalidade {
-  id              String         @id @default(cuid())
-  procedimentoId  String
-  procedimento    ProcedimentoApuratorio @relation(fields: [procedimentoId], references: [id], onDelete: Cascade)
-  tipo            TipoPenalidade
-  valor           Float?         // pra multa
-  duracaoMeses    Int?           // pra impedimento/inidoneidade
-  fundamentacao   String?
-  dataAplicacao   DateTime
-  criadoEm        DateTime       @default(now())
+  id             String                 @id @default(cuid())
+  procedimentoId String
+  procedimento   ProcedimentoApuratorio @relation(fields: [procedimentoId], references: [id], onDelete: Cascade)
+  tipo           TipoPenalidade
+  valor          Float? // pra multa
+  duracaoMeses   Int? // pra impedimento/inidoneidade
+  fundamentacao  String?
+  dataAplicacao  DateTime
+  criadoEm       DateTime               @default(now())
 
   @@index([procedimentoId])
 }
@@ -1603,20 +1609,20 @@ enum ModalidadeGarantia {
 }
 
 model Garantia {
-  id          String             @id @default(cuid())
-  modalidade  ModalidadeGarantia
+  id            String             @id @default(cuid())
+  modalidade    ModalidadeGarantia
   // Seguro-garantia
-  seguradora  String?
+  seguradora    String?
   // Fiança bancária
-  banco       String?
+  banco         String?
   // Comum
-  valor       Float
-  dataInicio  DateTime
-  dataFim     DateTime?
-  descricao   String?            // pra títulos da dívida pública e outros
+  valor         Float
+  dataInicio    DateTime
+  dataFim       DateTime?
+  descricao     String? // pra títulos da dívida pública e outros
   arquivoPdfUrl String?
-  criadoEm    DateTime           @default(now())
-  atualizadoEm DateTime          @updatedAt
+  criadoEm      DateTime           @default(now())
+  atualizadoEm  DateTime           @updatedAt
 
   contratoId String?
   contrato   Contrato? @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -1630,15 +1636,15 @@ model Garantia {
 }
 
 model Endosso {
-  id          String   @id @default(cuid())
-  garantiaId  String
-  garantia    Garantia @relation(fields: [garantiaId], references: [id], onDelete: Cascade)
-  valor       Float
-  dataInicio  DateTime
-  dataFim     DateTime?
-  observacoes String?
+  id            String    @id @default(cuid())
+  garantiaId    String
+  garantia      Garantia  @relation(fields: [garantiaId], references: [id], onDelete: Cascade)
+  valor         Float
+  dataInicio    DateTime
+  dataFim       DateTime?
+  observacoes   String?
   arquivoPdfUrl String?
-  criadoEm    DateTime @default(now())
+  criadoEm      DateTime  @default(now())
 
   @@index([garantiaId])
 }
@@ -1662,7 +1668,7 @@ enum CategoriaAnexo {
 model Anexo {
   id           String         @id @default(cuid())
   nome         String
-  url          String         // path local /uploads/<id>.<ext>
+  url          String // path local /uploads/<id>.<ext>
   mimeType     String?
   tamanhoBytes Int?
   categoria    CategoriaAnexo @default(OUTRO)
@@ -1686,12 +1692,12 @@ model Anexo {
 // futuras (Regina 31/05).
 model AtestadoCapacidade {
   id             String   @id @default(cuid())
-  numero         String?  // nº do atestado (quando o orgao emite numerado)
+  numero         String? // nº do atestado (quando o orgao emite numerado)
   dataEmissao    DateTime
-  orgaoEmissor   String   // nome do orgao que emitiu
-  objeto         String?  // descricao curta do que foi atestado
+  orgaoEmissor   String // nome do orgao que emitiu
+  objeto         String? // descricao curta do que foi atestado
   observacoes    String?
-  arquivoPdfUrl  String   // url do PDF anexado
+  arquivoPdfUrl  String // url do PDF anexado
   arquivoPdfNome String?
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
@@ -1743,10 +1749,10 @@ enum AcaoAuditoria {
 // ou quando o endereço cadastrado muda.
 model OrgaoGeocode {
   cnpj         String   @id // CNPJ normalizado (só dígitos)
-  endereco     String   // endereço usado pra geocodificar (audita re-trigger)
+  endereco     String // endereço usado pra geocodificar (audita re-trigger)
   latitude     Float
   longitude    Float
-  precisao     String?  // "exact" / "city" / "state" — qualidade do resultado
+  precisao     String? // "exact" / "city" / "state" — qualidade do resultado
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 }
@@ -1764,17 +1770,17 @@ model EnderecoGeocode {
 }
 
 model LogAuditoria {
-  id          String        @id @default(cuid())
-  contaId     String
-  conta       Conta         @relation(fields: [contaId], references: [id], onDelete: Cascade)
-  usuarioId   String?
-  usuario     Usuario?      @relation(fields: [usuarioId], references: [id])
-  acao        AcaoAuditoria
-  recurso     String        // ex: "Ata", "Contrato"
-  recursoId   String?
-  resumo      String?
-  ip          String?
-  criadoEm    DateTime      @default(now())
+  id        String        @id @default(cuid())
+  contaId   String
+  conta     Conta         @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  usuarioId String?
+  usuario   Usuario?      @relation(fields: [usuarioId], references: [id])
+  acao      AcaoAuditoria
+  recurso   String // ex: "Ata", "Contrato"
+  recursoId String?
+  resumo    String?
+  ip        String?
+  criadoEm  DateTime      @default(now())
 
   @@index([contaId])
   @@index([usuarioId])
@@ -1793,51 +1799,51 @@ enum FormaPagamento {
 }
 
 enum StatusCobranca {
-  PENDENTE          // criada, aguardando pagamento
-  PROCESSANDO       // em retentativa de cartão
-  PAGA              // confirmada
-  ATRASADA          // venceu sem pagamento
+  PENDENTE // criada, aguardando pagamento
+  PROCESSANDO // em retentativa de cartão
+  PAGA // confirmada
+  ATRASADA // venceu sem pagamento
   CANCELADA
   ESTORNADA
 }
 
 model Cobranca {
-  id                String         @id @default(cuid())
-  contaId           String
-  conta             Conta          @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
 
-  competencia       String         // YYYY-MM
-  plano             Plano
-  forma             FormaPagamento
-  valor             Float
-  status            StatusCobranca @default(PENDENTE)
+  competencia String // YYYY-MM
+  plano       Plano
+  forma       FormaPagamento
+  valor       Float
+  status      StatusCobranca @default(PENDENTE)
 
-  vencimento        DateTime
-  pagaEm            DateTime?
-  tentativas        Int            @default(0)
+  vencimento DateTime
+  pagaEm     DateTime?
+  tentativas Int       @default(0)
 
   // IDs no gateway
-  gatewayChargeId   String?        // ID da cobrança no ASAAS/Stripe
-  gatewayInvoiceUrl String?        // link pra fatura/boleto/QR PIX
-  pixQrCode         String?        // base64 do QR
-  pixCopiaCola      String?        // string PIX copia e cola
-  boletoUrl         String?        // URL do boleto
+  gatewayChargeId   String? // ID da cobrança no ASAAS/Stripe
+  gatewayInvoiceUrl String? // link pra fatura/boleto/QR PIX
+  pixQrCode         String? // base64 do QR
+  pixCopiaCola      String? // string PIX copia e cola
+  boletoUrl         String? // URL do boleto
 
-  observacoes       String?
-  criadaEm          DateTime       @default(now())
-  atualizadoEm      DateTime       @updatedAt
+  observacoes  String?
+  criadaEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 
   // Nota Fiscal de Servico (Regina 03/07): emitida automaticamente pelo
   // Asaas quando a cobranca vira PAGA (config no dashboard Asaas). Sistema
   // recebe webhook INVOICE_CREATED/SYNCHRONIZED e grava aqui.
-  nfseId            String?
-  nfseNumero        String?
-  nfseStatus        String?         // ISSUED, SYNCHRONIZED, CANCELED, ERROR
-  nfsePdfUrl        String?
-  nfseXmlUrl        String?
-  nfseEmitidaEm     DateTime?
+  nfseId        String?
+  nfseNumero    String?
+  nfseStatus    String? // ISSUED, SYNCHRONIZED, CANCELED, ERROR
+  nfsePdfUrl    String?
+  nfseXmlUrl    String?
+  nfseEmitidaEm DateTime?
 
-  eventos           EventoGateway[]
+  eventos EventoGateway[]
 
   @@index([contaId])
   @@index([status])
@@ -1845,37 +1851,37 @@ model Cobranca {
 }
 
 model MetodoPagamento {
-  id                String         @id @default(cuid())
-  contaId           String
-  conta             Conta          @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
 
-  forma             FormaPagamento
-  apelido           String?        // ex: "Cartão Itaú final 1234"
+  forma   FormaPagamento
+  apelido String? // ex: "Cartão Itaú final 1234"
 
   // Cartão (NUNCA armazenar PAN — só os 4 últimos dígitos e bandeira)
-  bandeira          String?
-  ultimosDigitos    String?
-  validadeMes       Int?
-  validadeAno       Int?
+  bandeira       String?
+  ultimosDigitos String?
+  validadeMes    Int?
+  validadeAno    Int?
 
   // Token do gateway (referência segura, sem dados sensíveis)
-  gatewayTokenId    String?
+  gatewayTokenId String?
 
-  padrao            Boolean        @default(false)
-  ativo             Boolean        @default(true)
-  criadoEm          DateTime       @default(now())
+  padrao   Boolean  @default(false)
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now())
 
   @@index([contaId])
 }
 
 model EventoGateway {
-  id          String    @id @default(cuid())
-  cobrancaId  String?
-  cobranca    Cobranca? @relation(fields: [cobrancaId], references: [id], onDelete: Cascade)
-  provider    GatewayProvider
-  evento      String    // ex: "PAYMENT_CONFIRMED", "PAYMENT_OVERDUE"
-  payload     String    // JSON serializado
-  recebidoEm  DateTime  @default(now())
+  id         String          @id @default(cuid())
+  cobrancaId String?
+  cobranca   Cobranca?       @relation(fields: [cobrancaId], references: [id], onDelete: Cascade)
+  provider   GatewayProvider
+  evento     String // ex: "PAYMENT_CONFIRMED", "PAYMENT_OVERDUE"
+  payload    String // JSON serializado
+  recebidoEm DateTime        @default(now())
 
   @@index([cobrancaId])
   @@index([evento])
@@ -1886,29 +1892,29 @@ model EventoGateway {
 // ============================================================
 
 enum TipoNotificacaoSistema {
-  PRAZO_PROXIMO            // execução com data de execução/pagamento próxima
-  STATUS_PAGO              // execução mudou pra PAGO (analista é avisado)
-  NOVA_EXECUCAO            // empresa cadastrou nova execução em contrato vinculado ao analista
-  VINCULO_CRIADO           // empresa vinculou um analista
+  PRAZO_PROXIMO // execução com data de execução/pagamento próxima
+  STATUS_PAGO // execução mudou pra PAGO (analista é avisado)
+  NOVA_EXECUCAO // empresa cadastrou nova execução em contrato vinculado ao analista
+  VINCULO_CRIADO // empresa vinculou um analista
   VINCULO_ENCERRADO
-  COMISSAO_DISPONIVEL      // valor a receber consolidado mensal
-  AVISO_VENCIMENTO_FATURA  // assinatura SaaS vencendo
-  NOVO_INDICADO            // Regina 16/07: alguem se cadastrou pelo link ?ref do EMBAIXADOR (nao confundir com VINCULO_CRIADO que e do ANALISTA)
+  COMISSAO_DISPONIVEL // valor a receber consolidado mensal
+  AVISO_VENCIMENTO_FATURA // assinatura SaaS vencendo
+  NOVO_INDICADO // Regina 16/07: alguem se cadastrou pelo link ?ref do EMBAIXADOR (nao confundir com VINCULO_CRIADO que e do ANALISTA)
 }
 
 model NotificacaoSistema {
-  id              String                @id @default(cuid())
-  usuarioId       String                // destinatário
-  usuario         Usuario               @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  tipo            TipoNotificacaoSistema
-  titulo          String
-  descricao       String?
-  link            String?               // rota interna (ex: "/execucao/abc123")
-  recursoTipo     String?               // ex: "Empenho", "VinculoAnalista"
-  recursoId       String?
-  lida            Boolean               @default(false)
-  lidaEm          DateTime?
-  criadoEm        DateTime              @default(now())
+  id          String                 @id @default(cuid())
+  usuarioId   String // destinatário
+  usuario     Usuario                @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo        TipoNotificacaoSistema
+  titulo      String
+  descricao   String?
+  link        String? // rota interna (ex: "/execucao/abc123")
+  recursoTipo String? // ex: "Empenho", "VinculoAnalista"
+  recursoId   String?
+  lida        Boolean                @default(false)
+  lidaEm      DateTime?
+  criadoEm    DateTime               @default(now())
 
   @@index([usuarioId, lida])
   @@index([criadoEm])
@@ -1920,45 +1926,45 @@ model NotificacaoSistema {
 // a IA pode agir com ferramenta (opt-in WA, corrigir valor de item, etc)
 // gravando auditoria.
 enum CategoriaChamado {
-  DUVIDA_USO           // "como fazer X?"
-  AJUSTE_DADOS         // "trocar meu WA", "meu PIX ta errado"
+  DUVIDA_USO // "como fazer X?"
+  AJUSTE_DADOS // "trocar meu WA", "meu PIX ta errado"
   CORRECAO_OPERACIONAL // "valor unit dessa ata ta errado, o certo eh Y"
-  BUG_SISTEMA          // "clico e nao acontece nada"
-  FEATURE_PEDIDO       // "queria que tivesse tela X"
+  BUG_SISTEMA // "clico e nao acontece nada"
+  FEATURE_PEDIDO // "queria que tivesse tela X"
   OUTRO
 }
 
 enum StatusChamado {
   ABERTO
   IA_ANALISANDO
-  IA_RESOLVEU           // IA respondeu/executou — cliente confirmou
-  AGUARDANDO_ADMIN      // escalado, aguarda validacao Regina/Igor
-  EM_IMPLEMENTACAO      // admin aprovou, dev/IA vai implementar
+  IA_RESOLVEU // IA respondeu/executou — cliente confirmou
+  AGUARDANDO_ADMIN // escalado, aguarda validacao Regina/Igor
+  EM_IMPLEMENTACAO // admin aprovou, dev/IA vai implementar
   RESOLVIDO_ADMIN
   RECUSADO
 }
 
 model ChamadoSuporte {
-  id             String           @id @default(cuid())
+  id             String            @id @default(cuid())
   contaId        String
-  conta          Conta            @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  conta          Conta             @relation(fields: [contaId], references: [id], onDelete: Cascade)
   usuarioId      String
-  usuario        Usuario          @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  categoria      CategoriaChamado @default(OUTRO)
+  usuario        Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  categoria      CategoriaChamado  @default(OUTRO)
   titulo         String
   descricao      String
-  status         StatusChamado    @default(ABERTO)
+  status         StatusChamado     @default(ABERTO)
   // Resposta da IA (quando resolveu na hora ou explicou algo)
   respostaIA     String?
-  iaAgiu         Boolean          @default(false)
-  iaAcaoResumo   String?          // "atualizou opt-in WA para false"
+  iaAgiu         Boolean           @default(false)
+  iaAcaoResumo   String? // "atualizou opt-in WA para false"
   // Admin que validou/resolveu
   resolvidoPorId String?
   resolvidoEm    DateTime?
   // Trilha do chamado (respostas seguintes do cliente ou admin)
   mensagens      MensagemChamado[]
-  criadoEm       DateTime         @default(now())
-  atualizadoEm   DateTime         @updatedAt
+  criadoEm       DateTime          @default(now())
+  atualizadoEm   DateTime          @updatedAt
 
   @@index([status])
   @@index([contaId])
@@ -1966,24 +1972,131 @@ model ChamadoSuporte {
 }
 
 model MensagemChamado {
-  id         String         @id @default(cuid())
-  chamadoId  String
-  chamado    ChamadoSuporte @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
-  autor      String         // "CLIENTE" | "IA" | "ADMIN"
-  autorId    String?        // usuarioId quando CLIENTE/ADMIN
-  conteudo   String
-  criadoEm   DateTime       @default(now())
+  id        String         @id @default(cuid())
+  chamadoId String
+  chamado   ChamadoSuporte @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+  autor     String // "CLIENTE" | "IA" | "ADMIN"
+  autorId   String? // usuarioId quando CLIENTE/ADMIN
+  conteudo  String
+  criadoEm  DateTime       @default(now())
 
   @@index([chamadoId])
 }
 
 // Configuração singleton (1 linha por instalação) das credenciais do gateway
 model ConfiguracaoGateway {
-  id              String          @id @default("singleton")
-  provider        GatewayProvider @default(DEMO)
-  ambiente        String          @default("sandbox") // sandbox | production
-  apiKey          String?         // criptografada em produção
-  webhookToken    String?         // valida POSTs do gateway
-  atualizadoEm    DateTime        @updatedAt
-  atualizadoPor   String?
+  id            String          @id @default("singleton")
+  provider      GatewayProvider @default(DEMO)
+  ambiente      String          @default("sandbox") // sandbox | production
+  apiKey        String? // criptografada em produção
+  webhookToken  String? // valida POSTs do gateway
+  atualizadoEm  DateTime        @updatedAt
+  atualizadoPor String?
+}
+
+// ============================================================
+// CONCILIAÇÃO BANCÁRIA (Regina 21/07/2026)
+// Feature INTERMEDIARIO+PREMIUM. Cliente sobe PDF do extrato via web OU
+// responde WhatsApp com anexo. LLM extrai transacoes -> matcheia com
+// empenhos abertos por (valor, data, orgao, cnpj) -> gera dashboard.
+// ============================================================
+
+enum FonteExtrato {
+  WEB_UPLOAD // dropzone em /conciliacao
+  WHATSAPP_INBOUND // cliente respondeu lembrete anexando PDF
+  MANUAL_ADMIN // super admin subiu pra testar
+}
+
+enum StatusProcessamentoExtrato {
+  RECEBIDO // arquivo salvo, aguardando extracao LLM
+  EXTRAINDO // LLM rodando
+  EXTRAIDO // transacoes prontas, aguardando match
+  CONCILIANDO // matching em andamento
+  CONCLUIDO // dashboard pronto pra visualizar
+  ERRO // falha na extracao ou match
+}
+
+// 1 upload = 1 Extrato. hashArquivo evita reprocessar o mesmo PDF 2x.
+model Extrato {
+  id              String                     @id @default(cuid())
+  contaId         String
+  conta           Conta                      @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  fonte           FonteExtrato
+  status          StatusProcessamentoExtrato @default(RECEBIDO)
+  // SHA-256 do PDF - dedup: se mesmo arquivo for reenviado, retorna o Extrato existente
+  hashArquivo     String
+  nomeArquivo     String
+  tamanhoBytes    Int
+  urlArquivo      String? // Vercel Blob (opcional — pode expirar)
+  // Metadados extraidos pelo LLM
+  bancoDetectado  String? // nome livre do banco (ex: "Banco do Brasil")
+  agenciaConta    String? // ex: "1234-5 / 67890-1"
+  periodoInicio   DateTime?
+  periodoFim      DateTime?
+  saldoInicial    Float?
+  saldoFinal      Float?
+  // Estatisticas pos-processamento
+  totalTransacoes Int                        @default(0)
+  totalCreditos   Float                      @default(0)
+  totalDebitos    Float                      @default(0)
+  qtdMatchAlto    Int                        @default(0) // >85% score
+  qtdMatchMedio   Int                        @default(0) // 50-85%
+  qtdSemMatch     Int                        @default(0)
+  erroMsg         String? // se status=ERRO
+  criadoEm        DateTime                   @default(now())
+  atualizadoEm    DateTime                   @updatedAt
+
+  transacoes TransacaoExtrato[]
+
+  @@unique([contaId, hashArquivo])
+  @@index([contaId, status])
+}
+
+enum TipoTransacao {
+  CREDITO
+  DEBITO
+}
+
+// Uma linha do extrato bancário.
+model TransacaoExtrato {
+  id                    String        @id @default(cuid())
+  extratoId             String
+  extrato               Extrato       @relation(fields: [extratoId], references: [id], onDelete: Cascade)
+  tipo                  TipoTransacao
+  data                  DateTime
+  valor                 Float // sempre positivo; sinal vem do tipo
+  descricao             String // histórico bancário bruto
+  nomeContraparte       String? // nome pagador/recebedor (se identificável)
+  cnpjContraparte       String? // CNPJ se aparecer no histórico
+  identificadorBancario String? // nº lançamento / ID do banco (pra dedup interna)
+  // Match: 0..1 conciliação vinculada. Uma transação pode conciliar com no
+  // máximo 1 empenho (se casar com 2, cliente escolhe qual manualmente).
+  conciliacoes          Conciliacao[]
+  criadoEm              DateTime      @default(now())
+
+  @@index([extratoId, tipo])
+}
+
+enum StatusConciliacao {
+  SUGERIDA // score baixo/medio, aguarda aceite do cliente
+  CONFIRMADA // cliente aceitou OU score foi >85% (auto)
+  REJEITADA // cliente rejeitou match
+}
+
+// Vínculo entre transação bancária e empenho. Um empenho pode ter várias
+// conciliações (parcelamento). Uma transação idealmente casa com 1 empenho.
+model Conciliacao {
+  id              String            @id @default(cuid())
+  transacaoId     String
+  transacao       TransacaoExtrato  @relation(fields: [transacaoId], references: [id], onDelete: Cascade)
+  empenhoId       String
+  score           Float // 0..100, calculado pelo motor de match
+  fatoresMatch    Json? // {valorExato:true, datasDif:2, orgaoIgual:true, cnpjIgual:false}
+  status          StatusConciliacao @default(SUGERIDA)
+  confirmadaEm    DateTime?
+  confirmadaPorId String? // usuarioId
+  criadoEm        DateTime          @default(now())
+
+  @@index([transacaoId])
+  @@index([empenhoId])
 }
