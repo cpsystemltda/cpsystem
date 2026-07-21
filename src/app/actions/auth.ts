@@ -5,6 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { criarSessao, destruirSessao, hashSenha, verificarSenha } from "@/lib/auth";
 import { loginSchema, normalizarCnpj, normalizarCpf, signupAnalistaSchema, signupSchema } from "@/lib/validators";
 import { validarCartao } from "@/lib/cartao";
+import {
+  verificarLimiteLogin,
+  registrarTentativa,
+  ipDoRequest,
+  userAgentDoRequest,
+  mensagemBloqueio,
+} from "@/lib/rateLimitLogin";
 
 type ActionResult = {
   erro?: string;
@@ -475,14 +482,34 @@ export async function loginAction(_prev: ActionResult | null, formData: FormData
     return { erro: "Preencha e-mail e senha." };
   }
 
+  const emailNorm = parsed.data.email.toLowerCase();
+  const ip = await ipDoRequest();
+  const userAgent = await userAgentDoRequest();
+
+  // SEG P0: rate limit — bloqueia brute force antes mesmo de consultar o DB.
+  const limite = await verificarLimiteLogin(emailNorm, ip);
+  if (!limite.permitido) {
+    // NAO registra tentativa aqui: se um atacante estiver bloqueado por email,
+    // ele nao pode passar do rate limit registrando mais tentativas e mantendo
+    // o proprio bloqueio pra sempre. O bloqueio expira sozinho quando a
+    // tentativa mais antiga sai da janela.
+    return { erro: mensagemBloqueio(limite.motivo, limite.retryEmSegundos) };
+  }
+
   const usuario = await prisma.usuario.findUnique({
-    where: { email: parsed.data.email.toLowerCase() },
+    where: { email: emailNorm },
     include: { conta: true },
   });
-  if (!usuario) return { erro: "Credenciais inválidas." };
+  if (!usuario) {
+    await registrarTentativa({ email: emailNorm, ip, sucesso: false, userAgent });
+    return { erro: "Credenciais inválidas." };
+  }
 
   const ok = await verificarSenha(parsed.data.senha, usuario.senhaHash);
-  if (!ok) return { erro: "Credenciais inválidas." };
+  if (!ok) {
+    await registrarTentativa({ email: emailNorm, ip, sucesso: false, userAgent });
+    return { erro: "Credenciais inválidas." };
+  }
 
   // Valida que o tipo escolhido no toggle bate com o tipo real da conta
   // (Regina 10/06: caso comum de tentar logar no lado errado). SuperAdmin
@@ -498,6 +525,7 @@ export async function loginAction(_prev: ActionResult | null, formData: FormData
     };
   }
 
+  await registrarTentativa({ email: emailNorm, ip, sucesso: true, userAgent });
   await criarSessao(usuario.id);
   // Redireciona pra rota inicial conforme o tipo da conta:
   // - SuperAdmin: visão de plataforma

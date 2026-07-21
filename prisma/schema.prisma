@@ -2100,3 +2100,22 @@ model Conciliacao {
   @@index([transacaoId])
   @@index([empenhoId])
 }
+
+// Rate limit de login (Regina 21/07 — SEG P0).
+// Registra CADA tentativa (sucesso ou falha) pra:
+//   1) bloquear brute force por email (5 falhas / 15min)
+//   2) bloquear brute force por IP    (20 falhas / 15min)
+//   3) auditoria de invasoes bem-sucedidas depois de falhas suspeitas
+// Rotina de limpeza (cron): apaga registros com >30d.
+model TentativaLogin {
+  id        String   @id @default(cuid())
+  email     String // sempre lowercase
+  ip        String // remoteAddr do header x-forwarded-for
+  sucesso   Boolean
+  userAgent String? // pra correlacao / detectar bot
+  criadoEm  DateTime @default(now())
+
+  @@index([email, criadoEm])
+  @@index([ip, criadoEm])
+  @@index([criadoEm]) // pra limpeza
+}
