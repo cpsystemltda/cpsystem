@@ -319,6 +319,53 @@ async function coletarPlanejamento(inicioHoje: Date): Promise<MapaUsuarios> {
   return mapa;
 }
 
+// Lembretes de conciliacao bancaria — na MANHA.
+// Regina 21/07/2026: manda 5d antes, 1d antes e no dia da janela escolhida
+// pelo cliente. "Sem incomodar demais." Feature exclusiva de INTERMEDIARIO+PREMIUM.
+async function coletarLembretesConciliacao(inicioHoje: Date): Promise<MapaUsuarios> {
+  const mapa: MapaUsuarios = new Map();
+  const contas = await prisma.conta.findMany({
+    where: {
+      plano: { in: ["INTERMEDIARIO", "PREMIUM"] },
+      conciliacaoOptIn: true,
+      conciliacaoDiaMes: { not: null },
+    },
+    select: { id: true, conciliacaoDiaMes: true },
+  });
+  for (const c of contas) {
+    const dia = c.conciliacaoDiaMes;
+    if (!dia) continue;
+
+    // Proxima ocorrencia da janela: mes atual se o dia ainda nao passou; senao mes+1.
+    // JS Date normaliza dia > ultimoDiaDoMes automaticamente pro mes seguinte.
+    let proxima = new Date(inicioHoje.getFullYear(), inicioHoje.getMonth(), dia);
+    if (proxima.getTime() < inicioHoje.getTime()) {
+      proxima = new Date(inicioHoje.getFullYear(), inicioHoje.getMonth() + 1, dia);
+    }
+    const diff = Math.round((proxima.getTime() - inicioHoje.getTime()) / 86400000);
+
+    let linha: string | null = null;
+    let urgencia = 2;
+    if (diff === 5) {
+      linha = `🧾 Conciliação bancária em 5 dias (dia ${dia}). Já vai separando o extrato do banco.`;
+      urgencia = 2;
+    } else if (diff === 1) {
+      linha = `🧾 Conciliação bancária amanhã (dia ${dia}). Sobe o PDF em https://cpsystem.app.br/conciliacao`;
+      urgencia = 3;
+    } else if (diff === 0) {
+      linha = `🧾 Hoje é dia da conciliação bancária. Sobe o PDF em https://cpsystem.app.br/conciliacao — a gente cruza com os empenhos automaticamente.`;
+      urgencia = 4;
+    }
+    if (!linha) continue;
+
+    const usuarios = await destinatariosDaConta(c.id);
+    for (const u of usuarios) {
+      addItem(mapa, u.id, { categoria: "conciliacao", urgencia, linha });
+    }
+  }
+  return mapa;
+}
+
 // Aniversarios — na MANHA.
 async function coletarAniversarios(hoje: Date): Promise<MapaUsuarios> {
   const mapa: MapaUsuarios = new Map();
@@ -419,11 +466,12 @@ export async function executarResumoDaJanela(
   let mapa: MapaUsuarios = new Map();
 
   if (janela === "MANHA") {
-    const [criticos, aniv] = await Promise.all([
+    const [criticos, aniv, conc] = await Promise.all([
       coletarCriticosDoDia(inicioHoje, amanha),
       coletarAniversarios(inicioHoje),
+      coletarLembretesConciliacao(inicioHoje),
     ]);
-    mapa = mergeMapas(criticos, aniv);
+    mapa = mergeMapas(criticos, aniv, conc);
   } else if (janela === "TARDE") {
     mapa = await coletarAcaoImediata(inicioHoje);
   } else if (janela === "NOITE") {
