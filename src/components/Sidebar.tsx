@@ -21,6 +21,7 @@ import {
   Wallet,
   Plug,
   Banknote,
+  ShieldCheck,
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { SeletorVisao } from "@/components/SeletorVisao";
@@ -73,6 +74,7 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
     titulo: "Conta",
     itens: [
       { href: "/conta/perfil", label: "Meus dados", icon: UserCog },
+      { href: "/conta/seguranca", label: "Segurança", icon: ShieldCheck },
       { href: "/notificacoes", label: "Notificações", icon: Bell },
       { href: "/conta/notificacoes", label: "Notificações WhatsApp", icon: Bell },
       { href: "/conta/assinatura", label: "Assinatura", icon: CreditCard },
@@ -101,6 +103,7 @@ const GRUPOS_ANALISTA: Grupo[] = [
     titulo: "Conta",
     itens: [
       { href: "/conta/perfil", label: "Meus dados", icon: UserCog },
+      { href: "/conta/seguranca", label: "Segurança", icon: ShieldCheck },
       { href: "/equipe", label: "Equipe", icon: Users },
       { href: "/termos", label: "Termos / LGPD", icon: ScrollText },
     ],
