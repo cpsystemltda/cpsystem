@@ -3,9 +3,19 @@
 import bcrypt from "bcryptjs";
 import QRCode from "qrcode";
 import { revalidatePath } from "next/cache";
-import { exigirUsuario, verificarSenha } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { criarSessao, exigirUsuario, verificarSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { prisma } from "@/lib/prisma";
+import { lerPending2FA, limparPending2FA } from "@/lib/pending2FA";
+import {
+  registrarTentativa,
+  ipDoRequest,
+  userAgentDoRequest,
+  verificarLimiteLogin,
+  mensagemBloqueio,
+} from "@/lib/rateLimitLogin";
+import { verificarERegistrarDispositivo, notificarLoginDeviceNovo } from "@/lib/dispositivoConhecido";
 import {
   gerarSecretBase32,
   otpauthUri,
@@ -151,4 +161,98 @@ export async function desativar2FAAction(_p: SimpleResult | null, formData: Form
 
   revalidatePath("/conta/seguranca");
   return { ok: true };
+}
+
+// (5) Fluxo de login: apos senha correta, se totpAtivadoEm, redirect
+// pra /login/2fa. Cliente digita codigo aqui — validamos, criamos sessao
+// real, registramos device.
+export async function verificar2FALoginAction(_p: { erro?: string } | null, formData: FormData): Promise<{ erro?: string }> {
+  const usuarioId = await lerPending2FA();
+  if (!usuarioId) {
+    return { erro: "Sessão de 2FA expirou. Faça login de novo." };
+  }
+
+  const codigo = String(formData.get("codigo") || "").trim().toUpperCase();
+  const usarRecovery = String(formData.get("tipo") || "totp") === "recovery";
+
+  const u = await prisma.usuario.findUnique({
+    where: { id: usuarioId },
+    select: {
+      id: true, email: true, superAdmin: true, telefoneWhatsApp: true,
+      totpSecret: true, totpAtivadoEm: true,
+      conta: { select: { tipo: true } },
+    },
+  });
+  if (!u?.totpAtivadoEm || !u.totpSecret) {
+    // Nao deveria acontecer, mas defensivo
+    await limparPending2FA();
+    return { erro: "2FA não está mais ativo. Faça login de novo." };
+  }
+
+  // SEG: rate limit tambem no 2FA — atacante com senha vazada nao deve poder
+  // tentar TOTP infinito. Reusa a mesma tabela TentativaLogin.
+  const ip = await ipDoRequest();
+  const userAgent = await userAgentDoRequest();
+  const limite = await verificarLimiteLogin(u.email, ip);
+  if (!limite.permitido) {
+    return { erro: mensagemBloqueio(limite.motivo, limite.retryEmSegundos) };
+  }
+
+  let valido = false;
+  if (usarRecovery) {
+    // Codigo de recuperacao — busca todos os disponiveis e compara com bcrypt
+    if (!/^[A-Z0-9]{5}-?[A-Z0-9]{5}$/i.test(codigo)) {
+      return { erro: "Código de recuperação inválido. Use o formato XXXXX-XXXXX." };
+    }
+    const norm = codigo.includes("-") ? codigo : `${codigo.slice(0, 5)}-${codigo.slice(5)}`;
+    const disponiveis = await prisma.recoveryCode2FA.findMany({
+      where: { usuarioId, usadoEm: null },
+      select: { id: true, codigoHash: true },
+    });
+    for (const c of disponiveis) {
+      if (await bcrypt.compare(norm, c.codigoHash)) {
+        await prisma.recoveryCode2FA.update({
+          where: { id: c.id },
+          data: { usadoEm: new Date() },
+        });
+        valido = true;
+        break;
+      }
+    }
+  } else {
+    if (!/^\d{6}$/.test(codigo)) return { erro: "Código deve ter 6 dígitos." };
+    valido = verificarCodigoTotp(u.totpSecret, codigo);
+  }
+
+  if (!valido) {
+    await registrarTentativa({ email: u.email, ip, sucesso: false, userAgent });
+    return { erro: usarRecovery ? "Código de recuperação inválido ou já usado." : "Código 2FA incorreto." };
+  }
+
+  // Codigo OK — completar o fluxo de login (o que loginAction faria depois da senha)
+  await registrarTentativa({ email: u.email, ip, sucesso: true, userAgent });
+  const statusDevice = await verificarERegistrarDispositivo({
+    usuarioId: u.id,
+    userAgent,
+    ip,
+  });
+  if (statusDevice === "novo") {
+    await notificarLoginDeviceNovo({
+      usuarioId: u.id,
+      telefone: u.telefoneWhatsApp,
+      userAgent,
+      ip,
+      hora: new Date(),
+    });
+  }
+
+  await criarSessao(u.id);
+  await limparPending2FA();
+
+  const destino = u.superAdmin
+    ? "/admin-plataforma"
+    : u.conta.tipo === "ANALISTA"
+      ? "/painel-analista"
+      : "/dashboard";
+  redirect(destino);
 }

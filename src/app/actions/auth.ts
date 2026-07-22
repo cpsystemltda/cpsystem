@@ -17,6 +17,7 @@ import {
   verificarERegistrarDispositivo,
   notificarLoginDeviceNovo,
 } from "@/lib/dispositivoConhecido";
+import { criarPending2FA } from "@/lib/pending2FA";
 
 type ActionResult = {
   erro?: string;
@@ -520,6 +521,15 @@ export async function loginAction(_prev: ActionResult | null, formData: FormData
   if (!ok) {
     await registrarTentativa({ email: emailNorm, ip, sucesso: false, userAgent });
     return { erro: "Credenciais inválidas." };
+  }
+
+  // SEG P1: se 2FA esta ativo pra esse usuario, pausa aqui — nao cria sessao
+  // real. Redireciona pra /login/2fa com cookie pending TTL 5min.
+  // Registrar dispositivo/tentativa acontece SO depois do 2FA validado (senao
+  // atacante com senha vazada estaria "conhecido" mesmo sem completar 2FA).
+  if (usuario.totpAtivadoEm) {
+    await criarPending2FA(usuario.id);
+    redirect("/login/2fa");
   }
 
   // Valida que o tipo escolhido no toggle bate com o tipo real da conta
