@@ -126,6 +126,12 @@ model Usuario {
   cargo               String?
   dataNascimento      DateTime?
   onboardingConcluido Boolean       @default(true)
+  // 2FA TOTP opt-in (Regina 22/07 — SEG P1). totpSecret guarda o segredo
+  // em BASE32 puro (nao eh hash — precisamos dele pra validar codigos).
+  // Coluna criptografada em repouso (Neon AES-256). totpAtivadoEm marca
+  // a confirmacao — enquanto null, secret existe mas 2FA ainda nao ta ativo.
+  totpSecret          String?
+  totpAtivadoEm       DateTime?
   criadoEm            DateTime      @default(now())
   atualizadoEm        DateTime      @updatedAt
 
@@ -135,6 +141,7 @@ model Usuario {
   sessoes                     Sessao[]
   magicLinks                  MagicLink[]
   dispositivosConhecidos      DispositivoConhecido[]
+  recoveryCodes2FA            RecoveryCode2FA[]
   chamadosSuporte             ChamadoSuporte[]
   logsAuditoria               LogAuditoria[]
   notificacoesSistema         NotificacaoSistema[]
@@ -2103,6 +2110,22 @@ model Conciliacao {
 
   @@index([transacaoId])
   @@index([empenhoId])
+}
+
+// Recovery codes 2FA (Regina 22/07 — SEG P1).
+// 8 codigos alfanumericos gerados na ativacao do 2FA, cada um valido 1x.
+// Guardados como bcrypt hash (mesmo padrao de senhaHash). Cliente ve 1x
+// na ativacao e precisa imprimir/salvar. Se perder o celular, usa 1 desses
+// pra entrar e regerar 2FA.
+model RecoveryCode2FA {
+  id         String    @id @default(cuid())
+  usuarioId  String
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  codigoHash String // bcrypt do codigo alfanumerico
+  usadoEm    DateTime? // null = disponivel; datetime = ja consumido (mantem por auditoria)
+  criadoEm   DateTime  @default(now())
+
+  @@index([usuarioId])
 }
 
 // Alerta de login em dispositivo novo (Regina 22/07 — SEG P1).
