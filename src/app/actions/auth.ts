@@ -12,6 +12,11 @@ import {
   userAgentDoRequest,
   mensagemBloqueio,
 } from "@/lib/rateLimitLogin";
+import { validarSenhaSegura } from "@/lib/senhaSegura";
+import {
+  verificarERegistrarDispositivo,
+  notificarLoginDeviceNovo,
+} from "@/lib/dispositivoConhecido";
 
 type ActionResult = {
   erro?: string;
@@ -60,6 +65,12 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   const v = parsed.data;
   const cnpj = normalizarCnpj(v.cnpj);
   const emailNorm = v.email.trim().toLowerCase();
+
+  // SEG P0: valida senha forte + HIBP antes de qualquer coisa que toca no DB.
+  const senhaCheck = await validarSenhaSegura(v.senha, { email: emailNorm, nome: v.nome });
+  if (!senhaCheck.ok) {
+    return { erro: senhaCheck.erro, campos: { senha: senhaCheck.erro }, valores };
+  }
 
   // Valida cartão (Luhn + bandeira + validade + CVV + nome) — antes de tocar no DB
   const cartao = validarCartao({
@@ -526,6 +537,26 @@ export async function loginAction(_prev: ActionResult | null, formData: FormData
   }
 
   await registrarTentativa({ email: emailNorm, ip, sucesso: true, userAgent });
+
+  // SEG P1: alerta em dispositivo novo. Rodamos ANTES de criar sessao pra
+  // ter certeza que dispositivo eh registrado mesmo se sessao falhar depois.
+  // Nao trava login por falha de WA (o notificar ja captura erros).
+  const statusDevice = await verificarERegistrarDispositivo({
+    usuarioId: usuario.id,
+    userAgent,
+    ip,
+  });
+  if (statusDevice === "novo") {
+    // Fire-and-forget: nao trava o redirect por conta da chamada WA
+    await notificarLoginDeviceNovo({
+      usuarioId: usuario.id,
+      telefone: usuario.telefoneWhatsApp,
+      userAgent,
+      ip,
+      hora: new Date(),
+    });
+  }
+
   await criarSessao(usuario.id);
   // Redireciona pra rota inicial conforme o tipo da conta:
   // - SuperAdmin: visão de plataforma
@@ -581,6 +612,12 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
   const enderecoPj = (v.enderecoPj ?? "").trim();
   const emailPj = (v.emailPj ?? "").trim();
   const telefonePj = (v.telefonePj ?? "").trim();
+
+  // SEG P0: valida senha forte + HIBP antes de qualquer coisa que toca no DB.
+  const senhaCheck = await validarSenhaSegura(v.senha, { email, nome });
+  if (!senhaCheck.ok) {
+    return { erro: senhaCheck.erro, campos: { senha: senhaCheck.erro }, valores };
+  }
 
   const emailExiste = await prisma.usuario.findUnique({ where: { email } });
   if (emailExiste) return { erro: "E-mail já cadastrado.", campos: { email: "E-mail já cadastrado" }, valores };

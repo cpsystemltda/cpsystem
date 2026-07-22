@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { exigirUsuario, hashSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { formatarTelefone } from "@/lib/whatsapp";
+import { validarSenhaSegura } from "@/lib/senhaSegura";
 
 type Result = { erro?: string; ok?: boolean; campos?: Record<string, string> };
 
@@ -33,7 +34,6 @@ export async function salvarDadosPessoaisAction(
   if (cpf.length !== 11) campos.cpf = "CPF deve ter 11 dígitos";
   if (!cargo) campos.cargo = "Informe seu cargo";
   if (!dataNascimento) campos.dataNascimento = "Informe sua data de nascimento";
-  if (senha.length < 6) campos.senha = "Senha mínima de 6 caracteres";
   if (senha !== confirmacao) campos.confirmacaoSenha = "Senhas não conferem";
   if (!aceite) campos.aceiteTermos = "Você precisa aceitar os termos pra continuar";
   let telefone: string;
@@ -44,6 +44,10 @@ export async function salvarDadosPessoaisAction(
     telefone = "";
   }
   if (Object.keys(campos).length > 0) return { erro: "Verifique os campos", campos };
+
+  // SEG P0: valida senha forte + HIBP.
+  const senhaCheck = await validarSenhaSegura(senha, { email: usuario.email, nome });
+  if (!senhaCheck.ok) return { erro: senhaCheck.erro, campos: { senha: senhaCheck.erro } };
 
   await prisma.usuario.update({
     where: { id: usuario.id },

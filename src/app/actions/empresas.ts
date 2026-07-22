@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { exigirUsuario, hashSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { normalizarCnpj, novaEmpresaSchema } from "@/lib/validators";
+import { validarSenhaSegura } from "@/lib/senhaSegura";
 
 type ActionResult = { erro?: string; campos?: Record<string, string> };
 
@@ -65,6 +66,11 @@ export async function criarEmpresaAction(_prev: ActionResult | null, formData: F
     });
 
     if (v.senha) {
+      // SEG P0: valida senha forte + HIBP antes de criar o Usuario.
+      const senhaCheck = await validarSenhaSegura(v.senha, { email: v.email, nome: v.responsavel });
+      if (!senhaCheck.ok) {
+        throw new Error(senhaCheck.erro);
+      }
       await tx.usuario.create({
         data: {
           nome: v.responsavel,

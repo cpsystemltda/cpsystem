@@ -149,6 +149,9 @@ export async function dispararNotificacao(opts: {
   tipo: TipoNotificacaoWhatsApp;
   referenciaId: string;
   mensagem: string;
+  // Regina 22/07 — alertas de seguranca ignoram opt-in E cap diario.
+  // Kill switch continua respeitado (emergencia geral).
+  bypassCap?: boolean;
 }): Promise<{ enviado: boolean; motivo?: string; messageId?: string }> {
   if (killSwitchAtivo()) return { enviado: false, motivo: "kill_switch" };
   const usuario = await prisma.usuario.findUnique({
@@ -156,12 +159,14 @@ export async function dispararNotificacao(opts: {
     select: { id: true, telefoneWhatsApp: true, optInWhatsApp: true },
   });
   if (!usuario) return { enviado: false, motivo: "usuario_nao_encontrado" };
-  if (!usuario.optInWhatsApp) return { enviado: false, motivo: "sem_opt_in" };
+  if (!opts.bypassCap && !usuario.optInWhatsApp) return { enviado: false, motivo: "sem_opt_in" };
   if (!usuario.telefoneWhatsApp) return { enviado: false, motivo: "sem_telefone" };
-  // Cap diario — protege cliente de flood mesmo se tiver bug no cron.
-  const enviadasHoje = await contarEnviadasHoje(opts.usuarioId);
-  if (enviadasHoje >= LIMITE_MSGS_DIARIAS_POR_USUARIO) {
-    return { enviado: false, motivo: "cap_diario_atingido" };
+  if (!opts.bypassCap) {
+    // Cap diario — protege cliente de flood mesmo se tiver bug no cron.
+    const enviadasHoje = await contarEnviadasHoje(opts.usuarioId);
+    if (enviadasHoje >= LIMITE_MSGS_DIARIAS_POR_USUARIO) {
+      return { enviado: false, motivo: "cap_diario_atingido" };
+    }
   }
 
   // Idempotencia — se ja foi enviada com sucesso, no-op.

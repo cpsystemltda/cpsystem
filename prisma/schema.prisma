@@ -134,6 +134,7 @@ model Usuario {
 
   sessoes                     Sessao[]
   magicLinks                  MagicLink[]
+  dispositivosConhecidos      DispositivoConhecido[]
   chamadosSuporte             ChamadoSuporte[]
   logsAuditoria               LogAuditoria[]
   notificacoesSistema         NotificacaoSistema[]
@@ -181,6 +182,9 @@ enum TipoNotificacaoWhatsApp {
   // destinatario garantido pela chave (usuarioId, tipo, referenciaId=YYYY-Wxx)).
   RESUMO_SEMANAL_EMPRESA
   RESUMO_SEMANAL_ANALISTA
+  // Regina 22/07 — alerta de seguranca em login de dispositivo novo.
+  // Bypassa opt-in e cap diario (dispararNotificacao com bypassCap=true).
+  SEGURANCA_LOGIN_NOVO_DEVICE
 }
 
 enum StatusNotificacaoWhatsApp {
@@ -2099,6 +2103,24 @@ model Conciliacao {
 
   @@index([transacaoId])
   @@index([empenhoId])
+}
+
+// Alerta de login em dispositivo novo (Regina 22/07 — SEG P1).
+// Cada usuario tem N dispositivos conhecidos, identificados por hash SHA-256
+// do user-agent. Primeiro login (silencioso) marca o device como conhecido;
+// login subsequente de fingerprint NOVA dispara WA pro dono.
+model DispositivoConhecido {
+  id                 String   @id @default(cuid())
+  usuarioId          String
+  usuario            Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  fingerprint        String // sha256(user-agent). Substrings de IP nao — cliente troca de rede o tempo todo.
+  ipUltimoAcesso     String?
+  userAgentAmostra   String? // pra Regina/Igor auditarem em /admin
+  primeiroLoginEm    DateTime @default(now())
+  ultimoLoginEm      DateTime @default(now())
+
+  @@unique([usuarioId, fingerprint])
+  @@index([usuarioId])
 }
 
 // Rate limit de login (Regina 21/07 — SEG P0).

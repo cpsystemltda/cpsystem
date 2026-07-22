@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { criarSessao, hashSenha } from "@/lib/auth";
+import { validarSenhaSegura } from "@/lib/senhaSegura";
 import { gerarMagicLink, consumirMagicLink, urlDoMagicLink } from "@/lib/magicLink";
 import { enviarTexto } from "@/lib/whatsapp";
 import { registrarAuditoria } from "@/lib/auditoria";
@@ -95,12 +96,21 @@ export async function salvarNovaSenhaAction(
   const senha = String(formData.get("senha") || "");
   const confirmacao = String(formData.get("confirmacaoSenha") || "");
 
-  if (senha.length < 6) return { erro: "Senha muito curta.", campos: { senha: "Mínimo 6 caracteres" } };
   if (senha !== confirmacao) return { erro: "Confirmação não confere.", campos: { confirmacaoSenha: "Não confere" } };
 
   const consumido = await consumirMagicLink(token);
   if (!consumido) return { erro: "Link inválido ou expirado. Solicite novo em /esqueci-senha." };
   if (consumido.motivo !== "redefinir_senha") return { erro: "Link inválido para este fluxo." };
+
+  // SEG P0: valida senha forte + HIBP.
+  // Puxa o usuario primeiro pra passar email/nome como contexto.
+  const alvo = await prisma.usuario.findUnique({
+    where: { id: consumido.usuarioId },
+    select: { email: true, nome: true, contaId: true },
+  });
+  if (!alvo) return { erro: "Usuário não encontrado." };
+  const senhaCheck = await validarSenhaSegura(senha, { email: alvo.email, nome: alvo.nome });
+  if (!senhaCheck.ok) return { erro: senhaCheck.erro, campos: { senha: senhaCheck.erro } };
 
   const senhaHash = await hashSenha(senha);
   await prisma.usuario.update({

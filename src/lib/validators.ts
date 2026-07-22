@@ -33,7 +33,7 @@ export const signupSchema = z
     // vencimentos, resumo semanal via WhatsApp automatico. Cliente
     // recebe por padrao (pode desligar depois em /conta/notificacoes).
     telefoneWhatsApp: z.string().min(10, "Informe seu WhatsApp com DDD"),
-    senha: z.string().min(6, "Mínimo 6 caracteres"),
+    senha: z.string().min(10, "Mínimo 10 caracteres"),
     confirmacaoSenha: z.string().min(1, "Confirme a senha"),
 
     // Primeira empresa
@@ -102,7 +102,7 @@ export const signupAnalistaSchema = z
     nome: z.string().min(2, "Nome muito curto"),
     cpf: z.string().regex(cpfRegex, "CPF inválido"),
     email: z.string().email("E-mail inválido"),
-    senha: z.string().min(6, "Mínimo 6 caracteres"),
+    senha: z.string().min(10, "Mínimo 10 caracteres"),
     confirmacaoSenha: z.string().min(1, "Confirme a senha"),
     telefone: z.string().min(8, "Telefone obrigatório"),
     endereco: z.string().min(5, "Endereço muito curto"),

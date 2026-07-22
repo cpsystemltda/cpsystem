@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { exigirUsuario, hashSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { validarSenhaSegura } from "@/lib/senhaSegura";
 
 type Result = { erro?: string; ok?: boolean };
 
@@ -21,7 +22,10 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
 
   if (!nome || nome.length < 2) return { erro: "Nome obrigatório." };
   if (!email.includes("@")) return { erro: "E-mail inválido." };
-  if (senha.length < 8) return { erro: "Senha deve ter no mínimo 8 caracteres." };
+
+  // SEG P0: valida senha forte + HIBP.
+  const senhaCheck = await validarSenhaSegura(senha, { email, nome });
+  if (!senhaCheck.ok) return { erro: senhaCheck.erro };
 
   if (await prisma.usuario.findUnique({ where: { email } })) return { erro: "E-mail já cadastrado." };
 
