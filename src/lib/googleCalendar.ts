@@ -8,11 +8,21 @@ import { janelaExecucao } from "@/lib/prazoEntrega";
 // Cada usuario conecta sua conta; sync best-effort (falhas nao bloqueiam
 // criacao/edicao do empenho — log + console).
 
+// Regina 23/07/2026: trocamos calendar.events (scope SENSITIVE, exige
+// verificacao do Google que trava 6+ semanas) por calendar.app.created
+// (NON-SENSITIVE — publica sem verificacao). O app cria/gerencia SEU proprio
+// calendar secundario no Google Calendar do usuario ("CP System — Contratos
+// e Vencimentos"), sem tocar na agenda principal.
 const SCOPES = [
-  "https://www.googleapis.com/auth/calendar.events",
+  "https://www.googleapis.com/auth/calendar.app.created",
   "https://www.googleapis.com/auth/userinfo.email",
   "openid",
 ];
+
+// Nome fixo do calendar secundario que o CP System cria em cada conta.
+export const NOME_CALENDAR_CPS = "CP System — Contratos e Vencimentos";
+const DESC_CALENDAR_CPS =
+  "Eventos criados automaticamente pelo CP System: vencimentos de contratos, empenhos e prazos de entrega. Você pode ocultar esse calendário a qualquer momento.";
 
 const REDIRECT_URI =
   process.env.GOOGLE_REDIRECT_URI || "https://cpsystem.app.br/api/google/callback";
@@ -164,6 +174,30 @@ export type EventoCalendar = {
 
 const CAL_BASE = "https://www.googleapis.com/calendar/v3";
 
+// Cria o calendar dedicado do CP System na conta Google. Usa access_token
+// direto (na primeira conexao ainda nao gravamos o GoogleAccount, entao
+// nao temos o registro pra passar em callCalendar). Retorna o calendarId.
+export async function criarCalendarCpSystem(accessToken: string): Promise<string> {
+  const r = await fetch(`${CAL_BASE}/calendars`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      summary: NOME_CALENDAR_CPS,
+      description: DESC_CALENDAR_CPS,
+      timeZone: "America/Sao_Paulo",
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`Criar calendar CP System falhou ${r.status}: ${txt.slice(0, 200)}`);
+  }
+  const data = (await r.json()) as { id: string };
+  return data.id;
+}
+
 async function callCalendar<T>(
   contaGoogle: GoogleAccount,
   path: string,
@@ -197,14 +231,27 @@ function bodyDoEvento(ev: EventoCalendar): Record<string, unknown> {
   };
 }
 
+// Garante que o GoogleAccount tem um calendarId dedicado. Se nao tem,
+// cria o calendar do CP System agora e persiste no DB. Retorna o
+// GoogleAccount atualizado (com calendarId sempre preenchido).
+async function garantirCalendarDedicado(contaGoogle: GoogleAccount): Promise<GoogleAccount> {
+  if (contaGoogle.calendarId) return contaGoogle;
+  const token = await tokenValido(contaGoogle);
+  const calId = await criarCalendarCpSystem(token);
+  return prisma.googleAccount.update({
+    where: { id: contaGoogle.id },
+    data: { calendarId: calId },
+  });
+}
+
 export async function criarEvento(
   contaGoogle: GoogleAccount,
   ev: EventoCalendar,
 ): Promise<{ id: string; htmlLink?: string }> {
-  const calId = contaGoogle.calendarId || "primary";
+  const conta = await garantirCalendarDedicado(contaGoogle);
   const data = await callCalendar<{ id: string; htmlLink?: string }>(
-    contaGoogle,
-    `/calendars/${encodeURIComponent(calId)}/events`,
+    conta,
+    `/calendars/${encodeURIComponent(conta.calendarId!)}/events`,
     { method: "POST", body: JSON.stringify(bodyDoEvento(ev)) },
   );
   return { id: data.id, htmlLink: data.htmlLink };

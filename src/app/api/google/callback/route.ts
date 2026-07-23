@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { trocarCodePorTokens, emailDoIdToken } from "@/lib/googleCalendar";
+import { trocarCodePorTokens, emailDoIdToken, criarCalendarCpSystem } from "@/lib/googleCalendar";
 
 // Callback OAuth Google. Valida state (anti-CSRF), troca code por
 // tokens, salva GoogleAccount. Redireciona pra /conta/integracoes.
@@ -43,6 +43,20 @@ export async function GET(req: NextRequest) {
     const tokens = await trocarCodePorTokens(code);
     const email = emailDoIdToken(tokens.idToken);
 
+    // Cria o calendar dedicado do CP System AGORA — evita dor de cabeca
+    // no primeiro evento. Se falhar, calendar sera criado sob demanda em
+    // criarEvento (fallback via garantirCalendarDedicado).
+    let calendarId: string | null = null;
+    try {
+      calendarId = await criarCalendarCpSystem(tokens.accessToken);
+    } catch (err) {
+      console.error("[google callback] falha ao criar calendar CP System (tentaremos sob demanda):", err);
+    }
+
+    // Se o usuario ja tinha uma conexao (com scope antigo/calendar antigo),
+    // preservar googleEmail atualizado + tokens novos, mas RESETAR calendarId
+    // pro novo dedicado — os eventos antigos vao ficar orfaos no calendar
+    // antigo do usuario (best-effort ja tolera erro em delete/update).
     await prisma.googleAccount.upsert({
       where: { usuarioId },
       create: {
@@ -51,12 +65,14 @@ export async function GET(req: NextRequest) {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt: new Date(Date.now() + (tokens.expiresIn - 60) * 1000),
+        calendarId,
       },
       update: {
         googleEmail: email || "(desconhecido)",
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         expiresAt: new Date(Date.now() + (tokens.expiresIn - 60) * 1000),
+        calendarId,
       },
     });
 
