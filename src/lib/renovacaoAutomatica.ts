@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getGateway } from "@/lib/gateway";
 import { garantirCustomer } from "@/app/actions/assinatura";
 import { calcularValorMensal } from "@/lib/precos";
+import { sincronizarCobranca } from "@/lib/googleCalendar";
 
 /**
  * Renovação automática mensal — Regina 23/06.
@@ -126,6 +127,10 @@ export async function gerarRenovacoesMensais(): Promise<{
           }),
         },
       });
+
+      // Sync Google Calendar (Regina 23/07 — best-effort).
+      // Vai pro Google do primeiro admin da conta que tenha conectado.
+      await sincronizarCobranca(cobranca.id, "upsert");
 
       geradas++;
     } catch (e) {

@@ -574,3 +574,46 @@ export async function sincronizarGarantia(garantiaId: string, acao: "upsert" | "
     console.error("[Google Calendar sync] falhou pra garantia", garantiaId, e);
   }
 }
+
+// -------- Cobranca (fatura CP System) --------
+// Cobranca eh institucional (nao tem criadoPorId) — vai pro Google do
+// primeiro Admin da conta que tenha conectado.
+export async function sincronizarCobranca(cobrancaId: string, acao: "upsert" | "delete"): Promise<void> {
+  try {
+    const c = await prisma.cobranca.findUnique({
+      where: { id: cobrancaId },
+      select: {
+        id: true, contaId: true, competencia: true, valor: true, vencimento: true,
+        plano: true, googleEventId: true,
+      },
+    });
+    if (!c) return;
+    // Pega o primeiro admin da conta com Google conectado
+    const admin = await prisma.usuario.findFirst({
+      where: { contaId: c.contaId, perfil: "ADMIN" },
+      select: { id: true },
+      orderBy: { criadoEm: "asc" },
+    });
+    if (!admin) return;
+    const conta = await prisma.googleAccount.findUnique({ where: { usuarioId: admin.id } });
+    if (!conta) return;
+    if (acao === "delete") {
+      if (c.googleEventId) await deletarEvento(conta, c.googleEventId);
+      return;
+    }
+    const valorFmt = c.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const evento = dataAllDayEvent(
+      c.vencimento,
+      `💳 Fatura CP System (${c.plano}) — ${valorFmt}`,
+      `Vencimento da mensalidade CP System — ${valorFmt}\n\nCompetência: ${c.competencia}\nPlano: ${c.plano}`,
+    );
+    if (c.googleEventId) {
+      await atualizarEvento(conta, c.googleEventId, evento);
+    } else {
+      const r = await criarEvento(conta, evento);
+      await prisma.cobranca.update({ where: { id: c.id }, data: { googleEventId: r.id } });
+    }
+  } catch (e) {
+    console.error("[Google Calendar sync] falhou pra cobranca", cobrancaId, e);
+  }
+}

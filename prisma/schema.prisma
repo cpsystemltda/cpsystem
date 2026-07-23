@@ -1850,6 +1850,9 @@ model Cobranca {
   boletoUrl         String? // URL do boleto
 
   observacoes  String?
+  // Google Calendar sync (Regina 23/07 — SEG P1 expandido). Cobranca vai
+  // pro calendar do primeiro admin da conta que tenha Google conectado.
+  googleEventId String?
   criadaEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
