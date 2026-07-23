@@ -380,7 +380,6 @@ export async function sincronizarEmpenho(
         orgaoEndereco: true,
         instrumento: true,
         criadoPorId: true,
-        googleEventId: true,
         vigenciaFim: true,
         dataPrevistaExecucao: true,
         prazoEntregaModo: true,
@@ -392,24 +391,21 @@ export async function sincronizarEmpenho(
         prazoEntregaUnidade: true,
         horaInicio: true,
         horaFim: true,
+        empresa: { select: { contaId: true } },
       },
     });
-    if (!empenho || !empenho.criadoPorId) return;
+    if (!empenho) return;
+    const contas = await contasGoogleDaContaCliente(
+      empenho.empresa.contaId,
+      empenho.criadoPorId,
+    );
+    if (contas.length === 0) return;
 
-    const contaGoogle = await prisma.googleAccount.findUnique({
-      where: { usuarioId: empenho.criadoPorId },
-    });
-    if (!contaGoogle) return;
-
-    // Acao DELETE: remove no Google e zera o id local
     if (acao === "delete") {
-      if (empenho.googleEventId) {
-        await deletarEvento(contaGoogle, empenho.googleEventId);
-      }
+      await aplicarEmTodas(contas, "EMPENHO", empenho.id, "delete");
       return;
     }
 
-    // UPSERT
     const janela = janelaExecucao(empenho);
     const evento = empenhoParaEvento({
       id: empenho.id,
@@ -423,30 +419,136 @@ export async function sincronizarEmpenho(
       horaInicio: empenho.horaInicio,
       horaFim: empenho.horaFim,
     });
-
-    if (empenho.googleEventId) {
-      await atualizarEvento(contaGoogle, empenho.googleEventId, evento);
-    } else {
-      const r = await criarEvento(contaGoogle, evento);
-      await prisma.empenho.update({
-        where: { id: empenho.id },
-        data: { googleEventId: r.id },
-      });
-    }
+    await aplicarEmTodas(contas, "EMPENHO", empenho.id, "upsert", evento);
   } catch (e) {
-    // Best-effort — loga e segue. Empenho continua criado/editado normalmente.
     console.error("[Google Calendar sync] falhou pro empenho", empenhoId, e);
   }
 }
 
 // ============== SYNC de outras entidades (Regina 23/07) ==============
-// Padrao unificado: sincronizarGenerico busca contaGoogle do criadoPorId,
-// converte objeto em EventoCalendar all-day (vencimento = dia X), e chama
-// criar/atualizar/deletar. Best-effort — nunca trava operacao principal.
+// Regina 23/07: cada documento sincroniza pra TODAS as contas Google
+// relevantes — o dono da conta cliente MAIS todos os analistas
+// vinculados ativos. Cliente/analista veem a mesma agenda de vencimentos.
+//
+// Cada (GoogleAccount, entidade) tem 1 evento — rastreado em
+// EventoGoogleCalendar. Best-effort: cada Google individual pode falhar
+// sem travar os demais.
+
+type TipoEntidade = "EMPENHO" | "CONTRATO" | "ATA" | "GARANTIA" | "COBRANCA";
 
 async function contaGoogleDoCriador(criadoPorId: string | null): Promise<GoogleAccount | null> {
   if (!criadoPorId) return null;
   return prisma.googleAccount.findUnique({ where: { usuarioId: criadoPorId } });
+}
+
+// Descobre TODAS as contas Google que devem receber sync pra uma dada
+// conta cliente:
+//  - Todos os usuarios da conta cliente com Google conectado
+//  - Todos os usuarios das contas ANALISTA com vinculo ATIVO
+// Dedup por id (nao envia 2x pra mesma conta).
+async function contasGoogleDaContaCliente(
+  contaClienteId: string,
+  criadoPorId?: string | null,
+): Promise<GoogleAccount[]> {
+  // Analistas ATIVOS vinculados a essa conta
+  const vinculos = await prisma.vinculoAnalista.findMany({
+    where: { contaId: contaClienteId, status: "ATIVO" },
+    select: { analista: { select: { contaId: true } } },
+  });
+  const contasAnalistas = vinculos
+    .map((v) => v.analista.contaId)
+    .filter((id): id is string => !!id);
+
+  const contaIds = new Set<string>([contaClienteId, ...contasAnalistas]);
+
+  const contas = await prisma.googleAccount.findMany({
+    where: { usuario: { contaId: { in: Array.from(contaIds) } } },
+  });
+
+  // Se criadoPorId foi passado e nao esta na lista, adiciona (defensivo)
+  if (criadoPorId && !contas.some((c) => c.usuarioId === criadoPorId)) {
+    const c = await prisma.googleAccount.findUnique({ where: { usuarioId: criadoPorId } });
+    if (c) contas.push(c);
+  }
+  return contas;
+}
+
+// Sync individual: chamado 1x por conta Google, best-effort.
+async function syncPorContaGoogle(
+  conta: GoogleAccount,
+  tipo: TipoEntidade,
+  entidadeId: string,
+  evento: EventoCalendar,
+): Promise<void> {
+  const existente = await prisma.eventoGoogleCalendar.findUnique({
+    where: {
+      googleAccountId_entidadeTipo_entidadeId: {
+        googleAccountId: conta.id,
+        entidadeTipo: tipo,
+        entidadeId,
+      },
+    },
+  });
+  if (existente) {
+    await atualizarEvento(conta, existente.eventId, evento);
+  } else {
+    const r = await criarEvento(conta, evento);
+    await prisma.eventoGoogleCalendar.create({
+      data: {
+        googleAccountId: conta.id,
+        entidadeTipo: tipo,
+        entidadeId,
+        eventId: r.id,
+      },
+    });
+  }
+}
+
+async function deletePorContaGoogle(
+  conta: GoogleAccount,
+  tipo: TipoEntidade,
+  entidadeId: string,
+): Promise<void> {
+  const existente = await prisma.eventoGoogleCalendar.findUnique({
+    where: {
+      googleAccountId_entidadeTipo_entidadeId: {
+        googleAccountId: conta.id,
+        entidadeTipo: tipo,
+        entidadeId,
+      },
+    },
+  });
+  if (!existente) return;
+  try {
+    await deletarEvento(conta, existente.eventId);
+  } catch (e) {
+    console.warn("[Google Calendar] erro ao deletar evento", existente.eventId, e);
+  }
+  await prisma.eventoGoogleCalendar.deleteMany({
+    where: { googleAccountId: conta.id, entidadeTipo: tipo, entidadeId },
+  });
+}
+
+// Aplica upsert/delete pra CADA conta Google — best-effort por conta.
+async function aplicarEmTodas(
+  contas: GoogleAccount[],
+  tipo: TipoEntidade,
+  entidadeId: string,
+  acao: "upsert" | "delete",
+  evento?: EventoCalendar,
+): Promise<void> {
+  for (const c of contas) {
+    try {
+      if (acao === "delete") {
+        await deletePorContaGoogle(c, tipo, entidadeId);
+      } else if (evento) {
+        await syncPorContaGoogle(c, tipo, entidadeId, evento);
+      }
+    } catch (e) {
+      console.error(`[Google Calendar] falhou pra conta ${c.googleEmail} (${tipo}:${entidadeId}):`, e);
+      // Nao propaga — proxima conta segue normalmente
+    }
+  }
 }
 
 function dataAllDayEvent(data: Date, summary: string, description: string, location?: string): EventoCalendar {
@@ -475,14 +577,15 @@ export async function sincronizarAta(ataId: string, acao: "upsert" | "delete"): 
       where: { id: ataId },
       select: {
         id: true, numero: true, orgaoNome: true, orgaoEndereco: true, objeto: true,
-        vigenciaFim: true, criadoPorId: true, googleEventId: true,
+        vigenciaFim: true, criadoPorId: true,
+        empresa: { select: { contaId: true } },
       },
     });
     if (!ata) return;
-    const conta = await contaGoogleDoCriador(ata.criadoPorId);
-    if (!conta) return;
+    const contas = await contasGoogleDaContaCliente(ata.empresa.contaId, ata.criadoPorId);
+    if (contas.length === 0) return;
     if (acao === "delete") {
-      if (ata.googleEventId) await deletarEvento(conta, ata.googleEventId);
+      await aplicarEmTodas(contas, "ATA", ata.id, "delete");
       return;
     }
     const evento = dataAllDayEvent(
@@ -491,12 +594,7 @@ export async function sincronizarAta(ataId: string, acao: "upsert" | "delete"): 
       `Vencimento da Ata de Registro de Preços nº ${ata.numero}\n\nObjeto: ${ata.objeto}`,
       ata.orgaoEndereco || undefined,
     );
-    if (ata.googleEventId) {
-      await atualizarEvento(conta, ata.googleEventId, evento);
-    } else {
-      const r = await criarEvento(conta, evento);
-      await prisma.ata.update({ where: { id: ata.id }, data: { googleEventId: r.id } });
-    }
+    await aplicarEmTodas(contas, "ATA", ata.id, "upsert", evento);
   } catch (e) {
     console.error("[Google Calendar sync] falhou pra ata", ataId, e);
   }
@@ -509,14 +607,18 @@ export async function sincronizarContrato(contratoId: string, acao: "upsert" | "
       where: { id: contratoId },
       select: {
         id: true, numero: true, orgaoNome: true, orgaoEndereco: true, objeto: true,
-        vigenciaFim: true, criadoPorId: true, googleEventId: true,
+        vigenciaFim: true, criadoPorId: true,
+        empresa: { select: { contaId: true } },
       },
     });
     if (!contrato) return;
-    const conta = await contaGoogleDoCriador(contrato.criadoPorId);
-    if (!conta) return;
+    const contas = await contasGoogleDaContaCliente(
+      contrato.empresa.contaId,
+      contrato.criadoPorId,
+    );
+    if (contas.length === 0) return;
     if (acao === "delete") {
-      if (contrato.googleEventId) await deletarEvento(conta, contrato.googleEventId);
+      await aplicarEmTodas(contas, "CONTRATO", contrato.id, "delete");
       return;
     }
     const evento = dataAllDayEvent(
@@ -525,36 +627,41 @@ export async function sincronizarContrato(contratoId: string, acao: "upsert" | "
       `Vencimento do Contrato nº ${contrato.numero}\n\nObjeto: ${contrato.objeto}`,
       contrato.orgaoEndereco || undefined,
     );
-    if (contrato.googleEventId) {
-      await atualizarEvento(conta, contrato.googleEventId, evento);
-    } else {
-      const r = await criarEvento(conta, evento);
-      await prisma.contrato.update({ where: { id: contrato.id }, data: { googleEventId: r.id } });
-    }
+    await aplicarEmTodas(contas, "CONTRATO", contrato.id, "upsert", evento);
   } catch (e) {
     console.error("[Google Calendar sync] falhou pro contrato", contratoId, e);
   }
 }
 
 // -------- Garantia --------
-// Garantia pertence a Contrato OU Empenho — usa criadoPorId do parent.
+// Garantia pertence a Contrato OU Empenho — descobre a conta cliente via parent.
 export async function sincronizarGarantia(garantiaId: string, acao: "upsert" | "delete"): Promise<void> {
   try {
     const g = await prisma.garantia.findUnique({
       where: { id: garantiaId },
       select: {
-        id: true, modalidade: true, valor: true, dataFim: true, googleEventId: true,
-        contrato: { select: { numero: true, orgaoNome: true, orgaoEndereco: true, criadoPorId: true } },
-        empenho: { select: { numero: true, orgaoNome: true, orgaoEndereco: true, criadoPorId: true } },
+        id: true, modalidade: true, valor: true, dataFim: true,
+        contrato: {
+          select: {
+            numero: true, orgaoNome: true, orgaoEndereco: true, criadoPorId: true,
+            empresa: { select: { contaId: true } },
+          },
+        },
+        empenho: {
+          select: {
+            numero: true, orgaoNome: true, orgaoEndereco: true, criadoPorId: true,
+            empresa: { select: { contaId: true } },
+          },
+        },
       },
     });
-    if (!g || !g.dataFim) return; // garantia sem data de vencimento nao vira evento
+    if (!g || !g.dataFim) return;
     const parent = g.contrato ?? g.empenho;
     if (!parent) return;
-    const conta = await contaGoogleDoCriador(parent.criadoPorId);
-    if (!conta) return;
+    const contas = await contasGoogleDaContaCliente(parent.empresa.contaId, parent.criadoPorId);
+    if (contas.length === 0) return;
     if (acao === "delete") {
-      if (g.googleEventId) await deletarEvento(conta, g.googleEventId);
+      await aplicarEmTodas(contas, "GARANTIA", g.id, "delete");
       return;
     }
     const valorFmt = g.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -564,41 +671,29 @@ export async function sincronizarGarantia(garantiaId: string, acao: "upsert" | "
       `Vencimento de garantia (${g.modalidade}) — ${valorFmt}\n\nDocumento: ${parent.numero}`,
       parent.orgaoEndereco || undefined,
     );
-    if (g.googleEventId) {
-      await atualizarEvento(conta, g.googleEventId, evento);
-    } else {
-      const r = await criarEvento(conta, evento);
-      await prisma.garantia.update({ where: { id: g.id }, data: { googleEventId: r.id } });
-    }
+    await aplicarEmTodas(contas, "GARANTIA", g.id, "upsert", evento);
   } catch (e) {
     console.error("[Google Calendar sync] falhou pra garantia", garantiaId, e);
   }
 }
 
 // -------- Cobranca (fatura CP System) --------
-// Cobranca eh institucional (nao tem criadoPorId) — vai pro Google do
-// primeiro Admin da conta que tenha conectado.
+// Cobranca eh institucional. Vai pro Google de TODOS os usuarios da conta
+// cliente + analistas vinculados (analista precisa saber quando o cliente
+// tem que pagar, pra nao correr risco do cliente cair em inadimplencia).
 export async function sincronizarCobranca(cobrancaId: string, acao: "upsert" | "delete"): Promise<void> {
   try {
     const c = await prisma.cobranca.findUnique({
       where: { id: cobrancaId },
       select: {
-        id: true, contaId: true, competencia: true, valor: true, vencimento: true,
-        plano: true, googleEventId: true,
+        id: true, contaId: true, competencia: true, valor: true, vencimento: true, plano: true,
       },
     });
     if (!c) return;
-    // Pega o primeiro admin da conta com Google conectado
-    const admin = await prisma.usuario.findFirst({
-      where: { contaId: c.contaId, perfil: "ADMIN" },
-      select: { id: true },
-      orderBy: { criadoEm: "asc" },
-    });
-    if (!admin) return;
-    const conta = await prisma.googleAccount.findUnique({ where: { usuarioId: admin.id } });
-    if (!conta) return;
+    const contas = await contasGoogleDaContaCliente(c.contaId);
+    if (contas.length === 0) return;
     if (acao === "delete") {
-      if (c.googleEventId) await deletarEvento(conta, c.googleEventId);
+      await aplicarEmTodas(contas, "COBRANCA", c.id, "delete");
       return;
     }
     const valorFmt = c.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -607,12 +702,7 @@ export async function sincronizarCobranca(cobrancaId: string, acao: "upsert" | "
       `💳 Fatura CP System (${c.plano}) — ${valorFmt}`,
       `Vencimento da mensalidade CP System — ${valorFmt}\n\nCompetência: ${c.competencia}\nPlano: ${c.plano}`,
     );
-    if (c.googleEventId) {
-      await atualizarEvento(conta, c.googleEventId, evento);
-    } else {
-      const r = await criarEvento(conta, evento);
-      await prisma.cobranca.update({ where: { id: c.id }, data: { googleEventId: r.id } });
-    }
+    await aplicarEmTodas(contas, "COBRANCA", c.id, "upsert", evento);
   } catch (e) {
     console.error("[Google Calendar sync] falhou pra cobranca", cobrancaId, e);
   }

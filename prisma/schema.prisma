@@ -237,6 +237,26 @@ model GoogleAccount {
   calendarId   String?
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+
+  eventos EventoGoogleCalendar[]
+}
+
+// Um evento por (conta Google, entidade). Suporta multiplos calendars por
+// documento — criador + N analistas vinculados a conta cliente. Regina 23/07.
+// Ao deletar GoogleAccount, cascade limpa tudo — evitando eventos orfaos.
+model EventoGoogleCalendar {
+  id              String   @id @default(cuid())
+  googleAccountId String
+  googleAccount   GoogleAccount @relation(fields: [googleAccountId], references: [id], onDelete: Cascade)
+  // Qual entidade do CP System esse evento representa
+  entidadeTipo    String   // "EMPENHO" | "CONTRATO" | "ATA" | "GARANTIA" | "COBRANCA"
+  entidadeId      String
+  // ID retornado pelo Google Calendar API — usado pra atualizar/deletar
+  eventId         String
+  criadoEm        DateTime @default(now())
+
+  @@unique([googleAccountId, entidadeTipo, entidadeId])
+  @@index([entidadeTipo, entidadeId])
 }
 
 // Histórico do chat com o IAsystem — uma linha por mensagem, isolada por
