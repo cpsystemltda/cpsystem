@@ -33,7 +33,7 @@ import {
 } from "@/lib/diff";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
-import { sincronizarEmpenho } from "@/lib/googleCalendar";
+import { sincronizarEmpenho, sincronizarAta, sincronizarContrato } from "@/lib/googleCalendar";
 import {
   notificarNovoDocumento,
   notificarMudancaStatus,
@@ -469,6 +469,9 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
       }).catch((e) => console.error("[notif ata]", e));
     }
 
+    // Sync Google Calendar (Regina 23/07 — best-effort).
+    await sincronizarAta(ata.id, "upsert");
+
     revalidatePath("/atas");
     revalidatePath("/dashboard");
     redirect(`/atas/${ata.id}`);
@@ -732,6 +735,9 @@ export async function editarAtaAction(_prev: ActionResult | null, formData: Form
       }
     }
 
+    // Sync Google Calendar (Regina 23/07 — best-effort).
+    await sincronizarAta(ataId, "upsert");
+
     revalidatePath("/atas");
     revalidatePath(`/atas/${ataId}`);
     revalidatePath("/dashboard");
@@ -948,6 +954,9 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
         orgao: v.orgaoNome,
       }).catch((e) => console.error("[notif contrato]", e));
     }
+
+    // Sync Google Calendar (Regina 23/07 — best-effort).
+    await sincronizarContrato(contrato.id, "upsert");
 
     revalidatePath("/contratos");
     revalidatePath("/atas");
@@ -1233,6 +1242,9 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
       }
     }
 
+    // Sync Google Calendar (Regina 23/07 — best-effort).
+    await sincronizarContrato(contratoId, "upsert");
+
     revalidatePath("/contratos");
     revalidatePath(`/contratos/${contratoId}`);
     revalidatePath("/dashboard");
@@ -1263,6 +1275,8 @@ export async function excluirAtaAction(formData: FormData) {
   if (ata.contratos.length > 0 || ata.empenhos.length > 0) {
     throw new Error("Não é possível excluir: existem contratos ou empenhos vinculados a esta Ata.");
   }
+  // Sync Google Calendar ANTES de deletar (precisa do googleEventId).
+  await sincronizarAta(id, "delete");
   await prisma.ata.delete({ where: { id } });
   revalidatePath("/atas");
   revalidatePath("/dashboard");
@@ -1281,6 +1295,8 @@ export async function excluirContratoAction(formData: FormData) {
   if (contrato.empenhos.length > 0) {
     throw new Error("Não é possível excluir: existem empenhos vinculados a este Contrato.");
   }
+  // Sync Google Calendar ANTES de deletar (precisa do googleEventId).
+  await sincronizarContrato(id, "delete");
   await prisma.contrato.delete({ where: { id } });
   revalidatePath("/contratos");
   revalidatePath("/dashboard");

@@ -6,6 +6,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { salvarArquivo } from "@/lib/uploads";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { sincronizarGarantia } from "@/lib/googleCalendar";
 import { isContratoNaoContinuado, ROTULO_TIPO } from "@/lib/validators";
 import type {
   IndiceReajuste,
@@ -1889,6 +1890,9 @@ export async function criarGarantiaAction(_p: Result | null, formData: FormData)
       recursoId: g.id,
       resumo: g.modalidade,
     });
+
+    // Sync Google Calendar (Regina 23/07 — best-effort).
+    await sincronizarGarantia(g.id, "upsert");
 
     revalidatePath(link.paiPath);
     return { ok: true };

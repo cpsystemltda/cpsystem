@@ -642,6 +642,10 @@ model Ata {
   idAtaPncp     String?
   arquivoPdfUrl String?
 
+  // Google Calendar sync (Regina 23/07 — SEG P1 expandido).
+  // Event ID retornado pelo Google. Null = nunca sincronizado ainda.
+  googleEventId String?
+
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
@@ -817,6 +821,9 @@ model Contrato {
   arquivoOfUrl            String?
 
   arquivoPdfUrl String?
+
+  // Google Calendar sync (Regina 23/07 — SEG P1 expandido).
+  googleEventId String?
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
@@ -1632,6 +1639,8 @@ model Garantia {
   dataFim       DateTime?
   descricao     String? // pra títulos da dívida pública e outros
   arquivoPdfUrl String?
+  // Google Calendar sync (Regina 23/07 — SEG P1 expandido).
+  googleEventId String?
   criadoEm      DateTime           @default(now())
   atualizadoEm  DateTime           @updatedAt
 
