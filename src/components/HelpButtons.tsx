@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { LifeBuoy, BookOpen, X, MessageCircle, Mail, Phone } from "lucide-react";
+import { LifeBuoy, BookOpen, X, MessageCircle, Mail } from "lucide-react";
+import {
+  CONTATOS_CP_SYSTEM,
+  linkWhatsAppSuporte,
+  linkEmailSuporte,
+  whatsappFormatado,
+} from "@/lib/contatosCpSystem";
 
 export function HelpButtons() {
   const [aberto, setAberto] = useState<"suporte" | "manual" | null>(null);
@@ -74,25 +80,17 @@ function ContentSuporte() {
           icone={MessageCircle}
           cor="bg-green-100 text-green-700"
           titulo="WhatsApp Business"
-          texto="Resposta média em 15 min em horário comercial"
+          texto={`Fale com a gente em ${whatsappFormatado()} — respondemos em horário comercial (seg a sex, 8h às 18h).`}
           acao="Abrir conversa"
-          link="https://wa.me/556139000000"
+          link={linkWhatsAppSuporte()}
         />
         <CanalSuporte
           icone={Mail}
           cor="bg-blue-100 text-blue-700"
           titulo="E-mail"
-          texto="suporte@contratospublicos.com.br"
+          texto={CONTATOS_CP_SYSTEM.email}
           acao="Enviar e-mail"
-          link="mailto:suporte@contratospublicos.com.br"
-        />
-        <CanalSuporte
-          icone={Phone}
-          cor="bg-violet-100 text-violet-700"
-          titulo="Suporte prioritário (Premium)"
-          texto="Linha dedicada com SLA · clientes Premium"
-          acao="Ligar agora"
-          link="tel:+556139000000"
+          link={linkEmailSuporte()}
         />
       </div>
     </>
