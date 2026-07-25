@@ -130,9 +130,10 @@ export default async function AdminClientesPage({
         </button>
       </form>
 
-      {/* Tabela */}
-      <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 bg-white">
-        <table className="w-full text-sm">
+      {/* Tabela — overflow-x-auto pra tabela larga (9 colunas) nao esconder o botao
+          "Ver como cliente" da ultima coluna (Regina 25/07: cliente cortado) */}
+      <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-4 py-3 text-left font-medium">Cliente</th>

@@ -6,8 +6,15 @@ import { prisma } from "@/lib/prisma";
 const PRECO_BASICO = 397;
 const PRECO_PREMIUM = 997;
 
-// LTV simplificado: ARPU ÷ Churn mensal. Se Churn = 0, fallback de 36 meses (premium SaaS B2B típico).
-function calcularLtv(arpu: number, churnMensalPct: number): number {
+// Amostra minima pra LTV/churn terem significado real.
+// Abaixo disso, o numero e' matematicamente correto mas passa impressao
+// falsa de "sistema com metrica de SaaS grande" — melhor honestidade.
+const AMOSTRA_MINIMA_METRICA = 5;
+
+// LTV simplificado: ARPU ÷ Churn mensal. Se Churn = 0, fallback de 36 meses.
+// Retorna null quando amostra e' insuficiente pra ter significado real.
+function calcularLtv(arpu: number, churnMensalPct: number, totalAtivas: number): number | null {
+  if (totalAtivas < AMOSTRA_MINIMA_METRICA) return null;
   if (churnMensalPct <= 0) return arpu * 36;
   return arpu / (churnMensalPct / 100);
 }
@@ -87,8 +94,9 @@ export default async function AdminFinanceiroPage() {
     0,
   );
 
-  // LTV
-  const ltv = calcularLtv(arpu, churnPct);
+  // LTV — null quando amostra < 5 clientes pagantes (evita numero enganoso)
+  const ltv = calcularLtv(arpu, churnPct, ativas.length);
+  const amostraSuficiente = ativas.length >= AMOSTRA_MINIMA_METRICA;
 
   // Ranking de adimplência por origem (analista vs direto)
   const origens = new Map<string, { rotulo: string; total: number; pagas: number; mrr: number }>();
@@ -150,19 +158,41 @@ export default async function AdminFinanceiroPage() {
         </Link>
       </header>
 
+      {/* Aviso de amostra insuficiente (< 5 clientes pagantes) */}
+      {!amostraSuficiente && (
+        <div className="mb-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="text-2xl">⚠️</div>
+          <div>
+            <p className="text-sm font-semibold text-amber-900">
+              Amostra ainda pequena — métricas de SaaS aparecem, mas sem significância estatística
+            </p>
+            <p className="mt-1 text-xs text-amber-800">
+              Você tem <strong>{ativas.length} assinatura(s) ativa(s)</strong>. LTV, churn e projeções ficam ocultos até chegar em <strong>5+ clientes pagantes</strong>.
+              Números pequenos amplificam distorções (ex.: 1 cancelamento vira 100% de churn).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* KPIs principais */}
       <div className="grid gap-4 lg:grid-cols-4">
-        <Card icone={Wallet} tone="mint" titulo="MRR" valor={brlCompacto(mrr)} sub={`${ativas.length} assinaturas ativas`} />
+        <Card icone={Wallet} tone="mint" titulo="MRR" valor={brlCompacto(mrr)} sub={`${ativas.length} assinatura${ativas.length === 1 ? "" : "s"} ativa${ativas.length === 1 ? "" : "s"}`} />
         <Card icone={TrendingUp} tone="sky" titulo="ARR projetado" valor={brlCompacto(arr)} sub="MRR × 12" />
-        <Card icone={Target} tone="primary" titulo="Ticket médio" valor={brl(ticketMedioGeral)} sub="ARPU geral (todas as contas)" />
-        <Card icone={Users2} tone="lavender" titulo="LTV" valor={brl(ltv)} sub={churnPct > 0 ? `${arpu.toFixed(0)} ÷ ${churnPct.toFixed(2)}% churn mensal` : "Churn ≈ 0 — projeção 36 meses"} />
+        <Card icone={Target} tone="primary" titulo="Ticket médio" valor={brl(ticketMedioGeral)} sub="ARPU (média por conta ativa)" />
+        {ltv === null ? (
+          <Card icone={Users2} tone="lavender" titulo="LTV" valor="—" sub="Precisa de ≥ 5 clientes pagantes" />
+        ) : (
+          <Card icone={Users2} tone="lavender" titulo="LTV" valor={brl(ltv)} sub={churnPct > 0 ? `${arpu.toFixed(0)} ÷ ${churnPct.toFixed(2)}% churn mensal` : "Churn ≈ 0 — projeção 36 meses"} />
+        )}
       </div>
 
-      {/* Churn rate + MRR Churn */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card icone={Activity} tone="coral" titulo="Churn rate (mês)" valor={`${churnPct.toFixed(2)}%`} sub={`${canceladasNoMes.length} cancelamento(s) em ${hoje.toLocaleDateString("pt-BR", { month: "long" })}`} />
-        <Card icone={BarChart3} tone="rose" titulo="MRR Churn" valor={brl(mrrChurn)} sub="Receita recorrente perdida no mês" />
-      </div>
+      {/* Churn rate + MRR Churn — só faz sentido com amostra */}
+      {amostraSuficiente && (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <Card icone={Activity} tone="coral" titulo="Churn rate (mês)" valor={`${churnPct.toFixed(2)}%`} sub={`${canceladasNoMes.length} cancelamento(s) em ${hoje.toLocaleDateString("pt-BR", { month: "long" })}`} />
+          <Card icone={BarChart3} tone="rose" titulo="MRR Churn" valor={brl(mrrChurn)} sub="Receita recorrente perdida no mês" />
+        </div>
+      )}
 
       {/* Distribuição por plano */}
       <div className="mt-8">

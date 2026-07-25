@@ -3,6 +3,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { UpgradeForm, DowngradeForm } from "./UpgradeForm";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { AnaliseJuridicaPanel } from "@/components/AnaliseJuridicaPanel";
+import { linkWhatsAppSuporte } from "@/lib/contatosCpSystem";
 import { listarDocumentosParaAnalise } from "@/app/actions/iaJuridica";
 
 export default async function JuridicoPage() {
@@ -122,15 +123,15 @@ export default async function JuridicoPage() {
 
         <div className="glass mt-4 rounded-[20px] px-6 py-5">
           <p className="text-sm text-slate-600">
-            Para abrir uma consulta humana com o Grupo Contratos Públicos, use o canal VIP:
+            Para abrir uma consulta humana com o Grupo Contratos Públicos, fale com a gente:
           </p>
           <a
-            href="https://wa.me/5561999999999"
+            href={linkWhatsAppSuporte("Olá! Preciso abrir uma consulta jurídica humana com o Grupo Contratos Públicos.")}
             target="_blank"
             rel="noreferrer"
             className="mt-3 inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
           >
-            <MessageSquare className="h-4 w-4" /> Abrir WhatsApp Premium
+            <MessageSquare className="h-4 w-4" /> Abrir WhatsApp CP System
           </a>
         </div>
       </section>
