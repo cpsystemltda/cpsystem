@@ -56,3 +56,7 @@ uploads/
 /System R&I/
 /Análise*
 .env*.local
+
+# Playwright MCP artifacts
+.playwright-mcp/
+tela-*.png
