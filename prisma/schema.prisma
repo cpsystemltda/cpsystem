@@ -196,6 +196,9 @@ enum TipoNotificacaoWhatsApp {
   // Regina 22/07 — alerta de seguranca em login de dispositivo novo.
   // Bypassa opt-in e cap diario (dispararNotificacao com bypassCap=true).
   SEGURANCA_LOGIN_NOVO_DEVICE
+  // Regina 30/07 — lembrete semanal (sexta 10h BRT) pra clientes com
+  // conciliacao ativa enviarem o extrato bancario da semana.
+  LEMBRETE_EXTRATO_SEMANAL
 }
 
 enum StatusNotificacaoWhatsApp {

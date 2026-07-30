@@ -845,6 +845,97 @@ export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ 
   return { enviados };
 }
 
+// ==================== LEMBRETE EXTRATO SEMANAL ====================
+
+// Regina 30/07: sexta 10h BRT, avisa clientes com conciliacao ativa (plano
+// INTERMEDIARIO/PREMIUM OU cortesia) pra enviar o extrato bancario da
+// semana. Estrategia: sexta > segunda porque o extrato ja fechou a semana
+// util e o cliente ainda tem espaco antes do fim de semana pra tirar
+// pendencias com contador. Idempotente por (usuario, semanaISO) — 1 msg
+// por semana no maximo, mesmo se o cron rodar 2x.
+export async function enviarLembreteExtratoSemanal(
+  hoje: Date = new Date(),
+): Promise<{ enviados: number; contasElegiveis: number }> {
+  const { contaTemAcessoConciliacao } = await import("@/lib/conciliacao/planoGuard");
+
+  const inicioHoje = new Date(hoje);
+  inicioHoje.setHours(0, 0, 0, 0);
+  const ano = inicioHoje.getFullYear();
+  const jan1 = new Date(ano, 0, 1);
+  const diasAno = Math.floor((inicioHoje.getTime() - jan1.getTime()) / 86400000);
+  const semana = Math.ceil((diasAno + jan1.getDay() + 1) / 7);
+  const semanaKey = `${ano}-W${String(semana).padStart(2, "0")}`;
+
+  // Contas com acesso a conciliacao: plano INTERMEDIARIO/PREMIUM OU cortesia ativa
+  const contas = await prisma.conta.findMany({
+    where: {
+      statusAssinatura: { in: ["ATIVA", "TRIAL"] },
+      tipo: "EMPRESA",
+      conciliacaoOptIn: true,
+      OR: [
+        { plano: { in: ["INTERMEDIARIO", "PREMIUM"] } },
+        { conciliacaoCortesiaAte: { gt: hoje } },
+      ],
+    },
+    select: {
+      id: true,
+      plano: true,
+      conciliacaoCortesiaAte: true,
+      empresas: { select: { razaoSocial: true }, take: 1, orderBy: { criadoEm: "asc" } },
+    },
+  });
+
+  let enviados = 0;
+  for (const conta of contas) {
+    // Guarda extra caso a query acima nao pegue algum caso limite
+    if (
+      !contaTemAcessoConciliacao({
+        plano: conta.plano,
+        conciliacaoCortesiaAte: conta.conciliacaoCortesiaAte,
+      })
+    ) {
+      continue;
+    }
+
+    // Skip: se ja subiu extrato nesta semana, nao precisa lembrar
+    const inicioSemana = new Date(inicioHoje);
+    inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay()); // domingo
+    const extratoRecente = await prisma.extrato.findFirst({
+      where: {
+        contaId: conta.id,
+        criadoEm: { gte: inicioSemana },
+      },
+      select: { id: true },
+    });
+    if (extratoRecente) continue;
+
+    const usuarios = await destinatariosDaConta(conta.id);
+    for (const u of usuarios) {
+      const isCortesia = conta.plano === "BASICO" && conta.conciliacaoCortesiaAte;
+      const linhaCortesia = isCortesia
+        ? `\n_(Você está no período de cortesia da conciliação — expira em ${conta.conciliacaoCortesiaAte!.toLocaleDateString("pt-BR")}.)_\n`
+        : "";
+      const msg =
+        `📄 *Lembrete: envie o extrato bancário da semana*\n\n` +
+        `${primeiroNome(u.nome)}, é sexta — dia de subir o extrato da semana pra o CP System conciliar tudo automaticamente com seus empenhos, mensalidade e comissões.\n\n` +
+        `*2 formas de enviar:*\n` +
+        `• Responde este WhatsApp com o PDF anexado — a gente processa direto por aqui\n` +
+        `• Ou entra em cpsystem.app.br/conciliacao e faz o upload\n` +
+        `${linhaCortesia}` +
+        `\nAssim que subir, você recebe as sugestões pra aprovar e o dashboard já reflete tudo. Bom fim de semana! 🚀`;
+
+      const r = await dispararNotificacao({
+        usuarioId: u.id,
+        tipo: "LEMBRETE_EXTRATO_SEMANAL",
+        referenciaId: `extrato-${semanaKey}`,
+        mensagem: msg,
+      }).catch(() => ({ enviado: false }));
+      if (r.enviado) enviados++;
+    }
+  }
+  return { enviados, contasElegiveis: contas.length };
+}
+
 // ==================== ORQUESTRADOR DIARIO ====================
 
 // Chamado pela regua diaria (cron matinal 9h BRT). Regina 08/07: substituido

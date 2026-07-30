@@ -36,6 +36,10 @@
       "schedule": "0 12 * * 5"
     },
     {
+      "path": "/api/cron/lembrete-extrato",
+      "schedule": "0 13 * * 5"
+    },
+    {
       "path": "/api/cron/pagar-comissoes",
       "schedule": "0 12 20 * *"
     },
