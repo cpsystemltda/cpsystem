@@ -147,7 +147,14 @@ export default async function PainelAnalistaPage({
             if (v.status === "ATIVO") {
               totalComissaoAPagar += Math.max(0, c.valorCalculado - c.valorRecebido);
             }
-          } else if (c.status === "A_RECEBER" || c.status === "ATRASADO") {
+          } else if (
+            c.status === "A_RECEBER" ||
+            c.status === "ATRASADO" ||
+            c.status === "PAGO_AGUARDANDO_CONFIRMACAO"
+          ) {
+            // PAGO_AGUARDANDO_CONFIRMACAO: empresa declarou pagamento mas
+            // dinheiro ainda não caiu (ou não foi conferido) — continua na
+            // linha de "a pagar" até o analista confirmar recebimento.
             if (v.status === "ATIVO") totalComissaoAPagar += c.valorCalculado;
           }
           // AGUARDANDO_ORGAO: não conta como "a pagar" — empresa só deve

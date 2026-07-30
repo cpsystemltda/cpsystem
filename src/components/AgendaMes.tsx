@@ -105,13 +105,24 @@ export function AgendaMes({
     >
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h3
-            className="text-[12px] font-bold uppercase"
+          <p
+            className="text-[11px] font-bold uppercase"
             style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
           >
-            Agenda · {NOMES_MES[primeiroDoMes.getMonth()]} {primeiroDoMes.getFullYear()}
+            Agenda de execuções
+          </p>
+          {/* Igor 30/07: titulo do mes bem grande e limpo pra ficar claro
+              qual mes esta ativo ao navegar. */}
+          <h3
+            className="mt-1 text-[28px] font-extrabold leading-none"
+            style={{ color: "var(--text)", letterSpacing: "-0.02em" }}
+          >
+            {NOMES_MES[primeiroDoMes.getMonth()]}{" "}
+            <span style={{ color: "var(--text-mute)", fontWeight: 500 }}>
+              {primeiroDoMes.getFullYear()}
+            </span>
           </h3>
-          <p className="mt-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
+          <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
             {entregas.length} execução(ões) com janela neste mês
           </p>
         </div>
@@ -285,15 +296,22 @@ function SemanaRow({
               key={i}
               className="rounded-lg"
               style={{
+                // Igor 30/07: dias fora do mes ficam BEM apagados (quase
+                // invisiveis) pra ficar claro que so o mes selecionado esta
+                // ativo. Antes: 0.015 vs 0.03 (quase igual). Agora: 0 vs 0.05
+                // + opacity forte no numero do dia.
                 background: ehHoje
                   ? "rgba(212,175,55,0.14)"
                   : foraDoMes
-                    ? "rgba(15,14,12,0.015)"
+                    ? "transparent"
                     : "rgba(15,14,12,0.03)",
                 border: ehHoje
                   ? "0.5px solid rgba(168,137,71,0.5)"
-                  : "0.5px solid var(--hairline)",
+                  : foraDoMes
+                    ? "0.5px dashed rgba(168,163,154,0.25)"
+                    : "0.5px solid var(--hairline)",
                 minHeight: `${alturaMinima}px`,
+                opacity: foraDoMes ? 0.35 : 1,
               }}
             >
               <div className="flex items-center justify-between px-2 pt-1.5">
@@ -303,7 +321,7 @@ function SemanaRow({
                     color: ehHoje
                       ? "var(--primary-deep)"
                       : foraDoMes
-                        ? "var(--text-mute)"
+                        ? "var(--text-faint)"
                         : "var(--text)",
                   }}
                 >
@@ -336,9 +354,14 @@ function SemanaRow({
           const widthPct = (colSpan / 7) * 100;
           const topPx = HEADER_DIA + ev.trilha * (ALTURA_BARRA + GAP_BARRA);
           const atrasado = ev.limite < hojeNorm;
+          // Igor 30/07: empenhos ja concluidos (ENTREGUE em diante) aparecem
+          // no historico da agenda com visual mais apagado — pra saber que
+          // "aquele dia teve entrega e ja foi feita" sem sumir do calendario.
+          const concluido = ["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(ev.status);
           const cor = COR_POR_STATUS[ev.status] ?? COR_POR_STATUS.EMPENHADO;
           const corBg = atrasado ? "rgba(225,29,72,0.9)" : cor.bg;
           const corBorder = atrasado ? "rgba(190,18,60,1)" : cor.border;
+          const opacityConcluido = concluido && !atrasado ? 0.45 : 1;
           // Mostra hora SO no card do dia de inicio (evita poluir nos dias do meio)
           const ehDiaInicio = diffDias(ev.janelaInicio, inicioSemana) === ev.colInicio;
           const rotuloHora = ehDiaInicio && ev.horaInicio ? `${ev.horaInicio}${ev.horaFim ? `–${ev.horaFim}` : ""}` : null;
@@ -361,8 +384,9 @@ function SemanaRow({
                   border: `0.5px solid ${corBorder}`,
                   color: cor.text,
                   letterSpacing: "0.02em",
+                  opacity: opacityConcluido,
                 }}
-                title={`${labelInstrumento(ev.instrumento)} ${ev.numero} · ${ev.orgaoNome} · ${ev.objeto}${ev.horaInicio ? ` · ${ev.horaInicio}${ev.horaFim ? `–${ev.horaFim}` : ""}` : ""}`}
+                title={`${labelInstrumento(ev.instrumento)} ${ev.numero} · ${ev.orgaoNome} · ${ev.objeto}${ev.horaInicio ? ` · ${ev.horaInicio}${ev.horaFim ? `–${ev.horaFim}` : ""}` : ""}${concluido ? " · CONCLUÍDO" : ""}`}
               >
                 {rotuloHora && (
                   <span

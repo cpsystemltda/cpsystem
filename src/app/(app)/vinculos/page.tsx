@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { UserCheck, Briefcase } from "lucide-react";
+import { UserCheck, Briefcase, DollarSign } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
@@ -9,6 +9,7 @@ import {
   EditarPercentualForm,
   EncerrarVinculoButton,
   MarcarFixoPagoForm,
+  MarcarComissaoPagoForm,
 } from "./VinculoForms";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 
@@ -47,6 +48,23 @@ export default async function VinculosPage() {
     orderBy: [{ status: "asc" }, { criadoEm: "desc" }],
   });
 
+  // Comissões de execução (Linha B) que a empresa precisa liquidar com o
+  // analista. Igor 30/07: mostrar num painel só pra empresa dar 1 clique
+  // e notificar automaticamente. Aguardando confirmação também aparece aqui
+  // pra visibilidade — sem botão porque a bola tá com o analista.
+  const comissoesPendentes = await prisma.comissaoExecucao.findMany({
+    where: {
+      vinculo: { contaId: usuario.contaId },
+      status: { in: ["A_RECEBER", "ATRASADO", "PAGO_AGUARDANDO_CONFIRMACAO"] },
+    },
+    include: {
+      analista: { select: { nomeCompleto: true } },
+      empenho: { select: { instrumento: true, numero: true, orgaoNome: true } },
+    },
+    orderBy: [{ status: "asc" }, { criadoEm: "desc" }],
+    take: 30,
+  });
+
   // Lista de analistas disponíveis pra criar novo vínculo
   const analistas = await prisma.analista.findMany({
     where: { ativo: true },
@@ -80,6 +98,71 @@ export default async function VinculosPage() {
           <NovoVinculoForm analistas={analistas.map((a) => ({ value: a.id, label: `${a.nomeCompleto} (${formatarCpf(a.cpf)})` }))} />
         </div>
       </section>
+
+      {comissoesPendentes.length > 0 && (
+        <section className="mt-6">
+          <h2
+            className="mb-3 text-[12px] font-bold uppercase"
+            style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+          >
+            <DollarSign className="mr-1 inline-block h-3.5 w-3.5" /> Comissões variáveis a pagar ({comissoesPendentes.length})
+          </h2>
+          <div className="overflow-hidden rounded-[18px] border" style={{ borderColor: "var(--hairline)" }}>
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase" style={{ background: "var(--glass-1)", color: "var(--text-mute)" }}>
+                <tr>
+                  <th className="px-4 py-2 text-left">Empenho</th>
+                  <th className="px-4 py-2 text-left">Analista</th>
+                  <th className="px-4 py-2 text-right">Comissão</th>
+                  <th className="px-4 py-2 text-left">Status</th>
+                  <th className="px-4 py-2 text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {comissoesPendentes.map((c) => (
+                  <tr key={c.id} className="border-t" style={{ borderColor: "var(--hairline)" }}>
+                    <td className="px-4 py-2 text-xs">
+                      <div className="font-semibold text-slate-900">
+                        {c.empenho.instrumento} {c.empenho.numero}
+                      </div>
+                      <div className="text-slate-500">{c.empenho.orgaoNome}</div>
+                    </td>
+                    <td className="px-4 py-2 text-xs text-slate-700">{c.analista.nomeCompleto}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-semibold">{brl(c.valorCalculado)}</td>
+                    <td className="px-4 py-2 text-xs">
+                      <span
+                        className={`rounded px-2 py-0.5 font-medium ${
+                          c.status === "ATRASADO"
+                            ? "bg-rose-100 text-rose-700"
+                            : c.status === "PAGO_AGUARDANDO_CONFIRMACAO"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {c.status === "PAGO_AGUARDANDO_CONFIRMACAO" ? "Aguardando analista" : c.status.replace("_", " ")}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {c.status === "PAGO_AGUARDANDO_CONFIRMACAO" ? (
+                        <span className="text-[11px] text-slate-500">Aguardando confirmação do analista</span>
+                      ) : (
+                        <MarcarComissaoPagoForm
+                          comissaoId={c.id}
+                          empenhoRef={`${c.empenho.instrumento} ${c.empenho.numero}`}
+                          valor={c.valorCalculado}
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-500">
+            Ao marcar como pago, o analista recebe WhatsApp e precisa confirmar recebimento — só então vira "Pago" definitivo.
+          </p>
+        </section>
+      )}
 
       <section className="mt-6">
         <h2

@@ -210,7 +210,10 @@ async function HonorariosDaEmpresa({ contaId }: { contaId: string }) {
       orderBy: [{ competencia: "desc" }, { vencimento: "asc" }],
     }),
     prisma.comissaoExecucao.findMany({
-      where: { vinculo: { contaId }, status: { in: ["A_RECEBER", "ATRASADO", "PAGO_PARCIAL"] } },
+      where: {
+        vinculo: { contaId },
+        status: { in: ["A_RECEBER", "ATRASADO", "PAGO_PARCIAL", "PAGO_AGUARDANDO_CONFIRMACAO"] },
+      },
       include: {
         empenho: { select: { numero: true, orgaoNome: true } },
         vinculo: { select: { analista: { select: { nomeCompleto: true } } } },

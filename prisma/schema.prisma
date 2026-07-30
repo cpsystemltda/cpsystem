@@ -966,7 +966,8 @@ enum StatusComissaoExecucao {
   AGUARDANDO_ORGAO // Empenho ainda não foi pago pelo órgão à empresa
   A_RECEBER // Órgão pagou; comissão liberada para cobrança pelo analista
   ATRASADO // A_RECEBER e passou da data combinada (controle do analista)
-  PAGO // Empresa pagou a comissão ao analista
+  PAGO_AGUARDANDO_CONFIRMACAO // Empresa marcou como pago; aguarda analista confirmar recebimento
+  PAGO // Empresa pagou e analista confirmou recebimento
   PAGO_PARCIAL // Empresa pagou parcialmente a comissão
 }
 

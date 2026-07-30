@@ -10,6 +10,7 @@ import {
   encerrarVinculoAction,
   marcarFixoPagoAction,
 } from "@/app/actions/vinculoAnalista";
+import { marcarComissaoPagoPelaEmpresaAction } from "@/app/actions/comissaoExecucao";
 import { brl } from "@/lib/validators";
 
 type AnalistaOpt = { value: string; label: string };
@@ -203,6 +204,71 @@ export function MarcarFixoPagoForm({ vinculoId, competenciaAtual }: { vinculoId:
         Marcar fixo de {competenciaAtual} como pago
       </button>
     </form>
+  );
+}
+
+export function MarcarComissaoPagoForm({
+  comissaoId,
+  empenhoRef,
+  valor,
+}: {
+  comissaoId: string;
+  empenhoRef: string;
+  valor: number;
+}) {
+  const [state, formAction] = useActionState(marcarComissaoPagoPelaEmpresaAction, null);
+  const [aberto, setAberto] = useState(false);
+  if (!aberto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+      >
+        Marcar como pago
+      </button>
+    );
+  }
+  return (
+    <form action={formAction} className="flex flex-col gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+      <input type="hidden" name="id" value={comissaoId} />
+      <p className="text-xs text-slate-700">
+        Confirmar pagamento de <strong>{brl(valor)}</strong> — comissão do empenho {empenhoRef}?
+        O analista recebe WhatsApp e precisa confirmar recebimento.
+      </p>
+      <input
+        type="text"
+        name="observacao"
+        placeholder="Observação (opcional): PIX, TED, etc."
+        className="rounded border border-slate-300 px-2 py-1 text-xs"
+        maxLength={200}
+      />
+      <div className="flex items-center gap-2">
+        <SubmitEmerald>Confirmar pagamento</SubmitEmerald>
+        <button
+          type="button"
+          onClick={() => setAberto(false)}
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-50"
+        >
+          Cancelar
+        </button>
+      </div>
+      {state?.erro && <p className="text-xs text-rose-600">{state.erro}</p>}
+    </form>
+  );
+}
+
+function SubmitEmerald({ children }: { children: React.ReactNode }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+    >
+      {pending ? <Loader2 className="inline h-3 w-3 animate-spin mr-1" /> : <Check className="inline h-3 w-3 mr-1" />}
+      {children}
+    </button>
   );
 }
 

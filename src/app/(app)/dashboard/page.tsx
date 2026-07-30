@@ -254,7 +254,11 @@ export default async function DashboardPage({
     prisma.empenho.findMany({
       where: {
         empresa: filtroEmpresa,
-        status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] },
+        // Igor 30/07: manter historico completo na agenda — mesmo
+        // empenhos ENTREGUES/NF/PAGOS aparecem, com visual diferenciado
+        // (opacity + cor verde). Antes o filtro era ["EMPENHADO",
+        // "PEDIDO_RECEBIDO", "EM_TRANSITO"] mas isso escondia o que ja
+        // rolou no mes e passava a impressao de "nao teve nada".
         OR: [
           { dataEntregaInicio: { lt: fimMesAgenda }, dataEntregaFim: { gte: mesAgenda } },
           { dataEntregaCerta: { gte: mesAgenda, lt: fimMesAgenda } },

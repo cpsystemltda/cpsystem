@@ -16,6 +16,7 @@ import {
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl, formatarCnpj } from "@/lib/validators";
+import { ConfirmarRecebimentoForm } from "./ConfirmarRecebimentoForm";
 
 // Tela detalhada de uma empresa vinculada — acessada quando o analista
 // clica num card de "Empresas vinculadas" no painel. Mostra:
@@ -122,8 +123,15 @@ export default async function EmpresaDoAnalistaPage({
   const recebidoVariavel = vinculo.comissoesExecucao
     .filter((c) => c.status === "PAGO" || c.status === "PAGO_PARCIAL")
     .reduce((s, c) => s + c.valorRecebido, 0);
+  // PAGO_AGUARDANDO_CONFIRMACAO ainda entra em "a receber" porque o dinheiro
+  // não caiu na conta do analista até ele confirmar recebimento.
   const aReceberCliente = vinculo.comissoesExecucao
-    .filter((c) => c.status === "A_RECEBER" || c.status === "ATRASADO")
+    .filter(
+      (c) =>
+        c.status === "A_RECEBER" ||
+        c.status === "ATRASADO" ||
+        c.status === "PAGO_AGUARDANDO_CONFIRMACAO",
+    )
     .reduce((s, c) => s + c.valorCalculado, 0);
   const aguardandoOrgao = vinculo.comissoesExecucao
     .filter((c) => c.status === "AGUARDANDO_ORGAO")
@@ -409,6 +417,7 @@ export default async function EmpresaDoAnalistaPage({
                   <th className="px-4 py-2 text-right">Valor</th>
                   <th className="px-4 py-2 text-right">Comissão</th>
                   <th className="px-4 py-2 text-left">Status</th>
+                  <th className="px-4 py-2 text-right">Ação</th>
                 </tr>
               </thead>
               <tbody>
@@ -434,13 +443,22 @@ export default async function EmpresaDoAnalistaPage({
                             ? "bg-emerald-100 text-emerald-700"
                             : c.status === "PAGO_PARCIAL"
                               ? "bg-amber-100 text-amber-700"
-                              : c.status === "A_RECEBER" || c.status === "ATRASADO"
-                                ? "bg-rose-100 text-rose-700"
-                                : "bg-slate-100 text-slate-600"
+                              : c.status === "PAGO_AGUARDANDO_CONFIRMACAO"
+                                ? "bg-amber-100 text-amber-800"
+                                : c.status === "A_RECEBER" || c.status === "ATRASADO"
+                                  ? "bg-rose-100 text-rose-700"
+                                  : "bg-slate-100 text-slate-600"
                         }`}
                       >
-                        {c.status}
+                        {c.status === "PAGO_AGUARDANDO_CONFIRMACAO"
+                          ? "Empresa marcou como pago"
+                          : c.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {c.status === "PAGO_AGUARDANDO_CONFIRMACAO" && (
+                        <ConfirmarRecebimentoForm comissaoId={c.id} />
+                      )}
                     </td>
                   </tr>
                 ))}

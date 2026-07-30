@@ -7,10 +7,17 @@ import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { calcularDiff, CAMPOS_COMISSAO_EXECUCAO } from "@/lib/diff";
 import { salvarArquivo } from "@/lib/uploads";
+import { notificarAnalistaVinculadoSobre } from "@/lib/notifAnalistaVinculado";
 
 type Result = { erro?: string; ok?: boolean };
 
-type StatusComissao = "AGUARDANDO_ORGAO" | "A_RECEBER" | "ATRASADO" | "PAGO" | "PAGO_PARCIAL";
+type StatusComissao =
+  | "AGUARDANDO_ORGAO"
+  | "A_RECEBER"
+  | "ATRASADO"
+  | "PAGO_AGUARDANDO_CONFIRMACAO"
+  | "PAGO"
+  | "PAGO_PARCIAL";
 
 /**
  * Action exclusiva do analista: atualiza Linha B de uma execução.
@@ -58,6 +65,8 @@ export async function marcarComissaoExecucaoAction(
   }
 
   // Trava: não pode marcar PAGO se órgão ainda não pagou a empresa.
+  // (PAGO_AGUARDANDO_CONFIRMACAO já implica que empresa marcou pagamento, o
+  // que pressupõe recebimento do órgão, então não bloqueia o A→PAGO daqui.)
   if (
     comissaoAntes.status === "AGUARDANDO_ORGAO" &&
     (novoStatus === "PAGO" || novoStatus === "PAGO_PARCIAL")
@@ -199,6 +208,107 @@ export async function overridePercentualComissaoAction(
     mudancas,
   });
 
+  revalidatePath("/painel-analista");
+  return { ok: true };
+}
+
+/**
+ * Ação da EMPRESA: marca uma comissão de execução como paga.
+ * Fluxo: empresa clica em "Marcar como pago" no /vinculos → status vira
+ * PAGO_AGUARDANDO_CONFIRMACAO + notifica o analista via WhatsApp. Só vira
+ * PAGO definitivo quando o analista confirmar recebimento no painel dele
+ * (via marcarComissaoExecucaoAction).
+ * Igor 30/07: separar quem declarou de quem confirmou pra evitar disputas.
+ */
+export async function marcarComissaoPagoPelaEmpresaAction(
+  _p: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  if (usuario.conta.tipo !== "EMPRESA" && !usuario.superAdmin) {
+    return { erro: "Apenas empresas podem declarar pagamento de comissão." };
+  }
+
+  const id = String(formData.get("id") || "");
+  const comissaoAntes = await prisma.comissaoExecucao.findUnique({ where: { id } });
+  if (!comissaoAntes) return { erro: "Comissão não encontrada." };
+
+  const [empenho, vinculo] = await Promise.all([
+    prisma.empenho.findUnique({
+      where: { id: comissaoAntes.empenhoId },
+      select: { instrumento: true, numero: true },
+    }),
+    prisma.vinculoAnalista.findUnique({
+      where: { id: comissaoAntes.vinculoId },
+      select: { contaId: true },
+    }),
+  ]);
+  if (!empenho || !vinculo) return { erro: "Vínculo/empenho não encontrado." };
+
+  if (!usuario.superAdmin && vinculo.contaId !== usuario.contaId) {
+    return { erro: "Sem permissão para esta comissão." };
+  }
+
+  if (comissaoAntes.status === "AGUARDANDO_ORGAO") {
+    return {
+      erro: "Empenho ainda não foi pago pelo órgão. Registre o pagamento (Linha A) antes de declarar comissão.",
+    };
+  }
+  if (comissaoAntes.status === "PAGO" || comissaoAntes.status === "PAGO_PARCIAL") {
+    return { erro: "Comissão já está registrada como paga." };
+  }
+  if (comissaoAntes.status === "PAGO_AGUARDANDO_CONFIRMACAO") {
+    return { erro: "Comissão já aguarda confirmação do analista." };
+  }
+
+  const observacao = String(formData.get("observacao") || "").trim() || null;
+
+  const nomeEmpresa =
+    (
+      await prisma.empresa.findFirst({
+        where: { contaId: usuario.contaId },
+        select: { razaoSocial: true },
+        orderBy: { criadoEm: "asc" },
+      })
+    )?.razaoSocial ?? "Sua empresa";
+
+  const dadosNovos = {
+    status: "PAGO_AGUARDANDO_CONFIRMACAO" as const,
+    observacao,
+  };
+
+  await prisma.comissaoExecucao.update({ where: { id }, data: dadosNovos });
+
+  const mudancas = calcularDiff(
+    comissaoAntes as unknown as Record<string, unknown>,
+    dadosNovos as Record<string, unknown>,
+    CAMPOS_COMISSAO_EXECUCAO,
+  );
+  await registrarAuditoria({
+    contaId: usuario.contaId,
+    usuarioId: usuario.id,
+    acao: "ATUALIZAR",
+    recurso: "ComissaoExecucao",
+    recursoId: id,
+    titulo: `Empresa declarou pagamento de comissão`,
+    mudancas,
+  });
+
+  const empenhoRef = `${empenho.instrumento} ${empenho.numero}`;
+  await notificarAnalistaVinculadoSobre({
+    analistaId: comissaoAntes.analistaId,
+    evento: {
+      tipo: "COMISSAO_MARCADA_PAGA_EMPRESA",
+      nomeEmpresa,
+      empenhoRef,
+      valor: comissaoAntes.valorCalculado,
+      observacao,
+      linkConfirmacao: `https://cpsystem.app.br/painel-analista`,
+    },
+  }).catch(() => undefined);
+
+  revalidatePath("/vinculos");
   revalidatePath("/painel-analista");
   return { ok: true };
 }

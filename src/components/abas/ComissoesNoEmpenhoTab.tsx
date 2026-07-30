@@ -4,6 +4,7 @@ type StatusComissao =
   | "AGUARDANDO_ORGAO"
   | "A_RECEBER"
   | "ATRASADO"
+  | "PAGO_AGUARDANDO_CONFIRMACAO"
   | "PAGO"
   | "PAGO_PARCIAL";
 
@@ -11,6 +12,7 @@ const ROTULO_STATUS: Record<StatusComissao, string> = {
   AGUARDANDO_ORGAO: "Aguardando órgão",
   A_RECEBER: "A receber",
   ATRASADO: "Atrasado",
+  PAGO_AGUARDANDO_CONFIRMACAO: "Empresa marcou como pago",
   PAGO: "Pago",
   PAGO_PARCIAL: "Pago parcial",
 };
@@ -19,6 +21,7 @@ const COR_STATUS: Record<StatusComissao, { bg: string; fg: string; border: strin
   AGUARDANDO_ORGAO: { bg: "rgba(184,197,214,0.18)", fg: "#365175", border: "rgba(120,140,170,0.4)" },
   A_RECEBER: { bg: "rgba(212,175,55,0.20)", fg: "#7a5c1a", border: "rgba(168,137,71,0.5)" },
   ATRASADO: { bg: "rgba(232,138,152,0.20)", fg: "#9b2c3a", border: "rgba(198,103,112,0.5)" },
+  PAGO_AGUARDANDO_CONFIRMACAO: { bg: "rgba(255,213,128,0.28)", fg: "#8a5a1a", border: "rgba(216,157,64,0.55)" },
   PAGO: { bg: "rgba(93,216,182,0.20)", fg: "#1f6f55", border: "rgba(93,216,182,0.4)" },
   PAGO_PARCIAL: { bg: "rgba(197,180,255,0.22)", fg: "#5a4795", border: "rgba(155,135,225,0.5)" },
 };
