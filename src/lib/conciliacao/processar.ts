@@ -3,7 +3,13 @@ import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { extrairExtrato } from "./extrator";
 import { encontrarCandidatos, SCORE_AUTO_CONFIRMA, classificarScore } from "./match";
+import {
+  encontrarCandidatosDebito,
+  classificarScoreDebito,
+  SCORE_AUTO_CONFIRMA_DEBITO,
+} from "./matchDebito";
 import { aplicarPagamentoDeConciliacao } from "./aplicarPagamento";
+import { aplicarDebitoDeConciliacao } from "./aplicarDebito";
 import type { FonteExtrato } from "@/generated/prisma/client";
 
 // Orquestrador: recebe PDF, salva Extrato, extrai transacoes via LLM,
@@ -153,6 +159,53 @@ export async function processarExtrato(
         transacaoId: tx.id,
       });
     } else if (nivel === "medio") qtdMedio++;
+    else qtdSem++;
+  }
+
+  // 4b) DEBITOS — o cliente pagou algo. Contrapartida pode ser mensalidade CP,
+  // fixo mensal analista ou comissao variavel analista. Regina 30/07.
+  const transacoesDebito = await prisma.transacaoExtrato.findMany({
+    where: { extratoId: extrato.id, tipo: "DEBITO" },
+    select: {
+      id: true,
+      data: true,
+      valor: true,
+      descricao: true,
+      nomeContraparte: true,
+      cnpjContraparte: true,
+    },
+  });
+
+  for (const tx of transacoesDebito) {
+    const candidatos = await encontrarCandidatosDebito(input.contaId, tx);
+    if (candidatos.length === 0) {
+      qtdSem++;
+      continue;
+    }
+    for (const c of candidatos) {
+      const auto = c.score >= SCORE_AUTO_CONFIRMA_DEBITO;
+      await prisma.conciliacaoDebito.create({
+        data: {
+          transacaoId: tx.id,
+          tipoContrapartida: c.tipoContrapartida,
+          contrapartidaId: c.contrapartidaId,
+          score: c.score,
+          fatoresMatch: c.fatores as unknown as import("@/generated/prisma/client").Prisma.InputJsonValue,
+          status: auto ? "CONFIRMADA" : "SUGERIDA",
+          confirmadaEm: auto ? new Date() : null,
+        },
+      });
+    }
+    const melhor = candidatos[0];
+    const nivelD = classificarScoreDebito(melhor.score);
+    if (nivelD === "alto") {
+      qtdAlto++;
+      await aplicarDebitoDeConciliacao({
+        tipoContrapartida: melhor.tipoContrapartida,
+        contrapartidaId: melhor.contrapartidaId,
+        transacaoId: tx.id,
+      });
+    } else if (nivelD === "medio") qtdMedio++;
     else qtdSem++;
   }
 

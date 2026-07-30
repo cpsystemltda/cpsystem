@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
 import { processarExtrato } from "@/lib/conciliacao/processar";
 import { aplicarPagamentoDeConciliacao } from "@/lib/conciliacao/aplicarPagamento";
+import { aplicarDebitoDeConciliacao } from "@/lib/conciliacao/aplicarDebito";
 
 type Result = { ok?: true; erro?: string; extratoId?: string; jaProcessado?: boolean };
 
@@ -133,5 +134,74 @@ export async function configurarJanelaAction(_p: Result | null, formData: FormDa
   });
   revalidatePath("/conciliacao");
   revalidatePath("/conta");
+  return { ok: true };
+}
+
+// DEBITOS — confirma/rejeita ConciliacaoDebito. Aplica pagamento na
+// contrapartida (Cobranca / PagamentoFixoMensal / ComissaoExecucao).
+export async function confirmarConciliacaoDebitoAction(
+  _p: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  const id = String(formData.get("conciliacaoId") || "");
+  if (!id) return { erro: "conciliacaoId ausente" };
+
+  const c = await prisma.conciliacaoDebito.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      transacaoId: true,
+      tipoContrapartida: true,
+      contrapartidaId: true,
+      transacao: { select: { extrato: { select: { contaId: true } } } },
+    },
+  });
+  if (!c) return { erro: "Conciliação não encontrada" };
+  if (c.transacao.extrato.contaId !== usuario.contaId) return { erro: "Sem permissão" };
+
+  await prisma.conciliacaoDebito.update({
+    where: { id },
+    data: { status: "CONFIRMADA", confirmadaEm: new Date(), confirmadaPorId: usuario.id },
+  });
+  await prisma.conciliacaoDebito.updateMany({
+    where: {
+      transacaoId: c.transacaoId,
+      id: { not: id },
+      status: "SUGERIDA",
+    },
+    data: { status: "REJEITADA" },
+  });
+
+  await aplicarDebitoDeConciliacao({
+    tipoContrapartida: c.tipoContrapartida,
+    contrapartidaId: c.contrapartidaId,
+    transacaoId: c.transacaoId,
+  });
+
+  revalidatePath("/conciliacao");
+  revalidatePath("/conta/assinatura");
+  revalidatePath("/vinculos");
+  revalidatePath("/painel-analista");
+  return { ok: true };
+}
+
+export async function rejeitarConciliacaoDebitoAction(
+  _p: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  const id = String(formData.get("conciliacaoId") || "");
+  if (!id) return { erro: "conciliacaoId ausente" };
+  const c = await prisma.conciliacaoDebito.findUnique({
+    where: { id },
+    select: { transacao: { select: { extrato: { select: { contaId: true } } } } },
+  });
+  if (!c) return { erro: "Conciliação não encontrada" };
+  if (c.transacao.extrato.contaId !== usuario.contaId) return { erro: "Sem permissão" };
+  await prisma.conciliacaoDebito.update({ where: { id }, data: { status: "REJEITADA" } });
+  revalidatePath("/conciliacao");
   return { ok: true };
 }

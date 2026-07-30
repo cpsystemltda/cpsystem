@@ -2116,6 +2116,7 @@ model TransacaoExtrato {
   // Match: 0..1 conciliação vinculada. Uma transação pode conciliar com no
   // máximo 1 empenho (se casar com 2, cliente escolhe qual manualmente).
   conciliacoes          Conciliacao[]
+  conciliacoesDebito    ConciliacaoDebito[]
   criadoEm              DateTime      @default(now())
 
   @@index([extratoId, tipo])
@@ -2125,6 +2126,37 @@ enum StatusConciliacao {
   SUGERIDA // score baixo/medio, aguarda aceite do cliente
   CONFIRMADA // cliente aceitou OU score foi >85% (auto)
   REJEITADA // cliente rejeitou match
+}
+
+// Contrapartidas de DÉBITO — o cliente empresa é quem PAGA. Regina 30/07:
+// completar a conciliação bancária considera não só o que ele recebe do
+// órgão (crédito → Empenho) mas também o que ele paga: mensalidade CP,
+// fixo mensal do analista e comissão variável marcada como paga.
+enum TipoContrapartidaDebito {
+  COBRANCA_CP // Cobranca — mensalidade CP System (débito p/ CP)
+  FIXO_ANALISTA // PagamentoFixoMensal — fixo mensal ao analista
+  COMISSAO_ANALISTA // ComissaoExecucao — comissão variável ao analista
+}
+
+// Model separado (em vez de campos opcionais no Conciliacao) pra não quebrar
+// a semântica atual do fluxo de crédito/empenho. Simetricamente segue o
+// mesmo padrão de score + status + campos de auditoria.
+model ConciliacaoDebito {
+  id                 String                  @id @default(cuid())
+  transacaoId        String
+  transacao          TransacaoExtrato        @relation(fields: [transacaoId], references: [id], onDelete: Cascade)
+  tipoContrapartida  TipoContrapartidaDebito
+  contrapartidaId    String // FK "virtual" pra Cobranca/PagamentoFixoMensal/ComissaoExecucao
+  score              Float
+  fatoresMatch       Json?
+  status             StatusConciliacao       @default(SUGERIDA)
+  confirmadaEm       DateTime?
+  confirmadaPorId    String?
+  criadoEm           DateTime                @default(now())
+
+  @@index([transacaoId])
+  @@index([contrapartidaId])
+  @@index([tipoContrapartida])
 }
 
 // Vínculo entre transação bancária e empenho. Um empenho pode ter várias

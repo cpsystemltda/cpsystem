@@ -88,6 +88,106 @@ export default async function ConciliacaoPage() {
     })
     .filter((s): s is NonNullable<typeof s> => s !== null);
 
+  // DEBITOS: sugestoes de contrapartida (Cobranca, Fixo, Comissao)
+  const sugestoesDebitoRaw = await prisma.conciliacaoDebito.findMany({
+    where: {
+      status: "SUGERIDA",
+      transacao: { extrato: { contaId: usuario.contaId } },
+    },
+    orderBy: [{ score: "desc" }, { criadoEm: "desc" }],
+    take: 50,
+    select: {
+      id: true,
+      score: true,
+      tipoContrapartida: true,
+      contrapartidaId: true,
+      transacao: {
+        select: { data: true, valor: true, descricao: true, nomeContraparte: true },
+      },
+    },
+  });
+
+  const cobIds = sugestoesDebitoRaw.filter((s) => s.tipoContrapartida === "COBRANCA_CP").map((s) => s.contrapartidaId);
+  const fixIds = sugestoesDebitoRaw.filter((s) => s.tipoContrapartida === "FIXO_ANALISTA").map((s) => s.contrapartidaId);
+  const comIds = sugestoesDebitoRaw.filter((s) => s.tipoContrapartida === "COMISSAO_ANALISTA").map((s) => s.contrapartidaId);
+  const [cobList, fixList, comList] = await Promise.all([
+    cobIds.length ? prisma.cobranca.findMany({ where: { id: { in: cobIds } }, select: { id: true, valor: true, competencia: true, plano: true } }) : Promise.resolve([]),
+    fixIds.length
+      ? prisma.pagamentoFixoMensal.findMany({
+          where: { id: { in: fixIds } },
+          select: {
+            id: true,
+            valor: true,
+            competencia: true,
+            vinculo: { select: { analista: { select: { nomeCompleto: true } } } },
+          },
+        })
+      : Promise.resolve([]),
+    comIds.length
+      ? prisma.comissaoExecucao.findMany({
+          where: { id: { in: comIds } },
+          select: {
+            id: true,
+            valorCalculado: true,
+            valorRecebido: true,
+            analista: { select: { nomeCompleto: true } },
+            empenho: { select: { numero: true, instrumento: true } },
+          },
+        })
+      : Promise.resolve([]),
+  ]);
+  const cobMap = new Map(cobList.map((c) => [c.id, c]));
+  const fixMap = new Map(fixList.map((f) => [f.id, f]));
+  const comMap = new Map(comList.map((c) => [c.id, c]));
+
+  const sugestoesDebito = sugestoesDebitoRaw
+    .map((s) => {
+      if (s.tipoContrapartida === "COBRANCA_CP") {
+        const c = cobMap.get(s.contrapartidaId);
+        if (!c) return null;
+        return {
+          id: s.id,
+          score: s.score,
+          transacao: s.transacao,
+          contrapartida: {
+            tipo: "COBRANCA_CP" as const,
+            titulo: `Mensalidade ${c.plano} — ${c.competencia}`,
+            detalhe: "Assinatura CP System",
+            valorEsperado: c.valor,
+          },
+        };
+      }
+      if (s.tipoContrapartida === "FIXO_ANALISTA") {
+        const f = fixMap.get(s.contrapartidaId);
+        if (!f) return null;
+        return {
+          id: s.id,
+          score: s.score,
+          transacao: s.transacao,
+          contrapartida: {
+            tipo: "FIXO_ANALISTA" as const,
+            titulo: `Fixo mensal ${f.competencia}`,
+            detalhe: `Analista: ${f.vinculo.analista.nomeCompleto}`,
+            valorEsperado: f.valor,
+          },
+        };
+      }
+      const c = comMap.get(s.contrapartidaId);
+      if (!c) return null;
+      return {
+        id: s.id,
+        score: s.score,
+        transacao: s.transacao,
+        contrapartida: {
+          tipo: "COMISSAO_ANALISTA" as const,
+          titulo: `Comissão — ${c.empenho.instrumento} ${c.empenho.numero}`,
+          detalhe: `Analista: ${c.analista.nomeCompleto}`,
+          valorEsperado: c.valorCalculado - c.valorRecebido,
+        },
+      };
+    })
+    .filter((s): s is NonNullable<typeof s> => s !== null);
+
   const extratos = await prisma.extrato.findMany({
     where: { contaId: usuario.contaId },
     orderBy: { criadoEm: "desc" },
@@ -125,7 +225,7 @@ export default async function ConciliacaoPage() {
         </div>
       </section>
 
-      <SugestoesPendentes sugestoes={sugestoes} />
+      <SugestoesPendentes sugestoes={sugestoes} sugestoesDebito={sugestoesDebito} />
 
       <section className="mt-10">
         <h2 className="text-lg font-semibold text-slate-900">Extratos importados</h2>
