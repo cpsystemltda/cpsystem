@@ -6,6 +6,7 @@ import { bloquearEspionagem } from "@/lib/espionagem";
 import { prisma } from "@/lib/prisma";
 import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
 import { processarExtrato } from "@/lib/conciliacao/processar";
+import { aplicarPagamentoDeConciliacao } from "@/lib/conciliacao/aplicarPagamento";
 
 type Result = { ok?: true; erro?: string; extratoId?: string; jaProcessado?: boolean };
 
@@ -56,23 +57,38 @@ export async function confirmarConciliacaoAction(_p: Result | null, formData: Fo
 
   const c = await prisma.conciliacao.findUnique({
     where: { id: conciliacaoId },
-    select: { transacao: { select: { extrato: { select: { contaId: true } } } }, empenhoId: true },
+    select: {
+      empenhoId: true,
+      transacaoId: true,
+      transacao: { select: { extrato: { select: { contaId: true } } } },
+    },
   });
   if (!c) return { erro: "Conciliação não encontrada" };
   if (c.transacao.extrato.contaId !== usuario.contaId) return { erro: "Sem permissão" };
 
-  await prisma.$transaction([
-    prisma.conciliacao.update({
-      where: { id: conciliacaoId },
-      data: { status: "CONFIRMADA", confirmadaEm: new Date(), confirmadaPorId: usuario.id },
-    }),
-    prisma.empenho.update({
-      where: { id: c.empenhoId },
-      data: { status: "PAGO" },
-    }),
-  ]);
+  await prisma.conciliacao.update({
+    where: { id: conciliacaoId },
+    data: { status: "CONFIRMADA", confirmadaEm: new Date(), confirmadaPorId: usuario.id },
+  });
+
+  // Rejeita as OUTRAS conciliacoes que competiam pela mesma transacao — evita
+  // que o mesmo credito bancario seja aplicado a 2 empenhos diferentes.
+  await prisma.conciliacao.updateMany({
+    where: {
+      transacaoId: c.transacaoId,
+      id: { not: conciliacaoId },
+      status: "SUGERIDA",
+    },
+    data: { status: "REJEITADA" },
+  });
+
+  await aplicarPagamentoDeConciliacao({
+    empenhoId: c.empenhoId,
+    transacaoId: c.transacaoId,
+  });
 
   revalidatePath("/conciliacao");
+  revalidatePath("/painel-analista");
   return { ok: true };
 }
 

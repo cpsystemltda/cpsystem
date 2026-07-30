@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { extrairExtrato } from "./extrator";
 import { encontrarCandidatos, SCORE_AUTO_CONFIRMA, classificarScore } from "./match";
+import { aplicarPagamentoDeConciliacao } from "./aplicarPagamento";
 import type { FonteExtrato } from "@/generated/prisma/client";
 
 // Orquestrador: recebe PDF, salva Extrato, extrai transacoes via LLM,
@@ -144,10 +145,12 @@ export async function processarExtrato(
     const nivel = classificarScore(melhor.score);
     if (nivel === "alto") {
       qtdAlto++;
-      // Se auto-confirmou o melhor candidato, atualiza o Empenho pra PAGO
-      await prisma.empenho.update({
-        where: { id: melhor.empenhoId },
-        data: { status: "PAGO" },
+      // Auto-confirmou o melhor candidato → aplica efeitos laterais completos:
+      // Empenho.status=PAGO + dataPagamento + comprovante + libera comissao
+      // do analista (AGUARDANDO_ORGAO → A_RECEBER com valorBasePago correto).
+      await aplicarPagamentoDeConciliacao({
+        empenhoId: melhor.empenhoId,
+        transacaoId: tx.id,
       });
     } else if (nivel === "medio") qtdMedio++;
     else qtdSem++;

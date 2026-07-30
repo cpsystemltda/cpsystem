@@ -5,6 +5,7 @@ import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
 import { UploadDropzone } from "./_components/upload-dropzone";
 import { ListaExtratos } from "./_components/lista-extratos";
 import { ConfigJanela } from "./_components/config-janela";
+import { SugestoesPendentes } from "./_components/sugestoes-pendentes";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,55 @@ export default async function ConciliacaoPage() {
     where: { id: usuario.contaId },
     select: { conciliacaoDiaMes: true, conciliacaoOptIn: true },
   });
+
+  // Sugestoes pendentes: score 50-85 que a maquina nao teve certeza suficiente
+  // pra auto-conciliar. Regina 30/07: antes ficavam presas no banco sem UI.
+  const sugestoesRaw = await prisma.conciliacao.findMany({
+    where: {
+      status: "SUGERIDA",
+      transacao: { extrato: { contaId: usuario.contaId } },
+    },
+    orderBy: [{ score: "desc" }, { criadoEm: "desc" }],
+    take: 50,
+    select: {
+      id: true,
+      score: true,
+      empenhoId: true,
+      transacao: {
+        select: { data: true, valor: true, descricao: true, nomeContraparte: true },
+      },
+    },
+  });
+  const empenhoIds = Array.from(new Set(sugestoesRaw.map((s) => s.empenhoId)));
+  const empenhos = empenhoIds.length
+    ? await prisma.empenho.findMany({
+        where: { id: { in: empenhoIds } },
+        select: {
+          id: true,
+          numero: true,
+          orgaoNome: true,
+          itens: { select: { valorTotal: true } },
+        },
+      })
+    : [];
+  const empenhoMap = new Map(
+    empenhos.map((e) => [
+      e.id,
+      {
+        id: e.id,
+        numero: e.numero,
+        orgaoNome: e.orgaoNome,
+        valorEmpenho: e.itens.reduce((s, i) => s + i.valorTotal, 0),
+      },
+    ]),
+  );
+  const sugestoes = sugestoesRaw
+    .map((s) => {
+      const emp = empenhoMap.get(s.empenhoId);
+      if (!emp) return null;
+      return { id: s.id, score: s.score, transacao: s.transacao, empenho: emp };
+    })
+    .filter((s): s is NonNullable<typeof s> => s !== null);
 
   const extratos = await prisma.extrato.findMany({
     where: { contaId: usuario.contaId },
@@ -74,6 +124,8 @@ export default async function ConciliacaoPage() {
           <UploadDropzone />
         </div>
       </section>
+
+      <SugestoesPendentes sugestoes={sugestoes} />
 
       <section className="mt-10">
         <h2 className="text-lg font-semibold text-slate-900">Extratos importados</h2>
