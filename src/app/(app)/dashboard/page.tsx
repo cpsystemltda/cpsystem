@@ -80,11 +80,16 @@ export default async function DashboardPage({
   const contaId = usuario.contaId;
   const conta = await prisma.conta.findUnique({
     where: { id: contaId },
-    select: { plano: true, conciliacaoDiaMes: true, conciliacaoOptIn: true },
+    select: {
+      plano: true,
+      conciliacaoDiaMes: true,
+      conciliacaoOptIn: true,
+      conciliacaoCortesiaAte: true,
+    },
   });
   const mostrarBannerConciliacao =
     !!conta &&
-    contaTemAcessoConciliacao(conta.plano) &&
+    contaTemAcessoConciliacao(conta) &&
     conta.conciliacaoOptIn &&
     conta.conciliacaoDiaMes === null;
   const filtroEmpresa = await filtroEmpresaWhere(contaId);

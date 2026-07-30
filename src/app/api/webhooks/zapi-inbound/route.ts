@@ -378,13 +378,13 @@ async function processarExtratoBancarioViaWhatsApp(input: {
 }): Promise<NextResponse> {
   const usuario = await prisma.usuario.findFirst({
     where: { telefoneWhatsApp: input.telefone },
-    include: { conta: { select: { id: true, plano: true } } },
+    include: { conta: { select: { id: true, plano: true, conciliacaoCortesiaAte: true } } },
   });
   if (!usuario) {
     return NextResponse.json({ ok: true, skipped: "usuario_nao_cadastrado", telefone: input.telefone });
   }
 
-  if (!contaTemAcessoConciliacao(usuario.conta.plano)) {
+  if (!contaTemAcessoConciliacao(usuario.conta)) {
     await enviarTexto(
       input.telefone,
       `Recebi o PDF, mas a conciliação bancária automática está disponível a partir do plano *Intermediário*. Seu plano atual: *${usuario.conta.plano}*.\n\nVer planos: https://cpsystem.app.br/conta/assinatura`,

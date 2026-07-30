@@ -72,6 +72,10 @@ model Conta {
   // null = não configurado (opt-out). Se plano BASICO, ignorar mesmo se preenchido.
   conciliacaoDiaMes       Int?
   conciliacaoOptIn        Boolean          @default(true)
+  // Cortesia temporaria: quando setada, a conta ganha acesso a conciliacao
+  // bancaria mesmo estando no plano BASICO ate a data indicada. Regina 30/07
+  // (Leo Santos foi o 1o beneficiado — 30 dias).
+  conciliacaoCortesiaAte  DateTime?
   criadoEm                DateTime         @default(now())
   atualizadoEm            DateTime         @updatedAt
 

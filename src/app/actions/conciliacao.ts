@@ -16,7 +16,7 @@ export async function uploadExtratoAction(_p: Result | null, formData: FormData)
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
 
-  if (!contaTemAcessoConciliacao(usuario.conta.plano)) {
+  if (!contaTemAcessoConciliacao(usuario.conta)) {
     return { erro: "Conciliação bancária disponível apenas nos planos INTERMEDIARIO e PREMIUM." };
   }
 
@@ -116,7 +116,7 @@ export async function rejeitarConciliacaoAction(_p: Result | null, formData: For
 export async function configurarJanelaAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
-  if (!contaTemAcessoConciliacao(usuario.conta.plano)) {
+  if (!contaTemAcessoConciliacao(usuario.conta)) {
     return { erro: "Recurso disponível a partir do plano INTERMEDIARIO." };
   }
   const diaMesRaw = formData.get("diaMes");
@@ -184,6 +184,45 @@ export async function confirmarConciliacaoDebitoAction(
   revalidatePath("/conta/assinatura");
   revalidatePath("/vinculos");
   revalidatePath("/painel-analista");
+  return { ok: true };
+}
+
+// Regina 30/07: dar cortesia de N dias de conciliacao pra conta BASICO.
+// Restrito a super admin (uso interno pra clientes-piloto). Idempotente:
+// se ja tem cortesia futura, estende com base na maior data.
+export async function ativarCortesiaConciliacaoAction(
+  _p: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  if (!usuario.superAdmin) return { erro: "Somente super admin." };
+
+  const contaId = String(formData.get("contaId") || "");
+  const diasRaw = Number(formData.get("dias") || 0);
+  if (!contaId) return { erro: "contaId ausente" };
+  if (!Number.isFinite(diasRaw) || diasRaw <= 0 || diasRaw > 365) {
+    return { erro: "dias deve ser 1..365" };
+  }
+
+  const conta = await prisma.conta.findUnique({
+    where: { id: contaId },
+    select: { conciliacaoCortesiaAte: true },
+  });
+  if (!conta) return { erro: "conta nao encontrada" };
+
+  const hoje = Date.now();
+  const baseAtual = conta.conciliacaoCortesiaAte
+    ? Math.max(conta.conciliacaoCortesiaAte.getTime(), hoje)
+    : hoje;
+  const novaData = new Date(baseAtual + diasRaw * 86400000);
+
+  await prisma.conta.update({
+    where: { id: contaId },
+    data: { conciliacaoCortesiaAte: novaData },
+  });
+  revalidatePath("/conciliacao");
+  revalidatePath("/admin-plataforma");
   return { ok: true };
 }
 

@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
+import { Gift } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
+import {
+  contaTemAcessoConciliacao,
+  cortesiaConciliacaoAtiva,
+} from "@/lib/conciliacao/planoGuard";
 import { UploadDropzone } from "./_components/upload-dropzone";
 import { ListaExtratos } from "./_components/lista-extratos";
 import { ConfigJanela } from "./_components/config-janela";
@@ -12,7 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function ConciliacaoPage() {
   const usuario = await exigirUsuario();
 
-  if (!contaTemAcessoConciliacao(usuario.conta.plano)) {
+  if (!contaTemAcessoConciliacao(usuario.conta)) {
     // Não redireciona à força — mostra tela de upgrade
     return (
       <div className="mx-auto max-w-3xl p-6">
@@ -36,8 +40,18 @@ export default async function ConciliacaoPage() {
 
   const conta = await prisma.conta.findUnique({
     where: { id: usuario.contaId },
-    select: { conciliacaoDiaMes: true, conciliacaoOptIn: true },
+    select: {
+      conciliacaoDiaMes: true,
+      conciliacaoOptIn: true,
+      conciliacaoCortesiaAte: true,
+      plano: true,
+    },
   });
+  const cortesiaAtiva =
+    !!conta && conta.plano === "BASICO" && cortesiaConciliacaoAtiva(conta);
+  const diasRestantesCortesia = cortesiaAtiva
+    ? Math.ceil((conta!.conciliacaoCortesiaAte!.getTime() - Date.now()) / 86400000)
+    : 0;
 
   // Sugestoes pendentes: score 50-85 que a maquina nao teve certeza suficiente
   // pra auto-conciliar. Regina 30/07: antes ficavam presas no banco sem UI.
@@ -209,6 +223,31 @@ export default async function ConciliacaoPage() {
           Sobe o PDF do extrato e a gente concilia automaticamente com seus empenhos.
         </p>
       </header>
+
+      {cortesiaAtiva && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-emerald-50 p-5">
+          <div className="flex items-start gap-3">
+            <Gift className="mt-0.5 h-6 w-6 text-amber-600" />
+            <div>
+              <p className="text-sm font-bold text-slate-900">
+                Você tem conciliação bancária cortesia — expira em {diasRestantesCortesia} {diasRestantesCortesia === 1 ? "dia" : "dias"}
+              </p>
+              <p className="mt-1 text-xs text-slate-700">
+                Aproveite pra subir seus extratos e ver o CP System conciliando pagamentos automaticamente
+                com seus empenhos, mensalidades e comissões. Após{" "}
+                {conta?.conciliacaoCortesiaAte?.toLocaleDateString("pt-BR")} a feature só continua
+                disponível nos planos Intermediário e Premium.
+              </p>
+              <a
+                href="/conta/assinatura"
+                className="mt-3 inline-block text-xs font-medium text-amber-700 hover:underline"
+              >
+                Ver planos →
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfigJanela
         diaMes={conta?.conciliacaoDiaMes ?? null}
