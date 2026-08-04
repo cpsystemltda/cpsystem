@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { enviarTexto } from "@/lib/whatsapp";
+import { enviarTexto, variantesTelefone } from "@/lib/whatsapp";
 import { decidirRespostaIA, historicoDoUsuario } from "@/lib/ia-suporte";
 import { interpretarMsgAdmin, idCurto } from "@/lib/ia-decisao-grupo";
 import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
@@ -36,7 +36,22 @@ type ZapiInbound = {
     fileName?: string;
     caption?: string;
   };
+  // Midia sem texto — cliente mandando audio/foto/video em vez de digitar.
+  // Regina 04/08: o Leo mandou AUDIO e o webhook descartou em "no_content".
+  audio?: { audioUrl?: string; mimeType?: string };
+  image?: { imageUrl?: string; caption?: string };
+  video?: { videoUrl?: string; caption?: string };
+  sticker?: { stickerUrl?: string };
 };
+
+// Descreve a midia que veio sem texto, pra escalar pro admin com contexto.
+function descreverMidia(body: ZapiInbound): { rotulo: string; url?: string } | null {
+  if (body.audio?.audioUrl) return { rotulo: "áudio", url: body.audio.audioUrl };
+  if (body.video?.videoUrl) return { rotulo: "vídeo", url: body.video.videoUrl };
+  if (body.image?.imageUrl) return { rotulo: "imagem", url: body.image.imageUrl };
+  if (body.sticker?.stickerUrl) return { rotulo: "figurinha", url: body.sticker.stickerUrl };
+  return null;
+}
 
 export async function POST(req: NextRequest) {
   const rawText = await req.text();
@@ -97,17 +112,20 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (!mensagem) return NextResponse.json({ ok: true, skipped: "no_content" });
+  const midia = descreverMidia(body);
+  if (!mensagem && !midia) return NextResponse.json({ ok: true, skipped: "no_content" });
 
   // Kill switch
   if (process.env.WHATSAPP_KILL_SWITCH === "1") {
     return NextResponse.json({ ok: true, skipped: "kill_switch" });
   }
 
-  // 3) Localiza usuario pelo telefone. Se nao existir, ignora (numero de fora
-  //    nao deve receber resposta automatica — pode ser spam).
+  // 3) Localiza usuario pelo telefone. Casa por TODAS as variantes do numero:
+  //    a Z-API entrega sem o nono digito ("556181505557") e o cadastro pode
+  //    ter com o 9 e/ou sem o DDI. Comparar por igualdade exata fazia cliente
+  //    real cair como desconhecido (Regina 04/08, caso do Leo).
   const usuario = await prisma.usuario.findFirst({
-    where: { telefoneWhatsApp: telefone },
+    where: { telefoneWhatsApp: { in: variantesTelefone(telefone) } },
     include: {
       conta: {
         include: {
@@ -116,7 +134,60 @@ export async function POST(req: NextRequest) {
       },
     },
   });
-  if (!usuario) return NextResponse.json({ ok: true, skipped: "usuario_nao_cadastrado", telefone });
+
+  // Numero que nao casou com nenhum cadastro. NAO auto-responde (pode ser
+  // spam), mas tambem NAO morre em silencio: avisa os admins, porque pode ser
+  // cliente com telefone cadastrado errado — foi exatamente o que aconteceu.
+  if (!usuario) {
+    const nome = String(body.senderName || "desconhecido");
+    await notificarAdmin(
+      `${nome} (NÃO CADASTRADO)`,
+      telefone,
+      mensagem || `[enviou ${midia?.rotulo}]`,
+      `Número não bate com nenhum cadastro. Se for cliente, corrigir o telefone no perfil dele — ` +
+        `enquanto não bater, ele não recebe resposta automática.`,
+    );
+    return NextResponse.json({ ok: true, escalado: "usuario_nao_cadastrado", telefone });
+  }
+
+  // 3b) Cliente mandou audio/foto/video sem texto. A IA so lê texto, entao
+  //     confirma o recebimento na hora e escala pro humano ouvir/ver.
+  //     Antes isso caia em "no_content" e o cliente ficava sem retorno.
+  if (!mensagem && midia) {
+    const chamadoMidia = await prisma.chamadoSuporte.create({
+      data: {
+        contaId: usuario.contaId,
+        usuarioId: usuario.id,
+        categoria: "OUTRO",
+        titulo: `Cliente enviou ${midia.rotulo}`,
+        descricao: `Cliente enviou ${midia.rotulo} sem texto.${midia.url ? ` Arquivo: ${midia.url}` : ""}`,
+        status: "AGUARDANDO_ADMIN",
+        iaAcaoResumo: `${midia.rotulo} não é lido pela IA — escalado pra humano`,
+      },
+    });
+    await prisma.mensagemChamado.create({
+      data: {
+        chamadoId: chamadoMidia.id,
+        autor: "CLIENTE",
+        autorId: usuario.id,
+        conteudo: `[${midia.rotulo}]${midia.url ? ` ${midia.url}` : ""}`,
+      },
+    });
+    await enviarTexto(
+      telefone,
+      `Recebi seu ${midia.rotulo}, ${usuario.nome.split(" ")[0]}! Como não consigo processar ` +
+        `${midia.rotulo} automaticamente, nossa equipe vai ${midia.rotulo === "áudio" ? "ouvir" : "ver"} ` +
+        `e te responder ainda hoje.\n\nSe preferir, pode me mandar por escrito que já te ajudo na hora.`,
+    ).catch((err) => console.error("[zapi-inbound] falha ao confirmar midia:", err));
+    await notificarAdmin(
+      usuario.nome,
+      telefone,
+      `[enviou ${midia.rotulo}]${midia.url ? ` — ${midia.url}` : ""}`,
+      `Cliente mandou ${midia.rotulo}, que a IA não lê. Precisa de resposta humana.`,
+      chamadoMidia.id,
+    );
+    return NextResponse.json({ ok: true, midia: midia.rotulo, escalado: true });
+  }
 
   // 4) Idempotencia: ja processamos essa messageId?
   if (messageId) {
@@ -377,11 +448,19 @@ async function processarExtratoBancarioViaWhatsApp(input: {
   messageId: string;
 }): Promise<NextResponse> {
   const usuario = await prisma.usuario.findFirst({
-    where: { telefoneWhatsApp: input.telefone },
+    where: { telefoneWhatsApp: { in: variantesTelefone(input.telefone) } },
     include: { conta: { select: { id: true, plano: true, conciliacaoCortesiaAte: true } } },
   });
   if (!usuario) {
-    return NextResponse.json({ ok: true, skipped: "usuario_nao_cadastrado", telefone: input.telefone });
+    // Mesmo motivo do fluxo de suporte: numero que nao casa vira alerta pro
+    // admin, nunca silencio. Cliente mandando extrato nao pode ser engolido.
+    await notificarAdmin(
+      "desconhecido",
+      input.telefone,
+      `[enviou PDF: ${input.nomeArquivo}]`,
+      "Mandou PDF (provável extrato) mas o número não bate com nenhum cadastro.",
+    );
+    return NextResponse.json({ ok: true, escalado: "usuario_nao_cadastrado", telefone: input.telefone });
   }
 
   if (!contaTemAcessoConciliacao(usuario.conta)) {

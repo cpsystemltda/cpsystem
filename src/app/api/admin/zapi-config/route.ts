@@ -46,7 +46,15 @@ export async function GET(req: NextRequest) {
       results.push({ path, erro: err instanceof Error ? err.message : String(err) });
     }
   }
-  return NextResponse.json({ base: base.replace(inst, inst.slice(0, 6) + "…").replace(tok, tok.slice(0, 6) + "…"), results });
+  // Diagnostico de config — booleano apenas, nunca o valor do segredo.
+  // Sem SUPORTE_GROUP_ID o alerta de chamado cai no fallback (admins com
+  // optInWhatsApp=true); se nenhum admin tiver opt-in, o alerta some.
+  const env = {
+    SUPORTE_GROUP_ID: !!process.env.SUPORTE_GROUP_ID,
+    WHATSAPP_KILL_SWITCH: process.env.WHATSAPP_KILL_SWITCH === "1",
+    NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL || "(nao setado)",
+  };
+  return NextResponse.json({ base: base.replace(inst, inst.slice(0, 6) + "…").replace(tok, tok.slice(0, 6) + "…"), env, results });
 }
 
 export async function POST(req: NextRequest) {

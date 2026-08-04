@@ -39,6 +39,41 @@ export function formatarTelefone(raw: string): string {
   throw new Error(`Telefone com formato inesperado: ${raw} (${digits.length} digitos)`);
 }
 
+// Gera TODAS as variantes plausiveis de um numero BR pra casar cadastro x Z-API.
+// Regina 04/08: o Leo mandou msg e o sistema ignorou em silencio porque ele esta
+// cadastrado como "5561981505557" (13 digitos, com o 9) e a Z-API entrega o
+// mesmo numero como "556181505557" (12 digitos, sem o 9). O lookup era
+// igualdade exata — nao batia, caia em "usuario_nao_cadastrado" e morria ali.
+// O cadastro da Regina tem 11 digitos (sem o 55), entao tambem nunca bateria.
+//
+// Cobre as 4 formas em circulacao: nacional com/sem o nono digito, cada uma
+// com e sem o DDI 55.
+export function variantesTelefone(raw: string): string[] {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length < 10) return digits ? [digits] : [];
+
+  // Descasca o DDI pra trabalhar sempre com DDD + numero
+  const nacional =
+    digits.startsWith("55") && (digits.length === 12 || digits.length === 13)
+      ? digits.slice(2)
+      : digits;
+  if (nacional.length !== 10 && nacional.length !== 11) return [digits];
+
+  const ddd = nacional.slice(0, 2);
+  const numero = nacional.slice(2);
+  // O par: com o nono digito e sem ele
+  const comNove = numero.length === 8 ? `9${numero}` : numero;
+  const semNove = numero.length === 9 && numero.startsWith("9") ? numero.slice(1) : numero;
+
+  const formas = new Set<string>();
+  for (const n of [comNove, semNove]) {
+    formas.add(`${ddd}${n}`);
+    formas.add(`55${ddd}${n}`);
+  }
+  formas.add(digits); // o formato cru, por garantia
+  return [...formas];
+}
+
 type ZapiResponse = { messageId?: string; zaapId?: string; id?: string };
 type ZapiStatus = { connected?: boolean; smartphoneConnected?: boolean; error?: string };
 
