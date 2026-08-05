@@ -488,6 +488,20 @@ export async function notificarVencimentosPlano(hoje: Date = new Date()): Promis
 
 // ==================== CRON SEMANAL ====================
 
+// Uma execucao so fecha quando o orgao paga. ENTREGUE / NF_EMITIDA /
+// NF_ENCAMINHADA continuam sendo trabalho em aberto — tem NF encaminhada
+// esperando pagamento ha semanas. Igor 31/07 (video): contar esses tres como
+// "concluido" zerava o numero de andamento e inflava o de concluidos. Na
+// carteira dele: 25 NF_ENCAMINHADA + 3 ENTREGUE sumiam do resumo.
+const STATUS_EM_ANDAMENTO: StatusExecucao[] = [
+  "EMPENHADO",
+  "PEDIDO_RECEBIDO",
+  "EM_TRANSITO",
+  "ENTREGUE",
+  "NF_EMITIDA",
+  "NF_ENCAMINHADA",
+];
+
 // Sexta 8h — resumo geral da conta pra cada usuario com opt-in.
 export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
   enviados: number;
@@ -506,7 +520,7 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
 
   const contas = await prisma.conta.findMany({
     where: { statusAssinatura: { in: ["ATIVA", "TRIAL"] } },
-    select: { id: true },
+    select: { id: true, tipo: true, analista: { select: { id: true } } },
   });
 
   let enviados = 0;
@@ -515,10 +529,30 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
     const usuarios = await destinatariosDaConta(conta.id);
     if (!usuarios.length) continue;
 
+    // Qual carteira resumir. Igor 31/07 (video): o resumo dele chegava zerado
+    // ("empenhos em andamento: 0") enquanto ele via 23 execuções no sistema.
+    // Motivo: conta ANALISTA nao tem Empresa propria — quem tem carteira sao
+    // os CLIENTES vinculados a ele. Contar por contaId da propria conta dava
+    // zero em tudo. Agora o analista resume a carteira dos vinculos ATIVOS.
+    let contaIdsCarteira: string[] = [conta.id];
+    let clientesNaCarteira = 0;
+    if (conta.tipo === "ANALISTA") {
+      if (!conta.analista) continue;
+      const vinculos = await prisma.vinculoAnalista.findMany({
+        where: { analistaId: conta.analista.id, status: "ATIVO" },
+        select: { contaId: true },
+      });
+      contaIdsCarteira = [...new Set(vinculos.map((v) => v.contaId))];
+      // Analista sem cliente nao recebe resumo — mandar tudo zerado e pior
+      // que nao mandar nada.
+      if (!contaIdsCarteira.length) continue;
+      clientesNaCarteira = contaIdsCarteira.length;
+    }
+
     // Agrega dados da conta
     const [
       empenhosPendentes,
-      empenhosEntreguesSemana,
+      empenhosPagosSemana,
       atasVencendo,
       contratosVencendo,
       empenhosVencendo,
@@ -526,27 +560,33 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
     ] = await Promise.all([
       prisma.empenho.count({
         where: {
-          empresa: { contaId: conta.id },
-          status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] },
+          empresa: { contaId: { in: contaIdsCarteira } },
+          status: { in: STATUS_EM_ANDAMENTO },
         },
       }),
       prisma.empenho.count({
         where: {
-          empresa: { contaId: conta.id },
-          status: { in: ["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"] },
+          empresa: { contaId: { in: contaIdsCarteira } },
+          status: "PAGO",
           atualizadoEm: { gte: new Date(inicioHoje.getTime() - 7 * 86400000) },
         },
       }),
       prisma.ata.count({
-        where: { empresa: { contaId: conta.id }, vigenciaFim: { gte: inicioHoje, lt: em30d } },
+        where: {
+          empresa: { contaId: { in: contaIdsCarteira } },
+          vigenciaFim: { gte: inicioHoje, lt: em30d },
+        },
       }),
       prisma.contrato.count({
-        where: { empresa: { contaId: conta.id }, vigenciaFim: { gte: inicioHoje, lt: em30d } },
+        where: {
+          empresa: { contaId: { in: contaIdsCarteira } },
+          vigenciaFim: { gte: inicioHoje, lt: em30d },
+        },
       }),
       prisma.empenho.count({
         where: {
-          empresa: { contaId: conta.id },
-          status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] },
+          empresa: { contaId: { in: contaIdsCarteira } },
+          status: { in: STATUS_EM_ANDAMENTO },
           OR: [
             { dataEntregaCerta: { gte: inicioHoje, lt: em7d } },
             { dataEntregaFim: { gte: inicioHoje, lt: em7d } },
@@ -560,18 +600,23 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
     ]);
 
     for (const u of usuarios) {
+      // Igor 31/07: "vencendo nos próximos sete dias, vencimento do quê?".
+      // Cada linha agora diz exatamente o que esta sendo contado.
       const linhas: string[] = [
         `📊 *Resumo da semana — CP System*`,
         ``,
-        `Bom dia, ${primeiroNome(u.nome)}! Aqui está o panorama da sua conta:`,
+        clientesNaCarteira > 0
+          ? `Bom dia, ${primeiroNome(u.nome)}! Panorama da sua carteira ` +
+            `(${clientesNaCarteira} cliente${clientesNaCarteira > 1 ? "s" : ""}):`
+          : `Bom dia, ${primeiroNome(u.nome)}! Aqui está o panorama da sua conta:`,
         ``,
-        `📦 *Execução*`,
-        `• Empenhos em andamento: ${empenhosPendentes}`,
-        `• Concluídos nesta semana: ${empenhosEntreguesSemana}`,
-        `• Vencendo nos próximos 7 dias: ${empenhosVencendo}`,
+        `📦 *Execuções*`,
+        `• Em andamento (órgão ainda não pagou): ${empenhosPendentes}`,
+        `• Pagas pelo órgão nesta semana: ${empenhosPagosSemana}`,
+        `• Com prazo de entrega nos próximos 7 dias: ${empenhosVencendo}`,
         ``,
-        `📅 *Carteira (Atas + Contratos)*`,
-        `• Vencendo em até 30 dias: ${atasVencendo + contratosVencendo}`,
+        `📅 *Atas e contratos*`,
+        `• Com vigência terminando em até 30 dias: ${atasVencendo + contratosVencendo}`,
         ``,
       ];
       if (cobrancasPendentes > 0) {
@@ -581,9 +626,12 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
       }
       // Pontos de atenção
       const alertas: string[] = [];
-      if (empenhosVencendo > 0) alertas.push(`⚠️ ${empenhosVencendo} empenho(s) com prazo na semana`);
+      if (empenhosVencendo > 0)
+        alertas.push(`⚠️ ${empenhosVencendo} execução(ões) com prazo de entrega nesta semana`);
       if (atasVencendo + contratosVencendo > 0)
-        alertas.push(`📌 ${atasVencendo + contratosVencendo} documento(s) vencendo em 30 dias`);
+        alertas.push(
+          `📌 ${atasVencendo + contratosVencendo} documento(s) com vigência vencendo em 30 dias`,
+        );
       if (cobrancasPendentes > 0) alertas.push(`💰 ${cobrancasPendentes} fatura(s) pendente(s)`);
 
       if (alertas.length) {

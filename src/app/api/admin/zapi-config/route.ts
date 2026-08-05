@@ -111,6 +111,13 @@ export async function POST(req: NextRequest) {
       },
     },
     { method: "PUT", path: "update-webhook-received", body: { value: targetUrl } },
+    // Regina 05/08: update-webhook-received sozinho retornou {"value":true} mas
+    // o ReceivedCallback continuou nao chegando (teste real com msg de numero
+    // externo). update-every-webhooks e o endpoint que a doc recomenda — seta
+    // TODOS os webhooks da instancia de uma vez, inclusive o "ao receber".
+    // notifySentByMe:false pra nao ecoar o que nos mesmos enviamos (o webhook
+    // ja ignora fromMe, mas evita trafego inutil).
+    { method: "PUT", path: "update-every-webhooks", body: { value: targetUrl, notifySentByMe: false } },
   ];
 
   const results: Record<string, unknown>[] = [];
