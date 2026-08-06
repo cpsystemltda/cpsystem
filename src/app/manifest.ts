@@ -17,13 +17,16 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#1e3a5f",
     lang: "pt-BR",
     scope: "/",
+    // Nomes trocados junto com a troca da arte (Regina 06/08) — ver comentario
+    // em layout.tsx: URL nova e o que obriga navegador e PWA ja instalado a
+    // buscar o icone de novo em vez de servir o antigo do cache.
     icons: [
-      { src: "/favicon-16.png", sizes: "16x16", type: "image/png" },
-      { src: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { src: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/cp-icone-16.png", sizes: "16x16", type: "image/png" },
+      { src: "/cp-icone-32.png", sizes: "32x32", type: "image/png" },
+      { src: "/cp-icone-180.png", sizes: "180x180", type: "image/png" },
+      { src: "/cp-icone-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/cp-icone-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/cp-icone-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     categories: ["business", "productivity", "finance"],
   };

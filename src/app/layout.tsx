@@ -31,12 +31,18 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },
+  // Regina 06/08: os icones foram regerados com a logo correta (monograma CP
+  // dourado), mas a aba continuava mostrando a REPROVADA — o Chrome guarda
+  // favicon num cache proprio que nem hard refresh limpa, e isso valia pra
+  // todo visitante que ja tinha entrado no site. Por isso os arquivos mudaram
+  // de nome (favicon-32 -> cp-icone-32): URL nova obriga o navegador a baixar.
+  // Se um dia trocar a arte de novo, trocar o nome junto.
   icons: {
     icon: [
-      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/cp-icone-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/cp-icone-16.png", sizes: "16x16", type: "image/png" },
     ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    apple: [{ url: "/cp-icone-180.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
