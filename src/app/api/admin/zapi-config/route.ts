@@ -12,24 +12,12 @@ export async function GET(req: NextRequest) {
   if (!inst || !tok || !client) return NextResponse.json({ erro: "ZAPI env faltando" }, { status: 500 });
   const base = `https://api.z-api.io/instances/${inst}/token/${tok}`;
 
-  // Testa MUITOS paths pra descobrir quais existem no plano da instancia
-  const testes = [
-    "status",
-    "webhook",
-    "webhook-received",
-    "webhook-on-receive",
-    "on-receive-webhook",
-    "on-message-received",
-    "webhook-received-message",
-    "get-webhook",
-    "webhook-message",
-    "callback",
-    "callbacks",
-    "on-message",
-    "message-webhook",
-    "groups",
-    "chats",
-  ];
+  // "me" é o endpoint que devolve a config real da instancia: todas as
+  // *CallbackUrl (inclusive receivedCallbackUrl), receiveCallbackSentByMe,
+  // connected, due e paymentStatus. É por onde se confere o que ESTÁ valendo —
+  // os update-* respondem {"value":true} mesmo quando o efeito nao é o
+  // esperado, entao nunca confie no retorno deles, confira aqui.
+  const testes = ["me", "status", "device", "chats"];
   const results: Record<string, unknown>[] = [];
   for (const path of testes) {
     try {
@@ -70,53 +58,28 @@ export async function POST(req: NextRequest) {
   const base = `https://api.z-api.io/instances/${inst}/token/${tok}`;
   const targetUrl = `${(process.env.NEXT_PUBLIC_BASE_URL || "https://cpsystem.app.br").replace(/\/$/, "")}/api/webhooks/zapi-inbound`;
 
-  // Config atualiza FILTROS de tipos de msg (senao Z-API nao dispara nada).
-  // Tenta multiplos formatos porque a doc é vaga sobre o path exato.
+  // ⚠️ NUNCA mandar tipo nenhum em messageFilters/callbackTypeFilters.
+  //
+  // Os filtros do Z-API sao BLOCKLIST: "os tipos incluidos no array NAO serao
+  // entregues" (https://developer.z-api.io/webhooks/update-filters). A versao
+  // anterior deste arquivo entendeu ao contrario — comentario dizia "Z-API
+  // bloqueia webhook se filters vazio" — e mandava bloquear chat privado,
+  // grupo, texto, audio, imagem, video, documento e FILTER_RECEIVED_CALLBACK.
+  //
+  // Resultado: de 14/07 a 06/08 o CP System nao recebeu UMA mensagem de
+  // cliente. So chegavam callbacks de status/entrega, que nao estavam na
+  // blocklist. O Leo mandou pergunta e ficou sem resposta por causa disso.
+  //
+  // Arrays vazios = nada bloqueado = tudo e entregue.
   const configs = [
-    // Ativa filtros pra receber TODAS as msgs privadas + grupo
-    {
-      method: "PUT",
-      path: "update-message-filters",
-      body: {
-        messageFilters: [
-          "FILTER_FROM_PRIVATE_CHAT",
-          "FILTER_FROM_GROUP",
-          "FILTER_TEXT_MESSAGE",
-          "FILTER_AUDIO_MESSAGE",
-          "FILTER_IMAGE_MESSAGE",
-          "FILTER_VIDEO_MESSAGE",
-          "FILTER_DOCUMENT_MESSAGE",
-        ],
-        callbackTypeFilters: ["FILTER_RECEIVED_CALLBACK"],
-      },
-    },
-    { method: "PUT", path: "filters", body: { messageFilters: ["FILTER_FROM_PRIVATE_CHAT", "FILTER_TEXT_MESSAGE"], callbackTypeFilters: ["FILTER_RECEIVED_CALLBACK"] } },
-    // FILTROS ATIVOS — Z-API bloqueia webhook se filters vazio.
-    // Aceita msgs de chats privados E grupos, todos tipos de conteudo,
-    // callback tipo "recebido" (nao enviado).
     {
       method: "PUT",
       path: "update-filters",
-      body: {
-        messageFilters: [
-          "FILTER_FROM_PRIVATE_CHAT",
-          "FILTER_FROM_GROUP",
-          "FILTER_TEXT_MESSAGE",
-          "FILTER_AUDIO_MESSAGE",
-          "FILTER_IMAGE_MESSAGE",
-          "FILTER_VIDEO_MESSAGE",
-          "FILTER_DOCUMENT_MESSAGE",
-        ],
-        callbackTypeFilters: ["FILTER_RECEIVED_CALLBACK"],
-      },
+      body: { messageFilters: [], callbackTypeFilters: [] },
     },
     { method: "PUT", path: "update-webhook-received", body: { value: targetUrl } },
-    // Regina 05/08: update-webhook-received sozinho retornou {"value":true} mas
-    // o ReceivedCallback continuou nao chegando (teste real com msg de numero
-    // externo). update-every-webhooks e o endpoint que a doc recomenda — seta
-    // TODOS os webhooks da instancia de uma vez, inclusive o "ao receber".
-    // notifySentByMe:false pra nao ecoar o que nos mesmos enviamos (o webhook
-    // ja ignora fromMe, mas evita trafego inutil).
+    // Seta todos os webhooks da instancia de uma vez. notifySentByMe:false pra
+    // nao ecoar o que nos mesmos enviamos (o webhook ja ignora fromMe).
     { method: "PUT", path: "update-every-webhooks", body: { value: targetUrl, notifySentByMe: false } },
   ];
 
