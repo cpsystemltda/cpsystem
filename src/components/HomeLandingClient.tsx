@@ -822,10 +822,19 @@ function PlanoCardDark({
 // ===========================================================
 // MINI-STAT (4 blocos compactos abaixo do texto institucional)
 // ===========================================================
+// Regina 06/08: os cards apareciam com label ilegivel e texto vazando.
+// Duas causas:
+//   1) contraste — o card tem fundo branco fixo, mas dentro de
+//      .section-dark-bleed a var --text-mute vira branco 62% (globals.css),
+//      entao o label ficava branco sobre branco. A cor do label agora e
+//      literal e escura, imune a troca de tema da secao.
+//   2) overflow — "Tipos de instrumentos" / "Dispensa treinamento" sao longos
+//      e o tracking de 0.16em estourava a coluna. Item de grid precisa de
+//      min-w-0 pra poder encolher, mais quebra de palavra e tracking menor.
 function StatBlock({ numero, label }: { numero: string; label: string }) {
   return (
     <div
-      className="rounded-2xl px-3 py-3.5 text-center"
+      className="stat-block min-w-0 rounded-2xl px-3 py-3.5 text-center"
       style={{
         background: "rgba(255,255,255,0.7)",
         border: "0.5px solid var(--hairline)",
@@ -844,8 +853,13 @@ function StatBlock({ numero, label }: { numero: string; label: string }) {
         {numero}
       </div>
       <div
-        className="mt-1.5 text-[10px] font-bold uppercase leading-tight"
-        style={{ color: "var(--text-mute)", letterSpacing: "0.16em" }}
+        className="stat-block__label mt-1.5 text-[10px] font-bold uppercase leading-tight"
+        style={{
+          color: "rgba(58, 52, 40, 0.75)",
+          letterSpacing: "0.10em",
+          overflowWrap: "anywhere",
+          hyphens: "auto",
+        }}
       >
         {label}
       </div>
@@ -918,6 +932,16 @@ function TabTipo({
 // ===========================================================
 // VÍDEO INSTITUCIONAL
 // ===========================================================
+// Video institucional (Regina 06/08). Hospedado no Vercel Blob em vez de
+// public/ — o master tinha 576 MB (1080p60 a 40 Mbps); reencodado pra 23 MB
+// mantendo 1080p, porque e um tour da tela do sistema e baixar a resolucao
+// deixaria a UI ilegivel. preload="none" + poster: quem nao clica no play
+// nao baixa nada.
+const VIDEO_INSTITUCIONAL =
+  "https://daci3hzdnsf8gryv.public.blob.vercel-storage.com/institucional/cp-system-tour.mp4";
+const VIDEO_INSTITUCIONAL_POSTER =
+  "https://daci3hzdnsf8gryv.public.blob.vercel-storage.com/institucional/cp-system-tour-poster.jpg";
+
 function VideoPlayerInstitucional({
   aberto,
   onAbrir,
@@ -939,26 +963,24 @@ function VideoPlayerInstitucional({
 
       <div
         className="glass relative w-full overflow-hidden rounded-[20px]"
-        style={{ aspectRatio: "16 / 10" }}
+        style={{ aspectRatio: "16 / 9" }}
       >
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse 520px 360px at 28% 32%, rgba(212,175,55,0.22), transparent 60%), radial-gradient(ellipse 420px 280px at 78% 72%, rgba(197,180,255,0.18), transparent 60%), linear-gradient(135deg, rgba(255,254,249,0.82), rgba(245,239,221,0.95))",
-          }}
-        />
-        <div aria-hidden className="absolute inset-0 flex items-center justify-center opacity-40">
-          <svg width="84%" height="62%" viewBox="0 0 400 220" fill="none">
-            <rect x="0" y="0" width="120" height="80" rx="10" fill="rgba(212,175,55,0.22)" />
-            <rect x="140" y="0" width="120" height="80" rx="10" fill="rgba(94,168,159,0.20)" />
-            <rect x="280" y="0" width="120" height="80" rx="10" fill="rgba(197,180,255,0.24)" />
-            <rect x="0" y="100" width="260" height="120" rx="12" fill="rgba(255,255,255,0.65)" />
-            <rect x="280" y="100" width="120" height="120" rx="12" fill="rgba(212,175,55,0.18)" />
-            <path d="M14 200 Q 60 150 100 170 T 180 160 T 250 130" stroke="rgba(168,137,71,0.65)" strokeWidth="2.6" fill="none" strokeLinecap="round" />
-          </svg>
-        </div>
+        {/* Primeiro frame do proprio video como capa — so aparece antes do play */}
+        {!aberto && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={VIDEO_INSTITUCIONAL_POSTER}
+              alt="Tour guiado pelo CP System"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div
+              aria-hidden
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(180deg, rgba(15,14,12,0.28), rgba(15,14,12,0.52))" }}
+            />
+          </>
+        )}
 
         {!aberto && (
           <button
@@ -987,31 +1009,28 @@ function VideoPlayerInstitucional({
             </span>
             <span
               className="relative text-[11px] font-bold uppercase"
-              style={{ color: "var(--primary-deep)", letterSpacing: "0.32em" }}
+              style={{
+                color: "#FFFEF9",
+                letterSpacing: "0.32em",
+                textShadow: "0 2px 12px rgba(15,14,12,0.75)",
+              }}
             >
-              Tour guiado · 2:22 min
+              Tour guiado · 2 min
             </span>
           </button>
         )}
 
         {aberto && (
-          <div
-            className="absolute inset-0 z-[2] flex flex-col items-center justify-center gap-3"
-            style={{ background: "rgba(15,14,12,0.94)" }}
-          >
-            <span
-              className="text-[11px] font-bold uppercase"
-              style={{ color: "var(--primary)", letterSpacing: "0.3em" }}
-            >
-              Em produção
-            </span>
-            <span
-              className="max-w-[360px] text-center text-[13px]"
-              style={{ color: "rgba(255,254,249,0.78)" }}
-            >
-              O vídeo institucional está sendo finalizado. Assim que estiver pronto, ele toca direto aqui.
-            </span>
-          </div>
+          <video
+            className="absolute inset-0 z-[2] h-full w-full bg-black"
+            src={VIDEO_INSTITUCIONAL}
+            poster={VIDEO_INSTITUCIONAL_POSTER}
+            controls
+            autoPlay
+            playsInline
+            preload="none"
+            style={{ objectFit: "contain" }}
+          />
         )}
       </div>
     </div>
