@@ -486,6 +486,70 @@ export async function notificarVencimentosPlano(hoje: Date = new Date()): Promis
   return { em3d: em3dCount, atrasado: atrasadoCount };
 }
 
+// ==================== FIM DE TRIAL ====================
+
+// Regina 06/08: o signup ja pede cartao e o Asaas cobra sozinho no fim dos 14
+// dias — mas NADA avisava o cliente antes. Ele era cobrado de surpresa, o que
+// derruba conversao e convida contestacao de cartao. Pre-requisito pra mandar
+// trafego pago pro cadastro.
+//
+// Avisa em D-3 e D-1. Usa VENCIMENTO_PLANO (tipo que ja existe no enum) com
+// referenciaId proprio — evita migration de enum em producao.
+export async function notificarTrialVencendo(hoje: Date = new Date()): Promise<{
+  avisados: number;
+}> {
+  const inicioHoje = new Date(hoje);
+  inicioHoje.setHours(0, 0, 0, 0);
+
+  let avisados = 0;
+
+  for (const diasAntes of [3, 1]) {
+    const alvo = new Date(inicioHoje.getTime() + diasAntes * 86400000);
+    const alvoFim = new Date(alvo.getTime() + 86400000);
+
+    const contas = await prisma.conta.findMany({
+      where: {
+        statusAssinatura: "TRIAL",
+        trialAteEm: { gte: alvo, lt: alvoFim },
+      },
+      select: { id: true, plano: true, trialAteEm: true },
+    });
+
+    for (const conta of contas) {
+      const usuarios = await destinatariosDaConta(conta.id);
+      if (!usuarios.length) continue;
+
+      const { calcularValorMensal } = await import("@/lib/precos");
+      const breakdown = await calcularValorMensal(conta.id, conta.plano);
+      const quando =
+        diasAntes === 1
+          ? "amanhã"
+          : `em ${diasAntes} dias (${conta.trialAteEm!.toLocaleDateString("pt-BR")})`;
+
+      for (const u of usuarios) {
+        const r = await dispararNotificacao({
+          usuarioId: u.id,
+          tipo: "VENCIMENTO_PLANO",
+          referenciaId: `trial-fim-${conta.id}-d${diasAntes}`,
+          mensagem:
+            `⏳ *Seu período de teste termina ${quando}*\n\n` +
+            `Olá, ${primeiroNome(u.nome)}! Passando pra avisar com antecedência: ` +
+            `seu teste gratuito do CP System encerra ${quando}.\n\n` +
+            `A partir daí, a assinatura do plano *${conta.plano}* segue automaticamente ` +
+            `por *${brl(breakdown.valorTotal)}/mês* no cartão cadastrado — ` +
+            `você não precisa fazer nada pra continuar.\n\n` +
+            `Se preferir não seguir, é só cancelar antes em ` +
+            `https://cpsystem.app.br/conta/assinatura — sem multa e sem burocracia.\n\n` +
+            `Qualquer dúvida, responda esta mensagem que a gente ajuda.`,
+        });
+        if (r.enviado) avisados++;
+      }
+    }
+  }
+
+  return { avisados };
+}
+
 // ==================== CRON SEMANAL ====================
 
 // Uma execucao so fecha quando o orgao paga. ENTREGUE / NF_EMITIDA /

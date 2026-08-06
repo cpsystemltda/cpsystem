@@ -27,6 +27,7 @@ export type ResumoRegua = {
   fixosAtrasados: number;
   whatsAppResumo: { janela: string; usuariosNotificados: number; capAtingido: number; semItems: number };
   comissoesEmbaixador: { competencia: string; vinculos: number; totalGeradoBRL: number };
+  trialAvisados: number;
 };
 
 export async function executarRegua(): Promise<ResumoRegua> {
@@ -134,7 +135,17 @@ export async function executarRegua(): Promise<ResumoRegua> {
     return { competencia: "", vinculos: 0, totalGeradoBRL: 0 };
   });
 
+  // 9. Fim de trial (Regina 06/08) — avisa em D-3 e D-1 que a cobranca vai
+  // comecar. O cartao ja foi tokenizado no signup, entao sem aviso o cliente
+  // e cobrado de surpresa. Best-effort: nunca derruba o resto da regua.
+  const { notificarTrialVencendo } = await import("@/lib/notificacoesWhatsapp");
+  const trial = await notificarTrialVencendo().catch((e) => {
+    console.error("[regua] erro no aviso de fim de trial:", e);
+    return { avisados: 0 };
+  });
+
   return {
+    trialAvisados: trial.avisados,
     renovacoesGeradas: renov.geradas,
     renovacoesIgnoradas: renov.ignoradas,
     renovacoesErros: renov.erros,
