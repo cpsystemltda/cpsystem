@@ -5,6 +5,14 @@
    Source of truth visual: public/dashboard-preview.html
    ============================================================ */
 :root {
+  /* Regina 06/08: a landing aparecia com as cores invertidas no navegador
+     dela — cards de fundo branco viravam escuros e o texto sumia. Causa: o
+     "modo escuro automatico" do Chrome, que inverte paginas que nao declaram
+     esquema de cor. Como a identidade e clara (com secoes escuras proprias,
+     .section-dark-bleed), declarar light desliga essa inversao e o site
+     aparece igual pra todo mundo. */
+  color-scheme: light;
+
   /* Texto / fundos legados (light mode original) */
   --background: #ffffff;
   --foreground: #171717;
