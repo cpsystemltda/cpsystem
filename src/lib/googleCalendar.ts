@@ -257,12 +257,22 @@ export async function criarEvento(
   return { id: data.id, htmlLink: data.htmlLink };
 }
 
+// Regina 07/08 (preocupacao do Leo): NUNCA cair em "primary". A agenda
+// principal do cliente e dele — o CP System so escreve no calendar dedicado
+// que ele mesmo criou. Hoje o escopo calendar.app.created ja barraria uma
+// chamada a "primary" com 403, mas o fallback era uma bomba-relogio: bastaria
+// um dia alguem ampliar o escopo pra passarmos a escrever na agenda pessoal
+// sem ninguem perceber. Sem calendar dedicado, nao mexe em nada.
 export async function atualizarEvento(
   contaGoogle: GoogleAccount,
   eventId: string,
   ev: EventoCalendar,
 ): Promise<void> {
-  const calId = contaGoogle.calendarId || "primary";
+  const calId = contaGoogle.calendarId;
+  if (!calId) {
+    console.warn("[google] atualizarEvento ignorado: conexao sem calendar dedicado");
+    return;
+  }
   await callCalendar(
     contaGoogle,
     `/calendars/${encodeURIComponent(calId)}/events/${encodeURIComponent(eventId)}`,
@@ -274,7 +284,13 @@ export async function deletarEvento(
   contaGoogle: GoogleAccount,
   eventId: string,
 ): Promise<void> {
-  const calId = contaGoogle.calendarId || "primary";
+  // Mesmo motivo do atualizarEvento: sem calendar dedicado, nao tocamos na
+  // agenda principal do cliente nem pra apagar.
+  const calId = contaGoogle.calendarId;
+  if (!calId) {
+    console.warn("[google] deletarEvento ignorado: conexao sem calendar dedicado");
+    return;
+  }
   try {
     await callCalendar(
       contaGoogle,
