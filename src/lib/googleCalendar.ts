@@ -414,6 +414,7 @@ export async function sincronizarEmpenho(
     const contas = await contasGoogleDaContaCliente(
       empenho.empresa.contaId,
       empenho.criadoPorId,
+      "EMPENHO",
     );
     if (contas.length === 0) return;
 
@@ -462,9 +463,28 @@ async function contaGoogleDoCriador(criadoPorId: string | null): Promise<GoogleA
 //  - Todos os usuarios da conta cliente com Google conectado
 //  - Todos os usuarios das contas ANALISTA com vinculo ATIVO
 // Dedup por id (nao envia 2x pra mesma conta).
+// O cliente escolhe o que quer receber na agenda (Leo 30/07 — "senao vai
+// todas, ai vira uma zona"). Cada tipo pode ser desligado sem desconectar a
+// integracao inteira. Default de todos e true: quem ja usava nao perde nada.
+function contaAceitaTipo(conta: GoogleAccount, tipo: TipoEntidade): boolean {
+  switch (tipo) {
+    case "EMPENHO":
+      return conta.syncEmpenhos;
+    case "ATA":
+      return conta.syncAtas;
+    case "CONTRATO":
+      return conta.syncContratos;
+    case "GARANTIA":
+      return conta.syncGarantias;
+    case "COBRANCA":
+      return conta.syncCobrancas;
+  }
+}
+
 async function contasGoogleDaContaCliente(
   contaClienteId: string,
   criadoPorId?: string | null,
+  tipo?: TipoEntidade,
 ): Promise<GoogleAccount[]> {
   // Analistas ATIVOS vinculados a essa conta
   const vinculos = await prisma.vinculoAnalista.findMany({
@@ -486,7 +506,8 @@ async function contasGoogleDaContaCliente(
     const c = await prisma.googleAccount.findUnique({ where: { usuarioId: criadoPorId } });
     if (c) contas.push(c);
   }
-  return contas;
+  // Respeita a escolha de cada um: quem desligou esse tipo fica de fora.
+  return tipo ? contas.filter((c) => contaAceitaTipo(c, tipo)) : contas;
 }
 
 // Sync individual: chamado 1x por conta Google, best-effort.
@@ -598,7 +619,7 @@ export async function sincronizarAta(ataId: string, acao: "upsert" | "delete"): 
       },
     });
     if (!ata) return;
-    const contas = await contasGoogleDaContaCliente(ata.empresa.contaId, ata.criadoPorId);
+    const contas = await contasGoogleDaContaCliente(ata.empresa.contaId, ata.criadoPorId, "ATA");
     if (contas.length === 0) return;
     if (acao === "delete") {
       await aplicarEmTodas(contas, "ATA", ata.id, "delete");
@@ -631,6 +652,7 @@ export async function sincronizarContrato(contratoId: string, acao: "upsert" | "
     const contas = await contasGoogleDaContaCliente(
       contrato.empresa.contaId,
       contrato.criadoPorId,
+      "CONTRATO",
     );
     if (contas.length === 0) return;
     if (acao === "delete") {
@@ -674,7 +696,7 @@ export async function sincronizarGarantia(garantiaId: string, acao: "upsert" | "
     if (!g || !g.dataFim) return;
     const parent = g.contrato ?? g.empenho;
     if (!parent) return;
-    const contas = await contasGoogleDaContaCliente(parent.empresa.contaId, parent.criadoPorId);
+    const contas = await contasGoogleDaContaCliente(parent.empresa.contaId, parent.criadoPorId, "GARANTIA");
     if (contas.length === 0) return;
     if (acao === "delete") {
       await aplicarEmTodas(contas, "GARANTIA", g.id, "delete");
@@ -706,7 +728,7 @@ export async function sincronizarCobranca(cobrancaId: string, acao: "upsert" | "
       },
     });
     if (!c) return;
-    const contas = await contasGoogleDaContaCliente(c.contaId);
+    const contas = await contasGoogleDaContaCliente(c.contaId, null, "COBRANCA");
     if (contas.length === 0) return;
     if (acao === "delete") {
       await aplicarEmTodas(contas, "COBRANCA", c.id, "delete");

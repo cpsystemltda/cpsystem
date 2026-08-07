@@ -12,6 +12,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NOME_CALENDAR_CPS } from "@/lib/googleCalendar";
 import { DesconectarGoogleForm } from "./DesconectarForm";
+import { PreferenciasSyncForm } from "./PreferenciasSyncForm";
 
 export default async function IntegracoesPage({
   searchParams,
@@ -23,7 +24,16 @@ export default async function IntegracoesPage({
 
   const conta = await prisma.googleAccount.findUnique({
     where: { usuarioId: usuario.id },
-    select: { googleEmail: true, criadoEm: true, calendarId: true },
+    select: {
+      googleEmail: true,
+      criadoEm: true,
+      calendarId: true,
+      syncEmpenhos: true,
+      syncAtas: true,
+      syncContratos: true,
+      syncGarantias: true,
+      syncCobrancas: true,
+    },
   });
 
   return (
@@ -186,6 +196,31 @@ export default async function IntegracoesPage({
                       </li>
                     </ol>
                   </details>
+                </div>
+
+                {/* Leo 30/07: controle do que entra na agenda, pra ela nao
+                    "virar uma zona". Escolher agendas do Google exigiria
+                    permissao pra ver todas — o oposto do que ele pediu. */}
+                <div
+                  className="rounded-xl px-4 py-3.5"
+                  style={{ border: "0.5px solid var(--hairline)", background: "rgba(255,255,255,0.5)" }}
+                >
+                  <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--primary-deep)" }}>
+                    O que mandar pra agenda
+                  </p>
+                  <p className="mt-1 mb-3 text-xs" style={{ color: "var(--text-soft)" }}>
+                    Escolha os tipos de evento que o CP System cria. O que você desmarcar
+                    simplesmente deixa de ser enviado.
+                  </p>
+                  <PreferenciasSyncForm
+                    valores={{
+                      syncEmpenhos: conta.syncEmpenhos,
+                      syncAtas: conta.syncAtas,
+                      syncContratos: conta.syncContratos,
+                      syncGarantias: conta.syncGarantias,
+                      syncCobrancas: conta.syncCobrancas,
+                    }}
+                  />
                 </div>
               </div>
             ) : (

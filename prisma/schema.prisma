@@ -240,10 +240,24 @@ model GoogleAccount {
   accessToken  String   @db.Text
   refreshToken String   @db.Text
   expiresAt    DateTime
-  // Calendario destino: null = primary (calendario principal do usuario)
+  // Calendario destino — SEMPRE o calendar dedicado criado pelo app
+  // ("CP System — Contratos e Vencimentos"). Null = conexao antiga que ainda
+  // nao passou por garantirCalendarDedicado; nesse caso nao sincronizamos
+  // nada (o codigo NAO cai mais em "primary" — a agenda pessoal e do cliente).
   calendarId   String?
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+
+  // O que o CP System pode mandar pra agenda (Leo 30/07, via Regina 07/08).
+  // Ele nao queria que a agenda "virasse uma zona". Escolher QUAIS agendas do
+  // Google integrar exigiria permissao pra enxergar todas elas — o oposto do
+  // que ele quer. Entao o controle e sobre o que SAI daqui: cada tipo de
+  // evento pode ser desligado sem desconectar a integracao.
+  syncEmpenhos  Boolean @default(true)
+  syncAtas      Boolean @default(true)
+  syncContratos Boolean @default(true)
+  syncGarantias Boolean @default(true)
+  syncCobrancas Boolean @default(true)
 
   eventos EventoGoogleCalendar[]
 }
