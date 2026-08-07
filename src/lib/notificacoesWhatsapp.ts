@@ -611,6 +611,13 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
       // que nao mandar nada.
       if (!contaIdsCarteira.length) continue;
       clientesNaCarteira = contaIdsCarteira.length;
+    } else {
+      // Conta EMPRESA sem nenhuma empresa cadastrada nao tem o que resumir.
+      // Regina 07/08: o Igor recebeu resumo zerado porque o WhatsApp dele
+      // esta no usuario de uma conta EMPRESA vazia — a carteira real esta na
+      // conta ANALISTA dele, que nao tem telefone cadastrado.
+      const temEmpresa = await prisma.empresa.count({ where: { contaId: conta.id } });
+      if (!temEmpresa) continue;
     }
 
     // Agrega dados da conta
@@ -662,6 +669,18 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
         where: { contaId: conta.id, status: { in: ["PENDENTE", "ATRASADA"] } },
       }),
     ]);
+
+    // Trava final: se TUDO deu zero, nao manda. Uma mensagem "0, 0, 0, 0" nao
+    // informa nada e passa a impressao de sistema quebrado — foi o que o Igor
+    // recebeu em 31/07 e de novo em 07/08. Silencio e melhor que ruido vazio.
+    const totalDoResumo =
+      empenhosPendentes +
+      empenhosPagosSemana +
+      empenhosVencendo +
+      atasVencendo +
+      contratosVencendo +
+      cobrancasPendentes;
+    if (totalDoResumo === 0) continue;
 
     for (const u of usuarios) {
       // Igor 31/07: "vencendo nos próximos sete dias, vencimento do quê?".
