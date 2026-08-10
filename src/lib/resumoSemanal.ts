@@ -64,7 +64,15 @@ export async function montarResumoEmpresa(contaId: string): Promise<ResumoEmpres
     }),
     prisma.ata.count({ where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: agora, lte: em7 } } }),
     prisma.contrato.count({ where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: agora, lte: em7 } } }),
-    prisma.empenho.count({ where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: agora } } }),
+    // Regina 10/08: o Leo recebeu "EMPENHOS VIGENTES: 59" e o numero nao
+    // significava nada pra ele. A contagem pegava TODO empenho com vigencia
+    // futura, incluindo os 94 ja PAGOS — misturava o que acabou com o que
+    // ainda da trabalho. Agora conta so o que esta em aberto (nao pago), que
+    // e a mesma regua do resumo de sexta: a execucao so fecha quando o orgao
+    // paga.
+    prisma.empenho.count({
+      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: agora }, status: { not: "PAGO" } },
+    }),
   ]);
 
   const primeiroNome = usuario.nome.split(" ")[0] || usuario.nome;
@@ -89,7 +97,7 @@ export async function montarResumoEmpresa(contaId: string): Promise<ResumoEmpres
 
   if (empenhosVigentes > 0) {
     linhas.push("");
-    linhas.push(`📦 *EMPENHOS VIGENTES:* ${empenhosVigentes}`);
+    linhas.push(`📦 *EM EXECUÇÃO (órgão ainda não pagou):* ${empenhosVigentes}`);
   }
 
   // Assinatura
@@ -184,6 +192,21 @@ export async function montarResumoAnalista(analistaId: string): Promise<ResumoAn
   linhas.push("💰 *COMISSÃO*");
   if (aReceber > 0) {
     linhas.push(`• A receber no próximo PIX: *${BRL(aReceber)}*`);
+    // Regina 10/08: o Igor viu R$ 59,80 com UM cliente e estranhou, com razao.
+    // O valor estava certo (julho + agosto acumulados), mas a mensagem nao
+    // dizia isso — parecia erro de calculo. Agora discrimina as competencias
+    // sempre que houver mais de um mes em aberto.
+    if (comissoes.length > 1) {
+      const meses = comissoes
+        .map((c) => c.competencia)
+        .sort()
+        .map((c) => {
+          const [ano, mes] = c.split("-");
+          const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+          return `${nomes[Number(mes) - 1]}/${ano.slice(2)}`;
+        });
+      linhas.push(`• Referente a ${comissoes.length} meses acumulados: ${meses.join(" + ")}`);
+    }
     linhas.push(`• Data do PIX: ${dataBr(prox20)}`);
   } else {
     linhas.push(`• Nada apurado ainda. Comissão só passa a correr após a 1ª fatura paga do cliente.`);
