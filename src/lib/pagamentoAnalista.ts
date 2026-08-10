@@ -57,7 +57,7 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
 
   // Busca comissões não pagas do mês anterior + comissões de bônus/pendências antigas
   // Filtro amplo: qualquer competencia <= mês anterior e paga=false.
-  const comissoes = await prisma.comissao.findMany({
+  const candidatas = await prisma.comissao.findMany({
     where: {
       paga: false,
       competencia: { lte: competencia }, // inclui bonus com sufixo (ex: 2026-07-BONUS-INICIO) — compara alfabeticamente
@@ -66,8 +66,40 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
       analista: {
         select: { id: true, nomeCompleto: true, pix: true, ativo: true },
       },
-      conta: { select: { id: true } },
+      conta: {
+        select: {
+          id: true,
+          // Precisamos das faturas pagas da conta pra saber se o dinheiro do
+          // cliente ja caiu de fato na conta do CP System.
+          cobrancas: {
+            where: { status: "PAGA", pagaEm: { not: null } },
+            select: { pagaEm: true },
+            orderBy: { pagaEm: "desc" },
+          },
+        },
+      },
     },
+  });
+
+  // REGRA DE CAIXA (Regina 10/08): o CP System so recebe do gateway D+32 do
+  // pagamento do cliente (cartao de credito). Antes disso o dinheiro nao
+  // existe em conta — pagar o analista aqui seria adiantar capital proprio.
+  //
+  // Caso real que motivou: o Leo pagou em 20/07, compensacao em 21/08, e o
+  // PIX de comissao estava agendado pro dia 20/08 — sairia UM DIA antes de a
+  // receita entrar.
+  //
+  // Regra: so paga comissao cujo pagamento do cliente ja compensou. O que
+  // ainda nao compensou fica para o proximo dia 20, sem perder nada (a
+  // comissao continua com paga=false).
+  const DIAS_COMPENSACAO = 32;
+  const limite = new Date(hoje.getTime() - DIAS_COMPENSACAO * 24 * 60 * 60 * 1000);
+  const comissoes = candidatas.filter((c) => {
+    const pagamentos = c.conta?.cobrancas ?? [];
+    // Sem fatura paga registrada: nao ha receita correspondente, nao paga.
+    if (pagamentos.length === 0) return false;
+    // Basta o pagamento mais antigo ja ter compensado pra haver caixa.
+    return pagamentos.some((p) => p.pagaEm !== null && p.pagaEm <= limite);
   });
 
   let sucessos = 0;

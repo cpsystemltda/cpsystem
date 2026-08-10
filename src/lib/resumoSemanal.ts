@@ -165,7 +165,22 @@ export async function montarResumoAnalista(analistaId: string): Promise<ResumoAn
     }),
     prisma.comissao.findMany({
       where: { analistaId, paga: false },
-      select: { valor: true, competencia: true },
+      select: {
+        valor: true,
+        competencia: true,
+        // Data de compensacao: o CP System so recebe D+32 do pagamento do
+        // cliente, entao a comissao so pode sair depois disso.
+        conta: {
+          select: {
+            cobrancas: {
+              where: { status: "PAGA", pagaEm: { not: null } },
+              select: { pagaEm: true },
+              orderBy: { pagaEm: "asc" },
+              take: 1,
+            },
+          },
+        },
+      },
     }),
   ]);
 
@@ -207,7 +222,28 @@ export async function montarResumoAnalista(analistaId: string): Promise<ResumoAn
         });
       linhas.push(`• Referente a ${comissoes.length} meses acumulados: ${meses.join(" + ")}`);
     }
-    linhas.push(`• Data do PIX: ${dataBr(prox20)}`);
+
+    // Regina 10/08: a data do PIX nao pode ser so "proximo dia 20". O CP
+    // System recebe do gateway D+32 do pagamento do cliente; antes disso nao
+    // ha caixa pra repassar. Anuncia o dia 20 seguinte a compensacao, pra nao
+    // prometer data que nao se cumpre.
+    const COMPENSACAO_DIAS = 32;
+    let dataPix = prox20;
+    const compensacoes = comissoes
+      .map((c) => c.conta?.cobrancas?.[0]?.pagaEm)
+      .filter((d): d is Date => !!d)
+      .map((d) => new Date(d.getTime() + COMPENSACAO_DIAS * 24 * 60 * 60 * 1000));
+    if (compensacoes.length > 0) {
+      const maisCedo = new Date(Math.min(...compensacoes.map((d) => d.getTime())));
+      if (maisCedo > prox20) {
+        // primeiro dia 20 depois da compensacao
+        const d = new Date(maisCedo.getFullYear(), maisCedo.getMonth(), 20);
+        if (maisCedo.getDate() > 20) d.setMonth(d.getMonth() + 1);
+        dataPix = d;
+      }
+    }
+    linhas.push(`• Data do PIX: ${dataBr(dataPix)}`);
+    linhas.push(`• O repasse sai após o pagamento do cliente compensar (32 dias).`);
   } else {
     linhas.push(`• Nada apurado ainda. Comissão só passa a correr após a 1ª fatura paga do cliente.`);
     if (trials > 0) linhas.push(`• Você tem ${trials} cliente(s) em trial — quando pagarem, sua comissão começa.`);
