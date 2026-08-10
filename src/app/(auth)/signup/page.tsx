@@ -15,6 +15,7 @@ import { CampoBanco } from "@/components/CampoBanco";
 import { CampoMultiplo } from "@/components/CampoMultiplo";
 import { signupAction, signupAnalistaAction, buscarAnalistasPublicos } from "@/app/actions/auth";
 import { Logo } from "@/components/Logo";
+import { CamposAtribuicao } from "@/components/CamposAtribuicao";
 import { OPCOES_NATUREZA_JURIDICA } from "@/lib/validators";
 
 const PORTES = [
@@ -285,6 +286,8 @@ function FormEmpresa() {
       {/* Hidden: id do analista que indicou (link /signup?ref=ID). A
           server action valida + grava em Conta.embaixadorId. */}
       <input type="hidden" name="embaixadorIdRef" value={embaixadorIdRef} />
+      {/* Origem da visita (gclid/UTMs) — liga o cadastro ao anuncio que pagou por ele. */}
+      <CamposAtribuicao />
       {embaixadorIdRef && !cupomInfo?.ok && (
         <div className="col-span-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-800">
           ✓ Analista indicado
@@ -794,6 +797,9 @@ function FormAnalista() {
 
   return (
     <form action={formAction} className="mt-8 grid grid-cols-4 gap-4">
+      {/* Origem da visita (gclid/UTMs) — vale tambem pro cadastro de analista,
+          que e um dos publicos que a campanha busca. */}
+      <CamposAtribuicao />
       {(state?.erro || errosResumo.length > 0) && (
         <div
           ref={resumoRef}

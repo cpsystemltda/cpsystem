@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Cinzel } from "next/font/google";
 import Script from "next/script";
+import { GoogleTag } from "@/components/GoogleTag";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -65,6 +66,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-white text-slate-900">
         {children}
+        <GoogleTag />
         <Script id="pwa-sw" strategy="afterInteractive">
           {`if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {

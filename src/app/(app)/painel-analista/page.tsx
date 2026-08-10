@@ -15,6 +15,7 @@ import { PercentualForm } from "./PercentualForm";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { KPI } from "@/components/ui/KPI";
 import { LinkIndicacaoBloco } from "@/components/LinkIndicacaoBloco";
+import { ConversaoCadastro } from "@/components/ConversaoCadastro";
 
 // Formato compacto pra valores grandes — evita corte no KPI ("R$ 1,2 Mi" em vez de "R$ 1.234.567,89")
 function brlCompacto(n: number): string {
@@ -43,7 +44,7 @@ function statusSimples(s: string): "Emitida" | "Pendente" | "Paga" {
 export default async function PainelAnalistaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vinculo?: string; cnpj?: string; analistaId?: string }>;
+  searchParams: Promise<{ vinculo?: string; cnpj?: string; analistaId?: string; novo?: string }>;
 }) {
   const usuario = await exigirUsuario();
   const sp = await searchParams;
@@ -312,6 +313,8 @@ export default async function PainelAnalistaPage({
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
+      {/* Cadastro de analista recem-concluido — mesma conversao do dashboard. */}
+      {sp?.novo === "1" ? <ConversaoCadastro /> : null}
       {ehPreviewAdmin && (
         <div
           className="glass-tile mb-4 flex items-center justify-between gap-3 rounded-[14px] px-4 py-3 text-sm"

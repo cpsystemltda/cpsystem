@@ -40,6 +40,7 @@ import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 import { UploadInteligenteCard } from "@/components/UploadInteligenteCard";
 import { AgendaMes, parseMesAgenda, type EmpenhoAgenda } from "@/components/AgendaMes";
 import { labelCurtoInstrumento, labelInstrumento } from "@/lib/instrumentoLabel";
+import { ConversaoCadastro } from "@/components/ConversaoCadastro";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
 const ROTULO_STATUS: Record<string, string> = {
@@ -74,7 +75,7 @@ function formatDate(d: Date | null | undefined): string {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mesAgenda?: string }>;
+  searchParams: Promise<{ mesAgenda?: string; novo?: string }>;
 }) {
   const usuario = await exigirUsuario();
   const contaId = usuario.contaId;
@@ -664,6 +665,9 @@ export default async function DashboardPage({
 
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-6">
+      {/* Cadastro recem-concluido (?novo=1 vem da server action de signup):
+          conta a conversao no Google Ads uma unica vez. */}
+      {sp?.novo === "1" ? <ConversaoCadastro /> : null}
       <BannerEmpresaEmFoco contaId={contaId} />
       {mostrarBannerConciliacao ? <BannerConciliacaoOnboarding /> : null}
 

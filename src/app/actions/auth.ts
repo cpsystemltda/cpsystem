@@ -25,6 +25,27 @@ type ActionResult = {
   valores?: Record<string, string>;
 };
 
+/**
+ * Le os campos de origem (gclid + UTMs) que o <CamposAtribuicao /> manda junto
+ * com o cadastro. Sao os dados que permitem, depois, dizer ao Google Ads qual
+ * clique virou assinatura paga — sem eles a campanha otimiza no escuro.
+ * Campos vazios viram `undefined` pra nao gravar string vazia no banco.
+ */
+function atribuicaoDoForm(formData: FormData) {
+  const ler = (nome: string) => {
+    const v = formData.get(nome);
+    const s = typeof v === "string" ? v.trim() : "";
+    return s ? s.slice(0, 255) : undefined;
+  };
+  return {
+    gclid: ler("gclid"),
+    utmSource: ler("utmSource"),
+    utmMedium: ler("utmMedium"),
+    utmCampaign: ler("utmCampaign"),
+    utmTerm: ler("utmTerm"),
+  };
+}
+
 function valoresParaEcho(formData: FormData): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of formData.entries()) {
@@ -208,6 +229,7 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       embaixadorId: analistaViaCupomId ?? embaixadorIdValido,
       cupomAplicadoId,
       indicadoPorContaId: indicadoPorContaIdValido,
+      ...atribuicaoDoForm(formData),
       usuarios: {
         create: {
           nome: v.nome,
@@ -453,7 +475,10 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   }
 
   await criarSessao(conta.usuarios[0].id);
-  redirect("/dashboard");
+  // ?novo=1 sinaliza pro dashboard disparar a conversao "cadastro" no Google
+  // Ads. O evento vai no client, no primeiro carregamento apos o cadastro —
+  // marcar a URL e a forma de o servidor avisar o browser que a acao ocorreu.
+  redirect("/dashboard?novo=1");
 }
 
 // Busca pública (sem auth) usada pelo autocomplete no signup.
@@ -646,6 +671,7 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
       // Analista aceita o contrato de analista, nao o de empresa.
       termosAceitosEm: new Date(),
       termosAceitosVersao: "1.0",
+      ...atribuicaoDoForm(formData),
       usuarios: {
         create: { nome, email, senhaHash, perfil: "ADMIN" },
       },
@@ -682,5 +708,5 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
   });
 
   await criarSessao(conta.usuarios[0].id);
-  redirect("/painel-analista");
+  redirect("/painel-analista?novo=1");
 }

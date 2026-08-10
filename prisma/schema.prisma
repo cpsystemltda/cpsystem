@@ -76,6 +76,19 @@ model Conta {
   // bancaria mesmo estando no plano BASICO ate a data indicada. Regina 30/07
   // (Leo Santos foi o 1o beneficiado — 30 dias).
   conciliacaoCortesiaAte  DateTime?
+  // Atribuicao de marketing (Regina 10/08). O gclid e o identificador que o
+  // Google poe na URL quando alguem chega por um anuncio; guardamos no signup
+  // pra depois conseguir dizer QUAL clique virou assinatura paga. Sem ele a
+  // campanha so mede visita, nunca receita. Preenchido so quando a visita veio
+  // de anuncio — trafego organico deixa nulo.
+  gclid                   String?
+  utmSource               String?
+  utmMedium               String?
+  utmCampaign             String?
+  utmTerm                 String?
+  // Marca quando a conversao "assinatura paga" ja foi exportada pro Google Ads
+  // (upload offline), pra nao contar a mesma venda duas vezes.
+  conversaoEnviadaEm      DateTime?
   criadoEm                DateTime         @default(now())
   atualizadoEm            DateTime         @updatedAt
 
@@ -96,6 +109,9 @@ model Conta {
   vinculosAnalista VinculoAnalista[]
 
   @@index([indicadoPorContaId])
+  // Busca do exportador de conversoes offline: contas vindas de anuncio que
+  // ainda nao foram reportadas ao Google Ads.
+  @@index([gclid, conversaoEnviadaEm])
 }
 
 enum GatewayProvider {
