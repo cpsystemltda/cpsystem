@@ -7,11 +7,14 @@
 :root {
   /* Regina 06/08: a landing aparecia com as cores invertidas no navegador
      dela — cards de fundo branco viravam escuros e o texto sumia. Causa: o
-     "modo escuro automatico" do Chrome, que inverte paginas que nao declaram
-     esquema de cor. Como a identidade e clara (com secoes escuras proprias,
-     .section-dark-bleed), declarar light desliga essa inversao e o site
-     aparece igual pra todo mundo. */
-  color-scheme: light;
+     "modo escuro automatico" do Chrome, que inverte paginas claras.
+     Regina 10/08: `light` sozinho NAO resolveu (video no Windows mostrava os
+     mini-stats ainda invertidos, com o label so aparecendo ao selecionar o
+     texto). `light` apenas declara qual esquema a pagina suporta; quem
+     desliga a inversao forcada do Chrome e o `only`. A mesma declaracao vai
+     tambem na meta tag do layout, porque o CSS chega depois do primeiro
+     paint e a inversao ja teria acontecido. */
+  color-scheme: only light;
 
   /* Texto / fundos legados (light mode original) */
   --background: #ffffff;

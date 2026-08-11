@@ -49,6 +49,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#1e3a5f",
+  // Vai como <meta name="color-scheme" content="only light">, que o navegador
+  // le antes do CSS. Sem isso o Chrome do Windows inverte a pagina no primeiro
+  // paint e os cards claros aparecem escuros com o texto sumido (Regina 10/08).
+  colorScheme: "only light",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

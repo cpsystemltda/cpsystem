@@ -225,12 +225,12 @@ export default function HomeLandingClient() {
 
               {/* Mini-stats horizontais (substituem números factuais ainda inexistentes) */}
               <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                <StatBlock numero="12+" label="Tipos de instrumentos" />
+                <StatBlock numero="12+" label="Instrumentos" />
                 <StatBlock numero="100%" label="Auditável" />
-                <StatBlock numero="IA" label="Nativa especializada" />
+                <StatBlock numero="IA" label="Especializada" />
                 <StatBlock numero="∞" label="Multi-empresa" />
                 {/* Igor 13/07: destacar que a plataforma dispensa treinamento */}
-                <StatBlock numero="0h" label="Dispensa treinamento" />
+                <StatBlock numero="0h" label="Sem treinamento" />
               </div>
 
               <div className="mt-7">
@@ -831,19 +831,34 @@ function PlanoCardDark({
 //   2) overflow — "Tipos de instrumentos" / "Dispensa treinamento" sao longos
 //      e o tracking de 0.16em estourava a coluna. Item de grid precisa de
 //      min-w-0 pra poder encolher, mais quebra de palavra e tracking menor.
+//
+// Regina 10/08: voltou a acontecer num Windows — no video o label so aparecia
+// quando o texto era selecionado. A causa raiz nao era o CSS da secao, e sim o
+// modo escuro automatico do Chrome escurecendo o card branco enquanto mantinha
+// o label escuro. O bloqueio da inversao esta no layout/globals (color-scheme:
+// only light); aqui o card ficou quase opaco e o label sem transparencia, pra
+// que o contraste nao dependa mais do que estiver atras nem do navegador.
 function StatBlock({ numero, label }: { numero: string; label: string }) {
   return (
     <div
-      className="stat-block min-w-0 rounded-2xl px-3 py-3.5 text-center"
+      className="stat-block flex min-w-0 flex-col items-center justify-center rounded-2xl px-2.5 py-4 text-center"
       style={{
-        background: "rgba(255,255,255,0.7)",
+        // Branco solido: com 0.7 o card dependia do que estivesse atras dele, e
+        // bastava algo escurecer o fundo pra o label escuro sumir. Opaco, o
+        // contraste passa a ser garantido pelo proprio card.
+        background: "#FFFFFF",
         border: "0.5px solid var(--hairline)",
+        // Altura igual nos cinco cards: sem isso o de rotulo curto ("Auditavel")
+        // encolhia e a fileira ficava desalinhada.
+        minHeight: 92,
       }}
     >
       <div
-        className="text-[24px] font-extrabold leading-none"
+        className="text-[26px] font-extrabold leading-none"
         style={{
-          background: "linear-gradient(135deg, var(--primary-deep), var(--primary))",
+          // Gradiente so entre os tons fechados do dourado. A ponta clara
+          // (#D4AF37) sobre branco quase nao lia.
+          background: "linear-gradient(135deg, #8A6E2F, var(--primary-deep))",
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           WebkitTextFillColor: "transparent",
@@ -853,12 +868,19 @@ function StatBlock({ numero, label }: { numero: string; label: string }) {
         {numero}
       </div>
       <div
-        className="stat-block__label mt-1.5 text-[10px] font-bold uppercase leading-tight"
+        className="stat-block__label mt-2 text-[10px] font-bold uppercase"
         style={{
-          color: "rgba(58, 52, 40, 0.75)",
-          letterSpacing: "0.10em",
-          overflowWrap: "anywhere",
-          hyphens: "auto",
+          // Quase preto e sem transparencia (era rgba .75): num texto de 10px
+          // em maiuscula com tracking, transparencia custa contraste justo onde
+          // ele e mais necessario.
+          color: "#241E12",
+          // Tracking menor e sem hifenizacao: com 0.10em + hyphens o Chrome
+          // partia "INSTRUMEN-TOS" no meio da palavra, o que a Regina apontou
+          // como desarmonico. Agora a quebra so acontece entre palavras.
+          letterSpacing: "0.05em",
+          lineHeight: 1.25,
+          overflowWrap: "break-word",
+          hyphens: "manual",
         }}
       >
         {label}
