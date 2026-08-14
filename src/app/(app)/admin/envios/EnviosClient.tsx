@@ -6,9 +6,9 @@ import {
   enviarContratoAnalistaWaAction,
   enviarMagicLinkMigracaoAction,
   enviarProspeccaoAction,
-  TEXTO_PROSPECCAO,
   type EnvioResult,
 } from "@/app/actions/admin/enviosAvulsos";
+import { TEXTO_PROSPECCAO } from "@/lib/textoProspeccao";
 
 type Candidato = {
   contaId: string;
