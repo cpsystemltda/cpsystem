@@ -150,8 +150,8 @@ export async function enviarProspeccaoAction(
 
   try {
     const { enviarVideo } = await import("@/lib/whatsapp");
-    const { VIDEO_INSTITUCIONAL } = await import("@/components/VideoInstitucional");
-    const r = await enviarVideo(telefone, VIDEO_INSTITUCIONAL, caption);
+    const { VIDEO_INSTITUCIONAL_WHATSAPP } = await import("@/components/VideoInstitucional");
+    const r = await enviarVideo(telefone, VIDEO_INSTITUCIONAL_WHATSAPP, caption);
     await registrarAuditoria({
       contaId: usuario.contaId,
       usuarioId: usuario.id,

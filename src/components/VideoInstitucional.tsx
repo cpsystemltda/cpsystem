@@ -12,6 +12,11 @@ import { Play } from "lucide-react";
 // preload="none" + poster do primeiro frame: quem nao da play nao baixa nada.
 export const VIDEO_INSTITUCIONAL =
   "https://daci3hzdnsf8gryv.public.blob.vercel-storage.com/institucional/cp-system-tour.mp4";
+// Versao leve do mesmo tour, para envio por WhatsApp (Regina 14/08). O arquivo
+// de 23MB do site era recusado na entrega — o WhatsApp corta video acima de
+// ~16MB. Este tem 9,8MB e a mesma duracao.
+export const VIDEO_INSTITUCIONAL_WHATSAPP =
+  "https://daci3hzdnsf8gryv.public.blob.vercel-storage.com/institucional/cp-system-tour-wa.mp4";
 export const VIDEO_INSTITUCIONAL_POSTER =
   "https://daci3hzdnsf8gryv.public.blob.vercel-storage.com/institucional/cp-system-tour-poster.jpg";
 
