@@ -16,7 +16,7 @@ export const VIDEO_INSTITUCIONAL =
 // de 23MB do site era recusado na entrega — o WhatsApp corta video acima de
 // ~16MB. Este tem 9,8MB e a mesma duracao.
 export const VIDEO_INSTITUCIONAL_WHATSAPP =
-  "https://daci3hzdnsf8gryv.public.blob.vercel-storage.com/institucional/cp-system-tour-wa.mp4";
+  "https://daci3hzdnsf8gryv.public.blob.vercel-storage.com/institucional/cp-tour-min.mp4";
 export const VIDEO_INSTITUCIONAL_POSTER =
   "https://daci3hzdnsf8gryv.public.blob.vercel-storage.com/institucional/cp-system-tour-poster.jpg";
 
