@@ -323,7 +323,11 @@ export async function enviarVideo(
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
   await checarConexaoZapi();
   const phone = formatarTelefone(telefone);
-  const r = await fetch(`${getBaseUrl()}/send-video`, {
+  // Regina 14/08: /send-video devolvia messageId mas a mensagem nunca chegava.
+  // /send-document/mp4 e o mesmo caminho que ja entrega os PDFs de NF e o
+  // contrato do analista nesta instancia, entao e o que se usa aqui. Chega como
+  // arquivo de video anexado — reproduzivel dentro da conversa.
+  const r = await fetch(`${getBaseUrl()}/send-document/mp4`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -331,7 +335,8 @@ export async function enviarVideo(
     },
     body: JSON.stringify({
       phone,
-      video: videoUrl,
+      document: videoUrl,
+      fileName: "CP System - tour de 2 minutos.mp4",
       caption: caption ?? undefined,
     }),
   });
