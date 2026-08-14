@@ -306,6 +306,44 @@ export async function enviarDocumentoPdf(
   return { messageId };
 }
 
+/**
+ * Envia um video pelo WhatsApp com legenda (Regina 14/08).
+ *
+ * Usado na prospeccao: o tour institucional vai como ARQUIVO, nao como link —
+ * link exige um clique a mais e leva a pessoa pra fora da conversa, enquanto o
+ * video toca ali mesmo. A legenda viaja junto, entao a mensagem chega inteira.
+ *
+ * `videoUrl` precisa ser publica: a Z-API baixa o arquivo pelo endereco.
+ */
+export async function enviarVideo(
+  telefone: string,
+  videoUrl: string,
+  caption?: string,
+): Promise<{ messageId: string }> {
+  if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
+  await checarConexaoZapi();
+  const phone = formatarTelefone(telefone);
+  const r = await fetch(`${getBaseUrl()}/send-video`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Client-Token": CLIENT_TOKEN,
+    },
+    body: JSON.stringify({
+      phone,
+      video: videoUrl,
+      caption: caption ?? undefined,
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error(`Z-API ${r.status}: ${txt.slice(0, 300)}`);
+  }
+  const data = (await r.json()) as ZapiResponse;
+  const messageId = data.messageId || data.zaapId || data.id || "";
+  return { messageId };
+}
+
 // Variante de dispararNotificacao que envia PDF anexado em vez de texto.
 // Usada pelo fluxo de NF (processarNfseGateway) — Regina 07/07.
 // A `caption` vai como legenda embaixo do PDF no WhatsApp.

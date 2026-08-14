@@ -127,3 +127,56 @@ export async function enviarMagicLinkMigracaoAction(
     return { erro: err instanceof Error ? err.message : "Falha ao enviar." };
   }
 }
+
+// Regina 14/08: material de prospeccao — o tour institucional como VIDEO
+// (arquivo, nao link) com o texto de abordagem na legenda. Sai do WhatsApp do
+// CP System, entao chega como a empresa falando, nao como pessoa fisica.
+export async function enviarProspeccaoAction(
+  _prev: EnvioResult | null,
+  formData: FormData,
+): Promise<EnvioResult> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  if (!usuario.superAdmin) return { erro: "Somente super admin." };
+
+  const telefone = String(formData.get("telefone") || "").trim();
+  if (telefone.replace(/\D/g, "").length < 10) {
+    return { erro: "Telefone inválido — inclua DDD." };
+  }
+  // Permite ajustar o texto na hora sem precisar de deploy.
+  const textoCustom = String(formData.get("texto") || "").trim();
+  const caption = textoCustom || TEXTO_PROSPECCAO;
+
+  try {
+    const { enviarVideo } = await import("@/lib/whatsapp");
+    const { VIDEO_INSTITUCIONAL } = await import("@/components/VideoInstitucional");
+    const r = await enviarVideo(telefone, VIDEO_INSTITUCIONAL, caption);
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "CRIAR",
+      recurso: "ProspeccaoWhatsApp",
+      recursoId: telefone.replace(/\D/g, ""),
+      titulo: "Material de prospecção enviado por WhatsApp",
+    });
+    return { ok: true, detalhe: `Vídeo + texto enviados (id ${r.messageId}).` };
+  } catch (err) {
+    return { erro: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export const TEXTO_PROSPECCAO = `Olá! Tudo bem?
+
+Aqui é do CP System.
+
+Em contrato público, quase nunca o prejuízo vem de perder a licitação. Vem depois dela: saldo de ata que ninguém acompanha, empenho que vence sem a entrega sair, aditivo pedido fora do prazo legal, reajuste que passou da data. Tudo isso costuma morar numa planilha — até o dia em que vira multa.
+
+O CP System reúne atas, contratos e empenhos em um painel só, confere sozinho os limites da Lei 14.133 e avisa no seu WhatsApp antes de o prazo vencer.
+
+O vídeo aqui é um tour de 2 minutos mostrando o sistema por dentro.
+
+Se fizer sentido para a sua operação, o teste é gratuito por 14 dias e leva cerca de 5 minutos para começar: cpsystem.app.br
+
+Qualquer dúvida, é só chamar por aqui.
+
+Contato CP System`;

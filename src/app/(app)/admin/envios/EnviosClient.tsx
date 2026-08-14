@@ -1,10 +1,12 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { FileText, Send, ExternalLink, MessageCircle } from "lucide-react";
+import { FileText, Send, ExternalLink, MessageCircle, Video } from "lucide-react";
 import {
   enviarContratoAnalistaWaAction,
   enviarMagicLinkMigracaoAction,
+  enviarProspeccaoAction,
+  TEXTO_PROSPECCAO,
   type EnvioResult,
 } from "@/app/actions/admin/enviosAvulsos";
 
@@ -37,10 +39,67 @@ export function EnviosClient({
     null,
   );
 
+  const [stateProspeccao, actionProspeccao, pendingProspeccao] = useActionState<EnvioResult | null, FormData>(
+    enviarProspeccaoAction,
+    null,
+  );
+
   const [usuarioSelecionado, setUsuarioSelecionado] = useState<string>("");
 
   return (
     <div className="mt-6 space-y-8">
+      {/* Bloco 0: prospeccao — video institucional + texto de abordagem */}
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-start gap-3">
+          <Video className="mt-0.5 text-violet-600" size={22} />
+          <div>
+            <h2 className="text-base font-bold text-slate-900">
+              Enviar material de prospecção
+            </h2>
+            <p className="text-xs text-slate-500">
+              Tour institucional como vídeo (arquivo, não link) com o texto de abordagem na
+              legenda. Sai do WhatsApp do CP System.
+            </p>
+          </div>
+        </div>
+
+        <form action={actionProspeccao} className="space-y-3">
+          <label className="block text-xs font-semibold text-slate-700">
+            WhatsApp do destinatário (com DDD)
+            <input
+              name="telefone"
+              type="text"
+              required
+              placeholder="11970619434"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal"
+            />
+          </label>
+          <label className="block text-xs font-semibold text-slate-700">
+            Texto (editável antes de enviar)
+            <textarea
+              name="texto"
+              rows={10}
+              defaultValue={TEXTO_PROSPECCAO}
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={pendingProspeccao}
+            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            <Send size={15} />
+            {pendingProspeccao ? "Enviando..." : "Enviar vídeo + texto"}
+          </button>
+          {stateProspeccao?.erro && (
+            <p className="text-sm font-semibold text-red-700">{stateProspeccao.erro}</p>
+          )}
+          {stateProspeccao?.ok && (
+            <p className="text-sm font-semibold text-emerald-700">{stateProspeccao.detalhe}</p>
+          )}
+        </form>
+      </section>
+
       {/* Bloco 1: contrato analista pro Igor */}
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-start gap-3">
