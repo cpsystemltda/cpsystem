@@ -29,7 +29,7 @@ import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
 import { HelpButtonsInline } from "@/components/HelpButtonsInline";
 import { Logo } from "@/components/Logo";
 import type { Visao } from "@/lib/visao";
-import { Crown, Users2, Activity, Gift, Ticket, Send, UserCog, MessageCircle } from "lucide-react";
+import { Crown, Users2, Activity, Ticket, Send, UserCog, MessageCircle } from "lucide-react";
 
 type Item = { href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> };
 type Grupo = { titulo: string; itens: Item[] };
@@ -79,7 +79,6 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
       { href: "/conta/notificacoes", label: "Notificações WhatsApp", icon: Bell },
       { href: "/conta/assinatura", label: "Assinatura", icon: CreditCard },
       { href: "/conta/integracoes", label: "Integrações", icon: Plug },
-      { href: "/conta/indicar", label: "Indique e ganhe", icon: Gift },
       { href: "/vinculos", label: "Analista vinculado", icon: UserCheck },
       { href: "/equipe", label: "Equipe", icon: Users },
       { href: "/termos", label: "Termos / LGPD", icon: ScrollText },

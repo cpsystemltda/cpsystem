@@ -185,32 +185,20 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   // (link expirado, analista desativado), simplesmente ignora (signup
   // segue normal sem embaixador) — nao bloquear cadastro por isso.
   //
-  // ALEM disso: programa de Referral C2C — link /signup?ref=conta-<id>
-  // grava 'indicadoPorContaId'. Cliente que indicou ganha 1 mes gratis
-  // quando essa conta nova pagar a 1a fatura.
+  // Regina 14/08: o programa cliente-indica-cliente (?ref=conta-<id>, "1 mes
+  // gratis por indicacao") foi DESLIGADO — ela nunca aprovou dar mes gratis, e
+  // a tela chegou a prometer um credito que nenhum codigo concedia. A unica
+  // remuneracao por indicacao e a comissao do analista (R$ 29,90 por cliente
+  // vinculado ativo). Link com "conta-" agora e simplesmente ignorado.
   const refRaw = String(formData.get("embaixadorIdRef") || "").trim();
   let embaixadorIdValido: string | null = null;
-  let indicadoPorContaIdValido: string | null = null;
-  if (refRaw) {
-    if (refRaw.startsWith("conta-")) {
-      // Referral C2C: ?ref=conta-<contaId>
-      const contaIdRef = refRaw.slice("conta-".length);
-      const c = await prisma.conta.findUnique({
-        where: { id: contaIdRef },
-        select: { id: true, statusAssinatura: true },
-      });
-      // Só aceita se a conta indicadora existe e nao esta bloqueada/cancelada.
-      if (c && c.statusAssinatura !== "CANCELADA") {
-        indicadoPorContaIdValido = c.id;
-      }
-    } else {
-      // Programa Embaixador: ?ref=<analistaId>
-      const emb = await prisma.analista.findUnique({
-        where: { id: refRaw },
-        select: { id: true, ativo: true },
-      });
-      if (emb && emb.ativo) embaixadorIdValido = emb.id;
-    }
+  if (refRaw && !refRaw.startsWith("conta-")) {
+    // Programa Embaixador: ?ref=<analistaId>
+    const emb = await prisma.analista.findUnique({
+      where: { id: refRaw },
+      select: { id: true, ativo: true },
+    });
+    if (emb && emb.ativo) embaixadorIdValido = emb.id;
   }
 
   const conta = await prisma.conta.create({
@@ -228,7 +216,6 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       // Prioridade: cupom > ?ref= > autocomplete do signup.
       embaixadorId: analistaViaCupomId ?? embaixadorIdValido,
       cupomAplicadoId,
-      indicadoPorContaId: indicadoPorContaIdValido,
       ...atribuicaoDoForm(formData),
       usuarios: {
         create: {

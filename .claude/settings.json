@@ -39,7 +39,26 @@
       "Bash(node /tmp/check-mapa2.cjs)",
       "Bash(grep -v \"SECURITY WARNING\\\\|libpq\\\\|sslmode\\\\|the next major\\\\|To prepare\\\\|adopt standard\\\\|If you want\\\\|See https\\\\|tracewarnings\\\\|^Use\\\\|^$\")",
       "Bash(node /tmp/prepopular-geocode.cjs)",
-      "Bash(node /tmp/check-pins-final.cjs)"
+      "Bash(node /tmp/check-pins-final.cjs)",
+      "Bash(git rev-list *)",
+      "Bash(git fetch *)",
+      "Bash(python3 -c \"import whisper; print\\('openai-whisper OK'\\)\")",
+      "mcp__whatsapp__list_chats",
+      "Bash(whisper \"/Users/reginaluizafernandes/Downloads/Áudios/WhatsApp/WhatsApp Audio 2026-07-30 at 15.22.04.opus\" --language Portuguese --model small --output_format txt --output_dir .)",
+      "Bash(node -e \"console.log\\(process.version\\)\")",
+      "Bash(ffprobe -v error -show_entries format=duration -of csv=p=0 \"/Users/reginaluizafernandes/Downloads/WhatsApp Video 2026-07-31 at 09.07.35.mp4\")",
+      "Bash(ffmpeg -y -loglevel error -i \"/Users/reginaluizafernandes/Downloads/WhatsApp Video 2026-07-31 at 09.07.35.mp4\" -ar 16000 -ac 1 igor-video.wav)",
+      "Bash(whisper igor-video.wav --language Portuguese --model small --output_format txt --output_dir .)",
+      "Bash(node -e ' *)",
+      "Bash(echo \"tsc exit=$?\")",
+      "Bash(echo \"eslint exit=$?\")",
+      "mcp__whatsapp__get_last_interaction",
+      "Bash(python3 -c ' *)",
+      "Bash(ffprobe -v error -show_entries format=duration,size,bit_rate -show_entries stream=codec_name,width,height,r_frame_rate,codec_type -of default=noprint_wrappers=1 \"/Users/reginaluizafernandes/Downloads/CP SYSTEM_LEG_03mp3.mp4\")",
+      "Bash(ffmpeg -y -loglevel error -i \"/Users/reginaluizafernandes/Downloads/CP SYSTEM_LEG_03mp3.mp4\" -vf \"fps=30\" -c:v libx264 -crf 24 -preset slow -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k cp-system-video.mp4)",
+      "Bash(ffmpeg -y -loglevel error -ss 2 -i cp-system-video.mp4 -frames:v 1 -vf \"scale=1280:-2\" -q:v 3 cp-system-poster.jpg)",
+      "Bash(ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 cp-system-video.mp4)",
+      "Bash(ffmpeg -y -loglevel error -i \"/Users/reginaluizafernandes/Downloads/CP SYSTEM_LEG_03mp3.mp4\" -vf \"fps=30\" -c:v libx264 -crf 28 -preset slower -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 96k cp-system-video-leve.mp4)"
     ]
   }
 }
