@@ -148,10 +148,23 @@ export async function enviarProspeccaoAction(
   const textoCustom = String(formData.get("texto") || "").trim();
   const caption = textoCustom || TEXTO_PROSPECCAO;
 
+  // O texto vai PRIMEIRO e sozinho: e o unico trecho que a gente sabe que
+  // sempre chega (mesmo caminho das notificacoes diarias). Se o video falhar,
+  // o destinatario ainda recebe a abordagem, e o retorno diz qual das duas
+  // partes deu errado — antes isso vinha como um "enviado" unico e enganoso.
+  let statusTexto = "";
+  try {
+    const { enviarTexto: envTexto } = await import("@/lib/whatsapp");
+    const rt = await envTexto(telefone, caption);
+    statusTexto = `texto ok (${rt.messageId})`;
+  } catch (err) {
+    statusTexto = `TEXTO FALHOU: ${err instanceof Error ? err.message : String(err)}`;
+  }
+
   try {
     const { enviarVideo } = await import("@/lib/whatsapp");
     const { VIDEO_INSTITUCIONAL_WHATSAPP } = await import("@/components/VideoInstitucional");
-    const r = await enviarVideo(telefone, VIDEO_INSTITUCIONAL_WHATSAPP, caption);
+    const r = await enviarVideo(telefone, VIDEO_INSTITUCIONAL_WHATSAPP);
     await registrarAuditoria({
       contaId: usuario.contaId,
       usuarioId: usuario.id,
@@ -160,8 +173,10 @@ export async function enviarProspeccaoAction(
       recursoId: telefone.replace(/\D/g, ""),
       titulo: "Material de prospecção enviado por WhatsApp",
     });
-    return { ok: true, detalhe: `Vídeo + texto enviados (id ${r.messageId}).` };
+    return { ok: true, detalhe: `${statusTexto} | vídeo ok (${r.messageId})` };
   } catch (err) {
-    return { erro: err instanceof Error ? err.message : String(err) };
+    const msg = err instanceof Error ? err.message : String(err);
+    // Texto pode ter ido mesmo com o video falhando — reporta os dois estados.
+    return { erro: `${statusTexto} | VÍDEO FALHOU: ${msg}` };
   }
 }
