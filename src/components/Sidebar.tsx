@@ -29,7 +29,7 @@ import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
 import { HelpButtonsInline } from "@/components/HelpButtonsInline";
 import { Logo } from "@/components/Logo";
 import type { Visao } from "@/lib/visao";
-import { Crown, Users2, Activity, Ticket, Send, UserCog, MessageCircle } from "lucide-react";
+import { Crown, Users2, Activity, Ticket, Send, UserCog, MessageCircle, FileSpreadsheet } from "lucide-react";
 
 type Item = { href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> };
 type Grupo = { titulo: string; itens: Item[] };
@@ -94,6 +94,7 @@ const GRUPOS_ANALISTA: Grupo[] = [
     itens: [
       { href: "/painel-analista", label: "Dashboard", icon: LayoutDashboard },
       { href: "/painel-analista/empresas-vinculadas", label: "Empresas vinculadas", icon: Wallet },
+      { href: "/painel-analista/importar", label: "Importar planilha", icon: FileSpreadsheet },
       { href: "/honorarios", label: "Comissões SaaS", icon: Sparkles },
       { href: "/notificacoes", label: "Notificações", icon: Bell },
     ],
