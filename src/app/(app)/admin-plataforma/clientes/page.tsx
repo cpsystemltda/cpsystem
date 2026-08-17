@@ -157,11 +157,20 @@ export default async function AdminClientesPage({
                     : "Sem empresa";
               const conf = STATUS_LABEL[c.statusAssinatura] || STATUS_LABEL.ATIVA;
               const Icon = conf.icone;
-              const mrr = c.tipo === "ANALISTA" ? 0 : c.plano === "PREMIUM" ? PRECO_PREMIUM : PRECO_BASICO;
+              const ehContaAdmin = c.usuarios.some((u) => u.superAdmin);
+              // Conta de super admin (Regina/Igor) nao e cliente: existe pra
+              // operar a plataforma e nunca gera fatura. Contar o plano dela
+              // como receita inflava o numero — a tela ja marcava "Adm CP" no
+              // nome e mesmo assim exibia R$ 997. Analista tambem nao paga.
+              const mrr =
+                ehContaAdmin || c.tipo === "ANALISTA"
+                  ? 0
+                  : c.plano === "PREMIUM"
+                    ? PRECO_PREMIUM
+                    : PRECO_BASICO;
               const totalCob = c.cobrancas.length;
               const pagas = c.cobrancas.filter((cb) => cb.status === "PAGA").length;
               const adimplenciaPct = totalCob > 0 ? (pagas / totalCob) * 100 : null;
-              const ehContaAdmin = c.usuarios.some((u) => u.superAdmin);
               const ehMinhaConta = c.usuarios.some((u) => u.id === usuario.id);
               return (
                 <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50">
