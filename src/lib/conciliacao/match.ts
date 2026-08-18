@@ -19,10 +19,13 @@ export type CandidatoMatch = {
   empenhoId: string;
   score: number;
   fatores: FatoresMatch;
+  /** Já estava PAGO antes deste extrato — baixa manual feita fora do sistema. */
+  jaRegistrado: boolean;
 };
 
 type EmpenhoBasico = {
   id: string;
+  status: string;
   orgaoNome: string;
   orgaoCnpj: string;
   itens: Array<{ valorTotal: number }>;
@@ -114,7 +117,7 @@ export function scorarCandidato(
   }
   score = Math.min(100, score);
 
-  return { empenhoId: empenho.id, score, fatores };
+  return { empenhoId: empenho.id, score, fatores, jaRegistrado: empenho.status === "PAGO" };
 }
 
 // Busca melhores candidatos para uma transacao entre os empenhos abertos
@@ -129,14 +132,23 @@ export async function encontrarCandidatos(
     descricao: string;
   },
 ): Promise<CandidatoMatch[]> {
-  // Busca empenhos da conta que ainda nao estao PAGO
+  // Regina 18/08: PAGO entra na busca de proposito. Antes ficava de fora, e
+  // quando alguem ja tinha dado baixa manual no pagamento (foi o que o Igor
+  // fez na carteira do Leo), o credito correspondente do extrato nao achava
+  // candidato nenhum e caia como "nao identificado" — parecia divergencia
+  // quando na verdade estava tudo certo, so ja registrado. O certo e casar e
+  // dizer "esse ja estava lancado"; quem decide nao reaplicar o pagamento e o
+  // processar.ts, pra nao duplicar comissao do analista.
   const empenhos = await prisma.empenho.findMany({
     where: {
       empresa: { contaId },
-      status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO", "ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA"] },
+      status: {
+        in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO", "ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"],
+      },
     },
     select: {
       id: true,
+      status: true,
       orgaoNome: true,
       orgaoCnpj: true,
       dataNfEmitida: true,

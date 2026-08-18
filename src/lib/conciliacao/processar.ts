@@ -151,13 +151,16 @@ export async function processarExtrato(
     const nivel = classificarScore(melhor.score);
     if (nivel === "alto") {
       qtdAlto++;
-      // Auto-confirmou o melhor candidato → aplica efeitos laterais completos:
-      // Empenho.status=PAGO + dataPagamento + comprovante + libera comissao
-      // do analista (AGUARDANDO_ORGAO → A_RECEBER com valorBasePago correto).
-      await aplicarPagamentoDeConciliacao({
-        empenhoId: melhor.empenhoId,
-        transacaoId: tx.id,
-      });
+      // Se o empenho ja estava PAGO, alguem deu baixa manual antes do extrato
+      // chegar (Igor fez isso na carteira do Leo em 08/2026). O credito CASA —
+      // e por isso deixa de aparecer como divergencia —, mas nao se reaplica o
+      // pagamento: reexecutar liberaria a comissao do analista uma segunda vez.
+      if (!melhor.jaRegistrado) {
+        await aplicarPagamentoDeConciliacao({
+          empenhoId: melhor.empenhoId,
+          transacaoId: tx.id,
+        });
+      }
     } else if (nivel === "medio") qtdMedio++;
     else qtdSem++;
   }
