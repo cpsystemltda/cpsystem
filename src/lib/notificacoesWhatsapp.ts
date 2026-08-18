@@ -579,6 +579,13 @@ const STATUS_EM_ANDAMENTO: StatusExecucao[] = [
  * QUAL orgao esta devendo e quanto, porque e com esse detalhe que ele cobra.
  * Contagem sem valor nao serve pra decidir nada.
  */
+/** CNPJ formatado como no modelo do Igor: 10.200.000/0001-07. */
+function formatarCnpjBr(cnpj: string | null | undefined): string {
+  const d = (cnpj ?? "").replace(/\D/g, "");
+  if (d.length !== 14) return cnpj ?? "—";
+  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
 async function blocoFinanceiroDoCliente(opts: {
   contaId: string;
   inicioSemana: Date;
@@ -846,7 +853,7 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
       const cabecalho =
         conta.tipo === "ANALISTA"
           ? `*${indice}) Cliente: ${nomeCliente}*`
-          : `*${indice}) CNPJ ${empresaDoCliente?.cnpj ?? "—"} · ${nomeCliente}*`;
+          : `*${indice}) CNPJ. ${nomeCliente}. ${formatarCnpjBr(empresaDoCliente?.cnpj)}*`;
 
       const bloco: string[] = [cabecalho, ``, ...fin.linhas];
       if (fin.temConteudo) temAlgumDado = true;
