@@ -24,24 +24,21 @@ const LIMITE_PERSISTENCIA = 500;
 // paywall pro Premium. Premium e super admin sao ilimitados.
 // NAO exportar — "use server" so aceita exports de async functions; o
 // cliente tem a propria copia desta constante em FlutuanteIAsystem.tsx.
-const LIMITE_PERGUNTAS_BASICO_POR_DIA = 2;
+// Regina 18/08: eram 2 por DIA, e como a cota voltava toda manha o cliente do
+// Basico nunca sentia falta — a degustacao virou plano gratuito disfarcado.
+// Agora sao 3 no TOTAL da conta: o cliente sente o gostinho, entende o valor e
+// bate na trava de vez, que e o momento em que o upgrade faz sentido pra ele.
+const PERGUNTAS_DEGUSTACAO = 3;
 
-// Retorna o inicio do dia atual em UTC (00:00:00). Usado pra contar
-// perguntas feitas "hoje". A cota reseta automaticamente na virada.
-function inicioDoDia(): Date {
-  const agora = new Date();
-  return new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), 0, 0, 0, 0));
-}
-
-// Conta perguntas (role=user) feitas HOJE pelo usuario. Inclui mensagens
-// soft-deletadas — limpar historico nao reseta a cota (Regina 02/06:
-// 'a cota volta no dia seguinte, nao quando limpa').
-async function contarPerguntasHoje(usuarioId: string): Promise<number> {
+// Conta TODAS as perguntas ja feitas pela conta, desde sempre. Inclui as
+// soft-deletadas — limpar o historico nao devolve cota (Regina 02/06).
+// Conta por CONTA, nao por usuario: senao bastava criar outro login da mesma
+// empresa pra ganhar mais tres.
+async function contarPerguntasDaConta(contaId: string): Promise<number> {
   return prisma.mensagemIAsystem.count({
     where: {
-      usuarioId,
       role: "user",
-      criadoEm: { gte: inicioDoDia() },
+      usuario: { contaId },
     },
   });
 }
@@ -52,17 +49,20 @@ export async function enviarMensagemIAsystemAction(
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
 
-  // Plano Basico: 2 perguntas/dia. Conta o que ja foi gasto hoje
-  // (mesmo se o usuario limpou o historico). Premium/super admin
-  // sao ilimitados.
-  const ehPremium = usuario.superAdmin || usuario.conta.plano === "PREMIUM";
-  if (!ehPremium) {
-    const perguntasHoje = await contarPerguntasHoje(usuario.id);
-    if (perguntasHoje >= LIMITE_PERGUNTAS_BASICO_POR_DIA) {
+  // Premium e ilimitado. Intermediario tem cota mensal propria (10/mes) e
+  // Basico ganha so a degustacao de 3 perguntas na vida da conta.
+  const plano = usuario.conta.plano;
+  const ilimitado = usuario.superAdmin || plano === "PREMIUM";
+  if (!ilimitado) {
+    const jaUsadas = await contarPerguntasDaConta(usuario.contaId);
+    if (jaUsadas >= PERGUNTAS_DEGUSTACAO) {
       return {
         ok: false,
         paywall: true,
-        erro: `Você já usou suas ${LIMITE_PERGUNTAS_BASICO_POR_DIA} perguntas grátis de hoje. A cota reseta amanhã, ou faça upgrade pro Premium em /conta/assinatura para chat ilimitado.`,
+        erro:
+          `Você usou as suas ${PERGUNTAS_DEGUSTACAO} perguntas de demonstração do IAsystem. ` +
+          `Para continuar tirando dúvidas sobre execução contratual, o plano Intermediário ` +
+          `inclui 10 perguntas por mês e o Premium é ilimitado — veja em /conta/assinatura.`,
       };
     }
   }
@@ -128,13 +128,14 @@ export async function enviarMensagemIAsystemAction(
   }
 
   revalidatePath("/iasystem");
-  // Conta perguntas usadas HOJE pra UI mostrar "X de N grátis" no Básico.
-  const perguntasUsadasFinal = ehPremium ? undefined : await contarPerguntasHoje(usuario.id);
+  // Quantas das perguntas de demonstração já foram gastas, pra UI mostrar
+  // "X de 3" enquanto ainda há saldo.
+  const perguntasUsadasFinal = ilimitado ? undefined : await contarPerguntasDaConta(usuario.contaId);
   return {
     ok: true,
     resposta,
     perguntasUsadas: perguntasUsadasFinal,
-    limiteGratis: ehPremium ? undefined : LIMITE_PERGUNTAS_BASICO_POR_DIA,
+    limiteGratis: ilimitado ? undefined : PERGUNTAS_DEGUSTACAO,
   };
 }
 
@@ -167,8 +168,8 @@ export async function carregarPerguntasUsadasHojeAction(): Promise<{
 }> {
   const usuario = await exigirUsuario();
   return {
-    perguntasUsadas: await contarPerguntasHoje(usuario.id),
-    limiteGratis: LIMITE_PERGUNTAS_BASICO_POR_DIA,
+    perguntasUsadas: await contarPerguntasDaConta(usuario.contaId),
+    limiteGratis: PERGUNTAS_DEGUSTACAO,
   };
 }
 

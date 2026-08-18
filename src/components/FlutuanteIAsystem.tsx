@@ -30,11 +30,13 @@ const SUGESTOES_INICIAIS = [
 // Botão flutuante (FAB) + drawer com o chat IAsystem embutido.
 // Toda conversa acontece no drawer — não navega pra outra rota.
 // Histórico vem do banco (isolado por usuarioId), não localStorage.
-// Plano Básico: 2 perguntas grátis POR DIA (Regina 02/06). Cota reseta
+// Demonstração do IAsystem: 3 perguntas no total da conta (Regina 18/08).
+// Antes eram 2 por dia e a cota voltava toda manhã — o cliente do Básico nunca
+// sentia falta, então a degustação virava plano gratuito disfarçado. Cota antiga:
 // na virada do dia. 3a pergunta dispara modal de upgrade pro Premium.
 // Premium e super admin: ilimitado. Contador vem do servidor — limpar
 // historico nao reseta a cota.
-const LIMITE_PERGUNTAS_BASICO_POR_DIA = 2;
+const PERGUNTAS_DEGUSTACAO = 3;
 
 export function FlutuanteIAsystem({
   plano,
@@ -105,7 +107,7 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
   // soft-deletadas tambem, entao limpar historico nao reseta). Atualiza
   // localmente apos cada envio bem-sucedido.
   const [perguntasUsadas, setPerguntasUsadas] = useState(0);
-  const cota = LIMITE_PERGUNTAS_BASICO_POR_DIA - perguntasUsadas;
+  const cota = PERGUNTAS_DEGUSTACAO - perguntasUsadas;
   const semCota = !isPremium && cota <= 0;
 
   // Carrega histórico + contagem de cota em paralelo quando o drawer abre.
@@ -114,7 +116,7 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
     Promise.all([
       carregarHistoricoIAsystem(),
       isPremium
-        ? Promise.resolve({ perguntasUsadas: 0, limiteGratis: LIMITE_PERGUNTAS_BASICO_POR_DIA })
+        ? Promise.resolve({ perguntasUsadas: 0, limiteGratis: PERGUNTAS_DEGUSTACAO })
         : carregarPerguntasUsadasHojeAction(),
     ])
       .then(([m, cota]) => {
@@ -294,7 +296,7 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
               {semCota ? (
                 <>
                   <strong>Cota grátis de hoje esgotada.</strong> Você já usou
-                  suas {LIMITE_PERGUNTAS_BASICO_POR_DIA} perguntas gratuitas
+                  suas {PERGUNTAS_DEGUSTACAO} perguntas gratuitas
                   do dia. A cota volta amanhã, ou faça upgrade pro Premium pra
                   chat ilimitado.
                 </>
@@ -302,7 +304,7 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
                 <>
                   <strong>{cota} pergunta{cota !== 1 ? "s" : ""} grátis</strong>{" "}
                   restante{cota !== 1 ? "s" : ""} hoje ({perguntasUsadas} de{" "}
-                  {LIMITE_PERGUNTAS_BASICO_POR_DIA} usada
+                  {PERGUNTAS_DEGUSTACAO} usada
                   {perguntasUsadas !== 1 ? "s" : ""}). Upgrade pro Premium
                   desbloqueia chat ilimitado.
                 </>
@@ -380,11 +382,11 @@ function PaywallModal({ onFechar }: { onFechar: () => void }) {
           <Sparkles className="h-6 w-6" />
         </div>
         <h3 className="mt-4 text-lg font-extrabold text-slate-900">
-          Suas {LIMITE_PERGUNTAS_BASICO_POR_DIA} perguntas grátis de hoje acabaram
+          Você usou suas {PERGUNTAS_DEGUSTACAO} perguntas de demonstração
         </h3>
         <p className="mt-2 text-sm text-slate-600">
-          A cota reseta amanhã. Se preferir não esperar, faça o upgrade pro
-          plano <strong>Premium</strong> — chat ilimitado com o{" "}
+          Para continuar, o plano <strong>Intermediário</strong> inclui 10 perguntas
+          por mês. Já o <strong>Premium</strong> tem chat ilimitado com o{" "}
           <strong>IAsystem</strong> (assistente jurídico Lei 14.133/2021),
           análise de Atas, Contratos e Empenhos + parecer estruturado.
         </p>
