@@ -567,6 +567,143 @@ const STATUS_EM_ANDAMENTO: StatusExecucao[] = [
 ];
 
 // Sexta 8h — resumo geral da conta pra cada usuario com opt-in.
+
+/**
+ * Monta o bloco de UM cliente no resumo semanal, no formato que o Igor pediu
+ * em 14/08 (print do WhatsApp + audio "queria fazer alguns ajustes nesse
+ * extrato").
+ *
+ * O que mudou em relacao ao formato anterior: antes o resumo era agregado e
+ * so contava documentos ("execucoes em andamento: 12"). O Igor precisa do
+ * dinheiro, cliente a cliente — quanto o orgao pagou na semana, e sobretudo
+ * QUAL orgao esta devendo e quanto, porque e com esse detalhe que ele cobra.
+ * Contagem sem valor nao serve pra decidir nada.
+ */
+async function blocoFinanceiroDoCliente(opts: {
+  contaId: string;
+  inicioSemana: Date;
+  agora: Date;
+}): Promise<{ linhas: string[]; temConteudo: boolean }> {
+  const { contaId, inicioSemana, agora } = opts;
+
+  // Pagos pelo orgao dentro da semana.
+  const pagosSemana = await prisma.empenho.findMany({
+    where: {
+      empresa: { contaId },
+      status: "PAGO",
+      dataPagamento: { gte: inicioSemana, lte: agora },
+    },
+    select: { itens: { select: { valorTotal: true } } },
+  });
+  const totalPago = pagosSemana.reduce(
+    (soma, e) => soma + e.itens.reduce((t, i) => t + (i.valorTotal || 0), 0),
+    0,
+  );
+
+  // Em atraso = NF ja encaminhada/emitida e o orgao ainda nao pagou.
+  const emAtraso = await prisma.empenho.findMany({
+    where: {
+      empresa: { contaId },
+      status: { in: ["NF_EMITIDA", "NF_ENCAMINHADA"] },
+    },
+    select: {
+      orgaoNome: true,
+      dataNfEncaminhada: true,
+      dataNfEmitida: true,
+      itens: { select: { valorTotal: true } },
+    },
+  });
+
+  // Agrupa por orgao: o Igor cobra o orgao, nao a nota — ver "Prefeitura X:
+  // R$ 40 mil em 3 notas" e mais acionavel que tres linhas soltas.
+  //
+  // A chave é o nome normalizado (sem acento, sem caixa) porque o mesmo órgão
+  // chega grafado de formas diferentes conforme o PDF de origem — na carteira
+  // real aparecem "GRUPAMENTO DE APOIO DE BRASILIA" e "Grupamento de Apoio de
+  // Brasília" como se fossem dois. Somados errado, o devedor parece menor do
+  // que é. Exibe-se a primeira grafia vista, que costuma ser a do documento.
+  const porOrgao = new Map<string, { valor: number; qtd: number; rotulo: string }>();
+  for (const e of emAtraso) {
+    const v = e.itens.reduce((t, i) => t + (i.valorTotal || 0), 0);
+    const chave = e.orgaoNome
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/\s+/g, " ")
+      .trim();
+    const atual = porOrgao.get(chave) ?? { valor: 0, qtd: 0, rotulo: e.orgaoNome };
+    porOrgao.set(chave, { valor: atual.valor + v, qtd: atual.qtd + 1, rotulo: atual.rotulo });
+  }
+  const totalAtraso = [...porOrgao.values()].reduce((t, o) => t + o.valor, 0);
+
+  const linhas: string[] = [`💲 *Financeiro*`];
+  linhas.push(
+    `• Pagamentos recebidos pela empresa nesta semana: ${pagosSemana.length}` +
+      (totalPago > 0 ? ` (${brl(totalPago)})` : ""),
+  );
+  linhas.push(
+    `• Pagamentos em atraso (órgão ainda não pagou a empresa): ${emAtraso.length}` +
+      (totalAtraso > 0 ? ` (${brl(totalAtraso)})` : ""),
+  );
+  // Detalhe do devedor — os maiores primeiro, no maximo 5 pra nao virar lista
+  // interminavel no WhatsApp.
+  const ordenados = [...porOrgao.entries()].sort((a, b) => b[1].valor - a[1].valor);
+  for (const [, dados] of ordenados.slice(0, 5)) {
+    linhas.push(`     – ${dados.rotulo}: ${brl(dados.valor)} (${dados.qtd} nota${dados.qtd > 1 ? "s" : ""})`);
+  }
+  if (ordenados.length > 5) {
+    linhas.push(`     – e mais ${ordenados.length - 5} órgão(s)`);
+  }
+
+  return { linhas, temConteudo: pagosSemana.length > 0 || emAtraso.length > 0 };
+}
+
+/**
+ * Comissoes do analista naquele cliente. So entra no resumo do ANALISTA —
+ * o cliente nao precisa ver quanto o analista ganha.
+ */
+async function blocoComissoes(opts: {
+  analistaId: string;
+  contaId: string;
+  inicioSemana: Date;
+  agora: Date;
+}): Promise<{ linhas: string[]; temConteudo: boolean }> {
+  const { analistaId, contaId, inicioSemana, agora } = opts;
+
+  const recebidas = await prisma.comissaoExecucao.findMany({
+    where: {
+      analistaId,
+      vinculo: { contaId },
+      status: { in: ["PAGO", "PAGO_PARCIAL"] },
+      dataPagamento: { gte: inicioSemana, lte: agora },
+    },
+    select: { valorRecebido: true },
+  });
+  const totalRecebido = recebidas.reduce((t, c) => t + (c.valorRecebido || 0), 0);
+
+  const pendentes = await prisma.comissaoExecucao.findMany({
+    where: {
+      analistaId,
+      vinculo: { contaId },
+      status: { in: ["A_RECEBER", "ATRASADO", "PAGO_AGUARDANDO_CONFIRMACAO"] },
+    },
+    select: { valorCalculado: true, valorRecebido: true },
+  });
+  const totalPendente = pendentes.reduce(
+    (t, c) => t + Math.max(0, (c.valorCalculado || 0) - (c.valorRecebido || 0)),
+    0,
+  );
+
+  const linhas = [
+    `💰 *Comissões*`,
+    `• Comissões recebidas nesta semana: ${recebidas.length}` +
+      (totalRecebido > 0 ? ` (${brl(totalRecebido)})` : ""),
+    `• Comissões pendentes (ainda não pagas pelo cliente): ${pendentes.length}` +
+      (totalPendente > 0 ? ` (${brl(totalPendente)})` : ""),
+  ];
+  return { linhas, temConteudo: recebidas.length > 0 || pendentes.length > 0 };
+}
+
 export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
   enviados: number;
 }> {
@@ -574,6 +711,8 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
   inicioHoje.setHours(0, 0, 0, 0);
   const em7d = new Date(inicioHoje.getTime() + 7 * 86400000);
   const em30d = new Date(inicioHoje.getTime() + 30 * 86400000);
+  // Janela do resumo: os ultimos 7 dias.
+  const inicio7d = new Date(inicioHoje.getTime() - 7 * 86400000);
 
   // Chave da semana pra idempotencia (ISO week YYYY-Www)
   const ano = inicioHoje.getFullYear();
@@ -682,32 +821,71 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
       cobrancasPendentes;
     if (totalDoResumo === 0) continue;
 
+    // Igor 14/08 (print + audio): o resumo passa a ser quebrado POR CLIENTE,
+    // com valor em reais e o nome do orgao devedor. O formato anterior era
+    // agregado e so contava documentos — nao dava pra cobrar ninguem com ele.
+    const blocosClientes: string[] = [];
+    let temAlgumDado = false;
+    let indice = 0;
+
+    for (const cId of contaIdsCarteira) {
+      indice++;
+      const empresaDoCliente = await prisma.empresa.findFirst({
+        where: { contaId: cId },
+        select: { razaoSocial: true, nomeFantasia: true, cnpj: true },
+      });
+      const nomeCliente =
+        empresaDoCliente?.nomeFantasia || empresaDoCliente?.razaoSocial || "Cliente";
+
+      const fin = await blocoFinanceiroDoCliente({
+        contaId: cId,
+        inicioSemana: inicio7d,
+        agora: hoje,
+      });
+
+      const cabecalho =
+        conta.tipo === "ANALISTA"
+          ? `*${indice}) Cliente: ${nomeCliente}*`
+          : `*${indice}) CNPJ ${empresaDoCliente?.cnpj ?? "—"} · ${nomeCliente}*`;
+
+      const bloco: string[] = [cabecalho, ``, ...fin.linhas];
+      if (fin.temConteudo) temAlgumDado = true;
+
+      // Comissoes so no resumo do analista.
+      if (conta.tipo === "ANALISTA" && conta.analista) {
+        const com = await blocoComissoes({
+          analistaId: conta.analista.id,
+          contaId: cId,
+          inicioSemana: inicio7d,
+          agora: hoje,
+        });
+        bloco.push(``, ...com.linhas);
+        if (com.temConteudo) temAlgumDado = true;
+      }
+
+      blocosClientes.push(bloco.join("\n"));
+    }
+
+    // Mesma trava de antes: resumo todo zerado nao vai. Silencio e melhor que
+    // ruido vazio — foi o que o Igor recebeu em 31/07 e 07/08.
+    if (!temAlgumDado && totalDoResumo === 0) continue;
+
     for (const u of usuarios) {
-      // Igor 31/07: "vencendo nos próximos sete dias, vencimento do quê?".
-      // Cada linha agora diz exatamente o que esta sendo contado.
       const linhas: string[] = [
         `📊 *Resumo da semana — CP System*`,
         ``,
-        clientesNaCarteira > 0
+        conta.tipo === "ANALISTA"
           ? `Bom dia, ${primeiroNome(u.nome)}! Panorama da sua carteira ` +
             `(${clientesNaCarteira} cliente${clientesNaCarteira > 1 ? "s" : ""}):`
-          : `Bom dia, ${primeiroNome(u.nome)}! Aqui está o panorama da sua conta:`,
+          : `Bom dia, ${primeiroNome(u.nome)}! Panorama da sua carteira ` +
+            `(${contaIdsCarteira.length} CNPJ${contaIdsCarteira.length > 1 ? "s" : ""}):`,
         ``,
-        `📦 *Execuções*`,
-        `• Em andamento (órgão ainda não pagou): ${empenhosPendentes}`,
-        `• Pagas pelo órgão nesta semana: ${empenhosPagosSemana}`,
-        `• Com prazo de entrega nos próximos 7 dias: ${empenhosVencendo}`,
-        ``,
-        `📅 *Atas e contratos*`,
-        `• Com vigência terminando em até 30 dias: ${atasVencendo + contratosVencendo}`,
+        blocosClientes.join("\n\n"),
         ``,
       ];
-      if (cobrancasPendentes > 0) {
-        linhas.push(`💳 *Financeiro*`);
-        linhas.push(`• Faturas em aberto: ${cobrancasPendentes}`);
-        linhas.push(``);
-      }
-      // Pontos de atenção
+
+      // Prazos seguem no fim: o financeiro e o que o Igor pediu em primeiro
+      // lugar, mas vencimento perdido continua sendo o que gera multa.
       const alertas: string[] = [];
       if (empenhosVencendo > 0)
         alertas.push(`⚠️ ${empenhosVencendo} execução(ões) com prazo de entrega nesta semana`);
@@ -715,13 +893,12 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
         alertas.push(
           `📌 ${atasVencendo + contratosVencendo} documento(s) com vigência vencendo em 30 dias`,
         );
-      if (cobrancasPendentes > 0) alertas.push(`💰 ${cobrancasPendentes} fatura(s) pendente(s)`);
-
       if (alertas.length) {
         linhas.push(`🔔 *Pontos de atenção*`);
         alertas.forEach((a) => linhas.push(`• ${a}`));
         linhas.push(``);
       }
+
       linhas.push(`Bom final de semana! 🚀`);
       linhas.push(``);
       linhas.push(`Detalhes completos: https://cpsystem.app.br/dashboard`);
