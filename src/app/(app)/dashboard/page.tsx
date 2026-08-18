@@ -138,6 +138,9 @@ export default async function DashboardPage({
         vigenciaFim: true,
         dataPrevistaExecucao: true,
         dataPagamento: true,
+        // Datas da NF: o card de atraso mede a partir do encaminhamento.
+        dataNfEmitida: true,
+        dataNfEncaminhada: true,
         itens: { select: { valorTotal: true } },
         orgaoNome: true,
         orgaoCnpj: true,
@@ -375,6 +378,18 @@ export default async function DashboardPage({
   const valoresAReceber = empenhosCompletos
     .filter((e) => ["NF_EMITIDA", "NF_ENCAMINHADA"].includes(e.status))
     .reduce((s, e) => s + sumItens(e), 0);
+
+  // Igor 18/08: "não tem esse alerta nem no dashboard". O aviso de NF parada
+  // ha 30+ dias so existia como notificacao no WhatsApp — quem abria o sistema
+  // via "Valores a receber" num numero so, sem saber quanto ja passou do prazo.
+  // Agora o atraso aparece na tela, que e onde ele olha pra cobrar.
+  const ha30dias = new Date(hoje.getTime() - 30 * 86400000);
+  const empenhosAtrasados = empenhosCompletos.filter((e) => {
+    if (!["NF_EMITIDA", "NF_ENCAMINHADA"].includes(e.status)) return false;
+    const dataNf = e.dataNfEncaminhada ?? e.dataNfEmitida;
+    return !!dataNf && dataNf <= ha30dias;
+  });
+  const valoresAReceberAtrasados = empenhosAtrasados.reduce((s, e) => s + sumItens(e), 0);
 
   const empenhosPagos = empenhosCompletos.filter((e) => e.status === "PAGO").length;
   const nfsPendentes = empenhosCompletos.filter((e) =>
@@ -776,6 +791,19 @@ export default async function DashboardPage({
             value={<CurrencyValue amount={valoresAReceber} />}
             meta={`${nfsPendentes} NFs pendentes`}
             href="/execucao?status=NF_ENCAMINHADA"
+          />
+          <KPI
+            tone="coral"
+            icon={AlertTriangle}
+            label="Valores a receber (atrasados)"
+            value={<CurrencyValue amount={valoresAReceberAtrasados} />}
+            meta={
+              empenhosAtrasados.length > 0
+                ? `${empenhosAtrasados.length} NF(s) há mais de 30 dias sem pagamento`
+                : "Nenhuma NF vencida há mais de 30 dias"
+            }
+            href="/execucao?status=NF_ENCAMINHADA"
+            pulse={empenhosAtrasados.length > 0}
           />
           <KPI
             tone="coral"
