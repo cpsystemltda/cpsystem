@@ -14,15 +14,18 @@ export function Block({
   titulo,
   tag,
   children,
-  inicialmenteAberto = true,
+  inicialmenteAberto = false,
 }: {
   numero: string;
   eyebrow: string;
   titulo: ReactNode;
   tag?: string;
   children: ReactNode;
-  /** Default e expandido (Regina 05/06 — segunda decisao). Usuario clica
-   *  na setinha pra recolher. */
+  /** Default e RECOLHIDO (Igor, 20/08). A decisao anterior era abrir tudo
+   *  (Regina 05/06), mas o dashboard cresceu pra 6 modulos e virava uma
+   *  rolagem longa no primeiro login: "acho que vai facilitar o entendimento
+   *  e a visao geral do sistema pelo usuario". Agora a pessoa bate o olho nos
+   *  6 titulos e abre o que interessa. */
   inicialmenteAberto?: boolean;
 }) {
   const [aberto, setAberto] = useState(inicialmenteAberto);

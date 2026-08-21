@@ -5,6 +5,7 @@ import Link from "next/link";
 import { UserCheck, Wallet, AlertCircle, Check, CalendarClock } from "lucide-react";
 import { brl } from "@/lib/validators";
 import { marcarPagamentoFixoAction } from "@/app/actions/comissaoFixa";
+import { MarcarComissaoPagoForm } from "@/components/MarcarComissaoPagoForm";
 
 type LinhaFixo = {
   id: string;
@@ -25,7 +26,13 @@ type LinhaVariavel = {
   valorCalculado: number;
   valorRecebido: number;
   percentual: number;
-  status: "AGUARDANDO_ORGAO" | "A_RECEBER" | "ATRASADO" | "PAGO" | "PAGO_PARCIAL";
+  status:
+    | "AGUARDANDO_ORGAO"
+    | "A_RECEBER"
+    | "ATRASADO"
+    | "PAGO"
+    | "PAGO_PARCIAL"
+    | "PAGO_AGUARDANDO_CONFIRMACAO";
   analistaNome: string;
 };
 
@@ -113,30 +120,52 @@ export function HonorariosAnalistaBloco({
                       Analista: {l.analistaNome} · {l.percentual}% sobre {brl(l.valorBaseEmpenho)}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="shrink-0 text-right">
                     <p className="text-sm font-extrabold tabular text-slate-900">
                       {brl(l.valorCalculado)}
                     </p>
-                    <span
-                      className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        l.status === "ATRASADO"
-                          ? "bg-red-50 text-red-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`}
-                    >
-                      {l.status === "ATRASADO" ? "Atrasado" : "A pagar"}
-                    </span>
+                    <StatusVariavel status={l.status} />
                   </div>
                 </div>
+
+                {/* Igor (20/08): o valor pendente ja aparecia aqui, mas o botao de
+                    declarar o repasse so existia em "Analista vinculado". Quem paga
+                    o analista trabalha nesta tela — o botao tinha que estar nela. */}
+                {(l.status === "A_RECEBER" || l.status === "ATRASADO") && (
+                  <div className="mt-2 flex justify-end">
+                    <MarcarComissaoPagoForm
+                      comissaoId={l.id}
+                      empenhoRef={l.empenhoNumero}
+                      valor={l.valorCalculado}
+                    />
+                  </div>
+                )}
               </li>
             ))}
           </ul>
           <div className="border-t border-slate-100 px-4 py-2 text-[11px] text-slate-500">
-            Para marcar comissões variáveis como pagas, peça ao seu analista — ele controla isso pelo painel dele.
+            Ao marcar como pago, o analista recebe um WhatsApp e precisa confirmar o recebimento —
+            só então a comissão vira &ldquo;Paga&rdquo; em definitivo.
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+function StatusVariavel({ status }: { status: LinhaVariavel["status"] }) {
+  const { classe, texto } =
+    status === "ATRASADO"
+      ? { classe: "bg-red-50 text-red-700", texto: "Atrasado" }
+      : status === "PAGO_AGUARDANDO_CONFIRMACAO"
+        ? { classe: "bg-blue-50 text-blue-700", texto: "Aguardando o analista confirmar" }
+        : status === "PAGO_PARCIAL"
+          ? { classe: "bg-emerald-50 text-emerald-700", texto: "Pago parcial" }
+          : { classe: "bg-amber-50 text-amber-700", texto: "A pagar" };
+  return (
+    <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${classe}`}>
+      {texto}
+    </span>
   );
 }
 

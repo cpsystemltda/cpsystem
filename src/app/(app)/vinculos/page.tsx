@@ -9,8 +9,8 @@ import {
   EditarPercentualForm,
   EncerrarVinculoButton,
   MarcarFixoPagoForm,
-  MarcarComissaoPagoForm,
 } from "./VinculoForms";
+import { MarcarComissaoPagoForm } from "@/components/MarcarComissaoPagoForm";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 
 function formatarCpf(cpf: string): string {
