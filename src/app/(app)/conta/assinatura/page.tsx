@@ -4,7 +4,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { statusGateway } from "@/lib/gateway";
-import { calcularValorMensal, PRECO_CNPJ_ADICIONAL } from "@/lib/precos";
+import { calcularValorMensal, PRECO_CNPJ_ADICIONAL, COLABORADORES_INCLUSOS, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precos";
 import { CancelarAssinaturaForm } from "./CancelarForm";
 
 const ROTULO_PLANO = { BASICO: "Básico", PREMIUM: "Premium" };
@@ -104,6 +104,14 @@ export default async function AssinaturaPage() {
             {breakdown.cnpjsAdicionais > 0 && (
               <div className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 <strong>{brl(breakdown.valorBase)}</strong> plano base + <strong>{breakdown.cnpjsAdicionais}</strong> CNPJ{breakdown.cnpjsAdicionais > 1 ? "s" : ""} adicional × {brl(PRECO_CNPJ_ADICIONAL)} = {brl(breakdown.valorAdicional)}
+              </div>
+            )}
+            {breakdown.colaboradoresAdicionais > 0 && (
+              <div className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <strong>{breakdown.colaboradoresAdicionais}</strong> colaborador
+                {breakdown.colaboradoresAdicionais > 1 ? "es" : ""} além dos{" "}
+                {COLABORADORES_INCLUSOS} inclusos × {brl(PRECO_COLABORADOR_ADICIONAL)} ={" "}
+                {brl(breakdown.valorColaboradores)}
               </div>
             )}
             <div className="mt-2 flex items-center gap-2">

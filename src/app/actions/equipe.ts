@@ -7,7 +7,7 @@ import { exigirUsuario, hashSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { validarSenhaSegura } from "@/lib/senhaSegura";
-import { ehChaveDeModulo, rotuloDoModulo, LIMITE_COLABORADORES } from "@/lib/modulosAcesso";
+import { ehChaveDeModulo, rotuloDoModulo } from "@/lib/modulosAcesso";
 
 type Result = { erro?: string; ok?: boolean };
 
@@ -50,16 +50,10 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
 
   if (await prisma.usuario.findUnique({ where: { email } })) return { erro: "E-mail já cadastrado." };
 
-  // Teto de colaboradores: conta o que ja existe fora o titular (o usuario mais
-  // antigo da conta). Checado aqui, e nao so na tela, porque server action e
-  // alcancavel por POST direto.
-  const totalNaConta = await prisma.usuario.count({ where: { contaId: usuario.contaId } });
-  if (totalNaConta - 1 >= LIMITE_COLABORADORES) {
-    return {
-      erro: `Sua conta permite até ${LIMITE_COLABORADORES} colaboradores além de você. Remova um antes de cadastrar outro.`,
-    };
-  }
-
+  // Colaborador acima do incluso nao e bloqueado: e cobrado (Regina 21/08).
+  // O valor entra na renovacao via `calcularValorMensal`, que conta os usuarios
+  // da conta — nada a gravar aqui. A tela avisa o custo ANTES de submeter, pra
+  // ninguem descobrir a cobranca na fatura.
   const acesso = lerAcessoDoForm(formData);
   if ("erro" in acesso) return { erro: acesso.erro };
 

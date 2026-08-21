@@ -6,7 +6,7 @@ import { ChevronLeft, CreditCard, QrCode, FileText, Lock } from "lucide-react";
 import { iniciarCheckoutAction } from "@/app/actions/assinatura";
 import { brl } from "@/lib/validators";
 import type { BreakdownCobranca } from "@/lib/precosConstants";
-import { PRECO_CNPJ_ADICIONAL } from "@/lib/precosConstants";
+import { PRECO_CNPJ_ADICIONAL, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precosConstants";
 
 const ROTULO = { BASICO: "Básico", PREMIUM: "Premium" };
 
@@ -138,6 +138,13 @@ export function CheckoutClient({
               <p className="mt-2 text-[11px] text-blue-700">
                 {brl(breakdownAtivo.valorBase)} base + {breakdownAtivo.cnpjsAdicionais} CNPJ adicional ×{" "}
                 {brl(PRECO_CNPJ_ADICIONAL)} = {brl(breakdownAtivo.valorAdicional)}
+              </p>
+            )}
+            {breakdownAtivo.colaboradoresAdicionais > 0 && (
+              <p className="mt-1 text-[11px] text-blue-700">
+                {breakdownAtivo.colaboradoresAdicionais} colaborador
+                {breakdownAtivo.colaboradoresAdicionais > 1 ? "es" : ""} adicional ×{" "}
+                {brl(PRECO_COLABORADOR_ADICIONAL)} = {brl(breakdownAtivo.valorColaboradores)}
               </p>
             )}
           </div>

@@ -8,7 +8,9 @@ import {
   removerUsuarioAction,
   atualizarAcessoAction,
 } from "@/app/actions/equipe";
-import { LIMITE_COLABORADORES, MODULOS_PADRAO_COLABORADOR, rotuloDoModulo } from "@/lib/modulosAcesso";
+import { MODULOS_PADRAO_COLABORADOR, rotuloDoModulo } from "@/lib/modulosAcesso";
+import { COLABORADORES_INCLUSOS, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precosConstants";
+import { brl } from "@/lib/validators";
 import { CaixaDeAcessos } from "./CaixaDeAcessos";
 
 type Membro = {
@@ -54,7 +56,11 @@ export function EquipeClient({
   const [editando, setEditando] = useState<string | null>(null);
 
   const colaboradores = membros.filter((m) => m.id !== titularId).length;
-  const vagas = Math.max(0, LIMITE_COLABORADORES - colaboradores);
+  const inclusosRestantes = Math.max(0, COLABORADORES_INCLUSOS - colaboradores);
+  // O proximo cadastro ja e cobrado? Serve pra avisar ANTES de submeter — a
+  // pessoa nao pode descobrir a cobranca na fatura do mes seguinte.
+  const proximoEhCobrado = colaboradores >= COLABORADORES_INCLUSOS;
+  const excedentes = Math.max(0, colaboradores - COLABORADORES_INCLUSOS);
 
   return (
     <div className="space-y-6">
@@ -66,10 +72,22 @@ export function EquipeClient({
           <Users className="h-4 w-4" /> Membros da equipe ({membros.length})
         </h2>
         <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-          Sua conta permite <strong>até {LIMITE_COLABORADORES} colaboradores</strong> além de você.{" "}
-          {vagas > 0
-            ? `${vagas === 1 ? "Resta 1 vaga" : `Restam ${vagas} vagas`}.`
-            : "As vagas estão ocupadas — remova um colaborador para cadastrar outro."}
+          Sua conta inclui <strong>{COLABORADORES_INCLUSOS} colaboradores</strong> além de você
+          {inclusosRestantes > 0
+            ? ` — ${inclusosRestantes === 1 ? "resta 1 incluso" : `restam ${inclusosRestantes} inclusos`}.`
+            : "."}{" "}
+          {excedentes > 0 ? (
+            <>
+              Você tem <strong>{excedentes}</strong> além do incluso, somando{" "}
+              <strong>{brl(excedentes * PRECO_COLABORADOR_ADICIONAL)}/mês</strong> à sua
+              mensalidade.
+            </>
+          ) : (
+            <>
+              A partir do {COLABORADORES_INCLUSOS + 1}º, cada colaborador custa{" "}
+              <strong>{brl(PRECO_COLABORADOR_ADICIONAL)}/mês</strong>.
+            </>
+          )}
         </p>
 
         <div className="mt-3 overflow-x-auto">
@@ -104,7 +122,7 @@ export function EquipeClient({
         </div>
       </section>
 
-      {ehAdmin && vagas > 0 && (
+      {ehAdmin && (
         <section className="glass rounded-[20px] px-6 py-5">
           <h2
             className="flex items-center gap-2 text-[12px] font-bold uppercase"
@@ -132,6 +150,21 @@ export function EquipeClient({
               restritoInicial
               modulosIniciais={MODULOS_PADRAO_COLABORADOR}
             />
+
+            {proximoEhCobrado && (
+              <p
+                className="rounded-[12px] border px-4 py-3 text-xs"
+                style={{
+                  borderColor: "rgba(168,137,71,0.4)",
+                  background: "rgba(212,175,55,0.10)",
+                  color: "var(--text)",
+                }}
+              >
+                Os {COLABORADORES_INCLUSOS} colaboradores inclusos já estão em uso. Cadastrar mais
+                um acrescenta <strong>{brl(PRECO_COLABORADOR_ADICIONAL)}/mês</strong> à sua
+                mensalidade, cobrado junto da próxima renovação.
+              </p>
+            )}
 
             {state?.erro && <div className="text-xs font-semibold text-red-700">{state.erro}</div>}
             {state?.ok && <div className="text-xs font-semibold text-emerald-700">Colaborador cadastrado.</div>}

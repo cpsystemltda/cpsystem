@@ -86,13 +86,6 @@ export const MODULOS: Modulo[] = [
   },
 ];
 
-/**
- * Teto de colaboradores por conta (Regina 21/08). O titular não entra na conta:
- * são 2 pessoas ALÉM dele. Vale só pra cadastro novo — conta que já tenha mais
- * gente continua funcionando, ninguém perde acesso de um dia pro outro.
- */
-export const LIMITE_COLABORADORES = 2;
-
 /** Módulos marcados por padrão ao cadastrar um colaborador: a operação, sem o dinheiro. */
 export const MODULOS_PADRAO_COLABORADOR: ChaveModulo[] = [
   "EMPRESAS",

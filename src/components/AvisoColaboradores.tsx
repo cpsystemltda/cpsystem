@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Users, ArrowUpRight } from "lucide-react";
-import { LIMITE_COLABORADORES } from "@/lib/modulosAcesso";
+import { COLABORADORES_INCLUSOS } from "@/lib/precosConstants";
 
 /**
  * Aviso de novidade: acesso por módulo pra colaboradores (Regina 21/08).
@@ -36,7 +36,7 @@ export function AvisoColaboradores() {
             Divida a operação com a sua equipe
           </h3>
           <p className="mt-1 text-sm leading-relaxed" style={{ color: "var(--text-soft)" }}>
-            Agora você cadastra até {LIMITE_COLABORADORES} colaboradores e escolhe, módulo a módulo,
+            Agora você cadastra {COLABORADORES_INCLUSOS} colaboradores inclusos e escolhe, módulo a módulo,
             o que cada um enxerga. Quem acompanha atas e entregas trabalha sozinho, sem passar pelo
             financeiro da empresa.
           </p>
