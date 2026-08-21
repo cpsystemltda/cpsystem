@@ -13,6 +13,8 @@ import { lerEspionagemAtual } from "@/lib/espionagem";
 import { BannerEspionagem } from "@/components/BannerEspionagem";
 import { FlutuanteIAsystem } from "@/components/FlutuanteIAsystem";
 import { ComandoRapido } from "@/components/ComandoRapido";
+import { SemAcessoModulo } from "@/components/SemAcessoModulo";
+import { moduloDaRota, podeAcessarModulo } from "@/lib/modulosAcesso";
 
 // Rotas que SÓ a empresa acessa (analista é redirecionado pro painel dele)
 const ROTAS_SO_EMPRESA = [
@@ -115,6 +117,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ROTAS_PERMITIDAS_INADIMPLENTE = ["/conta/", "/empresas", "/equipe", "/termos", "/auditoria", "/admin"];
   const rotaPermitidaPaywall = ROTAS_PERMITIDAS_INADIMPLENTE.some((r) => pathname.startsWith(r));
 
+  // Acesso por modulo (Regina 21/08). A trava fica AQUI, e nao em cada pagina:
+  // o layout ja conhece a rota atual pelo header x-pathname, entao uma regra so
+  // cobre tambem as subrotas (/contratos/<id>, /atas/<id>/editar...) sem deixar
+  // buraco quando alguem criar uma tela nova. Mesmo mecanismo do paywall.
+  const moduloDaRotaAtual = moduloDaRota(pathname);
+  const moduloBloqueado =
+    moduloDaRotaAtual && !podeAcessarModulo(usuario, moduloDaRotaAtual) ? moduloDaRotaAtual : null;
+
   // Bloqueio cruzado por tipo de conta (super admin nunca bloqueia).
   // Em vez de exibir tela de erro, redirecionamos pra rota inicial do perfil —
   // o usuário nunca cai em "tela não disponível" quando há um destino óbvio.
@@ -188,12 +198,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           qtdNotificacoesNaoLidas={qtdNotificacoes}
           empresas={empresasOpcoes}
           empresaIdSelecionada={empresaIdSelecionada}
+          acessoRestrito={usuario.acessoRestrito}
+          modulosPermitidos={usuario.modulosPermitidos}
         />
         <main className="flex-1 overflow-y-auto">
           {tipoConta === "EMPRESA" && bloqueada && !rotaPermitidaPaywall ? (
             <Paywall status={conta.statusAssinatura} trialExpirado={!!trialExpirado} />
           ) : consolidadoBloqueado ? (
             <SelecioneEmpresa />
+          ) : moduloBloqueado ? (
+            <SemAcessoModulo chave={moduloBloqueado} />
           ) : (
             children
           )}

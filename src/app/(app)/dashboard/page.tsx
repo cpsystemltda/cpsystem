@@ -20,6 +20,8 @@ import {
   Clock,
 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
+import { podeAcessarModulo } from "@/lib/modulosAcesso";
+import { AvisoColaboradores } from "@/components/AvisoColaboradores";
 import { prisma } from "@/lib/prisma";
 import { dadosPorUf, extrairUf } from "@/lib/agregacaoUf";
 import { coletarPinsOrgaos } from "@/lib/pinsOrgaos";
@@ -78,6 +80,13 @@ export default async function DashboardPage({
   searchParams: Promise<{ mesAgenda?: string; novo?: string }>;
 }) {
   const usuario = await exigirUsuario();
+  const podeVerFinanceiro = podeAcessarModulo(usuario, "FINANCEIRO");
+  // Aviso da novidade "acesso por modulo" (Regina 21/08). So pra quem ainda
+  // opera sozinho: assim que cadastrar a primeira pessoa, o aviso some sem
+  // precisar de botao de dispensa nem coluna nova no banco.
+  const totalUsuariosDaConta = await prisma.usuario.count({ where: { contaId: usuario.contaId } });
+  const mostrarAvisoColaboradores =
+    usuario.perfil === "ADMIN" && !usuario.acessoRestrito && totalUsuariosDaConta === 1;
   const contaId = usuario.contaId;
   const conta = await prisma.conta.findUnique({
     where: { id: contaId },
@@ -744,12 +753,20 @@ export default async function DashboardPage({
         </div>
       )}
 
+      {mostrarAvisoColaboradores && <AvisoColaboradores />}
+
       {/* Upload Inteligente — drop universal de PDF (camada IA) */}
       <div className="mt-6">
         <UploadInteligenteCard />
       </div>
 
-      {/* === Bloco I — Financeiro === */}
+      {/* === Bloco I — Financeiro ===
+          Some inteiro pra colaborador sem o modulo FINANCEIRO (Regina 21/08):
+          e o bloco que expoe faturamento, recebiveis e comissao. O resto do
+          dashboard continua igual — a pessoa foi convidada pra operar, nao pra
+          ficar sem contexto. */}
+      {podeVerFinanceiro && (
+      <>
       <Block numero="01" eyebrow="Performance financeira" titulo="Financeiro">
         <div className="grid grid-cols-3 gap-3.5">
           <KPI
@@ -883,6 +900,8 @@ export default async function DashboardPage({
           </div>
         )}
       </Block>
+      </>
+      )}
 
       {/* === Bloco II — Atas & Contratos === */}
       <Block numero="02" eyebrow="Instrumentos vigentes" titulo="Atas & Contratos">

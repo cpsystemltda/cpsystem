@@ -7,8 +7,29 @@ import { exigirUsuario, hashSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { validarSenhaSegura } from "@/lib/senhaSegura";
+import { ehChaveDeModulo, rotuloDoModulo, LIMITE_COLABORADORES } from "@/lib/modulosAcesso";
 
 type Result = { erro?: string; ok?: boolean };
+
+/**
+ * Le a caixa de opcoes do formulario. Quando "acesso completo" vem marcado, o
+ * colaborador fica sem restricao nenhuma (igual ao titular). Caso contrario,
+ * valem so os modulos marcados — e um colaborador sem nenhum modulo marcado
+ * seria um login que nao abre nada, entao isso e barrado como erro.
+ */
+function lerAcessoDoForm(formData: FormData): { acessoRestrito: boolean; modulos: string[] } | { erro: string } {
+  if (String(formData.get("acessoCompleto") || "") === "1") {
+    return { acessoRestrito: false, modulos: [] };
+  }
+  const modulos = formData
+    .getAll("modulos")
+    .map((m) => String(m))
+    .filter(ehChaveDeModulo);
+  if (modulos.length === 0) {
+    return { erro: "Marque ao menos um módulo — senão essa pessoa entra e não vê nada." };
+  }
+  return { acessoRestrito: true, modulos };
+}
 
 export async function convidarUsuarioAction(_p: Result | null, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
@@ -29,9 +50,30 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
 
   if (await prisma.usuario.findUnique({ where: { email } })) return { erro: "E-mail já cadastrado." };
 
+  // Teto de colaboradores: conta o que ja existe fora o titular (o usuario mais
+  // antigo da conta). Checado aqui, e nao so na tela, porque server action e
+  // alcancavel por POST direto.
+  const totalNaConta = await prisma.usuario.count({ where: { contaId: usuario.contaId } });
+  if (totalNaConta - 1 >= LIMITE_COLABORADORES) {
+    return {
+      erro: `Sua conta permite até ${LIMITE_COLABORADORES} colaboradores além de você. Remova um antes de cadastrar outro.`,
+    };
+  }
+
+  const acesso = lerAcessoDoForm(formData);
+  if ("erro" in acesso) return { erro: acesso.erro };
+
   const senhaHash = await hashSenha(senha);
   const u = await prisma.usuario.create({
-    data: { nome, email, senhaHash, perfil, contaId: usuario.contaId },
+    data: {
+      nome,
+      email,
+      senhaHash,
+      perfil,
+      contaId: usuario.contaId,
+      acessoRestrito: acesso.acessoRestrito,
+      modulosPermitidos: acesso.modulos,
+    },
   });
 
   await registrarAuditoria({
@@ -40,7 +82,9 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
     acao: "CRIAR",
     recurso: "Usuario",
     recursoId: u.id,
-    resumo: `Convidou ${email} (${perfil})`,
+    resumo: acesso.acessoRestrito
+      ? `Convidou ${email} (${perfil}) com acesso a ${acesso.modulos.map(rotuloDoModulo).join(", ")}`
+      : `Convidou ${email} (${perfil}) com acesso completo`,
   });
 
   revalidatePath("/equipe");
@@ -71,6 +115,54 @@ export async function alterarPerfilAction(formData: FormData) {
   });
 
   revalidatePath("/equipe");
+}
+
+/**
+ * Altera a caixa de opcoes de um colaborador que ja existe (Regina 21/08).
+ * O titular nao pode ser restringido por ninguem — inclusive por ele mesmo,
+ * senao a conta fica sem quem administra os acessos.
+ */
+export async function atualizarAcessoAction(_p: Result | null, formData: FormData): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  if (usuario.perfil !== "ADMIN") return { erro: "Apenas admins podem alterar acessos." };
+
+  const usuarioAlvoId = String(formData.get("usuarioId") || "");
+  const alvo = await prisma.usuario.findFirst({
+    where: { id: usuarioAlvoId, contaId: usuario.contaId },
+    select: { id: true, email: true, criadoEm: true },
+  });
+  if (!alvo) return { erro: "Usuário não encontrado." };
+  if (alvo.id === usuario.id) return { erro: "Você não pode limitar o seu próprio acesso." };
+
+  const titular = await prisma.usuario.findFirst({
+    where: { contaId: usuario.contaId },
+    orderBy: { criadoEm: "asc" },
+    select: { id: true },
+  });
+  if (titular?.id === alvo.id) return { erro: "O titular da conta sempre tem acesso completo." };
+
+  const acesso = lerAcessoDoForm(formData);
+  if ("erro" in acesso) return { erro: acesso.erro };
+
+  await prisma.usuario.update({
+    where: { id: alvo.id },
+    data: { acessoRestrito: acesso.acessoRestrito, modulosPermitidos: acesso.modulos },
+  });
+
+  await registrarAuditoria({
+    contaId: usuario.contaId,
+    usuarioId: usuario.id,
+    acao: "ATUALIZAR",
+    recurso: "Usuario",
+    recursoId: alvo.id,
+    resumo: acesso.acessoRestrito
+      ? `Acesso de ${alvo.email} → ${acesso.modulos.map(rotuloDoModulo).join(", ")}`
+      : `Acesso de ${alvo.email} → completo`,
+  });
+
+  revalidatePath("/equipe");
+  return { ok: true };
 }
 
 export async function removerUsuarioAction(formData: FormData) {

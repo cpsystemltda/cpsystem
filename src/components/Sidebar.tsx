@@ -29,6 +29,7 @@ import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
 import { HelpButtonsInline } from "@/components/HelpButtonsInline";
 import { Logo } from "@/components/Logo";
 import type { Visao } from "@/lib/visao";
+import { podeAcessarRota } from "@/lib/modulosAcesso";
 import { Crown, Users2, Activity, Ticket, Send, UserCog, MessageCircle, FileSpreadsheet } from "lucide-react";
 
 type Item = { href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> };
@@ -144,6 +145,8 @@ export function Sidebar({
   qtdNotificacoesNaoLidas = 0,
   empresas = [],
   empresaIdSelecionada = null,
+  acessoRestrito = false,
+  modulosPermitidos = [],
 }: {
   nomeUsuario: string;
   nomeConta: string;
@@ -153,6 +156,11 @@ export function Sidebar({
   qtdNotificacoesNaoLidas?: number;
   empresas?: EmpresaOpcao[];
   empresaIdSelecionada?: string | null;
+  // Acesso por modulo (Regina 21/08): colaborador so ve na navegacao o que o
+  // titular liberou. A pagina tambem barra por conta propria — esconder item
+  // de menu nao e controle de acesso, e so nao mostrar porta que nao abre.
+  acessoRestrito?: boolean;
+  modulosPermitidos?: string[];
 }) {
   const pathname = usePathname();
 
@@ -160,7 +168,7 @@ export function Sidebar({
   // (nesse caso, não faz sentido tela "consolidada" — toda operação é dela).
   const temEmpresaEmFoco = !!empresaIdSelecionada || empresas.length === 1;
 
-  const grupos =
+  const gruposBase =
     visao === "ADMIN_PLATAFORMA"
       ? GRUPOS_ADMIN_PLATAFORMA
       : visao === "ANALISTA"
@@ -168,6 +176,13 @@ export function Sidebar({
         : !temEmpresaEmFoco
           ? [...GRUPOS_EMPRESA_CONSOLIDADO, ...GRUPOS_EMPRESA_CONTA]
           : [...GRUPOS_EMPRESA_OPERACAO, ...GRUPOS_EMPRESA_CONTA];
+
+  // Tira do menu o que o colaborador nao pode abrir, e some com o grupo que
+  // ficar vazio — titulo de secao sem item embaixo parece tela quebrada.
+  const acesso = { acessoRestrito, modulosPermitidos, superAdmin };
+  const grupos = gruposBase
+    .map((g) => ({ ...g, itens: g.itens.filter((i) => podeAcessarRota(acesso, i.href)) }))
+    .filter((g) => g.itens.length > 0);
   const inicial = nomeUsuario.trim().charAt(0).toUpperCase();
 
   const subtituloFooter =

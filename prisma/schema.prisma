@@ -146,6 +146,13 @@ model Usuario {
   cargo               String?
   dataNascimento      DateTime?
   onboardingConcluido Boolean       @default(true)
+  // Acesso por modulo (Regina 21/08, a partir do pedido do Leo). O titular da
+  // conta cadastra ate 2 colaboradores e marca, numa caixa de opcoes, em quais
+  // modulos cada um entra. `acessoRestrito=false` significa acesso completo —
+  // e o valor de todo usuario que ja existia, entao ninguem perde acesso pela
+  // migration. Com `true`, so vale o que estiver em `modulosPermitidos`.
+  acessoRestrito      Boolean       @default(false)
+  modulosPermitidos   String[]      @default([])
   // 2FA TOTP opt-in (Regina 22/07 — SEG P1). totpSecret guarda o segredo
   // em BASE32 puro (nao eh hash — precisamos dele pra validar codigos).
   // Coluna criptografada em repouso (Neon AES-256). totpAtivadoEm marca
