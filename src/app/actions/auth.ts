@@ -125,12 +125,48 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     };
   }
 
-  const cnpjExiste = await prisma.empresa.findUnique({ where: { cnpj } });
-  if (cnpjExiste) {
-    return {
-      erro: "CNPJ já cadastrado em outra conta.",
-      campos: { cnpj: "CNPJ já cadastrado" },
-      valores,
+  // CNPJ ja cadastrado: em regra bloqueia o signup. A excecao e o cadastro que
+  // veio da importacao de carteira do analista (/painel-analista/importar) —
+  // ali a Conta nasce sem usuario, sem cobranca e sem movimento, so pra a
+  // empresa aparecer na carteira dele. Se o proprio cliente vem assinar depois,
+  // esse cadastro tem que sair da frente em vez de barrar a venda; o vinculo
+  // com o analista e preservado logo abaixo.
+  const empresaComEsseCnpj = await prisma.empresa.findUnique({
+    where: { cnpj },
+    select: {
+      id: true,
+      _count: { select: { atas: true, contratos: true, empenhos: true } },
+      conta: {
+        select: {
+          id: true,
+          _count: { select: { usuarios: true, cobrancas: true } },
+          vinculosAnalista: {
+            where: { status: "ATIVO" },
+            select: { analistaId: true },
+            take: 1,
+          },
+        },
+      },
+    },
+  });
+  let cadastroDeCarteiraAAbsorver: { contaId: string; analistaId: string | null } | null = null;
+  if (empresaComEsseCnpj) {
+    const contaDona = empresaComEsseCnpj.conta;
+    const semAcesso = contaDona._count.usuarios === 0 && contaDona._count.cobrancas === 0;
+    const semMovimento =
+      empresaComEsseCnpj._count.atas === 0 &&
+      empresaComEsseCnpj._count.contratos === 0 &&
+      empresaComEsseCnpj._count.empenhos === 0;
+    if (!semAcesso || !semMovimento) {
+      return {
+        erro: "CNPJ já cadastrado em outra conta.",
+        campos: { cnpj: "CNPJ já cadastrado" },
+        valores,
+      };
+    }
+    cadastroDeCarteiraAAbsorver = {
+      contaId: contaDona.id,
+      analistaId: contaDona.vinculosAnalista[0]?.analistaId ?? null,
     };
   }
 
@@ -180,6 +216,17 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     analistaValido = { id: a.id, contaId: a.contaId };
   }
 
+  // Se o cliente ja estava na carteira importada de um analista e nao escolheu
+  // analista no cadastro, herda o analista da carteira — foi ele quem trouxe o
+  // cliente, e perder esse vinculo aqui apagaria a comissao dele.
+  if (!analistaValido && cadastroDeCarteiraAAbsorver?.analistaId) {
+    const aCarteira = await prisma.analista.findUnique({
+      where: { id: cadastroDeCarteiraAAbsorver.analistaId },
+      select: { id: true, contaId: true, ativo: true },
+    });
+    if (aCarteira?.ativo) analistaValido = { id: aCarteira.id, contaId: aCarteira.contaId };
+  }
+
   // Programa de Embaixador: ID do analista que indicou via link pessoal
   // /signup?ref=ANALISTA_ID. Valida que existe e ta ativo. Se invalido
   // (link expirado, analista desativado), simplesmente ignora (signup
@@ -199,6 +246,15 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       select: { id: true, ativo: true },
     });
     if (emb && emb.ativo) embaixadorIdValido = emb.id;
+  }
+
+  // Sai da frente antes de criar a conta de verdade: o CNPJ e unico em Empresa,
+  // entao o cadastro de carteira precisa deixar de existir para a conta que o
+  // cliente esta assinando poder nascer com esse mesmo CNPJ. O delete leva
+  // junto a Empresa vazia e o vinculo antigo (cascade) — o vinculo novo e
+  // recriado logo abaixo, ja apontando pra conta que paga.
+  if (cadastroDeCarteiraAAbsorver) {
+    await prisma.conta.delete({ where: { id: cadastroDeCarteiraAAbsorver.contaId } });
   }
 
   const conta = await prisma.conta.create({

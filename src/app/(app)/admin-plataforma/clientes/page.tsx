@@ -158,12 +158,19 @@ export default async function AdminClientesPage({
               const conf = STATUS_LABEL[c.statusAssinatura] || STATUS_LABEL.ATIVA;
               const Icon = conf.icone;
               const ehContaAdmin = c.usuarios.some((u) => u.superAdmin);
+              // Cadastro criado pela importacao de carteira do analista: existe
+              // pra a empresa aparecer no painel dele, ninguem loga nela e ela
+              // nunca gerou fatura. Sem usuario e sem cobranca e a marca desse
+              // caso — quando o cliente assinar de verdade, o signup absorve o
+              // cadastro e a conta passa a ter usuario.
+              const ehCarteiraImportada =
+                c.tipo === "EMPRESA" && c.usuarios.length === 0 && c.cobrancas.length === 0;
               // Conta de super admin (Regina/Igor) nao e cliente: existe pra
               // operar a plataforma e nunca gera fatura. Contar o plano dela
               // como receita inflava o numero — a tela ja marcava "Adm CP" no
               // nome e mesmo assim exibia R$ 997. Analista tambem nao paga.
               const mrr =
-                ehContaAdmin || c.tipo === "ANALISTA"
+                ehContaAdmin || ehCarteiraImportada || c.tipo === "ANALISTA"
                   ? 0
                   : c.plano === "PREMIUM"
                     ? PRECO_PREMIUM
@@ -181,6 +188,11 @@ export default async function AdminClientesPage({
                         <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
                           <ShieldCheck className="h-2.5 w-2.5" />
                           Adm CP
+                        </span>
+                      )}
+                      {ehCarteiraImportada && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                          Carteira de analista
                         </span>
                       )}
                     </div>

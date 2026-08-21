@@ -55,8 +55,13 @@ export default async function AdminPlataformaPage() {
   const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   const inicioMesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
 
-  // Filtro: ignorar contas de super admin (Igor/Regina) — não são clientes pagantes
-  const semSuperAdmin = { usuarios: { none: { superAdmin: true } } };
+  // Filtro do funil: só conta quem é cliente de verdade.
+  // - `none superAdmin`: conta de super admin (Igor/Regina) não é cliente pagante.
+  // - `some`: conta SEM nenhum usuário é cadastro de carteira importada pelo
+  //   analista (/painel-analista/importar) — ninguém loga nela e ela nunca gerou
+  //   fatura. Contar como "em trial" encheria o funil de empresa que não pediu
+  //   nada; quando o cliente assina, o signup absorve o cadastro e aí ele entra.
+  const semSuperAdmin = { usuarios: { none: { superAdmin: true }, some: {} } };
 
   const [contas, contasUltimoMes, atividadeRecente] = await Promise.all([
     prisma.conta.findMany({
