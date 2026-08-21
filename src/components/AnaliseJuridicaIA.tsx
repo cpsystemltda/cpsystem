@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, AlertTriangle, CheckCircle2, Clock, Loader2, X } from "lucide-react";
-import { analisarContratoAction } from "@/app/actions/iaJuridica";
+import Link from "next/link";
+import { Sparkles, AlertTriangle, CheckCircle2, Clock, Loader2, X, Lock } from "lucide-react";
+import { analisarDocumentoJuridicoAction } from "@/app/actions/iaJuridica";
 import type { AnaliseJuridica } from "@/lib/iaJuridica";
 
 const SEVERIDADE_COR: Record<"alta" | "media" | "baixa", { bg: string; texto: string; borda: string; rotulo: string }> = {
@@ -11,7 +12,21 @@ const SEVERIDADE_COR: Record<"alta" | "media" | "baixa", { bg: string; texto: st
   baixa: { bg: "bg-slate-50", texto: "text-slate-700", borda: "border-slate-200", rotulo: "Baixa" },
 };
 
-export function AnaliseJuridicaIA({ contratoId }: { contratoId: string }) {
+/**
+ * Botao de parecer na tela do contrato.
+ *
+ * Chamava um caminho proprio (`analisarContratoAction`) que rodava num modelo
+ * mais barato, mandava menos contexto (sem itens, sem a ata de origem, sem
+ * marco de reajuste) e NAO gravava o parecer — sumia ao fechar o modal. A aba
+ * /juridico ja fazia tudo isso direito. Agora as duas telas chamam a mesma
+ * acao: mesmo contexto, mesmo modelo, parecer salvo com historico (Regina
+ * 21/08).
+ *
+ * `premium` vem da pagina porque a analise por IA e beneficio anunciado como
+ * exclusivo do Premium. A trava de verdade esta na server action; aqui e so
+ * pra nao oferecer um botao que vai recusar.
+ */
+export function AnaliseJuridicaIA({ contratoId, premium }: { contratoId: string; premium: boolean }) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [resultado, setResultado] = useState<AnaliseJuridica | null>(null);
@@ -21,7 +36,7 @@ export function AnaliseJuridicaIA({ contratoId }: { contratoId: string }) {
   async function disparar() {
     setCarregando(true);
     setErro(null);
-    const res = await analisarContratoAction(contratoId);
+    const res = await analisarDocumentoJuridicoAction("CONTRATO", contratoId);
     setCarregando(false);
     if (!res.ok) {
       setErro(res.erro);
@@ -30,6 +45,18 @@ export function AnaliseJuridicaIA({ contratoId }: { contratoId: string }) {
     setResultado(res.analise);
     setDemo(res.demo);
     setAberto(true);
+  }
+
+  if (!premium) {
+    return (
+      <Link
+        href="/juridico"
+        title="A análise jurídica por IA faz parte do plano Premium"
+        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-violet-300 hover:text-violet-700"
+      >
+        <Lock className="h-4 w-4" /> Análise jurídica IA
+      </Link>
+    );
   }
 
   return (

@@ -120,7 +120,7 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
           </p>
         </div>
         <div className="flex items-start gap-2">
-          <AnaliseJuridicaIA contratoId={contrato.id} />
+          <AnaliseJuridicaIA contratoId={contrato.id} premium={usuario.conta.plano === "PREMIUM"} />
           {podeEditar && (
             <Link
               href={`/contratos/${contrato.id}/editar`}

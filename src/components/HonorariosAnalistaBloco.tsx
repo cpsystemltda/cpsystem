@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "next/link";
 import { UserCheck, Wallet, AlertCircle, Check, CalendarClock } from "lucide-react";
 import { brl } from "@/lib/validators";
 import { marcarPagamentoFixoAction } from "@/app/actions/comissaoFixa";

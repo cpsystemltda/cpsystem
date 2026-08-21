@@ -4,7 +4,6 @@ import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { prisma } from "@/lib/prisma";
 import {
-  analisarContratoIA,
   analisarDocumentoIA,
   analisarPdfIA,
   compararDocumentosIA,
@@ -15,28 +14,21 @@ import {
 } from "@/lib/iaJuridica";
 import { salvarArquivo } from "@/lib/uploads";
 
-const MODELO_ATUAL = "claude-sonnet-4-6";
+const MODELO_ATUAL = "claude-opus-5";
 
-export type AnalisarContratoResult =
-  | { ok: true; analise: AnaliseJuridica; demo: boolean }
-  | { ok: false; erro: string };
+/**
+ * Parecer por IA e beneficio anunciado como exclusivo do Premium na propria
+ * pagina de venda ("Parecer IA de cada documento"). A aba /juridico ja barrava
+ * pelo plano na renderizacao, mas server action e alcancavel por POST direto —
+ * e a tela do contrato nao barrava nada: qualquer conta rodava analise sem
+ * limite, gastando token em cliente que nao paga por isso. Regina fechou em
+ * 21/08: mesma trava da aba.
+ */
+const ERRO_SEM_PREMIUM =
+  "A análise jurídica por IA é exclusiva do plano Premium. Faça o upgrade em Consultoria jurídica.";
 
-// Mantida pra compat com a UI antiga
-export async function analisarContratoAction(contratoId: string): Promise<AnalisarContratoResult> {
-  const usuario = await exigirUsuario();
-  await bloquearEspionagem();
-  const contrato = await prisma.contrato.findFirst({
-    where: { id: contratoId, empresa: { contaId: usuario.contaId } },
-    include: { itens: { select: { descricao: true, quantidade: true, valorUnitario: true, valorTotal: true } } },
-  });
-  if (!contrato) return { ok: false, erro: "Contrato não encontrado." };
-  const demo = !process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY.trim() === "";
-  try {
-    const analise = await analisarContratoIA(contrato);
-    return { ok: true, analise, demo };
-  } catch (err) {
-    return { ok: false, erro: err instanceof Error ? err.message : "Falha na análise." };
-  }
+function semPremium(plano: string): boolean {
+  return plano !== "PREMIUM";
 }
 
 // Novo: análise generalizada. Carrega o documento (Ata / Contrato / Empenho)
@@ -56,6 +48,7 @@ export async function analisarDocumentoJuridicoAction(
 ): Promise<AnalisarDocumentoResult> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  if (semPremium(usuario.conta.plano)) return { ok: false, erro: ERRO_SEM_PREMIUM };
 
   let doc: DocumentoEntrada | null = null;
 
@@ -379,6 +372,7 @@ export type UploadAvulsoResult =
 export async function uploadDocumentoAvulsoAction(form: FormData): Promise<UploadAvulsoResult> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  if (semPremium(usuario.conta.plano)) return { ok: false, erro: ERRO_SEM_PREMIUM };
 
   const arquivo = form.get("arquivo");
   const tipo = String(form.get("tipo") ?? "OUTRO");
@@ -423,6 +417,7 @@ export async function uploadDocumentoAvulsoAction(form: FormData): Promise<Uploa
 export async function analisarAvulsoAction(avulsoId: string): Promise<AnalisarDocumentoResult> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  if (semPremium(usuario.conta.plano)) return { ok: false, erro: ERRO_SEM_PREMIUM };
 
   const avulso = await prisma.documentoAvulsoJuridico.findFirst({
     where: { id: avulsoId, empresa: { contaId: usuario.contaId } },
@@ -469,6 +464,7 @@ export async function compararAvulsosAction(
 ): Promise<CompararResult> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  if (semPremium(usuario.conta.plano)) return { ok: false, erro: ERRO_SEM_PREMIUM };
 
   if (avulsoIdOriginal === avulsoIdAlterado) {
     return { ok: false, erro: "Escolha 2 documentos diferentes." };

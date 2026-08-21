@@ -89,23 +89,6 @@ export type DocumentoEntrada = {
   contextoAdicional?: string;
 };
 
-// Wrapper de compat — assinatura antiga (Contrato com schema interno).
-type ContratoEntrada = {
-  numero: string;
-  tipo: string;
-  procedimentoSelecao: string;
-  orgaoNome: string;
-  objeto: string;
-  dataAssinatura: Date;
-  vigenciaInicio: Date;
-  vigenciaFim: Date;
-  prazoEntregaDias: number | null;
-  prazoPagamentoDias: number | null;
-  modalidadeEntrega: string;
-  marcoInicialPrazo: string | null;
-  itens: { descricao: string; quantidade: number; valorUnitario: number; valorTotal: number }[];
-};
-
 const ROTULO_TIPO: Record<TipoDocJuridico, string> = {
   ATA: "ATA DE REGISTRO DE PREÇOS",
   CONTRATO: "CONTRATO ADMINISTRATIVO",
@@ -116,8 +99,9 @@ const ROTULO_TIPO: Record<TipoDocJuridico, string> = {
 
 // Análise generalizada — aceita Ata, Contrato, Empenho ou Termo de Cooperação.
 // Retorna AnaliseJuridica estruturada (resumo, pontos críticos, checklist,
-// janelas críticas). Usa claude-sonnet-4-6 (parecer técnico merece o modelo
-// mais capaz) com prompt caching no system.
+// janelas críticas). Usa claude-opus-5 — parecer técnico merece o modelo mais
+// capaz, e nele o raciocínio estendido já vem ligado por padrão (por isso o
+// max_tokens folgado: o pensamento divide o mesmo teto com a resposta).
 export async function analisarDocumentoIA(doc: DocumentoEntrada): Promise<AnaliseJuridica> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
@@ -159,8 +143,8 @@ export async function analisarDocumentoIA(doc: DocumentoEntrada): Promise<Analis
 
   const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    model: "claude-opus-5",
+    max_tokens: 16000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     output_config: { format: { type: "json_schema", schema: SCHEMA } },
     messages: [{ role: "user", content: linhas.join("\n") }],
@@ -211,8 +195,8 @@ export async function analisarPdfIA(opts: {
 
   const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    model: "claude-opus-5",
+    max_tokens: 16000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     output_config: { format: { type: "json_schema", schema: SCHEMA } },
     messages: [
@@ -332,8 +316,8 @@ export async function compararDocumentosIA(opts: {
 
   const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    model: "claude-opus-5",
+    max_tokens: 16000,
     system: [{ type: "text", text: SYSTEM_COMPARACAO, cache_control: { type: "ephemeral" } }],
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     output_config: { format: { type: "json_schema", schema: COMPARACAO_SCHEMA as any } },
@@ -365,73 +349,5 @@ function analiseMockGenerico(doc: DocumentoEntrada): AnaliseJuridica {
     janelasCriticas: doc.vigenciaFim
       ? [{ evento: "Vencimento da vigência", prazo: doc.vigenciaFim.toLocaleDateString("pt-BR"), recomendacao: "Avalie prorrogação/renovação com 90 dias de antecedência." }]
       : [],
-  };
-}
-
-export async function analisarContratoIA(contrato: ContratoEntrada): Promise<AnaliseJuridica> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey.trim() === "") {
-    return analiseMock(contrato);
-  }
-
-  const valorTotal = contrato.itens.reduce((s, i) => s + i.valorTotal, 0);
-  const userMessage = `Analise este contrato administrativo da perspectiva da empresa fornecedora.
-
-CONTRATO Nº ${contrato.numero}
-Tipo: ${contrato.tipo}
-Procedimento: ${contrato.procedimentoSelecao}
-Órgão: ${contrato.orgaoNome}
-Objeto: ${contrato.objeto}
-
-Datas e prazos:
-- Assinado em: ${contrato.dataAssinatura.toLocaleDateString("pt-BR")}
-- Vigência: ${contrato.vigenciaInicio.toLocaleDateString("pt-BR")} → ${contrato.vigenciaFim.toLocaleDateString("pt-BR")}
-- Prazo de entrega: ${contrato.prazoEntregaDias ?? "não informado"} dias
-- Prazo de pagamento: ${contrato.prazoPagamentoDias ?? "não informado"} dias
-- Modalidade de entrega: ${contrato.modalidadeEntrega}
-- Marco inicial do prazo: ${contrato.marcoInicialPrazo ?? "não informado"}
-
-Valor total: R$ ${valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-Itens: ${contrato.itens.length} item(ns)
-
-Entregue a análise estruturada conforme schema.`;
-
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.create({
-    model: "claude-haiku-4-5",
-    max_tokens: 4096,
-    system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
-    output_config: { format: { type: "json_schema", schema: SCHEMA } },
-    messages: [{ role: "user", content: userMessage }],
-  });
-
-  const block = response.content.find((c) => c.type === "text");
-  if (!block || block.type !== "text") throw new Error("Resposta vazia da IA.");
-  return JSON.parse(block.text) as AnaliseJuridica;
-}
-
-function analiseMock(contrato: ContratoEntrada): AnaliseJuridica {
-  const valor = contrato.itens.reduce((s, i) => s + i.valorTotal, 0);
-  return {
-    resumoExecutivo: `[MODO DEMO] Contrato ${contrato.numero} — ${contrato.objeto.slice(0, 100)}. Valor R$ ${valor.toLocaleString("pt-BR")}. Configure ANTHROPIC_API_KEY para análise real via Claude Haiku 4.5.`,
-    pontosCriticos: [
-      {
-        titulo: "Modo demonstração",
-        descricao: "Este conteúdo é exemplificativo. Configure ANTHROPIC_API_KEY no servidor para receber a análise jurídica real do contrato pela IA da Contratos Públicos.",
-        severidade: "baixa",
-      },
-    ],
-    checklistGestao: [
-      { item: "Confirmar recebimento da ordem de fornecimento", concluido: false },
-      { item: "Acompanhar prazo de entrega contratual", concluido: false },
-      { item: "Emitir nota fiscal e remeter ao fiscal do contrato", concluido: false },
-    ],
-    janelasCriticas: [
-      {
-        evento: "Vencimento da vigência",
-        prazo: contrato.vigenciaFim.toLocaleDateString("pt-BR"),
-        recomendacao: "Avalie repactuação, prorrogação ou nova licitação com 90 dias de antecedência.",
-      },
-    ],
   };
 }
