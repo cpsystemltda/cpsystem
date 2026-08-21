@@ -116,14 +116,15 @@ export default async function JuridicoPage() {
           <Scale className="mr-1 inline-block h-3.5 w-3.5" /> Consultoria humana — franquia anual
         </h2>
         <div className="grid gap-4 md:grid-cols-3">
-          <Franquia titulo="Consultas escritas" usado={0} total={12} />
-          <Franquia titulo="Peças administrativas" usado={0} total={2} />
-          <Franquia titulo="SLA primeiro atendimento" usado={"4h"} total={"úteis"} percentual={null} />
+          <Franquia titulo="Consultas escritas" valor="12" unidade="por ano" />
+          <Franquia titulo="Peças administrativas" valor="2" unidade="por ano" />
+          <Franquia titulo="SLA de primeiro atendimento" valor="4h" unidade="úteis" />
         </div>
 
         <div className="glass mt-4 rounded-[20px] px-6 py-5">
           <p className="text-sm text-slate-600">
-            Para abrir uma consulta humana com o Grupo Contratos Públicos, fale com a gente:
+            O consumo da franquia é controlado pelo time do Grupo Contratos Públicos — peça o
+            extrato no mesmo canal. Para abrir uma consulta humana, fale com a gente:
           </p>
           <a
             href={linkWhatsAppSuporte("Olá! Preciso abrir uma consulta jurídica humana com o Grupo Contratos Públicos.")}
@@ -163,32 +164,19 @@ function Beneficio({
 
 function Franquia({
   titulo,
-  usado,
-  total,
-  percentual,
+  valor,
+  unidade,
 }: {
   titulo: string;
-  usado: number | string;
-  total: number | string;
-  percentual?: number | null;
+  valor: string;
+  unidade: string;
 }) {
-  const pct =
-    percentual !== undefined
-      ? percentual
-      : typeof usado === "number" && typeof total === "number"
-        ? (usado / total) * 100
-        : 0;
   return (
     <div className="glass-tile rounded-[18px] px-5 py-5">
       <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{titulo}</p>
       <p className="mt-2 text-2xl font-bold text-slate-900">
-        {usado} <span className="text-base font-normal text-slate-400">/ {total}</span>
+        {valor} <span className="text-base font-normal text-slate-400">{unidade}</span>
       </p>
-      {pct !== null && (
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full bg-violet-500" style={{ width: `${pct}%` }} />
-        </div>
-      )}
     </div>
   );
 }
