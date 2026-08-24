@@ -245,6 +245,35 @@ export async function pagarComissaoAvulsa(comissaoId: string): Promise<
       where: { id: c.id },
       data: { ultimoErroPgto: msg.slice(0, 500) },
     });
-    return { ok: false, erro: msg.slice(0, 200) };
+    return { ok: false, erro: traduzirErroGateway(msg) };
   }
+}
+
+/**
+ * Traduz o erro cru do gateway pro que a pessoa precisa FAZER.
+ *
+ * O primeiro repasse tentado pela Regina em 24/08 devolveu um JSON de 403 na
+ * tela. A informação estava lá, mas ninguém deveria precisar ler JSON pra
+ * descobrir que falta marcar uma permissão no painel do Asaas.
+ */
+export function traduzirErroGateway(bruto: string): string {
+  const m = bruto.toLowerCase();
+  if (m.includes("insufficient_permission") || m.includes("operações de saque")) {
+    return (
+      "A chave de API do Asaas não tem permissão para transferências (saque via API). " +
+      "No Asaas: Integrações → API Key → habilite a permissão de saque/transferência (ou gere uma " +
+      "chave nova com ela) e atualize a chave no CP System. Enquanto isso, dá pra pagar o analista " +
+      "manualmente pelo app do Asaas."
+    );
+  }
+  if (m.includes("invalid_action") && m.includes("pix")) {
+    return "O Asaas recusou a chave PIX do analista. Confira a chave cadastrada no perfil dele.";
+  }
+  if (m.includes("insufficient_balance") || m.includes("saldo")) {
+    return "Saldo insuficiente na conta Asaas para este repasse.";
+  }
+  if (m.startsWith("asaas 401") || m.includes("unauthorized")) {
+    return "A chave de API do Asaas foi recusada (401). Confira se ela é da conta de produção e está válida.";
+  }
+  return bruto.slice(0, 240);
 }
