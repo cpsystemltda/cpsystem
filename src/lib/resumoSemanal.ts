@@ -174,7 +174,7 @@ export async function montarResumoAnalista(analistaId: string): Promise<ResumoAn
           select: {
             cobrancas: {
               where: { status: "PAGA", pagaEm: { not: null } },
-              select: { pagaEm: true },
+              select: { pagaEm: true, forma: true },
               orderBy: { pagaEm: "asc" },
               take: 1,
             },
@@ -223,27 +223,30 @@ export async function montarResumoAnalista(analistaId: string): Promise<ResumoAn
       linhas.push(`• Referente a ${comissoes.length} meses acumulados: ${meses.join(" + ")}`);
     }
 
-    // Regina 10/08: a data do PIX nao pode ser so "proximo dia 20". O CP
-    // System recebe do gateway D+32 do pagamento do cliente; antes disso nao
-    // ha caixa pra repassar. Anuncia o dia 20 seguinte a compensacao, pra nao
-    // prometer data que nao se cumpre.
-    const COMPENSACAO_DIAS = 32;
-    let dataPix = prox20;
-    const compensacoes = comissoes
-      .map((c) => c.conta?.cobrancas?.[0]?.pagaEm)
-      .filter((d): d is Date => !!d)
-      .map((d) => new Date(d.getTime() + COMPENSACAO_DIAS * 24 * 60 * 60 * 1000));
-    if (compensacoes.length > 0) {
-      const maisCedo = new Date(Math.min(...compensacoes.map((d) => d.getTime())));
-      if (maisCedo > prox20) {
-        // primeiro dia 20 depois da compensacao
-        const d = new Date(maisCedo.getFullYear(), maisCedo.getMonth(), 20);
-        if (maisCedo.getDate() > 20) d.setMonth(d.getMonth() + 1);
-        dataPix = d;
-      }
-    }
-    linhas.push(`• Data do PIX: ${dataBr(dataPix)}`);
-    linhas.push(`• O repasse sai após o pagamento do cliente compensar (32 dias).`);
+    // Regina 24/08: o repasse deixou de esperar o dia 20 — sai assim que o
+    // dinheiro do cliente é liberado pelo gateway (a régua roda todo dia). O
+    // que ainda manda na data é a liberação: cartão leva ~32 dias, PIX cai na
+    // hora. Anunciamos a previsão, não um dia fixo que não se cumpre.
+    const COMPENSACAO_CARTAO_DIAS = 32;
+    const amanha = new Date(hoje.getTime() + 86400000);
+    const liberacoes = comissoes
+      .map((c) => {
+        const cob = c.conta?.cobrancas?.[0];
+        if (!cob?.pagaEm) return null;
+        return cob.forma === "CARTAO_CREDITO"
+          ? new Date(cob.pagaEm.getTime() + COMPENSACAO_CARTAO_DIAS * 86400000)
+          : cob.pagaEm;
+      })
+      .filter((d): d is Date => !!d);
+    const maisCedo =
+      liberacoes.length > 0
+        ? new Date(Math.min(...liberacoes.map((d) => d.getTime())))
+        : amanha;
+    const dataPix = maisCedo > amanha ? maisCedo : amanha;
+    linhas.push(`• Data prevista do PIX: ${dataBr(dataPix)}`);
+    linhas.push(
+      `• O repasse sai assim que o pagamento do cliente é liberado pelo banco — no cartão isso leva cerca de 32 dias; no PIX, na hora.`,
+    );
   } else {
     linhas.push(`• Nada apurado ainda. Comissão só passa a correr após a 1ª fatura paga do cliente.`);
     if (trials > 0) linhas.push(`• Você tem ${trials} cliente(s) em trial — quando pagarem, sua comissão começa.`);

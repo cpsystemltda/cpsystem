@@ -210,10 +210,31 @@ export default async function AssinaturaPage() {
                 pra fatura do gateway — e quando ele nao vinha, nao sobrava
                 nenhuma forma de pagar. */}
             <div className="mt-3">
-              <PixPagamento
-                cobrancaId={cobrancaPendente.id}
-                invoiceUrl={cobrancaPendente.gatewayInvoiceUrl}
-              />
+              {cobrancaPendente.forma === "BOLETO" ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  {(cobrancaPendente.boletoUrl || cobrancaPendente.gatewayInvoiceUrl) && (
+                    <a
+                      href={cobrancaPendente.boletoUrl || cobrancaPendente.gatewayInvoiceUrl || "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white"
+                    >
+                      Abrir boleto
+                    </a>
+                  )}
+                  {/* Boleto compensa em dias úteis; quem quiser liberar na hora
+                      troca por PIX aqui mesmo. */}
+                  <PixPagamento
+                    cobrancaId={cobrancaPendente.id}
+                    invoiceUrl={cobrancaPendente.gatewayInvoiceUrl}
+                  />
+                </div>
+              ) : (
+                <PixPagamento
+                  cobrancaId={cobrancaPendente.id}
+                  invoiceUrl={cobrancaPendente.gatewayInvoiceUrl}
+                />
+              )}
             </div>
           </div>
         )}

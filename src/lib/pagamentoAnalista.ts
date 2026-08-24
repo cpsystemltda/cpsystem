@@ -73,7 +73,7 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
           // cliente ja caiu de fato na conta do CP System.
           cobrancas: {
             where: { status: "PAGA", pagaEm: { not: null } },
-            select: { pagaEm: true },
+            select: { pagaEm: true, forma: true, gatewayChargeId: true },
             orderBy: { pagaEm: "desc" },
           },
         },
@@ -92,15 +92,46 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
   // Regra: so paga comissao cujo pagamento do cliente ja compensou. O que
   // ainda nao compensou fica para o proximo dia 20, sem perder nada (a
   // comissao continua com paga=false).
-  const DIAS_COMPENSACAO = 32;
-  const limite = new Date(hoje.getTime() - DIAS_COMPENSACAO * 24 * 60 * 60 * 1000);
-  const comissoes = candidatas.filter((c) => {
+  // Regina 24/08: "eu quero que seja pago quando for em conta". Antes o filtro
+  // usava um prazo fixo de 32 dias pra TODA forma de pagamento — o pior dos dois
+  // mundos: segurava PIX que ja tinha caído e podia liberar cartao antecipado
+  // que ainda nao caiu. Agora a pergunta é feita ao gateway: quando o dinheiro
+  // desta fatura ficou disponível?
+  //
+  // PIX cai na hora; boleto em 1 dia util; cartao ~32 dias, menos se a conta
+  // tiver antecipacao ligada. O prazo fixo continua como rede de seguranca pra
+  // quando o gateway nao souber responder.
+  const DIAS_COMPENSACAO_CARTAO = 32;
+  const comissoes: typeof candidatas = [];
+  for (const c of candidatas) {
     const pagamentos = c.conta?.cobrancas ?? [];
     // Sem fatura paga registrada: nao ha receita correspondente, nao paga.
-    if (pagamentos.length === 0) return false;
-    // Basta o pagamento mais antigo ja ter compensado pra haver caixa.
-    return pagamentos.some((p) => p.pagaEm !== null && p.pagaEm <= limite);
-  });
+    if (pagamentos.length === 0) continue;
+
+    let temCaixa = false;
+    for (const p of pagamentos) {
+      if (!p.pagaEm) continue;
+      // PIX e boleto: o dinheiro entra junto com a confirmacao.
+      if (p.forma !== "CARTAO_CREDITO") {
+        if (p.pagaEm <= hoje) temCaixa = true;
+      } else if (p.gatewayChargeId && gateway.consultarCredito) {
+        try {
+          const credito = await gateway.consultarCredito(p.gatewayChargeId);
+          const quando = credito.creditadoEm ?? credito.previsaoCredito;
+          if (quando && quando <= hoje) temCaixa = true;
+        } catch {
+          // Gateway mudo: cai no prazo fixo do cartao.
+          const limite = new Date(hoje.getTime() - DIAS_COMPENSACAO_CARTAO * 86400000);
+          if (p.pagaEm <= limite) temCaixa = true;
+        }
+      } else {
+        const limite = new Date(hoje.getTime() - DIAS_COMPENSACAO_CARTAO * 86400000);
+        if (p.pagaEm <= limite) temCaixa = true;
+      }
+      if (temCaixa) break;
+    }
+    if (temCaixa) comissoes.push(c);
+  }
 
   let sucessos = 0;
   let falhas = 0;
@@ -166,4 +197,54 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
     falhas,
     totalPagoBRL,
   };
+}
+
+/**
+ * Paga UMA comissão agora, por decisão manual do super admin (Regina 24/08:
+ * "eu preciso que o Igor receba a comissão dele que já é devida").
+ *
+ * Diferente do fluxo automático, aqui não se pergunta se o dinheiro do cliente
+ * já caiu: quem clica está assumindo antecipar o repasse. Por isso a ação é
+ * exclusiva de super admin e fica registrada na auditoria.
+ */
+export async function pagarComissaoAvulsa(comissaoId: string): Promise<
+  { ok: true; transferId: string; valor: number } | { ok: false; erro: string }
+> {
+  const c = await prisma.comissao.findUnique({
+    where: { id: comissaoId },
+    include: { analista: { select: { nomeCompleto: true, pix: true, ativo: true } } },
+  });
+  if (!c) return { ok: false, erro: "Comissão não encontrada." };
+  if (c.paga) return { ok: false, erro: "Esta comissão já foi paga." };
+  if (!c.analista.ativo) return { ok: false, erro: "Analista inativo." };
+  if (!c.analista.pix || c.analista.pix.trim().length < 4) {
+    return { ok: false, erro: "Analista sem chave PIX cadastrada." };
+  }
+  const tipo = detectarTipoPix(c.analista.pix);
+  if (!tipo) return { ok: false, erro: "Chave PIX do analista em formato desconhecido." };
+
+  const gateway = await getGateway();
+  if (!gateway.transferirPix) return { ok: false, erro: "Gateway sem suporte a PIX out." };
+
+  try {
+    const tf = await gateway.transferirPix({
+      valor: c.valor,
+      chavePix: normalizarChavePix(c.analista.pix, tipo),
+      tipoChave: tipo,
+      descricao: `Comissão ${c.competencia} — CP System`,
+      referenciaExterna: `comissao-${c.id}`,
+    });
+    await prisma.comissao.update({
+      where: { id: c.id },
+      data: { paga: true, pagaEm: new Date(), transferenciaId: tf.transferId, ultimoErroPgto: null },
+    });
+    return { ok: true, transferId: tf.transferId, valor: c.valor };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await prisma.comissao.update({
+      where: { id: c.id },
+      data: { ultimoErroPgto: msg.slice(0, 500) },
+    });
+    return { ok: false, erro: msg.slice(0, 200) };
+  }
 }

@@ -30,6 +30,9 @@ export type ResumoRegua = {
   whatsAppResumo: { janela: string; usuariosNotificados: number; capAtingido: number; semItems: number };
   comissoesEmbaixador: { competencia: string; vinculos: number; totalGeradoBRL: number };
   trialAvisados: number;
+  /** Comissões de analista repassadas por PIX nesta execução. */
+  comissoesRepassadas: number;
+  comissoesRepasseFalhou: number;
 };
 
 export async function executarRegua(): Promise<ResumoRegua> {
@@ -147,6 +150,17 @@ export async function executarRegua(): Promise<ResumoRegua> {
     return { competencia: "", vinculos: 0, totalGeradoBRL: 0 };
   });
 
+  // 8b. Comissao do analista: paga assim que o dinheiro do cliente esta em
+  // conta, sem esperar o dia 20 (Regina 24/08: "nao quero que acumule, quero
+  // que seja pago quando for em conta"). O caso do Igor: o cliente pagou um dia
+  // DEPOIS da data de repasse, e a comissao ficaria parada ate o mes seguinte.
+  // Idempotente — comissao paga nao volta pra fila.
+  const { pagarComissoesDoMesAnterior } = await import("@/lib/pagamentoAnalista");
+  const repasses = await pagarComissoesDoMesAnterior(hoje).catch((e) => {
+    console.error("[regua] erro no repasse de comissoes:", e);
+    return { competenciaPaga: "", tentativas: 0, sucessos: 0, falhas: 0, totalPagoBRL: 0 };
+  });
+
   // 9. Fim de trial (Regina 06/08) — avisa em D-3 e D-1 que a cobranca vai
   // comecar. O cartao ja foi tokenizado no signup, entao sem aviso o cliente
   // e cobrado de surpresa. Best-effort: nunca derruba o resto da regua.
@@ -157,6 +171,8 @@ export async function executarRegua(): Promise<ResumoRegua> {
   });
 
   return {
+    comissoesRepassadas: repasses.sucessos,
+    comissoesRepasseFalhou: repasses.falhas,
     trialAvisados: trial.avisados,
     renovacoesGeradas: renov.geradas,
     renovacoesIgnoradas: renov.ignoradas,

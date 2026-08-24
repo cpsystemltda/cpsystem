@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, CreditCard, QrCode, Lock } from "lucide-react";
+import { ChevronLeft, CreditCard, QrCode, FileText, Lock } from "lucide-react";
 import { iniciarCheckoutAction } from "@/app/actions/assinatura";
 import { PixPagamento } from "@/components/PixPagamento";
 import { brl } from "@/lib/validators";
@@ -11,9 +11,9 @@ import { PRECO_CNPJ_ADICIONAL, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precosC
 
 const ROTULO = { BASICO: "Básico", PREMIUM: "Premium" };
 
-// Regina 24/08: boleto sai da tela — ela nao quer boleto, e PIX resolve o
-// mesmo caso (sem cartao) confirmando na hora em vez de em dias uteis.
-type Forma = "PIX" | "CARTAO_CREDITO";
+// Regina 24/08 (pedido do Igor): boleto voltou — "muita empresa ainda faz
+// assim". Entra com vencimento de 2 dias, prazo que a Regina definiu.
+type Forma = "PIX" | "BOLETO" | "CARTAO_CREDITO";
 
 export function CheckoutClient({
   planoInicial,
@@ -45,7 +45,9 @@ export function CheckoutClient({
           <p className="mt-2 text-sm text-slate-600">
             {forma === "PIX"
               ? "Pague o PIX abaixo — a confirmação é automática e a assinatura é liberada em seguida."
-              : "Assim que o cartão for aprovado, a assinatura é liberada automaticamente."}
+              : forma === "BOLETO"
+                ? "O boleto está em Assinatura, com vencimento em 2 dias. A compensação leva até 1 dia útil depois do pagamento."
+                : "Assim que o cartão for aprovado, a assinatura é liberada automaticamente."}
           </p>
         </div>
 
@@ -116,8 +118,9 @@ export function CheckoutClient({
         {/* Forma de pagamento */}
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Forma de pagamento</h2>
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-3">
             <FormaCard ativo={forma === "PIX"} onClick={() => setForma("PIX")} icone={QrCode} titulo="PIX" sub="Confirmação imediata" />
+            <FormaCard ativo={forma === "BOLETO"} onClick={() => setForma("BOLETO")} icone={FileText} titulo="Boleto" sub="Vence em 2 dias" />
             <FormaCard ativo={forma === "CARTAO_CREDITO"} onClick={() => setForma("CARTAO_CREDITO")} icone={CreditCard} titulo="Cartão" sub="Cobrança recorrente" />
           </div>
         </section>

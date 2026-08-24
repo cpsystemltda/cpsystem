@@ -94,14 +94,20 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     return { erro: senhaCheck.erro, campos: { senha: senhaCheck.erro }, valores };
   }
 
+  // Regina 24/08 (pedido do Igor): o trial não exige mais cartão. Quem escolhe
+  // "decidir depois" entra no teste sem meio de pagamento e escolhe PIX, boleto
+  // ou cartão no fim dos 14 dias — a trava por falta de pagamento já existe e
+  // leva ele direto pra tela de cobrança.
+  const comCartaoAgora = v.pagamentoAgora !== "DEPOIS";
+
   // Valida cartão (Luhn + bandeira + validade + CVV + nome) — antes de tocar no DB
   const cartao = validarCartao({
-    numero: v.cartaoNumero,
-    validade: v.cartaoValidade,
-    cvv: v.cartaoCvv,
-    nome: v.cartaoNome,
+    numero: v.cartaoNumero ?? "",
+    validade: v.cartaoValidade ?? "",
+    cvv: v.cartaoCvv ?? "",
+    nome: v.cartaoNome ?? "",
   });
-  if (!cartao.ok) {
+  if (comCartaoAgora && !cartao.ok) {
     const campoMap: Record<string, string> = {
       numero: "cartaoNumero",
       validade: "cartaoValidade",
@@ -304,23 +310,30 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
         },
       },
       // Cartão validado — só persistimos últimos 4 + bandeira + validade.
-      // PAN/CVV jamais tocam o disco. Tokenização real via gateway entra
-      // como melhoria futura quando ASAAS_API_KEY for configurado.
-      metodosPagamento: {
-        create: {
-          forma: "CARTAO_CREDITO",
-          apelido: `${cartao.bandeira} final ${cartao.ultimos4}`,
-          bandeira: cartao.bandeira,
-          ultimosDigitos: cartao.ultimos4,
-          validadeMes: cartao.validadeMes,
-          validadeAno: cartao.validadeAno,
-          padrao: true,
-          ativo: true,
-        },
-      },
+      // PAN/CVV jamais tocam o disco. Sem cartão no cadastro, a conta nasce sem
+      // método salvo (o cliente escolhe a forma no fim do trial).
+      ...(comCartaoAgora && cartao.ok
+        ? {
+            metodosPagamento: {
+              create: {
+                forma: "CARTAO_CREDITO" as const,
+                apelido: `${cartao.bandeira} final ${cartao.ultimos4}`,
+                bandeira: cartao.bandeira,
+                ultimosDigitos: cartao.ultimos4,
+                validadeMes: cartao.validadeMes,
+                validadeAno: cartao.validadeAno,
+                padrao: true,
+                ativo: true,
+              },
+            },
+          }
+        : {}),
       // Regina 13/07: dia de vencimento fixo + CPF titular pra Asaas.
-      diaVencimento: Number(v.diaVencimento),
-      cpfTitularCartao: v.cpfTitularCartao,
+      // Sem cartão no cadastro, os dois ficam nulos até o cliente escolher a
+      // forma de pagamento — `diaVencimento` nulo é o sinal de "ainda não
+      // escolheu como paga" (ver o funil em (app)/layout.tsx).
+      diaVencimento: v.diaVencimento ? Number(v.diaVencimento) : null,
+      cpfTitularCartao: v.cpfTitularCartao ? v.cpfTitularCartao.replace(/\D/g, "") : null,
     },
     include: { usuarios: true, empresas: { take: 1 } },
   });
@@ -332,6 +345,9 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   // recusado, gateway offline), signup continua e conta fica sem subscription
   // pra ser resolvida em /conta/completar-cadastro depois.
   try {
+    // Sem cartão não há assinatura recorrente pra criar: o cliente usa o trial
+    // e escolhe a forma no fim dele.
+    if (!comCartaoAgora || !cartao.ok) throw new Error("__sem_cartao__");
     const { calcularValorMensal } = await import("@/lib/precos");
     const { getGateway } = await import("@/lib/gateway");
     const gateway = await getGateway();
@@ -340,7 +356,7 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       const breakdown = await calcularValorMensal(conta.id, v.plano);
       const empresa = conta.empresas[0]!;
       // Calcula próximo dia diaVencimento APÓS trialAteEm
-      const diaEscolhido = Number(v.diaVencimento);
+      const diaEscolhido = Number(v.diaVencimento ?? "10");
       const nextDueDate = new Date(trialAteEm);
       nextDueDate.setDate(diaEscolhido);
       if (nextDueDate <= trialAteEm) {
@@ -375,9 +391,9 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
 
       // Cria subscription — Asaas tokeniza cartão e passa a cobrar todo mes.
       // Dados sensíveis do cartão vêm direto do formData (nao guardados em disco).
-      const cartaoNumero = v.cartaoNumero.replace(/\s/g, "");
-      const cartaoNome = v.cartaoNome;
-      const cartaoCvv = v.cartaoCvv;
+      const cartaoNumero = (v.cartaoNumero ?? "").replace(/\s/g, "");
+      const cartaoNome = v.cartaoNome ?? "";
+      const cartaoCvv = v.cartaoCvv ?? "";
       const sub = await gateway.criarAssinatura({
         customerId,
         cobrancaIdInterno: cobrancaInterna.id,
@@ -394,7 +410,7 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
         titular: {
           nome: cartaoNome,
           email: emailNorm,
-          cpfCnpj: v.cpfTitularCartao,
+          cpfCnpj: (v.cpfTitularCartao ?? "").replace(/\D/g, ""),
           telefone: empresa.telefones || undefined,
           cep: empresa.cep || undefined,
           numeroEndereco: empresa.endereco.match(/,\s*(\d+[A-Za-z]?)\b/)?.[1] || "S/N",
@@ -420,8 +436,11 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       });
     }
   } catch (err) {
-    // Best-effort — signup continua mesmo se gateway falhar
-    console.error("[signup] falha ao criar subscription no gateway:", err);
+    // Cadastro sem cartão não é falha: é o caminho novo, sai daqui em silêncio.
+    if (!(err instanceof Error) || err.message !== "__sem_cartao__") {
+      // Best-effort — signup continua mesmo se gateway falhar
+      console.error("[signup] falha ao criar subscription no gateway:", err);
+    }
   }
 
   // Cria o vínculo + notifica o analista

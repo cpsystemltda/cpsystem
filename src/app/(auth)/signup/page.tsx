@@ -218,6 +218,8 @@ function CardTipo({
 
 function FormEmpresa() {
   const [state, formAction] = useActionState(signupAction, null);
+  // Regina 24/08 (pedido do Igor): cartão deixou de ser obrigatório pra testar.
+  const [pagamentoAgora, setPagamentoAgora] = useState<"CARTAO" | "DEPOIS">("DEPOIS");
   const e = state?.campos ?? {};
   const v = state?.valores ?? {};
   const errosResumo = Object.entries(e);
@@ -515,16 +517,59 @@ function FormEmpresa() {
         ]}
       />
       <p className="col-span-4 -mt-2 text-xs text-slate-500">
-        Todos os planos começam com <strong>14 dias grátis</strong>. A cobrança só acontece após o trial — você
-        pode trocar de plano ou cancelar a qualquer momento.
+        Todos os planos começam com <strong>14 dias grátis</strong>, e você pode testar sem cadastrar cartão.
+        A cobrança só acontece após o trial — no 15º dia é preciso escolher a forma de pagamento (PIX, boleto ou
+        cartão) pra continuar usando. Dá pra trocar de plano ou cancelar a qualquer momento.
       </p>
 
       {/* Forma de pagamento aparece SÓ depois que o plano foi escolhido */}
       {plano && (
         <>
           <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Forma de pagamento <span className="text-red-500">*</span>
+            Forma de pagamento
           </h2>
+          <input type="hidden" name="pagamentoAgora" value={pagamentoAgora} />
+          <div className="col-span-4 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setPagamentoAgora("DEPOIS")}
+              className={`rounded-xl border p-4 text-left transition ${
+                pagamentoAgora === "DEPOIS"
+                  ? "border-violet-500 bg-violet-50"
+                  : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              <span className="block text-sm font-bold text-slate-900">
+                Começar o teste sem cartão
+              </span>
+              <span className="mt-1 block text-xs text-slate-600">
+                14 dias completos. No 15º dia você escolhe PIX, boleto ou cartão pra continuar —
+                avisamos antes.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPagamentoAgora("CARTAO")}
+              className={`rounded-xl border p-4 text-left transition ${
+                pagamentoAgora === "CARTAO"
+                  ? "border-violet-500 bg-violet-50"
+                  : "border-slate-200 bg-white hover:border-slate-300"
+              }`}
+            >
+              <span className="block text-sm font-bold text-slate-900">
+                Já deixar o cartão cadastrado
+              </span>
+              <span className="mt-1 block text-xs text-slate-600">
+                Nada é cobrado durante o teste. Depois do 14º dia a cobrança entra sozinha, no dia
+                que você escolher.
+              </span>
+            </button>
+          </div>
+        </>
+      )}
+
+      {plano && pagamentoAgora === "CARTAO" && (
+        <>
           <CampoCartao
             erros={{
               cartaoNumero: e.cartaoNumero,

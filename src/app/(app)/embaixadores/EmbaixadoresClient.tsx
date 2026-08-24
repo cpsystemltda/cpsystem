@@ -8,6 +8,7 @@ import {
   calcularComissoesDoMesAction,
   marcarComissaoPagaAction,
 } from "@/app/actions/embaixadores";
+import { pagarComissaoAgoraAction } from "@/app/actions/comissaoManual";
 
 type Analista = {
   id: string;
@@ -51,6 +52,9 @@ export function EmbaixadoresClient({
   const [stateNovo, actionNovo] = useActionState(cadastrarAnalistaAction, null);
   const [stateVinc, actionVinc] = useActionState(vincularEmbaixadorAction, null);
   const [stateCalc, actionCalc] = useActionState(calcularComissoesDoMesAction, null);
+  // Regina 24/08: paga a comissão na hora, por PIX, quando ela decide antecipar
+  // em vez de esperar o dinheiro do cliente ser liberado pelo gateway.
+  const [statePix, actionPix] = useActionState(pagarComissaoAgoraAction, null);
 
   const totalPagar = comissoes.filter((c) => !c.paga).reduce((s, c) => s + c.valor, 0);
   const totalPago = comissoes.filter((c) => c.paga).reduce((s, c) => s + c.valor, 0);
@@ -163,6 +167,16 @@ export function EmbaixadoresClient({
           </div>
           {stateCalc?.ok && <p className="mt-2 text-xs text-emerald-700">Comissões recalculadas.</p>}
 
+          {statePix?.erro && (
+            <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm font-semibold text-red-800">
+              {statePix.erro}
+            </p>
+          )}
+          {statePix?.ok && (
+            <p className="mb-3 rounded bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+              PIX de {brl(statePix.valor ?? 0)} enviado para o analista.
+            </p>
+          )}
           {comissoes.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">Nenhuma comissão calculada.</p>
           ) : (
@@ -202,12 +216,26 @@ export function EmbaixadoresClient({
                       </td>
                       <td className="px-3 py-2 text-right">
                         {!c.paga && (
-                          <form action={marcarComissaoPagaAction}>
-                            <input type="hidden" name="comissaoId" value={c.id} />
-                            <button type="submit" className="text-xs text-blue-600 hover:underline">
-                              Marcar como paga
-                            </button>
-                          </form>
+                          <div className="flex items-center justify-end gap-3">
+                            {podeAdministrar && (
+                              <form action={actionPix}>
+                                <input type="hidden" name="comissaoId" value={c.id} />
+                                <button
+                                  type="submit"
+                                  className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                                  title="Envia o PIX agora para a chave do analista"
+                                >
+                                  Pagar agora (PIX)
+                                </button>
+                              </form>
+                            )}
+                            <form action={marcarComissaoPagaAction}>
+                              <input type="hidden" name="comissaoId" value={c.id} />
+                              <button type="submit" className="text-xs text-blue-600 hover:underline">
+                                Marcar como paga
+                              </button>
+                            </form>
+                          </div>
                         )}
                       </td>
                     </tr>

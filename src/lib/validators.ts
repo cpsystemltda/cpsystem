@@ -39,11 +39,15 @@ export const signupSchema = z
     // Primeira empresa
     plano: z.enum(["BASICO", "INTERMEDIARIO", "PREMIUM"], { message: "Escolha um plano" }),
 
-    // Cartão (validado em detalhe pela função validarCartao no auth action)
-    cartaoNumero: z.string().min(13, "Informe o número do cartão"),
-    cartaoNome: z.string().min(4, "Informe o nome impresso no cartão"),
-    cartaoValidade: z.string().regex(/^\d{2}\/?\d{2}$/, "Validade no formato MM/AA"),
-    cartaoCvv: z.string().regex(/^\d{3,4}$/, "CVV inválido"),
+    // Regina 24/08 (pedido do Igor): o trial deixou de exigir cartão. Quem
+    // quiser já deixa a recorrência pronta; quem não quiser escolhe como pagar
+    // no fim dos 14 dias. Por isso o cartão é opcional aqui e só é validado de
+    // verdade (Luhn, bandeira, validade) quando `pagamentoAgora` = "CARTAO".
+    pagamentoAgora: z.enum(["CARTAO", "DEPOIS"]).optional(),
+    cartaoNumero: z.string().optional(),
+    cartaoNome: z.string().optional(),
+    cartaoValidade: z.string().optional(),
+    cartaoCvv: z.string().optional(),
 
     razaoSocial: z.string().min(2, "Informe a razão social"),
     nomeFantasia: z.string().optional(),
@@ -65,10 +69,9 @@ export const signupSchema = z
     // "1" quando marcado, ausente quando desmarcado.
     aceiteTermos: z.literal("1", { message: "Você precisa aceitar os termos pra continuar" }),
     // Regina 13/07: CPF do titular do cartão + dia de vencimento fixo.
-    cpfTitularCartao: z.string()
-      .transform((s) => s.replace(/\D/g, ""))
-      .refine((s) => s.length === 11, "CPF do titular deve ter 11 dígitos"),
-    diaVencimento: z.enum(["10", "15", "20"], { message: "Escolha o dia de vencimento (10, 15 ou 20)" }),
+    // Ambos só fazem sentido com cartão — viraram opcionais junto com ele.
+    cpfTitularCartao: z.string().optional(),
+    diaVencimento: z.enum(["10", "15", "20"]).optional(),
   })
   .superRefine((v, ctx) => {
     if (v.senha !== v.confirmacaoSenha) {
@@ -77,6 +80,27 @@ export const signupSchema = z
         path: ["confirmacaoSenha"],
         message: "Confirmação não confere com a senha",
       });
+    }
+    // Escolheu cartão? Então os campos do cartão voltam a ser obrigatórios.
+    if (v.pagamentoAgora === "CARTAO") {
+      if (!v.cartaoNumero || v.cartaoNumero.replace(/\D/g, "").length < 13) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cartaoNumero"], message: "Informe o número do cartão" });
+      }
+      if (!v.cartaoNome || v.cartaoNome.trim().length < 4) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cartaoNome"], message: "Informe o nome impresso no cartão" });
+      }
+      if (!v.cartaoValidade || !/^\d{2}\/?\d{2}$/.test(v.cartaoValidade)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cartaoValidade"], message: "Validade no formato MM/AA" });
+      }
+      if (!v.cartaoCvv || !/^\d{3,4}$/.test(v.cartaoCvv)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cartaoCvv"], message: "CVV inválido" });
+      }
+      if (!v.cpfTitularCartao || v.cpfTitularCartao.replace(/\D/g, "").length !== 11) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cpfTitularCartao"], message: "CPF do titular deve ter 11 dígitos" });
+      }
+      if (!v.diaVencimento) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["diaVencimento"], message: "Escolha o dia de vencimento (10, 15 ou 20)" });
+      }
     }
   });
 

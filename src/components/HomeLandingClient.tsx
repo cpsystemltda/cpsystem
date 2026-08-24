@@ -425,7 +425,7 @@ export default function HomeLandingClient() {
               .
             </h2>
             <p className="mx-auto mt-4 max-w-[640px] text-[14px] leading-relaxed lg:text-[15px]" style={{ color: "var(--text-soft)" }}>
-              Cartão validado no cadastro — <strong>não cobramos durante o teste</strong>. A primeira cobrança sai depois do 14º dia, e avisamos antes de debitar. Cancela com 1 clique antes disso, sem fidelidade.
+              <strong>Comece sem cartão</strong> — nada é cobrado durante o teste. Depois do 14º dia você escolhe PIX, boleto ou cartão pra continuar, e avisamos antes. Sem fidelidade.
             </p>
           </div>
 
@@ -655,7 +655,7 @@ export default function HomeLandingClient() {
               className="mx-auto mt-4 max-w-[560px] text-[15px] leading-relaxed lg:text-[16px]"
               style={{ color: "var(--text-soft)" }}
             >
-              São 14 dias grátis. O cartão é cadastrado no início e a primeira cobrança só acontece depois do 14º dia — avisamos antes, pra não ter surpresa. Configuração assistida e suporte humano via WhatsApp.
+              São 14 dias grátis e você começa sem cartão. No 15º dia, escolhe como pagar — PIX, boleto ou cartão — e avisamos antes, pra não ter surpresa. Configuração assistida e suporte humano via WhatsApp.
             </p>
             <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link

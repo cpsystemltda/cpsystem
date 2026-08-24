@@ -193,6 +193,19 @@ export class GatewayAsaas implements GatewayPagamento {
     });
   }
 
+  /**
+   * GET /v3/payments/{id} — `creditDate` sai preenchido quando o valor ja foi
+   * liberado; ate la vale `estimatedCreditDate`.
+   */
+  async consultarCredito(chargeId: string): Promise<{ creditadoEm: Date | null; previsaoCredito: Date | null }> {
+    type Resp = { creditDate?: string | null; estimatedCreditDate?: string | null };
+    const p = await this.req<Resp>(`/payments/${chargeId}`);
+    return {
+      creditadoEm: p.creditDate ? new Date(p.creditDate) : null,
+      previsaoCredito: p.estimatedCreditDate ? new Date(p.estimatedCreditDate) : null,
+    };
+  }
+
   async cancelarCobranca(chargeId: string): Promise<void> {
     await this.req(`/payments/${chargeId}`, { method: "DELETE" });
   }

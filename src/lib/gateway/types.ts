@@ -139,6 +139,13 @@ export interface GatewayPagamento {
   obterPix?(chargeId: string): Promise<PixParaPagar>;
   /** Troca a forma de pagamento de uma cobranca em aberto (ex: boleto -> PIX). */
   trocarFormaCobranca?(chargeId: string, forma: FormaPagamento): Promise<void>;
+  /**
+   * Quando o dinheiro desta cobranca fica (ou ficou) disponivel na conta.
+   * Regina 24/08: a comissao do analista sai quando o dinheiro entra de fato,
+   * e nao por um prazo fixo chutado — cartao segura ~32 dias, PIX cai na hora,
+   * e antecipacao muda tudo isso.
+   */
+  consultarCredito?(chargeId: string): Promise<{ creditadoEm: Date | null; previsaoCredito: Date | null }>;
   validarWebhook(headers: Headers, rawBody: string): Promise<boolean>;
   parsearWebhook(rawBody: string): Promise<EventoWebhook | null>;
   // Subscriptions (opcional — só Asaas implementa por enquanto)

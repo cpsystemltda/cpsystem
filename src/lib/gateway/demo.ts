@@ -58,6 +58,11 @@ export class GatewayDemo implements GatewayPagamento {
     // no-op
   }
 
+  async consultarCredito(_chargeId: string): Promise<{ creditadoEm: Date | null; previsaoCredito: Date | null }> {
+    // Em demo o dinheiro "cai" na hora.
+    return { creditadoEm: new Date(), previsaoCredito: new Date() };
+  }
+
   async cancelarCobranca(_chargeId: string): Promise<void> {
     // no-op
   }

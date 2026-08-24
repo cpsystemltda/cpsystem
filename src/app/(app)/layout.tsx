@@ -91,12 +91,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // por essa tela e escolheu como pagar. Sem essa condicao, quem escolhia PIX
   // (que nao gera assinatura no gateway) voltava pro funil do cartao em toda
   // navegacao — inclusive quando ia justamente pagar o PIX em /conta/assinatura.
+  //
+  // Regina 24/08: com o trial sem cartão, quase toda conta nova cai nessas
+  // condições — e mandar o cliente pra tela de pagamento no primeiro minuto
+  // mataria o teste. Por isso o funil só entra na reta final do trial (3 dias
+  // ou menos), que era o objetivo original: ativar a recorrência antes de o
+  // acesso parar.
+  const trialAcabando =
+    !!conta.trialAteEm && conta.trialAteEm.getTime() - Date.now() <= 3 * 86400000;
   const precisaCompletarCadastro =
     tipoConta === "EMPRESA" &&
     !usuario.superAdmin &&
     conta.statusAssinatura === "TRIAL" &&
     !conta.gatewaySubscriptionId &&
-    conta.diaVencimento === null;
+    conta.diaVencimento === null &&
+    trialAcabando;
   if (precisaCompletarCadastro && !pathname.startsWith("/conta/completar-cadastro") && !pathname.startsWith("/termos") && !pathname.startsWith("/api")) {
     redirect("/conta/completar-cadastro");
   }

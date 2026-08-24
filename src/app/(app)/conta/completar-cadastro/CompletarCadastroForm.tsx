@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { CreditCard, QrCode } from "lucide-react";
+import { CreditCard, QrCode, FileText } from "lucide-react";
 import { CampoCartao } from "@/components/CampoCartao";
 import { PixPagamento } from "@/components/PixPagamento";
 import { completarCadastroAction } from "@/app/actions/completarCadastro";
@@ -25,7 +25,7 @@ export function CompletarCadastroForm({
   modoMigracao?: boolean;
 }) {
   const [state, formAction] = useActionState(completarCadastroAction, null);
-  const [forma, setForma] = useState<"PIX" | "CARTAO_CREDITO">("PIX");
+  const [forma, setForma] = useState<"PIX" | "BOLETO" | "CARTAO_CREDITO">("PIX");
   const e = state?.campos ?? {};
 
   // Caminho PIX concluído: a cobrança existe e o código aparece aqui mesmo.
@@ -141,13 +141,20 @@ export function CompletarCadastroForm({
       <h2 className="border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
         Como você prefere pagar <span className="text-red-500">*</span>
       </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <OpcaoForma
           ativo={forma === "PIX"}
           onClick={() => setForma("PIX")}
           icone={QrCode}
           titulo="PIX"
           sub="Código na hora, confirmação em segundos. Todo mês você recebe o novo."
+        />
+        <OpcaoForma
+          ativo={forma === "BOLETO"}
+          onClick={() => setForma("BOLETO")}
+          icone={FileText}
+          titulo="Boleto"
+          sub="Vence em 2 dias. Compensa em até 1 dia útil depois do pagamento."
         />
         <OpcaoForma
           ativo={forma === "CARTAO_CREDITO"}
@@ -229,7 +236,7 @@ export function CompletarCadastroForm({
           type="submit"
           className="rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-700"
         >
-          {forma === "PIX" ? "Gerar PIX e concluir cadastro" : "Cadastrar cartão e ativar cobrança"}
+          {forma === "CARTAO_CREDITO" ? "Cadastrar cartão e ativar cobrança" : forma === "BOLETO" ? "Gerar boleto e concluir cadastro" : "Gerar PIX e concluir cadastro"}
         </button>
       </div>
     </form>
