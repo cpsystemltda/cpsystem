@@ -73,7 +73,7 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
           // cliente ja caiu de fato na conta do CP System.
           cobrancas: {
             where: { status: "PAGA", pagaEm: { not: null } },
-            select: { pagaEm: true, forma: true, gatewayChargeId: true },
+            select: { pagaEm: true, forma: true, gatewayChargeId: true, competencia: true },
             orderBy: { pagaEm: "desc" },
           },
         },
@@ -104,8 +104,13 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
   const DIAS_COMPENSACAO_CARTAO = 32;
   const comissoes: typeof candidatas = [];
   for (const c of candidatas) {
-    const pagamentos = c.conta?.cobrancas ?? [];
-    // Sem fatura paga registrada: nao ha receita correspondente, nao paga.
+    // Regina 24/08: "a comissão de agosto só vai ser paga quando o Léo pagar e
+    // cair na nossa conta". Cada competência anda com a SUA mensalidade — antes
+    // bastava qualquer fatura paga da conta ter compensado, o que liberaria a
+    // comissão de agosto com o dinheiro de julho, mesmo com agosto em aberto.
+    const doMes = (c.conta?.cobrancas ?? []).filter((p) => p.competencia === c.competencia);
+    // Competência sem fatura paga correspondente: o cliente não pagou esse mês.
+    const pagamentos = doMes;
     if (pagamentos.length === 0) continue;
 
     let temCaixa = false;
