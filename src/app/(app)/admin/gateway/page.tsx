@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { statusGateway } from "@/lib/gateway";
 import { GatewayConfigForm } from "./GatewayConfigForm";
 import { ReguaCobrancaButton } from "./ReguaCobrancaButton";
+import { CobrancasEmAberto } from "./CobrancasEmAberto";
 
 export default async function GatewayPage() {
   const usuario = await exigirUsuario();
@@ -31,6 +32,34 @@ export default async function GatewayPage() {
     prisma.cobranca.count({ where: { status: "ATRASADA" } }),
     prisma.cobranca.count({ where: { status: "PAGA" } }),
   ]);
+
+  const abertas = await prisma.cobranca.findMany({
+    where: { status: { in: ["PENDENTE", "PROCESSANDO", "ATRASADA"] } },
+    orderBy: { vencimento: "asc" },
+    take: 50,
+    select: {
+      id: true, competencia: true, forma: true, valor: true, status: true,
+      vencimento: true, observacoes: true,
+      conta: {
+        select: {
+          empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1 },
+          usuarios: { select: { superAdmin: true } },
+        },
+      },
+    },
+  });
+  const cobrancasAbertas = abertas.map((c) => ({
+    id: c.id,
+    competencia: c.competencia,
+    forma: c.forma as string,
+    valor: c.valor,
+    status: c.status as string,
+    vencimento: c.vencimento.toLocaleDateString("pt-BR"),
+    cliente:
+      c.conta.empresas[0]?.nomeFantasia ?? c.conta.empresas[0]?.razaoSocial ?? "Conta sem empresa",
+    interna: c.conta.usuarios.some((u) => u.superAdmin),
+    observacoes: c.observacoes,
+  }));
 
   return (
     <div className="mx-auto max-w-4xl px-8 py-8">
@@ -85,6 +114,7 @@ export default async function GatewayPage() {
           <li>Use o mesmo Webhook Token aqui e lá.</li>
         </ol>
       </section>
+      <CobrancasEmAberto cobrancas={cobrancasAbertas} />
     </div>
   );
 }
