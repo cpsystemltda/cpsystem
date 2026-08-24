@@ -673,12 +673,12 @@ async function blocoFinanceiroDoCliente(opts: {
   );
   // Detalhe do devedor — os maiores primeiro, no maximo 5 pra nao virar lista
   // interminavel no WhatsApp.
+  // Igor 24/08: "esse 'mais 2 órgãos' fica ruim, porque o cliente vai querer
+  // saber quais são. Seria bom discriminar tudo." Antes cortava no 5º maior —
+  // e justamente o órgão escondido podia ser o que ele precisava cobrar.
   const ordenados = [...porOrgao.entries()].sort((a, b) => b[1].valor - a[1].valor);
-  for (const [, dados] of ordenados.slice(0, 5)) {
+  for (const [, dados] of ordenados) {
     linhas.push(`     – ${dados.rotulo}: ${brl(dados.valor)} (${dados.qtd} nota${dados.qtd > 1 ? "s" : ""})`);
-  }
-  if (ordenados.length > 5) {
-    linhas.push(`     – e mais ${ordenados.length - 5} órgão(s)`);
   }
 
   return { linhas, temConteudo: pagosSemana.length > 0 || emAtraso.length > 0 };
@@ -789,9 +789,9 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
     const [
       empenhosPendentes,
       empenhosPagosSemana,
-      atasVencendo,
-      contratosVencendo,
-      empenhosVencendo,
+      atasVencendoLista,
+      contratosVencendoLista,
+      empenhosVencendoLista,
       cobrancasPendentes,
     ] = await Promise.all([
       prisma.empenho.count({
@@ -807,19 +807,26 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
           atualizadoEm: { gte: new Date(inicioHoje.getTime() - 7 * 86400000) },
         },
       }),
-      prisma.ata.count({
+      // Igor 24/08: "1 execução com prazo nesta semana QUAL? DESCREVER".
+      // Contagem sozinha nao serve — ele precisa saber QUAL documento cobrar.
+      // Por isso vem a lista, nao o numero.
+      prisma.ata.findMany({
         where: {
           empresa: { contaId: { in: contaIdsCarteira } },
           vigenciaFim: { gte: inicioHoje, lt: em30d },
         },
+        select: { numero: true, orgaoNome: true, vigenciaFim: true },
+        orderBy: { vigenciaFim: "asc" },
       }),
-      prisma.contrato.count({
+      prisma.contrato.findMany({
         where: {
           empresa: { contaId: { in: contaIdsCarteira } },
           vigenciaFim: { gte: inicioHoje, lt: em30d },
         },
+        select: { numero: true, orgaoNome: true, vigenciaFim: true },
+        orderBy: { vigenciaFim: "asc" },
       }),
-      prisma.empenho.count({
+      prisma.empenho.findMany({
         where: {
           empresa: { contaId: { in: contaIdsCarteira } },
           status: { in: STATUS_EM_ANDAMENTO },
@@ -829,11 +836,23 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
             { dataPrevistaExecucao: { gte: inicioHoje, lt: em7d } },
           ],
         },
+        select: {
+          numero: true,
+          orgaoNome: true,
+          dataEntregaCerta: true,
+          dataEntregaFim: true,
+          dataPrevistaExecucao: true,
+        },
+        orderBy: { criadoEm: "asc" },
       }),
       prisma.cobranca.count({
         where: { contaId: conta.id, status: { in: ["PENDENTE", "ATRASADA"] } },
       }),
     ]);
+
+    const atasVencendo = atasVencendoLista.length;
+    const contratosVencendo = contratosVencendoLista.length;
+    const empenhosVencendo = empenhosVencendoLista.length;
 
     // Trava final: se TUDO deu zero, nao manda. Uma mensagem "0, 0, 0, 0" nao
     // informa nada e passa a impressao de sistema quebrado — foi o que o Igor
@@ -913,12 +932,30 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
       // Prazos seguem no fim: o financeiro e o que o Igor pediu em primeiro
       // lugar, mas vencimento perdido continua sendo o que gera multa.
       const alertas: string[] = [];
-      if (empenhosVencendo > 0)
-        alertas.push(`⚠️ ${empenhosVencendo} execução(ões) com prazo de entrega nesta semana`);
-      if (atasVencendo + contratosVencendo > 0)
+      if (empenhosVencendo > 0) {
+        alertas.push(`⚠️ ${empenhosVencendo} execução(ões) com prazo de entrega nesta semana:`);
+        for (const e of empenhosVencendoLista) {
+          const prazo = e.dataEntregaCerta ?? e.dataEntregaFim ?? e.dataPrevistaExecucao;
+          alertas.push(
+            `     – ${e.numero} · ${e.orgaoNome}${prazo ? ` · entrega até ${prazo.toLocaleDateString("pt-BR")}` : ""}`,
+          );
+        }
+      }
+      if (atasVencendo + contratosVencendo > 0) {
         alertas.push(
-          `📌 ${atasVencendo + contratosVencendo} documento(s) com vigência vencendo em 30 dias`,
+          `📌 ${atasVencendo + contratosVencendo} documento(s) com vigência vencendo em 30 dias:`,
         );
+        for (const a of atasVencendoLista) {
+          alertas.push(
+            `     – Ata ${a.numero} · ${a.orgaoNome}${a.vigenciaFim ? ` · vence ${a.vigenciaFim.toLocaleDateString("pt-BR")}` : ""}`,
+          );
+        }
+        for (const ct of contratosVencendoLista) {
+          alertas.push(
+            `     – Contrato ${ct.numero} · ${ct.orgaoNome}${ct.vigenciaFim ? ` · vence ${ct.vigenciaFim.toLocaleDateString("pt-BR")}` : ""}`,
+          );
+        }
+      }
       if (alertas.length) {
         linhas.push(`🔔 *Pontos de atenção*`);
         alertas.forEach((a) => linhas.push(`• ${a}`));
