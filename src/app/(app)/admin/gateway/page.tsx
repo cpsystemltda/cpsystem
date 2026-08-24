@@ -6,6 +6,7 @@ import { statusGateway } from "@/lib/gateway";
 import { GatewayConfigForm } from "./GatewayConfigForm";
 import { ReguaCobrancaButton } from "./ReguaCobrancaButton";
 import { CobrancasEmAberto } from "./CobrancasEmAberto";
+import { FaturasEmFalta } from "./FaturasEmFalta";
 
 export default async function GatewayPage() {
   const usuario = await exigirUsuario();
@@ -61,6 +62,44 @@ export default async function GatewayPage() {
     observacoes: c.observacoes,
   }));
 
+  // Contas ativas sem cobrança na competência do mês — o mês que ficou pra trás
+  // quando o cliente pagou com atraso (ver `ativarPlano`).
+  const agora = new Date();
+  const competenciaAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}`;
+  const contasAtivas = await prisma.conta.findMany({
+    where: {
+      tipo: "EMPRESA",
+      statusAssinatura: "ATIVA",
+      usuarios: { none: { superAdmin: true } },
+      gatewaySubscriptionId: null, // com assinatura, quem cobra é o gateway
+    },
+    select: {
+      id: true,
+      empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1 },
+      cobrancas: {
+        select: { competencia: true, status: true, pagaEm: true },
+        orderBy: { vencimento: "desc" },
+      },
+    },
+  });
+  const faturasEmFalta = contasAtivas
+    .filter(
+      (c) =>
+        !c.cobrancas.some(
+          (cb) => cb.competencia === competenciaAtual && cb.status !== "CANCELADA",
+        ),
+    )
+    .map((c) => {
+      const ultimo = c.cobrancas.find((cb) => cb.status === "PAGA" && cb.pagaEm);
+      return {
+        contaId: c.id,
+        cliente:
+          c.empresas[0]?.nomeFantasia ?? c.empresas[0]?.razaoSocial ?? "Conta sem empresa",
+        competencia: competenciaAtual,
+        ultimoPago: ultimo?.pagaEm ? ultimo.pagaEm.toLocaleDateString("pt-BR") : null,
+      };
+    });
+
   return (
     <div className="mx-auto max-w-4xl px-8 py-8">
       <Link href="/admin" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
@@ -114,6 +153,7 @@ export default async function GatewayPage() {
           <li>Use o mesmo Webhook Token aqui e lá.</li>
         </ol>
       </section>
+      <FaturasEmFalta linhas={faturasEmFalta} />
       <CobrancasEmAberto cobrancas={cobrancasAbertas} />
     </div>
   );
