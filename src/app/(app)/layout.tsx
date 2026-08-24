@@ -15,6 +15,7 @@ import { FlutuanteIAsystem } from "@/components/FlutuanteIAsystem";
 import { ComandoRapido } from "@/components/ComandoRapido";
 import { SemAcessoModulo } from "@/components/SemAcessoModulo";
 import { moduloDaRota, podeAcessarModulo } from "@/lib/modulosAcesso";
+import { avaliarBloqueio } from "@/lib/bloqueio";
 
 // Rotas que SÓ a empresa acessa (analista é redirecionado pro painel dele)
 const ROTAS_SO_EMPRESA = [
@@ -35,16 +36,10 @@ const ROTAS_SO_EMPRESA = [
 // Rotas que SÓ o analista acessa
 const ROTAS_SO_ANALISTA = ["/painel-analista"];
 
-// Rotas que continuam acessíveis mesmo com conta bloqueada (paywall)
-const ROTAS_PERMITIDAS_INADIMPLENTE = [
-  "/conta/assinatura",
-  "/conta/checkout",
-  "/empresas",
-  "/equipe",
-  "/termos",
-  "/auditoria",
-  "/admin",
-];
+// Rotas que continuam acessíveis com a conta bloqueada por falta de pagamento.
+// Regina 24/08 apertou a régua: sem pagamento, o cliente não opera o sistema.
+// Sobra o que ele precisa pra pagar (tudo em /conta) e o contrato.
+const ROTAS_PERMITIDAS_INADIMPLENTE = ["/conta/", "/termos"];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Todas as queries/cookies em paralelo — layout não pode bloquear a navegação
@@ -79,9 +74,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const pathname = h.get("x-pathname") || "/";
 
   const conta = usuario.conta;
-  const trialExpirado = conta.statusAssinatura === "TRIAL" && conta.trialAteEm && conta.trialAteEm < new Date();
-  const inadimplente = conta.statusAssinatura === "INADIMPLENTE" || conta.statusAssinatura === "CANCELADA";
-  const bloqueada = inadimplente || trialExpirado;
+  // Bloqueio por falta de pagamento: 3 dias de atraso travam o uso. A regra
+  // mora em `@/lib/bloqueio` porque a tela de assinatura precisa dela também.
+  // Super admin nunca bloqueia — senão a plataforma fica sem operação.
+  const bloqueio = usuario.superAdmin
+    ? { bloqueada: false, motivo: null }
+    : await avaliarBloqueio(conta);
+  const bloqueada = bloqueio.bloqueada;
 
   // Regina 13/07: se conta EMPRESA nao tem subscription Asaas (signup antigo),
   // manda direto pra tela de completar cadastro em vez de mostrar Paywall.
@@ -119,9 +118,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/termos");
   }
 
-  // Paywall só aplica pra contas EMPRESA (analista não paga assinatura)
-  const ROTAS_PERMITIDAS_INADIMPLENTE = ["/conta/", "/empresas", "/equipe", "/termos", "/auditoria", "/admin"];
+  // Paywall só aplica pra contas EMPRESA (analista não paga assinatura).
   const rotaPermitidaPaywall = ROTAS_PERMITIDAS_INADIMPLENTE.some((r) => pathname.startsWith(r));
+
+  // Conta bloqueada vai DIRETO pra tela de pagamento (Regina 24/08). Antes
+  // aparecia um aviso com links e o cliente tinha que procurar onde pagar —
+  // agora ele cai na cobrança em aberto, com o PIX na tela.
+  if (tipoConta === "EMPRESA" && bloqueada && !rotaPermitidaPaywall) {
+    redirect("/conta/assinatura");
+  }
 
   // Acesso por modulo (Regina 21/08). A trava fica AQUI, e nao em cada pagina:
   // o layout ja conhece a rota atual pelo header x-pathname, entao uma regra so
@@ -208,9 +213,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           modulosPermitidos={usuario.modulosPermitidos}
         />
         <main className="flex-1 overflow-y-auto">
-          {tipoConta === "EMPRESA" && bloqueada && !rotaPermitidaPaywall ? (
-            <Paywall status={conta.statusAssinatura} trialExpirado={!!trialExpirado} />
-          ) : consolidadoBloqueado ? (
+          {consolidadoBloqueado ? (
             <SelecioneEmpresa />
           ) : moduloBloqueado ? (
             <SemAcessoModulo chave={moduloBloqueado} />
@@ -255,34 +258,3 @@ function SelecioneEmpresa() {
   );
 }
 
-function Paywall({ status, trialExpirado }: { status: string; trialExpirado: boolean }) {
-  const titulo = trialExpirado
-    ? "Seu trial gratuito acabou"
-    : status === "INADIMPLENTE"
-      ? "Sua assinatura está inadimplente"
-      : "Sua assinatura foi cancelada";
-  const texto = trialExpirado
-    ? "Para continuar usando o CP System, ative um plano pago. Seus dados estão preservados."
-    : status === "INADIMPLENTE"
-      ? "Identificamos cobrança em atraso. Regularize para liberar novamente o acesso aos módulos operacionais."
-      : "Reative para continuar gerenciando suas contratações.";
-
-  return (
-    <div className="mx-auto max-w-2xl px-8 py-20 text-center">
-      <div className="glass mx-auto inline-flex h-16 w-16 place-items-center justify-center rounded-full">
-        <AlertTriangle className="h-8 w-8" style={{ color: "var(--primary)" }} />
-      </div>
-      <h1 className="mt-6 text-3xl font-bold" style={{ color: "var(--text)", letterSpacing: "-0.025em" }}>
-        {titulo}
-      </h1>
-      <p className="mt-3 text-base" style={{ color: "var(--text-soft)" }}>{texto}</p>
-      <div className="mt-8 flex justify-center gap-3">
-        <Link href="/conta/assinatura" className="btn-primary">Ir para Assinatura</Link>
-        <Link href="/conta/checkout" className="btn-secondary">Ativar plano</Link>
-      </div>
-      <p className="mt-12 text-xs" style={{ color: "var(--text-mute)" }}>
-        Ainda pode acessar: <strong>Empresas</strong>, <strong>Equipe</strong>, <strong>Termos / LGPD</strong>, <strong>Auditoria</strong>, <strong>Admin</strong> e <strong>Conta</strong>.
-      </p>
-    </div>
-  );
-}

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { limiteDeAtraso } from "@/lib/bloqueio";
 
 /**
  * Régua de cobrança automatizada.
@@ -34,8 +35,6 @@ export async function executarRegua(): Promise<ResumoRegua> {
   const hoje = new Date();
   const em3dias = new Date(hoje.getTime() + 3 * 86400000);
   const ha2dias = new Date(hoje.getTime() - 2 * 86400000);
-  const ha3dias = new Date(hoje.getTime() - 3 * 86400000);
-  const ha7dias = new Date(hoje.getTime() - 7 * 86400000);
 
   // 0. Gera renovação automática mensal pra contas ATIVAS vencendo
   //    Regina 23/06 — fecha o ciclo de cobrança recorrente.
@@ -86,18 +85,28 @@ export async function executarRegua(): Promise<ResumoRegua> {
     });
   }
 
-  // 3. Vencidas há mais de 3 dias → ATRASADA
+  // 3. Passou do vencimento → ATRASADA.
+  // Antes esperava 3 dias pra marcar; agora os 3 dias são a tolerância ATÉ o
+  // bloqueio (Regina 24/08), então a cobrança já nasce atrasada no dia seguinte
+  // ao vencimento — é o que o cliente vê na tela de assinatura.
   const vencidas = await prisma.cobranca.findMany({
-    where: { status: "PENDENTE", vencimento: { lt: ha3dias } },
+    where: { status: "PENDENTE", vencimento: { lt: hoje } },
     select: { id: true },
   });
   for (const c of vencidas) {
     await prisma.cobranca.update({ where: { id: c.id }, data: { status: "ATRASADA" } });
   }
 
-  // 4. Contas com cobrança ATRASADA há mais de 7 dias → BLOQUEAR (paywall ativa)
+  // 4. Cobrança em aberto vencida há mais de 3 dias → BLOQUEIA a conta.
+  // Regina 24/08: "três dias de atraso é bloqueado para uso". Antes eram 7 dias
+  // depois de virar ATRASADA (que por sua vez já esperava 3) — dez dias de uso
+  // sem pagar. O acesso também confere isso em tempo real (`@/lib/bloqueio`);
+  // aqui a régua persiste o status pra relatório e cobrança.
   const aBloquear = await prisma.cobranca.findMany({
-    where: { status: "ATRASADA", vencimento: { lt: ha7dias } },
+    where: {
+      status: { in: ["PENDENTE", "PROCESSANDO", "ATRASADA"] },
+      vencimento: { lt: limiteDeAtraso(hoje) },
+    },
     distinct: ["contaId"],
     select: { contaId: true },
   });

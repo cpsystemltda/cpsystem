@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { statusGateway } from "@/lib/gateway";
 import { PixPagamento } from "@/components/PixPagamento";
+import { avaliarBloqueio } from "@/lib/bloqueio";
 import { calcularValorMensal, PRECO_CNPJ_ADICIONAL, COLABORADORES_INCLUSOS, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precos";
 import { CancelarAssinaturaForm } from "./CancelarForm";
 
@@ -53,9 +54,38 @@ export default async function AssinaturaPage() {
   const trial = conta.statusAssinatura === "TRIAL" && conta.trialAteEm;
   const diasTrial = trial ? Math.max(0, Math.ceil((conta.trialAteEm!.getTime() - Date.now()) / 86400000)) : 0;
   const cobrancaPendente = conta.cobrancas.find((c) => c.status === "PENDENTE" || c.status === "ATRASADA");
+  // Quem chega aqui redirecionado por falta de pagamento precisa entender por
+  // que perdeu o acesso e o que resolve — sem isso a tela parece igual à de
+  // sempre. Super admin não bloqueia (opera a plataforma).
+  const bloqueio = usuario.superAdmin
+    ? null
+    : await avaliarBloqueio({
+        id: conta.id,
+        tipo: conta.tipo,
+        statusAssinatura: conta.statusAssinatura,
+        trialAteEm: conta.trialAteEm,
+      });
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
+      {bloqueio?.bloqueada && (
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+          <p className="flex items-center gap-2 text-sm font-bold text-red-900">
+            <AlertTriangle className="h-4 w-4" /> Acesso suspenso por falta de pagamento
+          </p>
+          <p className="mt-2 text-sm text-red-900">
+            {bloqueio.motivo === "COBRANCA_VENCIDA" && bloqueio.vencidaEm
+              ? `A cobrança venceu em ${bloqueio.vencidaEm.toLocaleDateString("pt-BR")} e está ${bloqueio.diasDeAtraso} dia${bloqueio.diasDeAtraso === 1 ? "" : "s"} em atraso. `
+              : bloqueio.motivo === "TRIAL_EXPIRADO"
+                ? "Seu período de teste terminou. "
+                : bloqueio.motivo === "CANCELADA"
+                  ? "Sua assinatura está cancelada. "
+                  : "Sua assinatura está com pagamento pendente. "}
+            Assim que o pagamento for confirmado, o acesso volta automaticamente — em segundos, no
+            caso do PIX.
+          </p>
+        </div>
+      )}
       <div className="flex items-start gap-3">
         <div
           className="grid h-10 w-10 place-items-center rounded-[12px]"
