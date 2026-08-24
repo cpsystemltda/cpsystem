@@ -3,6 +3,7 @@ import { Crown, UserCheck, Users2, Wallet, Sparkles, Building2, Briefcase, Coins
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
+import { ComissoesEmAbertoTabela } from "./ComissoesEmAbertoTabela";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { KPI } from "@/components/ui/KPI";
 
@@ -72,6 +73,7 @@ export default async function AdminAnalistasPage() {
   // do PO: pagamentos que NOS fazemos aos analistas.
   const comissoesCpSystem = await prisma.comissao.findMany({
     select: {
+      id: true,
       analistaId: true,
       contaId: true,
       valor: true,
@@ -557,6 +559,39 @@ export default async function AdminAnalistasPage() {
             </tbody>
           </table>
         )}
+      </section>
+
+      {/* Comissões em aberto — Regina 24/08: o repasse automático só sai quando o
+          dinheiro do cliente é liberado pelo gateway (cartão leva ~32 dias).
+          Quando ela decide antecipar, paga por aqui. */}
+      <section className="mt-8">
+        <h2
+          className="text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
+          Comissões do programa em aberto
+        </h2>
+        <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
+          O sistema paga sozinho assim que o pagamento do cliente cai em conta. Use o botão só pra
+          antecipar o repasse — o PIX sai na hora, do caixa do CP System.
+        </p>
+        <div className="glass mt-3 overflow-hidden rounded-[20px]">
+          <ComissoesEmAbertoTabela
+            comissoes={comissoesCpSystem
+              .filter((c) => !c.paga)
+              .map((c) => ({
+                id: c.id,
+                competencia: c.competencia,
+                valor: c.valor,
+                analista:
+                  analistas.find((a) => a.id === c.analistaId)?.nomeCompleto ?? "Analista",
+                cliente:
+                  c.conta.empresas[0]?.nomeFantasia ??
+                  c.conta.empresas[0]?.razaoSocial ??
+                  "—",
+              }))}
+          />
+        </div>
       </section>
 
       {/* Atalho */}

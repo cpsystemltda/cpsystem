@@ -98,13 +98,25 @@ export default async function AdminFinanceiroPage() {
   const ltv = calcularLtv(arpu, churnPct, ativas.length);
   const amostraSuficiente = ativas.length >= AMOSTRA_MINIMA_METRICA;
 
-  // Ranking de adimplência por origem (analista vs direto)
+  // Ranking de adimplência por origem (analista vs direto).
+  //
+  // Regina 24/08: a linha do Igor aparecia com 33,3% e ela leu como se o Igor
+  // — que é analista e não paga nada — estivesse inadimplente. Duas correções:
+  // o rótulo agora diz que são os CLIENTES trazidos por ele, e o cálculo parou
+  // de contar como calote o que nunca foi devido. As duas cobranças de R$ 997
+  // que puxavam o número pra baixo estavam CANCELADAS (troca de plano) — e
+  // cobrança cancelada, ou ainda não vencida, não é inadimplência.
+  const hojeRef = new Date();
   const origens = new Map<string, { rotulo: string; total: number; pagas: number; mrr: number }>();
   for (const c of empresas) {
     const chave = c.embaixador?.id ?? "DIRETO";
-    const rotulo = c.embaixador?.nomeCompleto ?? "Direto / sem indicação";
+    const rotulo = c.embaixador
+      ? `Clientes via ${c.embaixador.nomeCompleto}`
+      : "Direto / sem indicação";
     const item = origens.get(chave) ?? { rotulo, total: 0, pagas: 0, mrr: 0 };
     for (const cb of c.cobrancas) {
+      if (cb.status === "CANCELADA" || cb.status === "ESTORNADA") continue;
+      if (cb.status !== "PAGA" && cb.vencimento > hojeRef) continue; // ainda no prazo
       item.total += 1;
       if (cb.status === "PAGA") item.pagas += 1;
     }
@@ -217,14 +229,16 @@ export default async function AdminFinanceiroPage() {
           Ranking de adimplência por origem
         </h2>
         <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-          Compara a qualidade financeira dos clientes por canal de aquisição (analistas vs aquisição direta).
+          Compara a qualidade financeira dos <strong>clientes</strong> por canal de aquisição — analista que
+          trouxe vs. cadastro direto. Os números são das faturas dos clientes, não do analista (analista não
+          paga assinatura). Cobrança cancelada e fatura ainda dentro do prazo ficam de fora.
         </p>
         <div className="glass mt-3 overflow-hidden rounded-[20px]">
           <table className="table-glass">
             <thead>
               <tr>
                 <th>#</th>
-                <th>Origem</th>
+                <th>Canal de aquisição</th>
                 <th className="num">Cobranças</th>
                 <th className="num">Pagas</th>
                 <th className="num">Adimplência</th>

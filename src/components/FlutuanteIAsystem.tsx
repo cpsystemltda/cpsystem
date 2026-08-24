@@ -19,6 +19,7 @@ import {
 } from "@/app/actions/iasystem";
 import type { MensagemIAsystem } from "@/lib/iasystem";
 import { MarkdownInline } from "@/lib/markdownInline";
+import { useArrastavel } from "@/components/useArrastavel";
 
 const SUGESTOES_INICIAIS = [
   "Posso aderir a uma Ata de outro órgão sem ter participado? Quais os limites?",
@@ -61,16 +62,30 @@ export function FlutuanteIAsystem({
 }
 
 function BotaoFAB({ onAbrir }: { onAbrir: () => void }) {
+  // Arrasta pra sair da frente do conteúdo (Regina 24/08) — a posição fica
+  // guardada no navegador dela.
+  const { alvoRef, aoPressionar, arrastando, foiArrasto, estilo } =
+    useArrastavel<HTMLButtonElement>("cp_iasystem_fab");
+
   return (
     <button
+      ref={alvoRef}
       type="button"
-      onClick={onAbrir}
-      aria-label="Abrir IAsystem — assistente jurídico"
-      className="group fixed bottom-6 right-6 z-[60] inline-flex items-center gap-3 rounded-full pl-3 pr-5 py-3 text-sm font-bold text-white shadow-lg transition-all hover:shadow-2xl hover:scale-105"
+      onPointerDown={aoPressionar}
+      onClick={() => {
+        if (foiArrasto()) return;
+        onAbrir();
+      }}
+      aria-label="Abrir IAsystem — assistente jurídico (arraste para mover)"
+      title="Clique para abrir · arraste para mover"
+      className={`group fixed bottom-6 right-6 z-[60] inline-flex touch-none select-none items-center gap-3 rounded-full pl-3 pr-5 py-3 text-sm font-bold text-white shadow-lg transition-shadow hover:shadow-2xl ${
+        arrastando ? "cursor-grabbing" : "cursor-grab"
+      }`}
       style={{
         background: "linear-gradient(135deg, #8E73E0 0%, #6B4FC9 100%)",
         boxShadow:
           "0 8px 24px -4px rgba(110, 78, 209, 0.45), 0 2px 8px rgba(110, 78, 209, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25)",
+        ...estilo,
       }}
     >
       <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20">
@@ -102,6 +117,17 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
   const [enviando, startTransition] = useTransition();
   const fimRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { alvoRef, aoPressionar, arrastando, estilo } =
+    useArrastavel<HTMLDivElement>("cp_iasystem_janela");
+
+  // Sem véu de fundo, o Esc passa a ser a saída rápida do chat.
+  useEffect(() => {
+    function aoTeclar(e: KeyboardEvent) {
+      if (e.key === "Escape") onFechar();
+    }
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  }, [onFechar]);
 
   // Contador de perguntas usadas HOJE — vem do servidor (counta as
   // soft-deletadas tambem, entao limpar historico nao reseta). Atualiza
@@ -193,25 +219,29 @@ function Drawer({ onFechar, isPremium }: { onFechar: () => void; isPremium: bool
 
   return (
     <>
+      {/* Regina 24/08: o chat deixou de escurecer a tela. Quem abre o assistente
+          quase sempre quer perguntar sobre o que está vendo — cobrir a página
+          com um véu escuro atrapalhava justamente isso. Fecha no X ou no Esc. */}
       <div
-        className="fixed inset-0 z-[55] bg-black/30 backdrop-blur-sm"
-        onClick={onFechar}
-        aria-hidden
-      />
-      <div
+        ref={alvoRef}
         className="fixed bottom-6 right-6 z-[60] flex flex-col rounded-2xl bg-white shadow-2xl"
         style={{
           width: "min(440px, calc(100vw - 48px))",
           height: "min(640px, calc(100vh - 80px))",
           boxShadow:
             "0 24px 48px -8px rgba(15, 14, 12, 0.25), 0 8px 16px -4px rgba(15, 14, 12, 0.1)",
+          ...estilo,
         }}
         role="dialog"
         aria-label="Chat IAsystem"
       >
-        {/* Header */}
+        {/* Header — também é a alça pra arrastar a janela */}
         <header
-          className="flex items-center justify-between gap-3 rounded-t-2xl px-4 py-3 text-white"
+          onPointerDown={aoPressionar}
+          title="Arraste para mover a janela"
+          className={`flex touch-none select-none items-center justify-between gap-3 rounded-t-2xl px-4 py-3 text-white ${
+            arrastando ? "cursor-grabbing" : "cursor-grab"
+          }`}
           style={{ background: "linear-gradient(135deg, #8E73E0 0%, #6B4FC9 100%)" }}
         >
           <div className="flex items-center gap-2">
