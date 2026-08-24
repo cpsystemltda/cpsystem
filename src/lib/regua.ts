@@ -30,6 +30,9 @@ export type ResumoRegua = {
   whatsAppResumo: { janela: string; usuariosNotificados: number; capAtingido: number; semItems: number };
   comissoesEmbaixador: { competencia: string; vinculos: number; totalGeradoBRL: number };
   trialAvisados: number;
+  /** Avisos de fatura vencida (cliente e analista do cliente). */
+  atrasoClientesAvisados: number;
+  atrasoAnalistasAvisados: number;
   /** Comissões de analista repassadas por PIX nesta execução. */
   comissoesRepassadas: number;
   comissoesRepasseFalhou: number;
@@ -161,6 +164,15 @@ export async function executarRegua(): Promise<ResumoRegua> {
     return { competenciaPaga: "", tentativas: 0, sucessos: 0, falhas: 0, totalPagoBRL: 0 };
   });
 
+  // 8c. Atraso de pagamento: avisa o cliente (fatura vencida, bloqueio em 3
+  // dias) e o analista (o atraso do cliente segura a comissao dele). Regina
+  // 24/08. Best-effort — nunca derruba o resto da regua.
+  const { notificarAtrasoDePagamento } = await import("@/lib/notificacoesWhatsapp");
+  const atrasos = await notificarAtrasoDePagamento(hoje).catch((e) => {
+    console.error("[regua] erro nos avisos de atraso:", e);
+    return { clientesAvisados: 0, analistasAvisados: 0 };
+  });
+
   // 9. Fim de trial (Regina 06/08) — avisa em D-3 e D-1 que a cobranca vai
   // comecar. O cartao ja foi tokenizado no signup, entao sem aviso o cliente
   // e cobrado de surpresa. Best-effort: nunca derruba o resto da regua.
@@ -171,6 +183,8 @@ export async function executarRegua(): Promise<ResumoRegua> {
   });
 
   return {
+    atrasoClientesAvisados: atrasos.clientesAvisados,
+    atrasoAnalistasAvisados: atrasos.analistasAvisados,
     comissoesRepassadas: repasses.sucessos,
     comissoesRepasseFalhou: repasses.falhas,
     trialAvisados: trial.avisados,

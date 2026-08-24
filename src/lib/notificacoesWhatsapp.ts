@@ -1271,3 +1271,123 @@ export async function executarNotificacoesDiarias(): Promise<{
     return { janela: "MANHA", usuariosNotificados: 0, capAtingido: 0, semItems: 0 };
   });
 }
+
+// ==================== ATRASO DE PAGAMENTO ====================
+
+/**
+ * Avisa CLIENTE e ANALISTA quando a fatura passa do vencimento (Regina 24/08).
+ *
+ * São dois avisos com propósitos diferentes:
+ * - o cliente precisa saber que tem fatura vencida e que o acesso para no 3º
+ *   dia de atraso — a mensagem leva ele direto pra tela onde paga por PIX;
+ * - o analista precisa saber que o cliente dele atrasou, porque a comissão de
+ *   R$ 29,90 depende de o cliente pagar. Sem esse aviso ele descobre no fim do
+ *   mês, quando não tem mais o que fazer.
+ *
+ * Cadência: D+1 (dia seguinte ao vencimento) e D+3 (o dia em que o acesso
+ * trava). `referenciaId` amarra cobrança + dia, então cada aviso sai uma vez só.
+ *
+ * Conta interna (Regina/Igor) fica de fora: ela não é cobrada.
+ */
+export async function notificarAtrasoDePagamento(hoje: Date = new Date()): Promise<{
+  clientesAvisados: number;
+  analistasAvisados: number;
+}> {
+  const inicioHoje = new Date(hoje);
+  inicioHoje.setHours(0, 0, 0, 0);
+
+  let clientesAvisados = 0;
+  let analistasAvisados = 0;
+
+  for (const diasAtraso of [1, 3]) {
+    // Cobranças que venceram exatamente há `diasAtraso` dias.
+    const inicioAlvo = new Date(inicioHoje.getTime() - diasAtraso * 86400000);
+    const fimAlvo = new Date(inicioAlvo.getTime() + 86400000);
+
+    const vencidas = await prisma.cobranca.findMany({
+      where: {
+        status: { in: ["PENDENTE", "PROCESSANDO", "ATRASADA"] },
+        vencimento: { gte: inicioAlvo, lt: fimAlvo },
+        conta: { usuarios: { none: { superAdmin: true } } },
+      },
+      select: {
+        id: true,
+        valor: true,
+        vencimento: true,
+        contaId: true,
+        conta: {
+          select: {
+            empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1 },
+            embaixador: { select: { contaId: true, nomeCompleto: true } },
+            vinculosAnalista: {
+              where: { status: "ATIVO" },
+              select: { analista: { select: { contaId: true, nomeCompleto: true } } },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    for (const cb of vencidas) {
+      const nomeCliente =
+        cb.conta.empresas[0]?.nomeFantasia ?? cb.conta.empresas[0]?.razaoSocial ?? "seu cliente";
+      const vencimentoBr = cb.vencimento.toLocaleDateString("pt-BR");
+      const bloqueado = diasAtraso >= 3;
+
+      // ---- Cliente ----
+      const usuarios = await destinatariosDaConta(cb.contaId);
+      for (const u of usuarios) {
+        const r = await dispararNotificacao({
+          usuarioId: u.id,
+          tipo: "PLANO_ATRASADO",
+          referenciaId: `atraso-cliente-${cb.id}-d${diasAtraso}`,
+          mensagem: bloqueado
+            ? `🔒 *Acesso suspenso por falta de pagamento*\n\n` +
+              `${primeiroNome(u.nome)}, a fatura de *${brl(cb.valor)}* venceu em ${vencimentoBr} e ` +
+              `o acesso ao CP System foi suspenso hoje.\n\n` +
+              `Pra liberar na hora: entre em *Conta › Assinatura* e pague por PIX — ` +
+              `a confirmação é automática e o acesso volta em segundos.\n\n` +
+              `https://cpsystem.app.br/conta/assinatura`
+            : `⏰ *Fatura vencida ontem*\n\n` +
+              `${primeiroNome(u.nome)}, a fatura de *${brl(cb.valor)}* venceu em ${vencimentoBr}.\n\n` +
+              `Regularizando até amanhã, nada muda no seu acesso. A partir de *3 dias de atraso* ` +
+              `o sistema bloqueia o uso automaticamente.\n\n` +
+              `Pague por PIX em segundos: https://cpsystem.app.br/conta/assinatura`,
+        });
+        if (r.enviado) clientesAvisados++;
+      }
+
+      // ---- Analista (quem ganha comissão por esse cliente) ----
+      const contaAnalista =
+        cb.conta.embaixador?.contaId ?? cb.conta.vinculosAnalista[0]?.analista.contaId ?? null;
+      if (!contaAnalista) continue;
+      const usuariosAnalista = await destinatariosDaConta(contaAnalista);
+      for (const u of usuariosAnalista) {
+        const r = await dispararNotificacao({
+          usuarioId: u.id,
+          tipo: "PLANO_ATRASADO",
+          referenciaId: `atraso-analista-${cb.id}-d${diasAtraso}`,
+          mensagem: bloqueado
+            ? `⚠️ *${nomeCliente} teve o acesso suspenso*\n\n` +
+              `${primeiroNome(u.nome)}, a fatura de ${nomeCliente} (${brl(cb.valor)}, vencida em ` +
+              `${vencimentoBr}) completou 3 dias de atraso e o acesso dele foi bloqueado.\n\n` +
+              `*O que isso significa pra você:* enquanto o cliente não regularizar, a comissão ` +
+              `de *R$ 29,90/mês* referente a ele não é repassada — o repasse só sai depois que o ` +
+              `pagamento dele entra em conta. Se ele cancelar, a comissão se encerra.\n\n` +
+              `Uma conversa sua com ele agora costuma resolver mais rápido que qualquer cobrança nossa.`
+            : `📌 *${nomeCliente} está com fatura em atraso*\n\n` +
+              `${primeiroNome(u.nome)}, a fatura de ${nomeCliente} (${brl(cb.valor)}) venceu em ` +
+              `${vencimentoBr} e ainda não foi paga.\n\n` +
+              `*Por que te avisamos:* a sua comissão de *R$ 29,90/mês* por esse cliente depende do ` +
+              `pagamento dele. Se o atraso chegar a 3 dias, o acesso dele é bloqueado — e a ` +
+              `comissão fica parada até regularizar.\n\n` +
+              `Se puder dar um toque nele, ajuda os dois lados.`,
+        });
+        if (r.enviado) analistasAvisados++;
+      }
+    }
+  }
+
+  return { clientesAvisados, analistasAvisados };
+}

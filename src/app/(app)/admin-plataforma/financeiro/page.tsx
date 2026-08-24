@@ -52,6 +52,11 @@ export default async function AdminFinanceiroPage() {
     include: {
       empresas: { select: { nomeFantasia: true, razaoSocial: true } },
       embaixador: { select: { id: true, nomeCompleto: true } },
+      vinculosAnalista: {
+        where: { status: "ATIVO" },
+        select: { analista: { select: { nomeCompleto: true } } },
+        take: 1,
+      },
       cobrancas: {
         select: { status: true, valor: true, vencimento: true, pagaEm: true },
         orderBy: { vencimento: "desc" },
@@ -98,37 +103,46 @@ export default async function AdminFinanceiroPage() {
   const ltv = calcularLtv(arpu, churnPct, ativas.length);
   const amostraSuficiente = ativas.length >= AMOSTRA_MINIMA_METRICA;
 
-  // Ranking de adimplência por origem (analista vs direto).
+  // Adimplência por cliente (Regina 24/08).
   //
-  // Regina 24/08: a linha do Igor aparecia com 33,3% e ela leu como se o Igor
-  // — que é analista e não paga nada — estivesse inadimplente. Duas correções:
-  // o rótulo agora diz que são os CLIENTES trazidos por ele, e o cálculo parou
-  // de contar como calote o que nunca foi devido. As duas cobranças de R$ 997
-  // que puxavam o número pra baixo estavam CANCELADAS (troca de plano) — e
-  // cobrança cancelada, ou ainda não vencida, não é inadimplência.
+  // Antes isso era um ranking agregado "por origem", e a linha aparecia com o
+  // nome do ANALISTA — a Regina leu como se o Igor, que é analista e não paga
+  // nada, estivesse inadimplente. Agora cada linha é um cliente, com o analista
+  // vinculado ao lado (ou nada, quando o cliente veio direto).
+  //
+  // O cálculo também estava errado: contava cobrança CANCELADA como calote. As
+  // duas de R$ 997 do cliente do Igor eram troca de plano — viravam 33,3% de
+  // adimplência num cliente que pagou tudo que devia. Cancelada, estornada e
+  // fatura ainda dentro do prazo ficam de fora.
   const hojeRef = new Date();
-  const origens = new Map<string, { rotulo: string; total: number; pagas: number; mrr: number }>();
-  for (const c of empresas) {
-    const chave = c.embaixador?.id ?? "DIRETO";
-    const rotulo = c.embaixador
-      ? `Clientes via ${c.embaixador.nomeCompleto}`
-      : "Direto / sem indicação";
-    const item = origens.get(chave) ?? { rotulo, total: 0, pagas: 0, mrr: 0 };
-    for (const cb of c.cobrancas) {
-      if (cb.status === "CANCELADA" || cb.status === "ESTORNADA") continue;
-      if (cb.status !== "PAGA" && cb.vencimento > hojeRef) continue; // ainda no prazo
-      item.total += 1;
-      if (cb.status === "PAGA") item.pagas += 1;
-    }
-    if (c.statusAssinatura === "ATIVA") {
-      item.mrr += c.plano === "PREMIUM" ? PRECO_PREMIUM : PRECO_BASICO;
-    }
-    origens.set(chave, item);
-  }
-  const ranking = Array.from(origens.values())
-    .filter((o) => o.total > 0)
-    .map((o) => ({ ...o, adimplenciaPct: (o.pagas / o.total) * 100 }))
-    .sort((a, b) => b.adimplenciaPct - a.adimplenciaPct);
+  const porCliente = empresas
+    .map((c) => {
+      const consideradas = c.cobrancas.filter((cb) => {
+        if (cb.status === "CANCELADA" || cb.status === "ESTORNADA") return false;
+        if (cb.status !== "PAGA" && cb.vencimento > hojeRef) return false;
+        return true;
+      });
+      const pagas = consideradas.filter((cb) => cb.status === "PAGA").length;
+      const emAtraso = consideradas.filter((cb) => cb.status !== "PAGA").length;
+      return {
+        cliente:
+          c.empresas[0]?.nomeFantasia ?? c.empresas[0]?.razaoSocial ?? "Cliente sem empresa",
+        analista:
+          c.embaixador?.nomeCompleto ?? c.vinculosAnalista[0]?.analista.nomeCompleto ?? null,
+        total: consideradas.length,
+        pagas,
+        emAtraso,
+        mrr:
+          c.statusAssinatura === "ATIVA"
+            ? c.plano === "PREMIUM"
+              ? PRECO_PREMIUM
+              : PRECO_BASICO
+            : 0,
+        adimplenciaPct: consideradas.length > 0 ? (pagas / consideradas.length) * 100 : 100,
+      };
+    })
+    .filter((l) => l.total > 0)
+    .sort((a, b) => a.adimplenciaPct - b.adimplenciaPct || b.mrr - a.mrr);
 
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
@@ -220,62 +234,71 @@ export default async function AdminFinanceiroPage() {
         </div>
       </div>
 
-      {/* Ranking de adimplência por origem */}
+      {/* Adimplência por cliente */}
       <div className="mt-8">
         <h2
           className="text-[12px] font-bold uppercase"
           style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
         >
-          Ranking de adimplência por origem
+          Adimplência por cliente
         </h2>
         <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-          Compara a qualidade financeira dos <strong>clientes</strong> por canal de aquisição — analista que
-          trouxe vs. cadastro direto. Os números são das faturas dos clientes, não do analista (analista não
-          paga assinatura). Cobrança cancelada e fatura ainda dentro do prazo ficam de fora.
+          Quem está em dia e quem está em atraso, com o analista vinculado ao lado. Os valores são
+          das faturas do cliente — analista não paga assinatura. Cobrança cancelada e fatura ainda
+          dentro do prazo não entram na conta.
         </p>
         <div className="glass mt-3 overflow-hidden rounded-[20px]">
           <table className="table-glass">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Canal de aquisição</th>
-                <th className="num">Cobranças</th>
+                <th>Cliente</th>
+                <th>Analista vinculado</th>
+                <th className="num">Faturas</th>
                 <th className="num">Pagas</th>
+                <th className="num">Em atraso</th>
                 <th className="num">Adimplência</th>
                 <th className="num">MRR ativo</th>
               </tr>
             </thead>
             <tbody>
-              {ranking.length === 0 ? (
+              {porCliente.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="center" style={{ padding: "48px 24px", color: "var(--text-mute)" }}>
-                    Sem cobranças registradas ainda. Quando as primeiras assinaturas pagas
-                    rodarem, o ranking aparece aqui.
+                  <td colSpan={7} className="center" style={{ padding: "48px 24px", color: "var(--text-mute)" }}>
+                    Sem faturas vencidas ainda. Quando a primeira assinatura rodar, o quadro
+                    aparece aqui.
                   </td>
                 </tr>
               ) : (
-                ranking.map((o, i) => (
-                  <tr key={o.rotulo}>
-                    <td className="strong">{i + 1}º</td>
-                    <td className="strong">{o.rotulo}</td>
-                    <td className="num">{o.total}</td>
-                    <td className="num" style={{ color: "var(--mint-deep)", fontWeight: 700 }}>{o.pagas}</td>
+                porCliente.map((l) => (
+                  <tr key={l.cliente}>
+                    <td className="strong">{l.cliente}</td>
+                    <td className="text-xs" style={{ color: "var(--text-soft)" }}>
+                      {l.analista ?? "—"}
+                    </td>
+                    <td className="num">{l.total}</td>
+                    <td className="num" style={{ color: "var(--mint-deep)", fontWeight: 700 }}>{l.pagas}</td>
+                    <td
+                      className="num"
+                      style={{ color: l.emAtraso > 0 ? "var(--coral-deep)" : "var(--text-mute)", fontWeight: 700 }}
+                    >
+                      {l.emAtraso > 0 ? l.emAtraso : "—"}
+                    </td>
                     <td className="num">
                       <span
                         style={{
                           fontWeight: 700,
                           color:
-                            o.adimplenciaPct >= 90
+                            l.adimplenciaPct >= 90
                               ? "var(--mint-deep)"
-                              : o.adimplenciaPct >= 70
+                              : l.adimplenciaPct >= 70
                                 ? "var(--primary-deep)"
                                 : "var(--coral-deep)",
                         }}
                       >
-                        {o.adimplenciaPct.toFixed(1)}%
+                        {l.adimplenciaPct.toFixed(1)}%
                       </span>
                     </td>
-                    <td className="num">{brl(o.mrr)}</td>
+                    <td className="num">{brl(l.mrr)}</td>
                   </tr>
                 ))
               )}
