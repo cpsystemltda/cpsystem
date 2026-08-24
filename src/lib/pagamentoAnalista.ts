@@ -178,6 +178,7 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
           ultimoErroPgto: null,
         },
       });
+      await avisarRepasseAoAnalista(c.id);
       sucessos++;
       totalPagoBRL += c.valor;
     } catch (err) {
@@ -197,6 +198,60 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
     falhas,
     totalPagoBRL,
   };
+}
+
+/**
+ * Avisa o analista de que o PIX da comissão saiu (Regina 24/08).
+ *
+ * Faltava: o repasse era transferido e o analista só descobria olhando o
+ * extrato. Quem recebe dinheiro precisa saber que recebeu, e por qual cliente —
+ * é isso que permite a ele conferir se está tudo certo.
+ *
+ * Best-effort: falha de WhatsApp nunca desfaz um pagamento que já saiu.
+ */
+async function avisarRepasseAoAnalista(comissaoId: string): Promise<void> {
+  try {
+    const c = await prisma.comissao.findUnique({
+      where: { id: comissaoId },
+      select: {
+        valor: true,
+        competencia: true,
+        analista: { select: { contaId: true, nomeCompleto: true } },
+        conta: { select: { empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1 } } },
+      },
+    });
+    if (!c?.analista.contaId) return;
+
+    const cliente =
+      c.conta?.empresas[0]?.nomeFantasia ?? c.conta?.empresas[0]?.razaoSocial ?? "seu cliente";
+    const [ano, mes] = c.competencia.split("-");
+    const nomes = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    const competenciaBr = `${nomes[Number(mes) - 1] ?? mes}/${ano?.slice(2) ?? ano}`;
+
+    const { dispararNotificacao } = await import("@/lib/whatsapp");
+    const usuarios = await prisma.usuario.findMany({
+      where: { contaId: c.analista.contaId, optInWhatsApp: true, telefoneWhatsApp: { not: null } },
+      select: { id: true, nome: true },
+    });
+    for (const u of usuarios) {
+      await dispararNotificacao({
+        usuarioId: u.id,
+        tipo: "COMISSAO_LIBERADA",
+        referenciaId: `repasse-${comissaoId}`,
+        mensagem:
+          `💰 *Comissão paga — ${c.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}*\n\n` +
+          `${u.nome.split(" ")[0]}, o PIX da sua comissão de *${competenciaBr}* acabou de sair para a chave ` +
+          `cadastrada no seu perfil.\n\n` +
+          `▸ Cliente: ${cliente}\n` +
+          `▸ Competência: ${competenciaBr}\n\n` +
+          `Costuma cair em segundos. Se não aparecer, confira a chave PIX em *Conta › Meus dados* ` +
+          `e fale com a gente.\n\n` +
+          `Contato CP System`,
+      });
+    }
+  } catch (e) {
+    console.error("[comissao] falha ao avisar repasse:", e);
+  }
 }
 
 /**
@@ -238,6 +293,7 @@ export async function pagarComissaoAvulsa(comissaoId: string): Promise<
       where: { id: c.id },
       data: { paga: true, pagaEm: new Date(), transferenciaId: tf.transferId, ultimoErroPgto: null },
     });
+    await avisarRepasseAoAnalista(c.id);
     return { ok: true, transferId: tf.transferId, valor: c.valor };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
