@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { CreditCard, QrCode } from "lucide-react";
 import { CampoCartao } from "@/components/CampoCartao";
+import { PixPagamento } from "@/components/PixPagamento";
 import { completarCadastroAction } from "@/app/actions/completarCadastro";
 
 export function CompletarCadastroForm({
@@ -23,10 +25,28 @@ export function CompletarCadastroForm({
   modoMigracao?: boolean;
 }) {
   const [state, formAction] = useActionState(completarCadastroAction, null);
+  const [forma, setForma] = useState<"PIX" | "CARTAO_CREDITO">("PIX");
   const e = state?.campos ?? {};
+
+  // Caminho PIX concluído: a cobrança existe e o código aparece aqui mesmo.
+  if (state?.ok && state.cobrancaId) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 text-sm text-slate-700">
+          <p className="font-semibold text-slate-900">Cadastro completo.</p>
+          <p className="mt-1 text-xs">
+            Pague o PIX abaixo pra liberar a assinatura. A confirmação é automática, e nos próximos
+            meses a cobrança chega no dia que você escolheu.
+          </p>
+        </div>
+        <PixPagamento cobrancaId={state.cobrancaId} autoCarregar />
+      </div>
+    );
+  }
 
   return (
     <form action={formAction} className="space-y-6">
+      <input type="hidden" name="forma" value={forma} />
       {modoMigracao ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
           <p className="font-semibold">Migração da conta</p>
@@ -119,18 +139,43 @@ export function CompletarCadastroForm({
       )}
 
       <h2 className="border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Dados do cartão de crédito <span className="text-red-500">*</span>
+        Como você prefere pagar <span className="text-red-500">*</span>
       </h2>
-      <CampoCartao
-        erros={{
-          cartaoNumero: e.cartaoNumero,
-          cartaoValidade: e.cartaoValidade,
-          cartaoCvv: e.cartaoCvv,
-          cartaoNome: e.cartaoNome,
-        }}
-      />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <OpcaoForma
+          ativo={forma === "PIX"}
+          onClick={() => setForma("PIX")}
+          icone={QrCode}
+          titulo="PIX"
+          sub="Código na hora, confirmação em segundos. Todo mês você recebe o novo."
+        />
+        <OpcaoForma
+          ativo={forma === "CARTAO_CREDITO"}
+          onClick={() => setForma("CARTAO_CREDITO")}
+          icone={CreditCard}
+          titulo="Cartão de crédito"
+          sub="Cobrança automática todo mês, sem precisar lembrar."
+        />
+      </div>
+
+      {forma === "CARTAO_CREDITO" && (
+        <>
+          <h2 className="border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Dados do cartão de crédito <span className="text-red-500">*</span>
+          </h2>
+          <CampoCartao
+            erros={{
+              cartaoNumero: e.cartaoNumero,
+              cartaoValidade: e.cartaoValidade,
+              cartaoCvv: e.cartaoCvv,
+              cartaoNome: e.cartaoNome,
+            }}
+          />
+        </>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
+        {forma === "CARTAO_CREDITO" && (
         <label className="text-xs font-semibold text-slate-700">
           CPF do titular do cartão <span className="text-red-500">*</span>
           <input
@@ -155,6 +200,7 @@ export function CompletarCadastroForm({
           )}
           <p className="mt-1 text-[11px] text-slate-500">Geralmente o CPF do responsável legal.</p>
         </label>
+        )}
 
         <label className="text-xs font-semibold text-slate-700">
           Dia de vencimento das mensalidades <span className="text-red-500">*</span>
@@ -183,9 +229,39 @@ export function CompletarCadastroForm({
           type="submit"
           className="rounded-lg bg-violet-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-violet-700"
         >
-          Cadastrar cartão e ativar cobrança
+          {forma === "PIX" ? "Gerar PIX e concluir cadastro" : "Cadastrar cartão e ativar cobrança"}
         </button>
       </div>
     </form>
+  );
+}
+
+function OpcaoForma({
+  ativo,
+  onClick,
+  icone: Icone,
+  titulo,
+  sub,
+}: {
+  ativo: boolean;
+  onClick: () => void;
+  icone: React.ComponentType<{ size?: number; className?: string }>;
+  titulo: string;
+  sub: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl border p-4 text-left transition ${
+        ativo ? "border-violet-500 bg-violet-50" : "border-slate-200 bg-white hover:border-slate-300"
+      }`}
+    >
+      <span className="flex items-center gap-2 text-sm font-bold text-slate-900">
+        <Icone size={16} className={ativo ? "text-violet-600" : "text-slate-400"} />
+        {titulo}
+      </span>
+      <span className="mt-1 block text-xs text-slate-600">{sub}</span>
+    </button>
   );
 }

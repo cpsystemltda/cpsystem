@@ -9,6 +9,8 @@ import type {
   CriarCobrancaInput,
   CriarCobrancaResultado,
   EventoWebhook,
+  FormaPagamento,
+  PixParaPagar,
 } from "./types";
 
 export class GatewayDemo implements GatewayPagamento {
@@ -43,6 +45,17 @@ export class GatewayDemo implements GatewayPagamento {
       return { chargeId, status: "ATRASADA" }; // simula recusa
     }
     return { chargeId, status: "PAGA" };
+  }
+
+  async obterPix(chargeId: string): Promise<PixParaPagar> {
+    return {
+      qrCodeBase64: gerarPlaceholderQrBase64(),
+      copiaCola: `00020126360014BR.GOV.BCB.PIX0114DEMO${chargeId.slice(-8).toUpperCase()}5204000053039865802BR5917CP SYSTEM DEMO6009BRASILIA6304ABCD`,
+    };
+  }
+
+  async trocarFormaCobranca(_chargeId: string, _forma: FormaPagamento): Promise<void> {
+    // no-op
   }
 
   async cancelarCobranca(_chargeId: string): Promise<void> {

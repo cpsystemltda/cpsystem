@@ -24,6 +24,8 @@ import type {
   CriarAssinaturaInput,
   CriarAssinaturaResultado,
   AtualizarAssinaturaInput,
+  FormaPagamento,
+  PixParaPagar,
 } from "./types";
 
 type AsaasConfig = {
@@ -42,11 +44,15 @@ export class GatewayAsaas implements GatewayPagamento {
   }
 
   private async req<T>(path: string, init: RequestInit = {}): Promise<T> {
+    // Content-Type so quando ha corpo. A Asaas documenta que "chamadas GET
+    // devem ser enviadas com body vazio" e responde 403 quando o request
+    // aparenta ter corpo — foi assim que o GET do QR PIX vinha falhando.
+    const temCorpo = init.body !== undefined && init.body !== null;
     const r = await fetch(`${this.baseUrl}${path}`, {
       ...init,
       headers: {
         access_token: this.cfg.apiKey,
-        "Content-Type": "application/json",
+        ...(temCorpo ? { "Content-Type": "application/json" } : {}),
         ...(init.headers || {}),
       },
     });
@@ -139,12 +145,14 @@ export class GatewayAsaas implements GatewayPagamento {
     let pixCopiaCola: string | undefined;
     if (input.forma === "PIX") {
       try {
-        type PixResp = { encodedImage: string; payload: string };
-        const pix = await this.req<PixResp>(`/payments/${r.id}/pixQrCode`);
-        pixQrCode = `data:image/png;base64,${pix.encodedImage}`;
-        pixCopiaCola = pix.payload;
-      } catch {
-        // ok — frontend mostra só o invoiceUrl
+        const pix = await this.obterPix(r.id);
+        pixQrCode = pix.qrCodeBase64;
+        pixCopiaCola = pix.copiaCola;
+      } catch (e) {
+        // Antes esse catch era vazio: o PIX sumia sem deixar rastro, e o
+        // cliente ficava sem como pagar sem ninguem saber. Agora fica no log
+        // (a cobranca continua valendo — a tela oferece "gerar de novo").
+        console.error(`[asaas] cobranca ${r.id} criada mas sem QR PIX:`, e);
       }
     }
 
@@ -156,6 +164,33 @@ export class GatewayAsaas implements GatewayPagamento {
       pixCopiaCola,
       status: mapearStatusAsaas(r.status),
     };
+  }
+
+  /**
+   * QR + copia-e-cola de uma cobranca existente.
+   * Docs: GET /v3/payments/{id}/pixQrCode. Vale pra billingType PIX, BOLETO e
+   * UNDEFINED — cobranca de cartao nao tem PIX, por isso a troca de forma
+   * existe logo abaixo.
+   */
+  async obterPix(chargeId: string): Promise<PixParaPagar> {
+    type PixResp = { encodedImage: string; payload: string; expirationDate?: string };
+    const pix = await this.req<PixResp>(`/payments/${chargeId}/pixQrCode`);
+    if (!pix.payload) throw new Error("Asaas não devolveu o código PIX desta cobrança.");
+    return {
+      qrCodeBase64: `data:image/png;base64,${pix.encodedImage}`,
+      copiaCola: pix.payload,
+      expiraEm: pix.expirationDate ? new Date(pix.expirationDate) : undefined,
+    };
+  }
+
+  /** PUT /v3/payments/{id} — so aceito enquanto a cobranca esta em aberto. */
+  async trocarFormaCobranca(chargeId: string, forma: FormaPagamento): Promise<void> {
+    const billingType =
+      forma === "PIX" ? "PIX" : forma === "BOLETO" ? "BOLETO" : "CREDIT_CARD";
+    await this.req(`/payments/${chargeId}`, {
+      method: "PUT",
+      body: JSON.stringify({ billingType }),
+    });
   }
 
   async cancelarCobranca(chargeId: string): Promise<void> {

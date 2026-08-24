@@ -87,11 +87,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // manda direto pra tela de completar cadastro em vez de mostrar Paywall.
   // Aplica pra qualquer TRIAL sem subscription, expirado ou nao (assim o Léo
   // e outros TRIAL antigos ativam recorrencia antes do trial terminar).
+  //
+  // Regina 24/08: `diaVencimento` preenchido significa que o cliente JA passou
+  // por essa tela e escolheu como pagar. Sem essa condicao, quem escolhia PIX
+  // (que nao gera assinatura no gateway) voltava pro funil do cartao em toda
+  // navegacao — inclusive quando ia justamente pagar o PIX em /conta/assinatura.
   const precisaCompletarCadastro =
     tipoConta === "EMPRESA" &&
     !usuario.superAdmin &&
     conta.statusAssinatura === "TRIAL" &&
-    !conta.gatewaySubscriptionId;
+    !conta.gatewaySubscriptionId &&
+    conta.diaVencimento === null;
   if (precisaCompletarCadastro && !pathname.startsWith("/conta/completar-cadastro") && !pathname.startsWith("/termos") && !pathname.startsWith("/api")) {
     redirect("/conta/completar-cadastro");
   }

@@ -2,15 +2,18 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, CreditCard, QrCode, FileText, Lock } from "lucide-react";
+import { ChevronLeft, CreditCard, QrCode, Lock } from "lucide-react";
 import { iniciarCheckoutAction } from "@/app/actions/assinatura";
+import { PixPagamento } from "@/components/PixPagamento";
 import { brl } from "@/lib/validators";
 import type { BreakdownCobranca } from "@/lib/precosConstants";
 import { PRECO_CNPJ_ADICIONAL, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precosConstants";
 
 const ROTULO = { BASICO: "Básico", PREMIUM: "Premium" };
 
-type Forma = "PIX" | "BOLETO" | "CARTAO_CREDITO";
+// Regina 24/08: boleto sai da tela — ela nao quer boleto, e PIX resolve o
+// mesmo caso (sem cartao) confirmando na hora em vez de em dias uteis.
+type Forma = "PIX" | "CARTAO_CREDITO";
 
 export function CheckoutClient({
   planoInicial,
@@ -27,20 +30,31 @@ export function CheckoutClient({
   const breakdownAtivo = plano === "BASICO" ? breakdownBasico : breakdownPremium;
   const valor = breakdownAtivo.valorTotal;
 
-  // Se já criou cobrança e ela tem PIX/boleto, mostra os dados
-  // (cobrancaId vem no state — precisaríamos buscar pelo cliente; pra simplificar, recarregamos)
+  // Cobranca criada. No PIX, o codigo aparece aqui mesmo: mandar o cliente
+  // "acompanhar em Assinatura" era pedir que ele procurasse como pagar.
   if (state?.ok) {
     return (
-      <div className="mx-auto max-w-2xl px-8 py-12 text-center">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-100">
-          <Lock className="h-6 w-6 text-emerald-700" />
+      <div className="mx-auto max-w-2xl px-8 py-12">
+        <div className="text-center">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald-100">
+            <Lock className="h-6 w-6 text-emerald-700" />
+          </div>
+          <h2 className="mt-4 text-2xl font-bold text-slate-900">
+            {forma === "PIX" ? "Falta só o pagamento" : "Cobrança criada"}
+          </h2>
+          <p className="mt-2 text-sm text-slate-600">
+            {forma === "PIX"
+              ? "Pague o PIX abaixo — a confirmação é automática e a assinatura é liberada em seguida."
+              : "Assim que o cartão for aprovado, a assinatura é liberada automaticamente."}
+          </p>
         </div>
-        <h2 className="mt-4 text-2xl font-bold text-slate-900">Cobrança criada</h2>
-        <p className="mt-2 text-sm text-slate-600">
-          Você pode acompanhar o status em <Link href="/conta/assinatura" className="text-blue-700 underline">Assinatura</Link>.
-          {forma === "PIX" && " Após o pagamento via PIX, a confirmação é automática."}
-          {forma === "BOLETO" && " O boleto leva até 3 dias úteis pra compensar."}
-        </p>
+
+        {forma === "PIX" && state.cobrancaId && (
+          <div className="mt-6 text-left">
+            <PixPagamento cobrancaId={state.cobrancaId} autoCarregar />
+          </div>
+        )}
+
         <div className="mt-6 flex justify-center gap-3">
           <Link href="/conta/assinatura" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white">
             Ir para minha assinatura
@@ -102,9 +116,8 @@ export function CheckoutClient({
         {/* Forma de pagamento */}
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Forma de pagamento</h2>
-          <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid gap-2 md:grid-cols-2">
             <FormaCard ativo={forma === "PIX"} onClick={() => setForma("PIX")} icone={QrCode} titulo="PIX" sub="Confirmação imediata" />
-            <FormaCard ativo={forma === "BOLETO"} onClick={() => setForma("BOLETO")} icone={FileText} titulo="Boleto" sub="Vencimento em 3 dias" />
             <FormaCard ativo={forma === "CARTAO_CREDITO"} onClick={() => setForma("CARTAO_CREDITO")} icone={CreditCard} titulo="Cartão" sub="Cobrança recorrente" />
           </div>
         </section>

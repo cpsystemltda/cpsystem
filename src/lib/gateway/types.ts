@@ -55,6 +55,17 @@ export type CriarCobrancaResultado = {
   status: "PENDENTE" | "PROCESSANDO" | "PAGA" | "ATRASADA" | "CANCELADA";
 };
 
+/**
+ * PIX pronto pra o cliente pagar. Regina 24/08: PIX e a forma principal, entao
+ * o codigo tem que chegar na tela do cliente — nao adianta so existir no banco.
+ */
+export type PixParaPagar = {
+  /** data:image/png;base64,... — pronto pra <img src>. */
+  qrCodeBase64: string;
+  copiaCola: string;
+  expiraEm?: Date;
+};
+
 export type EventoWebhook = {
   evento: string;
   chargeId?: string;
@@ -121,6 +132,13 @@ export interface GatewayPagamento {
   criarCliente(input: ClienteInput): Promise<CriarClienteResultado>;
   criarCobranca(input: CriarCobrancaInput): Promise<CriarCobrancaResultado>;
   cancelarCobranca(chargeId: string): Promise<void>;
+  /**
+   * Busca o QR/copia-e-cola de uma cobranca que ja existe. Serve pra quem tem
+   * fatura em aberto e quer pagar agora, sem gerar cobranca nova.
+   */
+  obterPix?(chargeId: string): Promise<PixParaPagar>;
+  /** Troca a forma de pagamento de uma cobranca em aberto (ex: boleto -> PIX). */
+  trocarFormaCobranca?(chargeId: string, forma: FormaPagamento): Promise<void>;
   validarWebhook(headers: Headers, rawBody: string): Promise<boolean>;
   parsearWebhook(rawBody: string): Promise<EventoWebhook | null>;
   // Subscriptions (opcional — só Asaas implementa por enquanto)

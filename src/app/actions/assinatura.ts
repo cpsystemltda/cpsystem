@@ -62,10 +62,47 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
   const breakdown = await calcularValorMensal(usuario.contaId, plano);
   const valor = breakdown.valorTotal;
   const competencia = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-  const vencimento = new Date(Date.now() + 3 * 86400000); // 3 dias
+  // Regina 24/08: boleto tem prazo de 2 dias. Ele saiu da tela de checkout,
+  // mas a forma continua existindo no schema e em cobranca antiga — se algum
+  // caminho gerar boleto, é com esse prazo.
+  const vencimento = new Date(Date.now() + (forma === "BOLETO" ? 2 : 3) * 86400000);
 
   try {
     const { customerId } = await garantirCustomer(usuario.contaId);
+
+    // Já existe cobrança em aberto? Reaproveita em vez de criar outra. Sem
+    // isso, quem voltasse ao checkout pra pagar a fatura acabaria com duas
+    // cobranças abertas — e pagando duas vezes o mesmo mês. Vale pra qualquer
+    // competência: a fatura em aberto pode ser a do mês que vem.
+    const emAberto = await prisma.cobranca.findFirst({
+      where: {
+        contaId: usuario.contaId,
+        status: { in: ["PENDENTE", "PROCESSANDO", "ATRASADA"] },
+      },
+      orderBy: { criadaEm: "desc" },
+    });
+    if (emAberto) {
+      const mesmaCobranca = emAberto.plano === plano && emAberto.valor === valor;
+      // Mesmo plano, mesmo valor e não é troca pra cartão: é a mesma dívida.
+      // A tela busca o PIX dessa cobrança e o cliente paga.
+      if (mesmaCobranca && forma !== "CARTAO_CREDITO") {
+        return { ok: true, cobrancaId: emAberto.id };
+      }
+      // Mudou de plano/valor, ou vai passar a pagar no cartão: a anterior sai
+      // de cena pra ninguém pagar duas vezes o mesmo mês.
+      if (emAberto.gatewayChargeId) {
+        try {
+          const gw = await getGateway();
+          await gw.cancelarCobranca(emAberto.gatewayChargeId);
+        } catch (e) {
+          console.error("[checkout] falha ao cancelar cobrança anterior:", e);
+        }
+      }
+      await prisma.cobranca.update({
+        where: { id: emAberto.id },
+        data: { status: "CANCELADA" },
+      });
+    }
 
     const cobrancaInterna = await prisma.cobranca.create({
       data: {
@@ -276,8 +313,18 @@ export async function cancelarAssinaturaAction(_p: Result | null, _formData: For
 // Marcar plano como ativo após confirmação de pagamento
 export async function ativarPlano(contaId: string, plano: Plano) {
   await bloquearEspionagem();
-  const proximo = new Date();
-  proximo.setMonth(proximo.getMonth() + 1);
+  const conta = await prisma.conta.findUnique({
+    where: { id: contaId },
+    select: { diaVencimento: true },
+  });
+  const hoje = new Date();
+  const proximo = new Date(hoje.getFullYear(), hoje.getMonth() + 1, hoje.getDate());
+  // Quem escolheu vencimento no dia 10, 15 ou 20 espera a próxima cobrança
+  // nesse dia — e não no dia em que por acaso pagou a anterior.
+  if (conta?.diaVencimento) {
+    const ultimoDia = new Date(proximo.getFullYear(), proximo.getMonth() + 1, 0).getDate();
+    proximo.setDate(Math.min(conta.diaVencimento, ultimoDia));
+  }
   await prisma.conta.update({
     where: { id: contaId },
     data: {

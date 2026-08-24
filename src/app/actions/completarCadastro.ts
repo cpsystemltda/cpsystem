@@ -7,6 +7,7 @@ import { bloquearEspionagem } from "@/lib/espionagem";
 import { validarCartao } from "@/lib/cartao";
 import { getGateway } from "@/lib/gateway";
 import { calcularValorMensal } from "@/lib/precos";
+import { garantirCustomer } from "@/app/actions/assinatura";
 import { normalizarCnpj } from "@/lib/validators";
 
 // Ativa cobrança recorrente pra contas TRIAL que não passaram pelo signup
@@ -16,6 +17,8 @@ export type CompletarResult = {
   erro?: string;
   campos?: Partial<Record<string, string>>;
   ok?: boolean;
+  /** Preenchido no caminho PIX: a tela mostra o QR desta cobranca. */
+  cobrancaId?: string;
 };
 
 export async function completarCadastroAction(
@@ -42,7 +45,13 @@ export async function completarCadastroAction(
   const usuarioConta = conta.usuarios[0];
   if (!empresa || !usuarioConta) return { erro: "Cadastre uma empresa primeiro." };
 
-  // Extrai + valida cartão
+  // Regina 24/08: a tela deixou de ser só cartão. Quem quiser pagar por PIX
+  // escolhe aqui — antes, toda conta em trial sem assinatura era empurrada pra
+  // esta página e não tinha outra saída além de cadastrar cartão. Boleto ficou
+  // de fora de propósito.
+  const forma = String(formData.get("forma") || "CARTAO_CREDITO") === "PIX" ? "PIX" : "CARTAO_CREDITO";
+
+  // Extrai + valida cartão (só no caminho do cartão)
   const cartaoInput = {
     numero: String(formData.get("cartaoNumero") || "").replace(/\s/g, ""),
     nome: String(formData.get("cartaoNome") || ""),
@@ -50,7 +59,7 @@ export async function completarCadastroAction(
     cvv: String(formData.get("cartaoCvv") || ""),
   };
   const cartao = validarCartao(cartaoInput);
-  if (!cartao.ok) {
+  if (forma === "CARTAO_CREDITO" && !cartao.ok) {
     const campoMap: Record<string, string> = {
       numero: "cartaoNumero",
       nome: "cartaoNome",
@@ -64,7 +73,7 @@ export async function completarCadastroAction(
   }
 
   const cpfTitularRaw = String(formData.get("cpfTitularCartao") || "").replace(/\D/g, "");
-  if (cpfTitularRaw.length !== 11) {
+  if (forma === "CARTAO_CREDITO" && cpfTitularRaw.length !== 11) {
     return { erro: "CPF do titular inválido.", campos: { cpfTitularCartao: "11 dígitos" } };
   }
 
@@ -116,6 +125,91 @@ export async function completarCadastroAction(
   nextDueDate.setDate(diaVenc);
   if (nextDueDate <= base) {
     nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+  }
+
+  // === Caminho PIX ===
+  // Gera a cobrança do primeiro ciclo e devolve pra tela mostrar o QR. A conta
+  // só vira ATIVA quando o pagamento cair (webhook -> ativarPlano): aqui ainda
+  // não entrou dinheiro. A partir daí a renovação mensal já sabe seguir por PIX
+  // pra quem não tem assinatura de cartão (ver renovacaoAutomatica).
+  if (forma === "PIX") {
+    try {
+      const gateway = await getGateway();
+      const breakdown = await calcularValorMensal(conta.id, conta.plano);
+      const { customerId } = await garantirCustomer(conta.id);
+      const competencia = `${nextDueDate.getFullYear()}-${String(nextDueDate.getMonth() + 1).padStart(2, "0")}`;
+
+      // Se já existe cobrança aberta desta competência, reaproveita em vez de
+      // criar outra — a tela busca o PIX dela.
+      const emAberto = await prisma.cobranca.findFirst({
+        where: {
+          contaId: conta.id,
+          competencia,
+          status: { in: ["PENDENTE", "PROCESSANDO", "ATRASADA"] },
+        },
+        orderBy: { criadaEm: "desc" },
+        select: { id: true },
+      });
+
+      let cobrancaId = emAberto?.id;
+      if (!cobrancaId) {
+        const cobranca = await prisma.cobranca.create({
+          data: {
+            contaId: conta.id,
+            competencia,
+            plano: conta.plano,
+            forma: "PIX",
+            valor: breakdown.valorTotal,
+            vencimento: nextDueDate,
+            status: "PENDENTE",
+            observacoes: "Primeira cobrança — cliente escolheu PIX",
+          },
+        });
+        const r = await gateway.criarCobranca({
+          customerId,
+          cobrancaIdInterno: cobranca.id,
+          valor: breakdown.valorTotal,
+          vencimento: nextDueDate,
+          forma: "PIX",
+          descricao: `CP System — Plano ${conta.plano} (${competencia})`,
+        });
+        await prisma.cobranca.update({
+          where: { id: cobranca.id },
+          data: {
+            gatewayChargeId: r.chargeId,
+            gatewayInvoiceUrl: r.invoiceUrl ?? null,
+            pixQrCode: r.pixQrCode ?? null,
+            pixCopiaCola: r.pixCopiaCola ?? null,
+            status: r.status,
+          },
+        });
+        cobrancaId = cobranca.id;
+      }
+
+      await prisma.conta.update({
+        where: { id: conta.id },
+        data: {
+          gatewayCustomerId: customerId,
+          gatewayProvider: gateway.nome,
+          // Escolher o dia de vencimento é o que marca "cadastro completo".
+          // É esse campo que tira o cliente do funil obrigatório do cartão.
+          diaVencimento: diaVenc,
+          proximoVencimento: nextDueDate,
+        },
+      });
+
+      return { ok: true, cobrancaId };
+    } catch (err) {
+      console.error("[completar-cadastro] falha no PIX:", err);
+      return { erro: err instanceof Error ? err.message : "Erro ao gerar o PIX." };
+    }
+  }
+
+  // === Caminho cartão (assinatura recorrente) ===
+  // Repetido de propósito: a validação lá em cima é condicional (o PIX não
+  // exige cartão), então aqui o TypeScript ainda não sabe que os dados vieram.
+  if (!cartao.ok) {
+    return { erro: `Cartão inválido: ${cartao.mensagem}` };
   }
 
   try {

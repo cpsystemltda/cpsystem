@@ -4,6 +4,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { statusGateway } from "@/lib/gateway";
+import { PixPagamento } from "@/components/PixPagamento";
 import { calcularValorMensal, PRECO_CNPJ_ADICIONAL, COLABORADORES_INCLUSOS, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precos";
 import { CancelarAssinaturaForm } from "./CancelarForm";
 
@@ -156,17 +157,23 @@ export default async function AssinaturaPage() {
         </div>
 
         {cobrancaPendente && (
-          <div className="mt-4 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <AlertTriangle className="h-4 w-4" />
-            <span>
-              Cobrança {ROTULO_STATUS_COBRANCA[cobrancaPendente.status]} de {brl(cobrancaPendente.valor)} — vence{" "}
-              {cobrancaPendente.vencimento.toLocaleDateString("pt-BR")}.{" "}
-              {cobrancaPendente.gatewayInvoiceUrl && (
-                <a href={cobrancaPendente.gatewayInvoiceUrl} target="_blank" rel="noreferrer" className="font-medium underline">
-                  Ver fatura
-                </a>
-              )}
-            </span>
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+            <div className="flex items-center gap-2 text-sm text-amber-900">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>
+                Cobrança {ROTULO_STATUS_COBRANCA[cobrancaPendente.status]} de {brl(cobrancaPendente.valor)} — vence{" "}
+                {cobrancaPendente.vencimento.toLocaleDateString("pt-BR")}.
+              </span>
+            </div>
+            {/* Regina 24/08: o cliente paga aqui dentro. Antes so havia o link
+                pra fatura do gateway — e quando ele nao vinha, nao sobrava
+                nenhuma forma de pagar. */}
+            <div className="mt-3">
+              <PixPagamento
+                cobrancaId={cobrancaPendente.id}
+                invoiceUrl={cobrancaPendente.gatewayInvoiceUrl}
+              />
+            </div>
           </div>
         )}
       </section>
@@ -180,7 +187,7 @@ export default async function AssinaturaPage() {
           Métodos de pagamento salvos
         </h2>
         {conta.metodosPagamento.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">Nenhum método salvo. PIX e boleto são gerados sob demanda.</p>
+          <p className="mt-3 text-sm text-slate-500">Nenhum método salvo — no PIX não precisa. O código é gerado na hora, a cada cobrança.</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {conta.metodosPagamento.map((m) => (
