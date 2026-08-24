@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { limiteDeAtraso } from "@/lib/bloqueio";
+import { COBRANCAS_DE_CLIENTE } from "@/lib/contaInterna";
 
 /**
  * Régua de cobrança automatizada.
@@ -90,7 +91,7 @@ export async function executarRegua(): Promise<ResumoRegua> {
   // bloqueio (Regina 24/08), então a cobrança já nasce atrasada no dia seguinte
   // ao vencimento — é o que o cliente vê na tela de assinatura.
   const vencidas = await prisma.cobranca.findMany({
-    where: { status: "PENDENTE", vencimento: { lt: hoje } },
+    where: { status: "PENDENTE", vencimento: { lt: hoje }, ...COBRANCAS_DE_CLIENTE },
     select: { id: true },
   });
   for (const c of vencidas) {
@@ -106,6 +107,8 @@ export async function executarRegua(): Promise<ResumoRegua> {
     where: {
       status: { in: ["PENDENTE", "PROCESSANDO", "ATRASADA"] },
       vencimento: { lt: limiteDeAtraso(hoje) },
+      // Conta interna não é cliente: não vira inadimplente nem bloqueia.
+      ...COBRANCAS_DE_CLIENTE,
     },
     distinct: ["contaId"],
     select: { contaId: true },

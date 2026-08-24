@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getGateway } from "@/lib/gateway";
+import { CONTAS_COBRAVEIS } from "@/lib/contaInterna";
 import { garantirCustomer } from "@/app/actions/assinatura";
 import { calcularValorMensal } from "@/lib/precos";
 import { sincronizarCobranca } from "@/lib/googleCalendar";
@@ -39,6 +40,10 @@ export async function gerarRenovacoesMensais(): Promise<{
       statusAssinatura: "ATIVA",
       proximoVencimento: { lte: em3dias },
       gatewaySubscriptionId: null,
+      // Conta interna (Regina/Igor) nunca gera cobrança — ver `contaInterna`.
+      // Sem este filtro o cron abriu uma cobrança de R$ 997 contra a própria
+      // conta da Regina em 24/08.
+      ...CONTAS_COBRAVEIS,
     },
     select: { id: true, plano: true, proximoVencimento: true },
   });

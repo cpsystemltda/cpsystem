@@ -68,6 +68,17 @@ export default async function AssinaturaPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
+      {usuario.superAdmin && (
+        <div className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 p-5">
+          <p className="text-sm font-bold text-violet-900">
+            Conta interna do CP System — sem cobrança
+          </p>
+          <p className="mt-1 text-sm text-violet-900">
+            Esta conta existe pra operar a plataforma. O plano aparece como Premium só pra liberar
+            todos os módulos: nenhuma mensalidade é gerada nem cobrada aqui.
+          </p>
+        </div>
+      )}
       {bloqueio?.bloqueada && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5">
           <p className="flex items-center gap-2 text-sm font-bold text-red-900">
