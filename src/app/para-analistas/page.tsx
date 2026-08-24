@@ -87,7 +87,7 @@ export default function ParaAnalistasPage() {
               <ArrowRight size={16} />
             </Link>
             <span className="" style={{ fontSize: "12px", color: "var(--text-mute)" }}>
-              14 dias de teste · cancele quando quiser
+              Cadastro gratuito · analista não paga mensalidade
             </span>
           </div>
         </header>
@@ -229,7 +229,7 @@ export default function ParaAnalistasPage() {
             <Passo
               n="1"
               titulo="Crie sua conta"
-              desc="Cadastro de analista em poucos minutos. 14 dias de teste, cancele quando quiser."
+              desc="Cadastro de analista em poucos minutos. Não tem mensalidade nem cartão: quem paga assinatura é a empresa cliente."
             />
             <Passo
               n="2"
