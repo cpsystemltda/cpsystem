@@ -46,18 +46,18 @@ export default async function CompletarCadastroPage() {
         titulo="Complete seu"
         destaque="cadastro"
         subtitulo={jaExpirou
-          ? "Seu período de teste terminou. Cadastre seu cartão pra continuar usando."
-          : "Cadastre seu cartão pra que a cobrança comece automaticamente no dia certo."}
+          ? "Seu período de teste terminou e o acesso está pausado. Escolha como pagar — PIX, boleto ou cartão — pra voltar a usar o sistema."
+          : "Escolha como pagar a mensalidade: PIX, boleto ou cartão. Nada é cobrado até o teste terminar."}
       />
 
       <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         {jaExpirou ? (
           <>
-            <strong>Período de teste encerrado em {trialAteEm.toLocaleDateString("pt-BR")}.</strong> Cadastre seu cartão agora pra reativar o acesso — a primeira cobrança acontece no próximo dia escolhido.
+            <strong>Período de teste encerrado em {trialAteEm.toLocaleDateString("pt-BR")}.</strong> Enquanto não houver forma de pagamento, o acesso às telas do sistema fica pausado. No cartão, o acesso volta na hora; no PIX, assim que o pagamento cair (leva segundos).
           </>
         ) : (
           <>
-            <strong>Seu trial termina em {trialAteEm.toLocaleDateString("pt-BR")}.</strong> Depois disso o Asaas cobra automaticamente no dia de vencimento que você escolher.
+            <strong>Seu trial termina em {trialAteEm.toLocaleDateString("pt-BR")}.</strong> A partir do dia seguinte, o acesso ao sistema depende de ter uma forma de pagamento escolhida — no cartão a cobrança sai sozinha no dia que você escolher; no PIX ou boleto, a fatura aparece aqui todo mês.
           </>
         )}
       </div>

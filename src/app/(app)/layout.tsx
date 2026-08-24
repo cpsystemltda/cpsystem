@@ -16,6 +16,7 @@ import { ComandoRapido } from "@/components/ComandoRapido";
 import { SemAcessoModulo } from "@/components/SemAcessoModulo";
 import { moduloDaRota, podeAcessarModulo } from "@/lib/modulosAcesso";
 import { avaliarBloqueio } from "@/lib/bloqueio";
+import { AvisoUltimoDiaTrial } from "@/components/AvisoUltimoDiaTrial";
 
 // Rotas que SÓ a empresa acessa (analista é redirecionado pro painel dele)
 const ROTAS_SO_EMPRESA = [
@@ -92,20 +93,38 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // (que nao gera assinatura no gateway) voltava pro funil do cartao em toda
   // navegacao — inclusive quando ia justamente pagar o PIX em /conta/assinatura.
   //
-  // Regina 24/08: com o trial sem cartão, quase toda conta nova cai nessas
-  // condições — e mandar o cliente pra tela de pagamento no primeiro minuto
-  // mataria o teste. Por isso o funil só entra na reta final do trial (3 dias
-  // ou menos), que era o objetivo original: ativar a recorrência antes de o
-  // acesso parar.
-  const trialAcabando =
-    !!conta.trialAteEm && conta.trialAteEm.getTime() - Date.now() <= 3 * 86400000;
+  // Regina 24/08, regra final do trial:
+  //   "No 14º dia eu já tenho que exigir o cartão. E no 15º dia, se a pessoa não
+  //    tiver cadastrado, ela não consegue navegar pelas funcionalidades, e a
+  //    mensagem de pagamento fica aparecendo pra ela."
+  //
+  // Traduzindo pro código:
+  //   - até o 13º dia: usa o sistema inteiro, sem interrupção;
+  //   - 14º dia (último do teste): aviso fixo em toda tela cobrando a forma de
+  //     pagamento — exige, mas não trava, senão o 15º dia não seria a virada;
+  //   - 15º dia em diante sem forma de pagamento: acesso travado e todo caminho
+  //     leva pra tela de pagamento.
+  const semFormaDePagamento =
+    !conta.gatewaySubscriptionId && conta.diaVencimento === null;
+  const msAteFimDoTrial = conta.trialAteEm ? conta.trialAteEm.getTime() - Date.now() : null;
+  const ultimoDiaDoTrial =
+    msAteFimDoTrial !== null && msAteFimDoTrial > 0 && msAteFimDoTrial <= 86400000;
+  const exigirFormaDePagamento =
+    tipoConta === "EMPRESA" &&
+    !usuario.superAdmin &&
+    conta.statusAssinatura === "TRIAL" &&
+    semFormaDePagamento &&
+    ultimoDiaDoTrial;
+
+  // O funil que empurra pra tela de pagamento só entra quando o teste ACABOU —
+  // antes disso o cliente navega normalmente (no último dia ele vê o aviso).
   const precisaCompletarCadastro =
     tipoConta === "EMPRESA" &&
     !usuario.superAdmin &&
     conta.statusAssinatura === "TRIAL" &&
-    !conta.gatewaySubscriptionId &&
-    conta.diaVencimento === null &&
-    trialAcabando;
+    semFormaDePagamento &&
+    msAteFimDoTrial !== null &&
+    msAteFimDoTrial <= 0;
   if (precisaCompletarCadastro && !pathname.startsWith("/conta/completar-cadastro") && !pathname.startsWith("/termos") && !pathname.startsWith("/api")) {
     redirect("/conta/completar-cadastro");
   }
@@ -222,6 +241,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           modulosPermitidos={usuario.modulosPermitidos}
         />
         <main className="flex-1 overflow-y-auto">
+          {exigirFormaDePagamento && <AvisoUltimoDiaTrial />}
           {consolidadoBloqueado ? (
             <SelecioneEmpresa />
           ) : moduloBloqueado ? (
