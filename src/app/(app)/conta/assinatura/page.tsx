@@ -6,6 +6,7 @@ import { brl } from "@/lib/validators";
 import { statusGateway } from "@/lib/gateway";
 import { PixPagamento } from "@/components/PixPagamento";
 import { avaliarBloqueio } from "@/lib/bloqueio";
+import { TrocarFormaPagamento } from "./TrocarFormaPagamento";
 import { calcularValorMensal, PRECO_CNPJ_ADICIONAL, COLABORADORES_INCLUSOS, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precos";
 import { CancelarAssinaturaForm } from "./CancelarForm";
 
@@ -248,6 +249,9 @@ export default async function AssinaturaPage() {
         >
           Métodos de pagamento salvos
         </h2>
+        <TrocarFormaPagamento
+          formaAtual={conta.gatewaySubscriptionId ? "CARTAO_CREDITO" : "AVULSO"}
+        />
         {conta.metodosPagamento.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">Nenhum método salvo — no PIX não precisa. O código é gerado na hora, a cada cobrança.</p>
         ) : (

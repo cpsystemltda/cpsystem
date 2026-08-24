@@ -37,8 +37,18 @@ export function invalidarCacheGateway() {
 
 // Status legível pra UI
 export async function statusGateway(): Promise<{ provider: string; configurado: boolean; ambiente: string }> {
+  // Regina 24/08: a tela de assinatura do cliente mostrava "Modo demo — nenhuma
+  // cobranca real e feita" para o Leo, que paga de verdade. O motivo: esta
+  // funcao so olhava a configuracao gravada no banco, que esta vazia — a chave
+  // do Asaas vive nas variaveis de ambiente da Vercel (mais seguro que texto
+  // puro no banco). Agora ela responde a mesma pergunta que `getGateway` faz na
+  // hora de cobrar, senao a tela contradiz o que o sistema realmente executa.
   const cfg = await prisma.configuracaoGateway.findUnique({ where: { id: "singleton" } });
-  const provider = cfg?.provider || "DEMO";
-  const configurado = !!cfg?.apiKey || !!process.env.ASAAS_API_KEY;
-  return { provider, configurado, ambiente: cfg?.ambiente || "sandbox" };
+  const apiKey = cfg?.apiKey || process.env.ASAAS_API_KEY || "";
+  const providerBruto =
+    cfg?.provider || (process.env.GATEWAY_PROVIDER as "ASAAS" | "STRIPE" | "DEMO") || "DEMO";
+  // Sem chave nao ha como cobrar de verdade, entao continua sendo demo.
+  const provider = providerBruto === "ASAAS" && !apiKey ? "DEMO" : providerBruto;
+  const ambiente = cfg?.ambiente || process.env.ASAAS_AMBIENTE || "sandbox";
+  return { provider, configurado: !!apiKey, ambiente };
 }

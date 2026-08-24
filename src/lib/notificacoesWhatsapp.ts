@@ -149,6 +149,10 @@ export async function notificarMudancaStatus(opts: {
 //  5d → crítico, agora ou nunca
 const CADENCIA_DIAS = [90, 60, 30, 15, 10, 5] as const;
 
+// Nota fiscal so vira "em atraso" depois desse prazo — antes disso o orgao
+// ainda esta dentro do que se espera dele (Igor 24/08).
+const DIAS_PARA_NF_VIRAR_ATRASO = 30;
+
 function tomPorDias(dias: number): { emoji: string; urgencia: string; cta: string } {
   if (dias >= 90) return { emoji: "🗓️", urgencia: "Planejamento", cta: "Comece a organizar a renovação/aditivo desde já." };
   if (dias >= 60) return { emoji: "📋", urgencia: "Preparar documentação", cta: "Reúna os documentos necessários e alinhe com o órgão." };
@@ -607,11 +611,26 @@ async function blocoFinanceiroDoCliente(opts: {
     0,
   );
 
-  // Em atraso = NF ja encaminhada/emitida e o orgao ainda nao pagou.
+  // Em atraso = NF emitida/encaminhada HA MAIS DE 30 DIAS e o orgao ainda nao
+  // pagou.
+  //
+  // Igor 24/08: o resumo dele acusou 20 notas em atraso quando so 11 estavam de
+  // fato atrasadas. O filtro contava toda nota nao paga como atraso — mas nota
+  // emitida ontem nao esta atrasada, esta dentro do prazo. Orgao publico costuma
+  // pagar em ate 30 dias; antes disso e fluxo normal, e chamar de atraso tira a
+  // credibilidade do numero (e faz o analista cobrar orgao que nao deve nada
+  // ainda).
+  const limiteAtraso = new Date(agora.getTime() - DIAS_PARA_NF_VIRAR_ATRASO * 86400000);
   const emAtraso = await prisma.empenho.findMany({
     where: {
       empresa: { contaId },
       status: { in: ["NF_EMITIDA", "NF_ENCAMINHADA"] },
+      // Conta pela data que o cliente tem: a de encaminhamento quando existe,
+      // senao a de emissao.
+      OR: [
+        { dataNfEncaminhada: { lt: limiteAtraso } },
+        { dataNfEncaminhada: null, dataNfEmitida: { lt: limiteAtraso } },
+      ],
     },
     select: {
       orgaoNome: true,
@@ -649,7 +668,7 @@ async function blocoFinanceiroDoCliente(opts: {
       (totalPago > 0 ? ` (${brl(totalPago)})` : ""),
   );
   linhas.push(
-    `• Pagamentos em atraso (órgão ainda não pagou a empresa): ${emAtraso.length}` +
+    `• Pagamentos em atraso (NF emitida há mais de ${DIAS_PARA_NF_VIRAR_ATRASO} dias e o órgão não pagou): ${emAtraso.length}` +
       (totalAtraso > 0 ? ` (${brl(totalAtraso)})` : ""),
   );
   // Detalhe do devedor — os maiores primeiro, no maximo 5 pra nao virar lista

@@ -315,16 +315,30 @@ export async function ativarPlano(contaId: string, plano: Plano) {
   await bloquearEspionagem();
   const conta = await prisma.conta.findUnique({
     where: { id: contaId },
-    select: { diaVencimento: true },
+    select: { diaVencimento: true, proximoVencimento: true },
   });
   const hoje = new Date();
-  const proximo = new Date(hoje.getFullYear(), hoje.getMonth() + 1, hoje.getDate());
+
+  // O ciclo anda a partir do VENCIMENTO anterior, não da data do pagamento.
+  //
+  // Regina 24/08: o Léo pagou a fatura de julho (vencida em 20/07) só em 21/08.
+  // Como a conta era jogada pra "hoje + 1 mês", o próximo vencimento virou 21/09
+  // e **agosto simplesmente não foi cobrado** — pagar atrasado empurrava o ciclo
+  // inteiro e a empresa perdia um mês de receita a cada atraso.
+  const base = conta?.proximoVencimento ?? hoje;
+  const proximo = new Date(base.getFullYear(), base.getMonth() + 1, base.getDate());
+
   // Quem escolheu vencimento no dia 10, 15 ou 20 espera a próxima cobrança
   // nesse dia — e não no dia em que por acaso pagou a anterior.
   if (conta?.diaVencimento) {
     const ultimoDia = new Date(proximo.getFullYear(), proximo.getMonth() + 1, 0).getDate();
     proximo.setDate(Math.min(conta.diaVencimento, ultimoDia));
   }
+
+  // O "próximo" pode cair no passado quando o cliente pagou com atraso — e é
+  // assim que tem que ser: a competência que ficou para trás precisa ser
+  // cobrada, não sumir. A renovação automática gera essa fatura com alguns dias
+  // de prazo, pra ninguém ser bloqueado no mesmo minuto em que pagou a anterior.
   await prisma.conta.update({
     where: { id: contaId },
     data: {

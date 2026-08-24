@@ -819,7 +819,9 @@ export default async function DashboardPage({
                 ? `${empenhosAtrasados.length} NF(s) há mais de 30 dias sem pagamento`
                 : "Nenhuma NF vencida há mais de 30 dias"
             }
-            href="/execucao?status=NF_ENCAMINHADA"
+            // Igor 24/08: clicar aqui tem que abrir exatamente as notas atrasadas,
+            // não a lista inteira de NFs em aberto.
+            href="/execucao?atrasadas=1"
             pulse={empenhosAtrasados.length > 0}
           />
           <KPI

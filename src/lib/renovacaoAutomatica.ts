@@ -58,8 +58,19 @@ export async function gerarRenovacoesMensais(): Promise<{
       continue;
     }
 
-    const vencimento = conta.proximoVencimento;
-    const competencia = `${vencimento.getFullYear()}-${String(vencimento.getMonth() + 1).padStart(2, "0")}`;
+    const vencimentoPrevisto = conta.proximoVencimento;
+    // A competência é sempre a do mês que está sendo cobrado — mesmo quando a
+    // fatura sai atrasada, para não perder o mês no histórico.
+    const competencia = `${vencimentoPrevisto.getFullYear()}-${String(vencimentoPrevisto.getMonth() + 1).padStart(2, "0")}`;
+    // Regina 24/08: fatura de competência que ficou para trás (cliente pagou a
+    // anterior com atraso) nasce com alguns dias de prazo em vez de já vencida —
+    // senão o cliente é bloqueado no mesmo instante em que quitou a fatura
+    // anterior. O valor e a competência não mudam; só o prazo para pagar.
+    const DIAS_DE_PRAZO_PARA_ATRASADA = 3;
+    const vencimento =
+      vencimentoPrevisto < hoje
+        ? new Date(hoje.getTime() + DIAS_DE_PRAZO_PARA_ATRASADA * 86400000)
+        : vencimentoPrevisto;
 
     // Idempotência: já existe cobrança pra essa competência?
     const jaExiste = await prisma.cobranca.findFirst({

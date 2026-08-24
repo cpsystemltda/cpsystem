@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Receipt, Truck } from "lucide-react";
+import { Plus, Receipt, Truck, AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
@@ -40,6 +40,8 @@ export default async function ExecucaoPage({
     ate?: string; // data emissão <= (filtro por período)
     ataId?: string;
     contratoId?: string;
+    /** "1" = só NF parada há mais de 30 dias (o card de atrasados do dashboard). */
+    atrasadas?: string;
   }>;
 }) {
   const usuario = await exigirUsuario();
@@ -52,6 +54,12 @@ export default async function ExecucaoPage({
   const ate = sp.ate || "";
   const ataId = sp.ataId || "";
   const contratoId = sp.contratoId || "";
+  // Igor 24/08: o dashboard acusava 11 notas em atraso, mas o clique trazia as
+  // 20 em aberto — sem como saber quais eram as 11. Este filtro aplica o mesmo
+  // critério do card: NF emitida (ou encaminhada) há mais de 30 dias e o órgão
+  // ainda não pagou.
+  const soAtrasadas = sp.atrasadas === "1";
+  const limiteAtraso = new Date(Date.now() - 30 * 86400000);
 
   const dataEmissaoFiltro =
     de || ate
@@ -83,6 +91,13 @@ export default async function ExecucaoPage({
           | "PAGO",
       }),
       ...(orgao && { orgaoNome: orgao }),
+      ...(soAtrasadas && {
+        status: { in: ["NF_EMITIDA", "NF_ENCAMINHADA"] as const },
+        OR: [
+          { dataNfEncaminhada: { lte: limiteAtraso } },
+          { dataNfEncaminhada: null, dataNfEmitida: { lte: limiteAtraso } },
+        ],
+      }),
       ...(dataEmissaoFiltro && { dataEmissao: dataEmissaoFiltro }),
       ...(ataId && { ataId }),
       ...(contratoId && { contratoId }),
@@ -119,13 +134,30 @@ export default async function ExecucaoPage({
         eyebrow="Operação · Logística"
         titulo="Fornecimento &"
         destaque="Execução"
-        subtitulo={`${empenhos.length} execução(ões) — empenhos, AE, OS, AC, Cartas-Contrato.`}
+        subtitulo={
+          soAtrasadas
+            ? `${empenhos.length} nota(s) em atraso — emitidas há mais de 30 dias e ainda não pagas pelo órgão.`
+            : `${empenhos.length} execução(ões) — empenhos, AE, OS, AC, Cartas-Contrato.`
+        }
         cta={
           <Link href="/contratacoes/nova/fornecimento" className="btn-primary">
             <Plus className="h-4 w-4" /> Nova execução
           </Link>
         }
       />
+
+      {soAtrasadas && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            Mostrando <strong>somente as notas em atraso</strong> (NF há mais de 30 dias sem
+            pagamento do órgão).
+          </span>
+          <Link href="/execucao" className="font-semibold underline">
+            Ver todas as execuções
+          </Link>
+        </div>
+      )}
 
       <div className="mt-6">
         <FiltroLista
