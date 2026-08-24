@@ -275,6 +275,34 @@ export class GatewayAsaas implements GatewayPagamento {
     };
   }
 
+  async listarCobrancasDaAssinatura(subscriptionId: string) {
+    type Resp = {
+      data: Array<{
+        id: string;
+        value: number;
+        dueDate: string;
+        status: string;
+        paymentDate?: string | null;
+        billingType?: string;
+        invoiceUrl?: string;
+      }>;
+    };
+    const r = await this.req<Resp>(`/subscriptions/${subscriptionId}/payments`);
+    return (r.data ?? []).map((p) => ({
+      chargeId: p.id,
+      valor: p.value,
+      vencimento: new Date(p.dueDate),
+      status: mapearStatusAsaas(p.status),
+      pagaEm: p.paymentDate ? new Date(p.paymentDate) : null,
+      forma: (p.billingType === "PIX"
+        ? "PIX"
+        : p.billingType === "BOLETO"
+          ? "BOLETO"
+          : "CARTAO_CREDITO") as FormaPagamento,
+      invoiceUrl: p.invoiceUrl,
+    }));
+  }
+
   async atualizarAssinatura(input: AtualizarAssinaturaInput): Promise<void> {
     await this.req(`/subscriptions/${input.subscriptionId}`, {
       method: "POST", // Asaas usa POST pra update tb
@@ -321,7 +349,17 @@ export class GatewayAsaas implements GatewayPagamento {
     try {
       const data = JSON.parse(rawBody) as {
         event?: string;
-        payment?: { id?: string; status?: string; value?: number; paymentDate?: string };
+        payment?: {
+          id?: string;
+          status?: string;
+          value?: number;
+          paymentDate?: string;
+          customer?: string;
+          subscription?: string;
+          dueDate?: string;
+          billingType?: string;
+          invoiceUrl?: string;
+        };
         invoice?: {
           id?: string;
           number?: string;
@@ -366,12 +404,28 @@ export class GatewayAsaas implements GatewayPagamento {
               : data.payment.status === "DELETED"
                 ? "CANCELADA"
                 : undefined;
+      const forma: FormaPagamento | undefined =
+        data.payment.billingType === "PIX"
+          ? "PIX"
+          : data.payment.billingType === "BOLETO"
+            ? "BOLETO"
+            : data.payment.billingType === "CREDIT_CARD"
+              ? "CARTAO_CREDITO"
+              : undefined;
       return {
         evento: data.event,
         chargeId: data.payment.id,
         status,
         valorPago: data.payment.value,
         pagaEm: data.payment.paymentDate ? new Date(data.payment.paymentDate) : undefined,
+        cobranca: {
+          customerId: data.payment.customer,
+          subscriptionId: data.payment.subscription,
+          valor: data.payment.value,
+          vencimento: data.payment.dueDate ? new Date(data.payment.dueDate) : undefined,
+          forma,
+          invoiceUrl: data.payment.invoiceUrl,
+        },
       };
     } catch {
       return null;

@@ -69,6 +69,20 @@ export type PixParaPagar = {
 export type EventoWebhook = {
   evento: string;
   chargeId?: string;
+  /**
+   * Dados da cobranca no gateway. Regina 24/08: cobranca gerada pela assinatura
+   * (o gateway cria sozinho todo mes) nunca existiu no nosso banco — o webhook
+   * chegava, nao achava a linha e desistia calado. Com isto da pra CRIAR a
+   * cobranca que faltava em vez de perder o mes.
+   */
+  cobranca?: {
+    customerId?: string;
+    subscriptionId?: string;
+    valor?: number;
+    vencimento?: Date;
+    forma?: FormaPagamento;
+    invoiceUrl?: string;
+  };
   status?: "PAGA" | "ATRASADA" | "CANCELADA" | "ESTORNADA";
   // valor pago (pode diferir do esperado)
   valorPago?: number;
@@ -146,6 +160,21 @@ export interface GatewayPagamento {
    * e antecipacao muda tudo isso.
    */
   consultarCredito?(chargeId: string): Promise<{ creditadoEm: Date | null; previsaoCredito: Date | null }>;
+  /**
+   * Cobrancas que a assinatura gerou no gateway. Serve pra trazer pro banco os
+   * meses que o gateway cobrou sozinho — antes eles nunca chegavam aqui.
+   */
+  listarCobrancasDaAssinatura?(subscriptionId: string): Promise<
+    {
+      chargeId: string;
+      valor: number;
+      vencimento: Date;
+      status: CriarCobrancaResultado["status"];
+      pagaEm: Date | null;
+      forma: FormaPagamento;
+      invoiceUrl?: string;
+    }[]
+  >;
   validarWebhook(headers: Headers, rawBody: string): Promise<boolean>;
   parsearWebhook(rawBody: string): Promise<EventoWebhook | null>;
   // Subscriptions (opcional — só Asaas implementa por enquanto)

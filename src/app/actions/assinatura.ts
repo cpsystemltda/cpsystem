@@ -371,8 +371,53 @@ export async function processarEventoGateway(opts: {
   chargeId: string;
   status: "PAGA" | "ATRASADA" | "CANCELADA" | "ESTORNADA";
   pagaEm?: Date;
+  /** Dados do gateway pra criar a cobrança quando ela não existir aqui. */
+  cobrancaDoGateway?: {
+    customerId?: string;
+    subscriptionId?: string;
+    valor?: number;
+    vencimento?: Date;
+    forma?: "PIX" | "BOLETO" | "CARTAO_CREDITO";
+    invoiceUrl?: string;
+  };
 }) {
-  const cobranca = await prisma.cobranca.findFirst({ where: { gatewayChargeId: opts.chargeId } });
+  let cobranca = await prisma.cobranca.findFirst({ where: { gatewayChargeId: opts.chargeId } });
+
+  // Cobrança que o gateway gerou sozinho (assinatura de cartão cobra todo mês)
+  // nunca passou por aqui — e antes o webhook desistia calado quando não achava
+  // a linha. Resultado: o cliente pagava e o sistema não registrava a
+  // mensalidade, não contava a receita e não mexia no ciclo. Regina 24/08:
+  // "ele não pagou esse mês e está como se estivesse adimplente" começou aqui.
+  if (!cobranca && opts.cobrancaDoGateway) {
+    const g = opts.cobrancaDoGateway;
+    const conta = await prisma.conta.findFirst({
+      where: {
+        OR: [
+          ...(g.subscriptionId ? [{ gatewaySubscriptionId: g.subscriptionId }] : []),
+          ...(g.customerId ? [{ gatewayCustomerId: g.customerId }] : []),
+        ],
+      },
+      select: { id: true, plano: true },
+    });
+    if (conta && g.valor) {
+      const venc = g.vencimento ?? new Date();
+      cobranca = await prisma.cobranca.create({
+        data: {
+          contaId: conta.id,
+          competencia: `${venc.getFullYear()}-${String(venc.getMonth() + 1).padStart(2, "0")}`,
+          plano: conta.plano,
+          forma: g.forma ?? "CARTAO_CREDITO",
+          valor: g.valor,
+          vencimento: venc,
+          status: "PENDENTE",
+          gatewayChargeId: opts.chargeId,
+          gatewayInvoiceUrl: g.invoiceUrl ?? null,
+          observacoes: "Cobrança gerada pela assinatura no gateway",
+        },
+      });
+    }
+  }
+
   if (!cobranca) return;
 
   await prisma.cobranca.update({

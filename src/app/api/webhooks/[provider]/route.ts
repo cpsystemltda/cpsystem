@@ -80,6 +80,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
         chargeId: evento.chargeId,
         status: evento.status,
         pagaEm: evento.pagaEm,
+        // Permite criar a cobrança quando ela nasceu no gateway (assinatura).
+        cobrancaDoGateway: evento.cobranca,
       });
     } catch (err) {
       // Nao propaga: retorna 200 pra Asaas nao penalizar; loga pra debug.

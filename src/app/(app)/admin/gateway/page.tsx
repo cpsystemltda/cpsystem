@@ -7,6 +7,7 @@ import { GatewayConfigForm } from "./GatewayConfigForm";
 import { ReguaCobrancaButton } from "./ReguaCobrancaButton";
 import { CobrancasEmAberto } from "./CobrancasEmAberto";
 import { FaturasEmFalta } from "./FaturasEmFalta";
+import { SincronizarAssinaturas } from "./SincronizarAssinaturas";
 
 export default async function GatewayPage() {
   const usuario = await exigirUsuario();
@@ -100,6 +101,25 @@ export default async function GatewayPage() {
       };
     });
 
+  // Contas cujo gateway cobra sozinho (assinatura) — as mensalidades nascem lá.
+  const comAssinatura = await prisma.conta.findMany({
+    where: {
+      tipo: "EMPRESA",
+      gatewaySubscriptionId: { not: null },
+      usuarios: { none: { superAdmin: true } },
+    },
+    select: {
+      id: true,
+      empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1 },
+      _count: { select: { cobrancas: true } },
+    },
+  });
+  const assinaturas = comAssinatura.map((c) => ({
+    contaId: c.id,
+    cliente: c.empresas[0]?.nomeFantasia ?? c.empresas[0]?.razaoSocial ?? "Conta sem empresa",
+    cobrancasNoBanco: c._count.cobrancas,
+  }));
+
   return (
     <div className="mx-auto max-w-4xl px-8 py-8">
       <Link href="/admin" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
@@ -153,6 +173,7 @@ export default async function GatewayPage() {
           <li>Use o mesmo Webhook Token aqui e lá.</li>
         </ol>
       </section>
+      <SincronizarAssinaturas linhas={assinaturas} />
       <FaturasEmFalta linhas={faturasEmFalta} />
       <CobrancasEmAberto cobrancas={cobrancasAbertas} />
     </div>
