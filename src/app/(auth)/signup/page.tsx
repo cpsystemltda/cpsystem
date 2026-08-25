@@ -17,6 +17,7 @@ import { signupAction, signupAnalistaAction, buscarAnalistasPublicos } from "@/a
 import { Logo } from "@/components/Logo";
 import { CamposAtribuicao } from "@/components/CamposAtribuicao";
 import { OPCOES_NATUREZA_JURIDICA } from "@/lib/validators";
+import { BotaoWhatsAppSite } from "@/components/BotaoWhatsAppSite";
 
 const PORTES = [
   { value: "MEI", label: "MEI" },
@@ -82,6 +83,7 @@ export default function SignupPage() {
   }, []);
 
   return (
+    <>
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#FAF6EC] via-white to-[#FFF8E1] px-6 py-12">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-32 top-20 h-96 w-96 rounded-full bg-[#D4AF37]/10 blur-3xl" />
@@ -121,6 +123,9 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+      {/* Quem trava no cadastro precisa de alguém pra perguntar sem sair da página. */}
+      <BotaoWhatsAppSite mensagem="Olá! Estou tentando criar minha conta no CP System e preciso de ajuda." />
+    </>
   );
 }
 

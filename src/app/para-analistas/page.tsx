@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { VideoInstitucional } from "@/components/VideoInstitucional";
+import { BotaoWhatsAppSite } from "@/components/BotaoWhatsAppSite";
 
 // Landing publica do Analista Parceiro (Regina 08/08/2026).
 //
@@ -35,6 +36,7 @@ export const metadata = {
 
 export default function ParaAnalistasPage() {
   return (
+    <>
     <div className="min-h-screen" style={{ background: "var(--bg)" }}>
       <div className="mx-auto max-w-5xl px-6 py-10">
         {/* topo */}
@@ -283,6 +285,8 @@ export default function ParaAnalistasPage() {
         </footer>
       </div>
     </div>
+      <BotaoWhatsAppSite mensagem="Olá! Sou analista de licitação e quero entender o programa de parceiros do CP System." />
+    </>
   );
 }
 

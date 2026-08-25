@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Crown, Sparkles, ArrowRight, TrendingUp, Coins, Users, Infinity as InfinityIcon } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { BotaoWhatsAppSite } from "@/components/BotaoWhatsAppSite";
 
 // Landing publica do Programa de Embaixador. Sem auth — qualquer um
 // pode abrir. CTA principal: cadastrar-se como Analista (que automaticamente
@@ -10,6 +11,7 @@ import { Logo } from "@/components/Logo";
 // recorrente vitalicio. Nao e mais % escalonado.
 export default function SejaEmbaixadorPage() {
   return (
+    <>
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-[#FAF6EC] via-white to-[#FFF8E1]">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-32 top-20 h-96 w-96 rounded-full bg-[#D4AF37]/10 blur-3xl" />
@@ -196,6 +198,8 @@ export default function SejaEmbaixadorPage() {
         </footer>
       </div>
     </div>
+      <BotaoWhatsAppSite mensagem="Olá! Quero saber como funciona o programa de indicação do CP System." />
+    </>
   );
 }
 
