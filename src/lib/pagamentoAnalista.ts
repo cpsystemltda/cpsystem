@@ -57,11 +57,14 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
 
   // Busca comissões não pagas do mês anterior + comissões de bônus/pendências antigas
   // Filtro amplo: qualquer competencia <= mês anterior e paga=false.
+  // Regina 25/08: o Léo pagou agosto por PIX em 24/08, o dinheiro caiu na hora —
+  // e a comissão de agosto do Igor continuou parada. O motivo era este filtro:
+  // só entravam competências até o MÊS ANTERIOR, herança de quando o repasse
+  // saía sempre no dia 20 do mês seguinte. Com a regra nova ("pago quando cair
+  // em conta"), segurar por competência contradiz o combinado — quem decide se
+  // há repasse é o caixa, logo abaixo.
   const candidatas = await prisma.comissao.findMany({
-    where: {
-      paga: false,
-      competencia: { lte: competencia }, // inclui bonus com sufixo (ex: 2026-07-BONUS-INICIO) — compara alfabeticamente
-    },
+    where: { paga: false },
     include: {
       analista: {
         select: { id: true, nomeCompleto: true, pix: true, ativo: true },
@@ -108,9 +111,15 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
     // cair na nossa conta". Cada competência anda com a SUA mensalidade — antes
     // bastava qualquer fatura paga da conta ter compensado, o que liberaria a
     // comissão de agosto com o dinheiro de julho, mesmo com agosto em aberto.
-    const doMes = (c.conta?.cobrancas ?? []).filter((p) => p.competencia === c.competencia);
+    //
+    // Exceção: comissão de bônus tem competência com sufixo (ex.:
+    // "2026-07-BONUS-INICIO") e não corresponde a uma mensalidade específica.
+    // Pra ela vale qualquer fatura paga e creditada da conta — senão ficaria
+    // presa pra sempre esperando uma competência que não existe.
+    const ehBonus = !/^\d{4}-\d{2}$/.test(c.competencia);
+    const todas = c.conta?.cobrancas ?? [];
+    const pagamentos = ehBonus ? todas : todas.filter((p) => p.competencia === c.competencia);
     // Competência sem fatura paga correspondente: o cliente não pagou esse mês.
-    const pagamentos = doMes;
     if (pagamentos.length === 0) continue;
 
     let temCaixa = false;
