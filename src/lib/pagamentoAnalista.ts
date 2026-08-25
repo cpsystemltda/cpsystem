@@ -42,7 +42,10 @@ function competenciaMesAnterior(hoje: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Promise<{
+export async function pagarComissoesDoMesAnterior(
+  hoje: Date = new Date(),
+  opts?: { contaId?: string },
+): Promise<{
   competenciaPaga: string;
   tentativas: number;
   sucessos: number;
@@ -64,7 +67,7 @@ export async function pagarComissoesDoMesAnterior(hoje: Date = new Date()): Prom
   // em conta"), segurar por competência contradiz o combinado — quem decide se
   // há repasse é o caixa, logo abaixo.
   const candidatas = await prisma.comissao.findMany({
-    where: { paga: false },
+    where: { paga: false, ...(opts?.contaId ? { contaId: opts.contaId } : {}) },
     include: {
       analista: {
         select: { id: true, nomeCompleto: true, pix: true, ativo: true },

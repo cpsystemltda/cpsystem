@@ -430,6 +430,26 @@ export async function processarEventoGateway(opts: {
 
   if (opts.status === "PAGA") {
     await ativarPlano(cobranca.contaId, cobranca.plano);
+
+    // Regina 25/08: "tem que fazer esse pagamento automático quando for PIX".
+    // O repasse ao analista sai AQUI, no instante em que o pagamento do cliente
+    // é confirmado — não no cron do dia seguinte. Quem decide se sai é a mesma
+    // regra de caixa de sempre: no PIX o dinheiro já está em conta e o PIX de
+    // comissão parte agora; no cartão a liberação leva ~32 dias, a regra segura
+    // e a régua diária paga no primeiro dia em que houver caixa.
+    try {
+      const { pagarComissoesDoMesAnterior } = await import("@/lib/pagamentoAnalista");
+      const r = await pagarComissoesDoMesAnterior(new Date(), { contaId: cobranca.contaId });
+      if (r.sucessos > 0) {
+        console.log(
+          `[comissao] repasse imediato apos pagamento: ${r.sucessos} comissao(oes), R$ ${r.totalPagoBRL.toFixed(2)}`,
+        );
+      }
+    } catch (e) {
+      // Nunca derruba o processamento do pagamento do cliente: se falhar aqui,
+      // a régua diária tenta de novo.
+      console.error("[comissao] falha no repasse imediato:", e);
+    }
     // Regina 19/07: notifica embaixador via WA (Igor quer receber msg quando
     // Léo pagar mensalidade). Best-effort — falha nao bloqueia processamento.
     try {

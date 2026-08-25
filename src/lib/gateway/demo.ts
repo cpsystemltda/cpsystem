@@ -67,6 +67,24 @@ export class GatewayDemo implements GatewayPagamento {
     // no-op
   }
 
+  /**
+   * PIX de saída simulado. Existe pra o caminho de repasse ao analista poder ser
+   * exercitado fora de produção — sem ele, qualquer teste do fluxo "cliente
+   * pagou → comissão sai" parava antes de começar.
+   */
+  async transferirPix(input: {
+    valor: number;
+    chavePix: string;
+    tipoChave: "CPF" | "CNPJ" | "EMAIL" | "PHONE" | "EVP";
+    descricao?: string;
+    referenciaExterna?: string;
+  }): Promise<{ transferId: string; status: string }> {
+    return {
+      transferId: `demo_transf_${randomBytes(6).toString("hex")}`,
+      status: input.valor > 0 ? "PENDING" : "FAILED",
+    };
+  }
+
   async validarWebhook(_headers: Headers, _rawBody: string): Promise<boolean> {
     return true; // demo aceita qualquer webhook
   }
