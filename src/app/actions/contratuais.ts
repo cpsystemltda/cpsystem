@@ -1627,6 +1627,26 @@ export async function criarProcedimentoAction(_p: Result | null, formData: FormD
 
   if (!ataId && !contratoId && !empenhoId) return { erro: "Vínculo obrigatório." };
 
+  // Confere que o documento e da conta de quem esta pedindo.
+  //
+  // Faltava so aqui: as acoes irmas deste arquivo (notificacao, anexo,
+  // anotacao, endereco, ponto focal) ja validavam. Sem isso, um usuario
+  // autenticado que soubesse o id de um empenho de OUTRO cliente conseguiria
+  // pendurar um procedimento apuratorio no documento dele. Encontrado em
+  // 28/08, na varredura pedida pela Regina a partir do laudo da MED+.
+  if (ataId && !(await prisma.ata.findFirst({ where: { id: ataId, empresa: { contaId: usuario.contaId } } })))
+    return { erro: "Ata inválida." };
+  if (
+    contratoId &&
+    !(await prisma.contrato.findFirst({ where: { id: contratoId, empresa: { contaId: usuario.contaId } } }))
+  )
+    return { erro: "Contrato inválido." };
+  if (
+    empenhoId &&
+    !(await prisma.empenho.findFirst({ where: { id: empenhoId, empresa: { contaId: usuario.contaId } } }))
+  )
+    return { erro: "Empenho inválido." };
+
   try {
     // PDF: se IA persistiu, pega hidden URL; senão usa file novo.
     let arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "") || undefined;
