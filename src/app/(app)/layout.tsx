@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/Sidebar";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { contarNaoLidas } from "@/lib/notificacoes";
+import { SinoNotificacoes } from "@/components/SinoNotificacoes";
 import { lerVisao, type Visao } from "@/lib/visao";
 import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
 import { lerEspionagemAtual } from "@/lib/espionagem";
@@ -67,6 +68,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const qtdNotificacoes = await contarNaoLidas(usuario.id);
+  // Últimos avisos pro sino. Oito é o que cabe no painel sem virar rolagem
+  // infinita — o resto fica na tela de notificações.
+  const avisosRecentes = await prisma.notificacaoSistema.findMany({
+    where: { usuarioId: usuario.id },
+    orderBy: { criadoEm: "desc" },
+    take: 8,
+    select: { id: true, titulo: true, descricao: true, link: true, lida: true, criadoEm: true },
+  });
 
   const empresas = usuario.conta.empresas;
   const principal = empresas[0]?.nomeFantasia || empresas[0]?.razaoSocial || (usuario.conta.tipo === "ANALISTA" ? "Analista" : "Sem empresa cadastrada");
@@ -248,6 +257,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <FlutuanteIAsystem plano={usuario.conta.plano} superAdmin={usuario.superAdmin} />
       <ComandoRapido visao={visao} superAdmin={usuario.superAdmin} />
       <div className="app-content flex flex-1 w-full overflow-hidden">
+        <SinoNotificacoes
+          naoLidas={qtdNotificacoes}
+          avisos={avisosRecentes.map((a) => ({
+            id: a.id,
+            titulo: a.titulo,
+            descricao: a.descricao,
+            link: a.link,
+            lida: a.lida,
+            quando: a.criadoEm.toLocaleString("pt-BR", {
+              day: "2-digit",
+              month: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "America/Sao_Paulo",
+            }),
+          }))}
+        />
         <Sidebar
           nomeUsuario={usuario.nome}
           nomeConta={principal}
