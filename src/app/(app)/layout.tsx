@@ -12,6 +12,7 @@ import { lerVisao, type Visao } from "@/lib/visao";
 import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
 import { lerEspionagemAtual } from "@/lib/espionagem";
 import { BannerEspionagem } from "@/components/BannerEspionagem";
+import { PaginaPessoalNaEspionagem } from "@/components/PaginaPessoalNaEspionagem";
 import { FlutuanteIAsystem } from "@/components/FlutuanteIAsystem";
 import { ComandoRapido } from "@/components/ComandoRapido";
 import { SemAcessoModulo } from "@/components/SemAcessoModulo";
@@ -137,6 +138,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (precisaCompletarCadastro && !pathname.startsWith("/conta/completar-cadastro") && !pathname.startsWith("/termos") && !pathname.startsWith("/api")) {
     redirect("/conta/completar-cadastro");
   }
+
+  // Telas pessoais ficam fora do modo de acompanhamento (Regina 28/08).
+  //
+  // O acompanhamento troca a CONTA observada, não a pessoa logada — então
+  // "Meus dados" mostrava o nome e o e-mail de quem está operando, ao lado dos
+  // dados da empresa do cliente. A gravação já era bloqueada; o problema era
+  // oferecer um formulário que mistura as duas identidades.
+  const ROTAS_PESSOAIS = ["/conta/perfil", "/conta/seguranca", "/conta/notificacoes"];
+  const paginaPessoalNoAcompanhamento =
+    !!espionagem && ROTAS_PESSOAIS.some((r) => pathname.startsWith(r));
 
   // Quem administra a plataforma é obrigado a usar segundo fator (Regina 28/08).
   //
@@ -288,7 +299,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         />
         <main className="flex-1 overflow-y-auto">
           {exigirFormaDePagamento && <AvisoUltimoDiaTrial />}
-          {consolidadoBloqueado ? (
+          {paginaPessoalNoAcompanhamento ? (
+            <PaginaPessoalNaEspionagem contaNome={espionagem!.contaNome} />
+          ) : consolidadoBloqueado ? (
             <SelecioneEmpresa />
           ) : moduloBloqueado ? (
             <SemAcessoModulo chave={moduloBloqueado} />
