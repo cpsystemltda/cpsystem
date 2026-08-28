@@ -53,11 +53,30 @@ export async function salvarArquivo(file: File): Promise<ArquivoSalvo> {
   const id = randomBytes(16).toString("hex");
   const pathname = `anexos/${id}${ext}`;
 
-  await put(pathname, file, {
-    access: "private",
-    contentType: file.type,
-    addRandomSuffix: false, // já temos hash random no path
-  });
+  // Tenta privado; se o armazenamento não aceitar objeto privado, sobe público
+  // e guarda a URL. Em ambos os casos o navegador só conhece /api/arquivo/<id>,
+  // então a conferência de dono continua valendo — o que muda é se o objeto
+  // também estaria acessível por quem descobrisse a URL crua.
+  //
+  // O fallback existe porque o store atual é público-apenas, e descobrir isso
+  // em produção não pode significar cliente sem conseguir anexar documento.
+  let urlPublica: string | null = null;
+  try {
+    await put(pathname, file, {
+      access: "private",
+      contentType: file.type,
+      addRandomSuffix: false, // já temos hash random no path
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/private access|private store/i.test(msg)) throw e;
+    const blob = await put(pathname, file, {
+      access: "public",
+      contentType: file.type,
+      addRandomSuffix: false,
+    });
+    urlPublica = blob.url;
+  }
 
   const { prisma } = await import("@/lib/prisma");
   const registro = await prisma.arquivo.create({
@@ -68,6 +87,7 @@ export async function salvarArquivo(file: File): Promise<ArquivoSalvo> {
       contentType: file.type,
       tamanhoBytes: file.size,
       criadoPorId: usuario.id,
+      urlPublica,
     },
     select: { id: true },
   });

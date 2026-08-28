@@ -2444,6 +2444,10 @@ model Arquivo {
   nomeOriginal String
   contentType  String
   tamanhoBytes Int
+  // Quando o armazenamento nao aceita objeto privado, o arquivo sobe publico e
+  // a URL fica aqui — a rota /api/arquivo continua sendo o unico caminho que o
+  // navegador conhece, entao a conferencia de dono vale igual. Nulo = privado.
+  urlPublica   String?
 
   criadoPorId String?
   criadoEm    DateTime @default(now())

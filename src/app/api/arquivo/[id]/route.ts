@@ -36,6 +36,7 @@ export async function GET(
       contaId: true,
       nomeOriginal: true,
       contentType: true,
+      urlPublica: true,
     },
   });
   // 404 (e não 403) quando o arquivo é de outra conta: responder "existe, mas
@@ -45,11 +46,25 @@ export async function GET(
   if (!podeVer) return NextResponse.json({ erro: "Arquivo não encontrado." }, { status: 404 });
 
   try {
-    const resultado = await get(arquivo.pathname, { access: "private" });
-    if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
-      return NextResponse.json({ erro: "Arquivo não encontrado." }, { status: 404 });
+    // Arquivo guardado antes de o armazenamento aceitar objeto privado: busca
+    // pela URL de origem. O navegador segue conhecendo só esta rota.
+    let stream: ReadableStream<Uint8Array> | null = null;
+    let tipoDoArmazenamento: string | null = null;
+    if (arquivo.urlPublica) {
+      const r = await fetch(arquivo.urlPublica);
+      if (!r.ok || !r.body) {
+        return NextResponse.json({ erro: "Arquivo não encontrado." }, { status: 404 });
+      }
+      stream = r.body;
+      tipoDoArmazenamento = r.headers.get("content-type");
+    } else {
+      const resultado = await get(arquivo.pathname, { access: "private" });
+      if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
+        return NextResponse.json({ erro: "Arquivo não encontrado." }, { status: 404 });
+      }
+      stream = resultado.stream;
+      tipoDoArmazenamento = resultado.headers.get("content-type");
     }
-    const { stream, headers } = resultado;
 
     // Best-effort: serve pra investigar acesso depois sem manter log por download.
     prisma.arquivo
@@ -59,7 +74,7 @@ export async function GET(
     const nomeSeguro = arquivo.nomeOriginal.replace(/["\\\r\n]/g, "_");
     return new NextResponse(stream as unknown as BodyInit, {
       headers: {
-        "Content-Type": arquivo.contentType || headers.get("content-type") || "application/octet-stream",
+        "Content-Type": arquivo.contentType || tipoDoArmazenamento || "application/octet-stream",
         "Content-Disposition": `inline; filename="${nomeSeguro}"`,
         // Cache só no navegador de quem já provou ter acesso — nunca em CDN
         // compartilhada, senão o arquivo volta a circular sem conferência.
