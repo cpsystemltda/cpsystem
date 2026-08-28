@@ -108,6 +108,9 @@ model Conta {
   metodosPagamento MetodoPagamento[]
   vinculosAnalista VinculoAnalista[]
 
+  // O indice do FK de cupom ja existe no banco desde sempre; faltava estar
+  // declarado aqui, o que fazia schema e banco divergirem sem motivo.
+  @@index([cupomAplicadoId])
   @@index([indicadoPorContaId])
   // Busca do exportador de conversoes offline: contas vindas de anuncio que
   // ainda nao foram reportadas ao Google Ads.
