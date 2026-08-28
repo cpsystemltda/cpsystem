@@ -20,10 +20,19 @@ export async function GET(req: Request) {
   }
   const inicio = Date.now();
   const resumo = await notificarAniversarios();
+
+  // Aproveita a mesma passagem diária pra convidar quem ainda não informou a
+  // data — sem esse dado a regra do aniversário não tem como funcionar.
+  const { lembrarDataNascimento } = await import("@/lib/lembretePerfil");
+  const lembretes = await lembrarDataNascimento().catch((e) => {
+    console.error("[aniversarios] lembrete de perfil falhou:", e);
+    return { criados: 0 };
+  });
   return NextResponse.json({
     ok: true,
     duracaoMs: Date.now() - inicio,
     resumo,
+    lembretesDeDataDeNascimento: lembretes.criados,
     executadoEm: new Date().toISOString(),
   });
 }
