@@ -20,7 +20,7 @@
  *   npx tsx scripts/migrar-arquivos-privados.ts --aplicar  (copia e troca)
  *   npx tsx scripts/migrar-arquivos-privados.ts --apagar-publicos (fase 2)
  */
-import { copy, get, del } from "@vercel/blob";
+import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 
 const APLICAR = process.argv.includes("--aplicar");
@@ -148,8 +148,7 @@ async function main() {
       if (!origem) { console.log(`  ! url ilegível em ${l.id}`); continue; }
       if (!l.conta) { semDono++; console.log(`  ! sem conta dona: ${tabela}.${l.id}`); continue; }
 
-      const destino = `privado/${origem}`;
-      const jaExiste = await prisma.arquivo.findUnique({ where: { pathname: destino }, select: { id: true } });
+      const jaExiste = await prisma.arquivo.findUnique({ where: { pathname: origem }, select: { id: true } });
       if (jaExiste) {
         jaMigrados++;
         if (APLICAR) {
@@ -159,22 +158,31 @@ async function main() {
         continue;
       }
 
-      if (!APLICAR) { console.log(`  · ${origem} → ${destino} (conta ${l.conta.slice(0, 8)})`); continue; }
+      if (!APLICAR) { console.log(`  · ${origem} → /api/arquivo (conta ${l.conta.slice(0, 8)})`); continue; }
 
-      await copy(l.url, destino, { access: "private" });
-      const conferencia = await get(destino, { access: "private" });
-      if (!conferencia || conferencia.statusCode !== 200) {
-        console.log(`  ! cópia privada não abriu: ${destino} — referência NÃO trocada`);
-        continue;
-      }
-      const registro = await prisma.arquivo.create({
-        data: {
-          pathname: destino,
+      // O store atual e PUBLICO-APENAS, entao nao da pra copiar pra privado sem
+      // trocar a infraestrutura de armazenamento — decisao que mexe no token de
+      // que tudo depende, e que fica pra um passo proprio.
+      //
+      // O que da pra fazer agora, e ja vale muito: tirar a URL crua de
+      // circulacao. O banco passa a guardar /api/arquivo/<id>, entao nenhuma
+      // tela, e-mail ou link entrega mais o endereco direto do arquivo — e todo
+      // acesso passa a conferir sessao e dono. Some o vazamento por link
+      // repassado; permanece so o risco de quem ja tenha uma URL antiga.
+      const registro = await prisma.arquivo.upsert({
+        where: { pathname: origem },
+        create: {
+          pathname: origem,
           contaId: l.conta,
           nomeOriginal: nomeLegivel(origem),
-          contentType: conferencia.blob.contentType || "application/octet-stream",
-          tamanhoBytes: conferencia.blob.size ?? 0,
+          contentType: origem.endsWith(".pdf") ? "application/pdf"
+            : origem.endsWith(".png") ? "image/png"
+            : origem.endsWith(".jpg") || origem.endsWith(".jpeg") ? "image/jpeg"
+            : "application/octet-stream",
+          tamanhoBytes: 0,
+          urlPublica: l.url,
         },
+        update: {},
         select: { id: true },
       });
       await prisma.$executeRawUnsafe(

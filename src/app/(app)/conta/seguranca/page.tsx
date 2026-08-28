@@ -4,8 +4,13 @@ import { TwoFactorConfig } from "./_components/TwoFactorConfig";
 
 export const dynamic = "force-dynamic";
 
-export default async function SegurancaPage() {
+export default async function SegurancaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ exigir2fa?: string }>;
+}) {
   const usuario = await exigirUsuario();
+  const sp = await searchParams;
 
   const u = await prisma.usuario.findUnique({
     where: { id: usuario.id },
@@ -24,6 +29,24 @@ export default async function SegurancaPage() {
           Camadas extras pra proteger sua conta contra acessos indevidos.
         </p>
       </header>
+
+      {sp.exigir2fa === "1" && !u?.totpAtivadoEm && (
+        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">
+            Ative o segundo fator para continuar
+          </p>
+          <p className="mt-1 text-sm text-amber-800">
+            Sua conta administra a plataforma inteira e enxerga os dados de todos os
+            clientes. Por isso o segundo fator passou a ser obrigatório aqui — uma senha
+            vazada nesta conta não seria o problema de uma conta só.
+          </p>
+          <p className="mt-2 text-xs text-amber-800">
+            Leva dois minutos: instale um aplicativo autenticador, aponte a câmera para o
+            QR abaixo e <strong>guarde os códigos de recuperação</strong> — são eles que
+            devolvem o acesso se você trocar de celular.
+          </p>
+        </div>
+      )}
 
       <TwoFactorConfig
         ativo={!!u?.totpAtivadoEm}

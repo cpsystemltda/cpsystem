@@ -2279,10 +2279,15 @@ model TentativaLogin {
   ip        String // remoteAddr do header x-forwarded-for
   sucesso   Boolean
   userAgent String? // pra correlacao / detectar bot
+  // LOGIN ou CADASTRO. Ate 28/08 so havia limite pra login: alguem podia criar
+  // conta em serie sem nenhum freio. Separar os dois evita que um escritorio
+  // inteiro logando no mesmo IP consuma o limite de cadastro, e vice-versa.
+  tipo      String   @default("LOGIN")
   criadoEm  DateTime @default(now())
 
   @@index([email, criadoEm])
   @@index([ip, criadoEm])
+  @@index([ip, tipo, criadoEm])
   @@index([criadoEm]) // pra limpeza
 }
 

@@ -87,6 +87,8 @@ async function calcularEspera(chave: "email" | "ip", valor: string): Promise<num
 }
 
 export async function registrarTentativa(input: {
+  /** LOGIN (padrao) ou CADASTRO — cada um tem o proprio limite. */
+  tipo?: "LOGIN" | "CADASTRO";
   email: string;
   ip: string;
   sucesso: boolean;
@@ -98,8 +100,42 @@ export async function registrarTentativa(input: {
       ip: input.ip,
       sucesso: input.sucesso,
       userAgent: input.userAgent?.slice(0, 500) ?? null,
+      tipo: input.tipo ?? "LOGIN",
     },
   });
+}
+
+/**
+ * Limite de CRIACAO DE CONTA por IP.
+ *
+ * Regina 28/08, item 2 da fila de seguranca: o limite existia so pro login, e
+ * o cadastro publico nao tinha freio nenhum — dava pra abrir conta em serie.
+ *
+ * O numero e generoso de proposito: cadastro e o passo que a gente PAGA pra
+ * acontecer, e escritorio com varias empresas cadastrando no mesmo IP e caso
+ * real. O que se quer barrar e robo, nao cliente.
+ */
+const LIMITE_CADASTROS_POR_IP = 5;
+const JANELA_CADASTRO_MS = 60 * 60 * 1000; // 1 hora
+
+export async function verificarLimiteCadastro(ip: string): Promise<ResultadoRateLimit> {
+  const desde = new Date(Date.now() - JANELA_CADASTRO_MS);
+  const tentativas = await prisma.tentativaLogin.count({
+    where: { ip, tipo: "CADASTRO", criadoEm: { gte: desde } },
+  });
+  if (tentativas < LIMITE_CADASTROS_POR_IP) return { permitido: true };
+
+  const maisAntiga = await prisma.tentativaLogin.findFirst({
+    where: { ip, tipo: "CADASTRO", criadoEm: { gte: desde } },
+    orderBy: { criadoEm: "asc" },
+    select: { criadoEm: true },
+  });
+  const expiraEm = (maisAntiga?.criadoEm.getTime() ?? Date.now()) + JANELA_CADASTRO_MS;
+  return {
+    permitido: false,
+    motivo: "muitos_cadastros_ip",
+    retryEmSegundos: Math.max(60, Math.ceil((expiraEm - Date.now()) / 1000)),
+  };
 }
 
 // Cron diario limpa registros com mais de 30 dias

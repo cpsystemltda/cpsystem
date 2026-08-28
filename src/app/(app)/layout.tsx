@@ -129,6 +129,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/conta/completar-cadastro");
   }
 
+  // Quem administra a plataforma é obrigado a usar segundo fator (Regina 28/08).
+  //
+  // O 2FA já existia completo — aplicativo autenticador, códigos de recuperação
+  // e dispositivos conhecidos — mas era opcional, inclusive pra quem enxerga
+  // TODOS os clientes. Uma senha vazada dessas contas é um vazamento de base
+  // inteira, não de uma conta.
+  //
+  // A trava deixa passar /conta/seguranca (onde se ativa), /termos e /api pra
+  // ninguém ficar sem caminho de saída — e nunca vale em modo de
+  // acompanhamento, porque ali `superAdmin` já vem desligado.
+  const precisaAtivar2FA = usuario.superAdmin && !usuario.totpAtivadoEm;
+  if (
+    precisaAtivar2FA &&
+    !pathname.startsWith("/conta/seguranca") &&
+    !pathname.startsWith("/termos") &&
+    !pathname.startsWith("/api")
+  ) {
+    redirect("/conta/seguranca?exigir2fa=1");
+  }
+
   // Regina 14/07: ANALISTA sem aceite do contrato v1.0 (cadastrado antes do
   // contrato existir) e forcado pra /termos ate aceitar. Nao pode pular
   // pra /painel-analista ou qualquer outra tela sem ter aceitado.

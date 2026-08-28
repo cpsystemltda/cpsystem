@@ -97,6 +97,30 @@ export async function darBoasVindas(contaId: string): Promise<void> {
     entregouWhats = r.enviado;
   }
 
+  // Link de confirmação de e-mail. Vai DENTRO das boas-vindas em vez de virar
+  // um segundo e-mail: duas mensagens automáticas no mesmo minuto é a receita
+  // pra a primeira ser ignorada e a segunda cair em spam.
+  //
+  // Confirmar não é obrigatório pra entrar — travar o acesso no cadastro
+  // derrubaria conversão de cliente legítimo por causa de robô. O que a
+  // confirmação faz é dar base pra a gente saber em quem falar de verdade.
+  let linkConfirmacao: string | null = null;
+  try {
+    const { randomBytes } = await import("node:crypto");
+    const token = randomBytes(32).toString("hex");
+    await prisma.magicLink.create({
+      data: {
+        token,
+        usuarioId: usuario.id,
+        motivo: "verificar-email",
+        expiraEm: new Date(Date.now() + 7 * 86400000),
+      },
+    });
+    linkConfirmacao = `https://cpsystem.app.br/verificar-email?token=${token}`;
+  } catch (e) {
+    console.error("[boas-vindas] não consegui criar o link de confirmação:", e);
+  }
+
   // ── 2. E-mail pro cliente ─────────────────────────────────────────────────
   // Vale mesmo com WhatsApp: quem não marcou opt-in só tem este canal, e é onde
   // o cliente reencontra o acesso quando precisa dias depois.
@@ -125,9 +149,17 @@ export async function darBoasVindas(contaId: string): Promise<void> {
           <li>Os avisos importantes chegam por WhatsApp e por aqui.</li>`
           }
         </ol>
-        <p style="margin:0 0 24px">
+        <p style="margin:0 0 16px">
           <a href="${ehAnalista ? "https://cpsystem.app.br/painel-analista" : "https://cpsystem.app.br/dashboard"}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600;display:inline-block">Acessar o sistema</a>
         </p>
+        ${
+          linkConfirmacao
+            ? `<p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#475569">
+                 Confirme que este e-mail é seu para receber avisos de prazo e cobrança sem risco de perder nada:
+                 <a href="${linkConfirmacao}" style="color:#1d4ed8;font-weight:600">confirmar meu e-mail</a>.
+               </p>`
+            : ""
+        }
         <p style="margin:0 0 6px;line-height:1.6">
           Precisando de qualquer coisa: WhatsApp ${whatsappFormatado()} ou ${CONTATOS_CP_SYSTEM.email}.
         </p>
@@ -145,6 +177,7 @@ export async function darBoasVindas(contaId: string): Promise<void> {
           : `A conta de ${empresa?.razaoSocial ?? "sua empresa"} está ativa` +
             (fimTeste ? `, com teste liberado até ${fimTeste}` : "") +
             `.\n\nComece cadastrando uma ata, contrato ou empenho em https://cpsystem.app.br/contratacoes/nova\n\n`) +
+        (linkConfirmacao ? `Confirme seu e-mail: ${linkConfirmacao}\n\n` : "") +
         `Dúvidas: WhatsApp ${whatsappFormatado()} ou ${CONTATOS_CP_SYSTEM.email}.\n\nContato CP System`,
     })
       .then(() => {

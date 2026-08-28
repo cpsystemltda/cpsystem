@@ -8,6 +8,7 @@ import { loginSchema, normalizarCnpj, normalizarCpf, signupAnalistaSchema, signu
 import { validarCartao } from "@/lib/cartao";
 import {
   verificarLimiteLogin,
+  verificarLimiteCadastro,
   registrarTentativa,
   ipDoRequest,
   userAgentDoRequest,
@@ -58,6 +59,19 @@ function valoresParaEcho(formData: FormData): Record<string, string> {
 }
 
 export async function signupAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
+  // Freio de criação de conta em série (Regina 28/08). O limite existia só pro
+  // login; o cadastro público não tinha nenhum. Fica antes de qualquer trabalho
+  // pesado — não faz sentido validar formulário de robô.
+  const ipCadastro = await ipDoRequest();
+  const limiteCadastro = await verificarLimiteCadastro(ipCadastro);
+  if (!limiteCadastro.permitido) {
+    return {
+      erro:
+        "Muitas contas criadas a partir desta conexão em pouco tempo. " +
+        "Se você precisa cadastrar várias empresas, fale com a gente pelo WhatsApp que a gente faz junto.",
+    };
+  }
+
   // Múltiplos e-mails e telefones (CampoMultiplo) chegam como name="X[]"
   // Pegamos todos, mas pro Zod usamos só o 1º (compat com schema antigo).
   const emailsArray = formData.getAll("emailEmpresa[]").map(String).filter(Boolean);
@@ -541,6 +555,15 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       console.error("[signup] erro ao notificar embaixador:", e);
     }
   }
+
+  // Marca o cadastro pro limite por IP enxergar as proximas tentativas.
+  await registrarTentativa({
+    tipo: "CADASTRO",
+    email: v.email,
+    ip: ipCadastro,
+    sucesso: true,
+    userAgent: await userAgentDoRequest(),
+  }).catch((e) => console.error("[signup] falha ao registrar tentativa:", e));
 
   // Boas-vindas ao cliente + aviso pra equipe (Regina 28/08: "foi direto pra
   // notificacao sem nem dar bom dia pro cara").
