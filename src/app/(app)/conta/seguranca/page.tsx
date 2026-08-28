@@ -41,9 +41,10 @@ export default async function SegurancaPage({
             vazada nesta conta não seria o problema de uma conta só.
           </p>
           <p className="mt-2 text-xs text-amber-800">
-            Leva dois minutos: instale um aplicativo autenticador, aponte a câmera para o
-            QR abaixo e <strong>guarde os códigos de recuperação</strong> — são eles que
-            devolvem o acesso se você trocar de celular.
+            Leva dois minutos. Abaixo estão três caminhos — aplicativo autenticador, app
+            Senhas do iPhone ou o código digitado à mão — e qualquer um serve. No fim,{" "}
+            <strong>guarde os códigos de recuperação</strong>: são eles que devolvem o acesso
+            se você trocar de celular.
           </p>
         </div>
       )}

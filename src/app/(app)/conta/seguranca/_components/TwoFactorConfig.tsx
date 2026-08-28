@@ -109,7 +109,7 @@ export function TwoFactorConfig(props: Props) {
     return (
       <section className="rounded-xl border border-slate-200 bg-white p-6">
         <div className="flex items-start justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Configurar 2FA — escaneie o QR</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Ativar o segundo fator</h2>
           <button type="button" onClick={() => setPasso({ modo: "off" })} className="text-slate-400 hover:text-slate-700">
             <X className="h-5 w-5" />
           </button>
@@ -117,24 +117,51 @@ export function TwoFactorConfig(props: Props) {
 
         <ol className="mt-4 space-y-4 text-sm text-slate-700">
           <li>
-            <strong>1.</strong> Instale um app autenticador no celular — Google Authenticator,
-            Authy, 1Password ou Microsoft Authenticator.
-            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              <strong>Escaneie pelo app autenticador, não pela câmera do iPhone.</strong> A câmera
-              abre o app Senhas da Apple, que pede pra escolher uma senha já salva onde guardar o
-              código — e se você não tem o CP System salvo lá, ele não sabe onde pôr. Se cair nessa
-              tela, é só fechar e usar o código escrito abaixo do QR.
-            </div>
+            <strong>1.</strong> Escolha onde guardar o código. Qualquer um destes funciona — o
+            que ele faz é gerar 6 dígitos novos a cada 30 segundos.
+            <ul className="mt-2 space-y-1.5 text-slate-600">
+              <li>
+                <strong className="text-slate-800">App autenticador</strong> — Google Authenticator,
+                Authy, 1Password ou Microsoft Authenticator.
+              </li>
+              <li>
+                <strong className="text-slate-800">iPhone, no app Senhas da Apple</strong> — depois
+                disso o próprio iPhone preenche o código no login pra você.
+              </li>
+            </ul>
           </li>
           <li>
-            <strong>2.</strong> Abra o app e escaneie esse QR code:
-            <div className="mt-3 inline-block rounded-lg border border-slate-200 bg-white p-3">
+            <strong>2.</strong> Guarde o código. Use o caminho que combina com o passo 1:
+            <div className="mt-3 block w-fit rounded-lg border border-slate-200 bg-white p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={passo.qrCodeDataUri} alt="QR code 2FA" className="h-56 w-56" />
             </div>
+            <div className="mt-3 space-y-2.5 text-xs text-slate-600">
+              <p>
+                <strong className="text-slate-800">No app autenticador:</strong> abra o app, toque
+                em “+” e use o leitor <em>dele</em> para ler o QR acima.
+              </p>
+              <p>
+                <strong className="text-slate-800">No iPhone, pelo app Senhas:</strong> aponte a
+                câmera para o QR. Vai abrir “Adicionar Código de Verificação” pedindo uma senha —
+                toque no <strong>+</strong> no canto superior direito para criar a entrada do CP
+                System. A lista que aparece antes é só das senhas que você já tinha salvas.
+              </p>
+              <p>
+                <strong className="text-slate-800">Já está no celular lendo esta tela?</strong>{" "}
+                <a
+                  href={passo.otpauthUri}
+                  className="font-semibold text-violet-700 underline underline-offset-2"
+                >
+                  Toque aqui para abrir direto no seu app
+                </a>{" "}
+                — sem câmera nenhuma.
+              </p>
+            </div>
+
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="text-xs font-semibold text-slate-700">
-                Sem câmera: digite este código no app, em “inserir chave manualmente”
+                Ou digite este código no app, em “inserir chave manualmente”
               </p>
               <code className="mt-1 block break-all rounded bg-white px-2 py-1.5 font-mono text-sm tracking-wider text-slate-900">
                 {passo.secret}

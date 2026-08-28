@@ -103,7 +103,11 @@ export function otpauthUri(input: {
     digits: String(DIGITS),
     period: String(STEP_SECONDS),
   });
-  return `otpauth://totp/${encodeURIComponent(label)}?${params.toString()}`;
+  // URLSearchParams codifica espaco como "+", mas a especificacao do otpauth
+  // pede "%20" — com o "+" alguns apps mostram literalmente "CP+System" no
+  // nome da conta. Trocar aqui e o suficiente porque nenhum parametro nosso
+  // contem um "+" de verdade.
+  return `otpauth://totp/${encodeURIComponent(label)}?${params.toString().replace(/\+/g, "%20")}`;
 }
 
 // Recovery codes: 8 codigos alfanumericos de 10 chars, agrupados em
