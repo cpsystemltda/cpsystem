@@ -15,10 +15,9 @@ import {
 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resumoReceita } from "@/lib/metricasReceita";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 
-const PRECO_BASICO = 397;
-const PRECO_PREMIUM = 997;
 
 function brl(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -69,11 +68,13 @@ export default async function AdminPlataformaPage() {
       include: {
         empresas: { select: { razaoSocial: true, nomeFantasia: true } },
         analista: { select: { nomeCompleto: true } },
-        usuarios: { select: { id: true, nome: true, email: true, criadoEm: true } },
+        usuarios: { select: { id: true, nome: true, email: true, criadoEm: true, superAdmin: true } },
         cobrancas: {
-          select: { id: true, status: true, vencimento: true, valor: true },
+          // pagaEm entra aqui porque a regra de receita usa a ULTIMA fatura
+          // paga pra saber a mensalidade real (com cupom e adicionais).
+          select: { id: true, status: true, vencimento: true, valor: true, pagaEm: true },
           orderBy: { vencimento: "desc" },
-          take: 3,
+          take: 6,
         },
       },
       orderBy: { criadoEm: "desc" },
@@ -107,11 +108,10 @@ export default async function AdminPlataformaPage() {
     (c) => c.trialAteEm && c.trialAteEm >= hoje && c.trialAteEm <= em7dias,
   );
 
-  const mrr = ativasEmpresa.reduce(
-    (s, c) => s + (c.plano === "PREMIUM" ? PRECO_PREMIUM : PRECO_BASICO),
-    0,
-  );
-  const arr = mrr * 12;
+  // Regra unica de receita (lib/metricasReceita). Antes: toda conta ATIVA
+  // valia preco de tabela, e `PREMIUM ? 997 : 397` cobrava o Intermediario
+  // (R$ 697) como se fosse Basico.
+  const { mrr, arr, pagantes, ativasSemPagamento } = resumoReceita(contas);
 
   const novasEsteMes = empresas.filter((c) => c.criadoEm >= inicioMes).length;
   const churnRate =
@@ -143,7 +143,7 @@ export default async function AdminPlataformaPage() {
         <KpiHero
           titulo="MRR atual"
           valor={brlCompacto(mrr)}
-          sub={`${ativasEmpresa.length} assinaturas ativas`}
+          sub={`${pagantes.length} cliente${pagantes.length === 1 ? "" : "s"} pagante${pagantes.length === 1 ? "" : "s"}`}
           tone="mint"
           icone={Wallet}
         />
@@ -177,6 +177,8 @@ export default async function AdminPlataformaPage() {
         <StatusCard
           titulo="Em dia"
           qtd={ativasEmpresa.length}
+          alerta={ativasSemPagamento.length}
+          alertaTexto="sem fatura paga"
           cor="emerald"
           icone={CheckCircle2}
           link="/admin-plataforma/clientes?status=ATIVA"
@@ -271,7 +273,10 @@ export default async function AdminPlataformaPage() {
               cor="bg-blue-100 text-blue-700"
               titulo="Empresas fornecedoras"
               valor={empresas.length}
-              sub={`${ativasEmpresa.length} pagantes · ${trial.length} em trial`}
+              sub={
+                `${pagantes.length} pagante${pagantes.length === 1 ? "" : "s"} · ${trial.length} em trial` +
+                (ativasSemPagamento.length > 0 ? ` · ${ativasSemPagamento.length} sem fatura paga` : "")
+              }
             />
             <Composicao
               icone={UserCheck}
@@ -287,14 +292,20 @@ export default async function AdminPlataformaPage() {
               <div className="mt-3 space-y-2.5">
                 <PlanoBar
                   label="Premium · R$ 997"
-                  qtd={ativasEmpresa.filter((c) => c.plano === "PREMIUM").length}
-                  total={Math.max(1, ativasEmpresa.length)}
+                  qtd={pagantes.filter((c) => c.plano === "PREMIUM").length}
+                  total={Math.max(1, pagantes.length)}
                   cor="bg-violet-600"
                 />
                 <PlanoBar
+                  label="Intermediário · R$ 697"
+                  qtd={pagantes.filter((c) => c.plano === "INTERMEDIARIO").length}
+                  total={Math.max(1, pagantes.length)}
+                  cor="bg-cyan-600"
+                />
+                <PlanoBar
                   label="Básico · R$ 397"
-                  qtd={ativasEmpresa.filter((c) => c.plano === "BASICO").length}
-                  total={Math.max(1, ativasEmpresa.length)}
+                  qtd={pagantes.filter((c) => c.plano === "BASICO").length}
+                  total={Math.max(1, pagantes.length)}
                   cor="bg-blue-600"
                 />
               </div>

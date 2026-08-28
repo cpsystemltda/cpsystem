@@ -453,6 +453,15 @@ function FormEmpresa() {
         span={4}
         helper="Você vai receber prazos, avanços de execução e resumo semanal aqui — direto no WhatsApp. Pode desligar depois em Conta → Notificações."
       />
+      <Field
+        label="Data de nascimento"
+        name="dataNascimento"
+        type="date"
+        defaultValue={v.dataNascimento ?? ""}
+        erro={e.dataNascimento}
+        span={2}
+        helper="Opcional — é só pra a gente te desejar feliz aniversário no dia."
+      />
 
       {/* 3) ANALISTA VINCULADO (opcional) */}
       <h2 className="col-span-4 mt-6 border-b border-slate-200 pb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">

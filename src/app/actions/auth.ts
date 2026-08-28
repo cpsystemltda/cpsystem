@@ -289,6 +289,11 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
           // Regina 02/07: WhatsApp obrigatorio no cadastro. Recebe
           // notificacoes automaticas (opt-out em /conta/notificacoes).
           telefoneWhatsApp: v.telefoneWhatsApp.replace(/\D/g, ""),
+          // Data de nascimento e opcional no cadastro: so grava se veio, e nunca
+          // deixa uma data invalida derrubar o signup inteiro.
+          ...(v.dataNascimento && !Number.isNaN(Date.parse(`${v.dataNascimento}T00:00:00`))
+            ? { dataNascimento: new Date(`${v.dataNascimento}T00:00:00`) }
+            : {}),
           optInWhatsApp: true,
         },
       },

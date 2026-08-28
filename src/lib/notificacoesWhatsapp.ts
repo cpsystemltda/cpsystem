@@ -1183,37 +1183,71 @@ export async function notificarReajusteAprovado(opts: {
 
 // Envia mensagem de parabens pra usuarios com dataNascimento=hoje.
 // Idempotente por ano — usa referenciaId = "aniv-YYYY".
-export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ enviados: number }> {
+//
+// Regina 28/08: "lembra da regra de dar parabens em dia de aniversario? Lembra
+// dessa regra e nunca esqueca... nao so pra esse cliente, mas para todos, pra
+// analista, pra todo mundo". Duas correcoes vieram dai:
+//
+// - Quem nao tem opt-in de WhatsApp agora recebe por E-MAIL. Antes, sem opt-in
+//   a pessoa simplesmente nao era parabenizada. Opt-in existe pra proteger o
+//   cliente de notificacao operacional em rajada; nao e motivo pra ignorar o
+//   aniversario de quem confia na gente.
+// - A rota /api/cron/aniversarios passou a chamar isto todo dia as 9h BRT.
+//   Ate 28/08 esta funcao era codigo morto: ninguem a chamava.
+export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ enviados: number; porEmail: number }> {
   const mes = hoje.getMonth() + 1;
   const dia = hoje.getDate();
   const ano = hoje.getFullYear();
 
   // Postgres — WHERE extract(month/day). Prisma nao suporta direto,
   // uso $queryRaw pra performance.
-  const usuarios = await prisma.$queryRaw<Array<{ id: string; nome: string }>>`
-    SELECT id, nome FROM "Usuario"
-    WHERE "optInWhatsApp" = true
-      AND "telefoneWhatsApp" IS NOT NULL
-      AND EXTRACT(MONTH FROM "dataNascimento") = ${mes}
+  const usuarios = await prisma.$queryRaw<
+    Array<{ id: string; nome: string; email: string; optInWhatsApp: boolean; telefoneWhatsApp: string | null }>
+  >`
+    SELECT id, nome, email, "optInWhatsApp", "telefoneWhatsApp" FROM "Usuario"
+    WHERE EXTRACT(MONTH FROM "dataNascimento") = ${mes}
       AND EXTRACT(DAY FROM "dataNascimento") = ${dia}
   `;
 
   let enviados = 0;
+  let porEmail = 0;
   for (const u of usuarios) {
     const msg =
       `🎉 *Feliz aniversário, ${primeiroNome(u.nome)}!* 🎂\n\n` +
       `Toda a equipe do CP System te deseja um dia incrível e um ano cheio de contratos fechados, prazos cumpridos e pagamentos em dia.\n\n` +
       `Muito obrigado por confiar na gente pra cuidar da sua execução pública. Que venha muito sucesso!\n\n` +
-      `Com carinho,\nEquipe CP System 💚`;
-    const r = await dispararNotificacao({
-      usuarioId: u.id,
-      tipo: "ANIVERSARIO",
-      referenciaId: `aniv-${ano}`,
-      mensagem: msg,
-    });
-    if (r.enviado) enviados++;
+      `Com carinho,\nContato CP System 💚`;
+
+    if (u.optInWhatsApp && u.telefoneWhatsApp) {
+      const r = await dispararNotificacao({
+        usuarioId: u.id,
+        tipo: "ANIVERSARIO",
+        referenciaId: `aniv-${ano}`,
+        mensagem: msg,
+      });
+      if (r.enviado) enviados++;
+    } else if (u.email) {
+      // Sem WhatsApp: o parabens vai por e-mail, pra ninguem ficar de fora.
+      try {
+        const { enviarEmail } = await import("@/lib/email");
+        await enviarEmail({
+          para: u.email,
+          assunto: `Feliz aniversário, ${primeiroNome(u.nome)}!`,
+          html:
+            `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:520px;margin:0 auto;color:#0f172a">` +
+            `<p style="font-size:18px;font-weight:700;margin:0 0 14px">🎉 Feliz aniversário, ${primeiroNome(u.nome)}! 🎂</p>` +
+            `<p style="margin:0 0 14px;line-height:1.6">Toda a equipe do CP System te deseja um dia incrível e um ano cheio de contratos fechados, prazos cumpridos e pagamentos em dia.</p>` +
+            `<p style="margin:0 0 14px;line-height:1.6">Obrigado por confiar na gente pra cuidar da sua execução pública.</p>` +
+            `<p style="margin:22px 0 0;color:#64748b;font-size:13px">Contato CP System</p></div>`,
+          texto: msg.replace(/\*/g, ""),
+        });
+        porEmail++;
+      } catch (e) {
+        console.error("[aniversario] e-mail falhou:", e);
+      }
+    }
   }
-  return { enviados };
+  return { enviados, porEmail };
 }
 
 // ==================== LEMBRETE EXTRATO SEMANAL ====================

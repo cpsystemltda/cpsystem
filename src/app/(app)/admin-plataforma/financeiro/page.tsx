@@ -2,9 +2,9 @@ import Link from "next/link";
 import { Crown, Wallet, TrendingUp, Activity, Target, Users2, BarChart3 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resumoReceita, mensalidadeDaConta, contaEhPagante } from "@/lib/metricasReceita";
+import { PRECO_BASE } from "@/lib/precosConstants";
 
-const PRECO_BASICO = 397;
-const PRECO_PREMIUM = 997;
 
 // Amostra minima pra LTV/churn terem significado real.
 // Abaixo disso, o numero e' matematicamente correto mas passa impressao
@@ -71,37 +71,30 @@ export default async function AdminFinanceiroPage() {
       c.atualizadoEm >= inicioMes,
   );
 
-  const mrr = ativas.reduce(
-    (s, c) => s + (c.plano === "PREMIUM" ? PRECO_PREMIUM : PRECO_BASICO),
-    0,
-  );
-  const arr = mrr * 12;
-  const arpu = ativas.length > 0 ? mrr / ativas.length : 0;
+  // Receita pela regra unica (lib/metricasReceita): EMPRESA, nao interna, ATIVA
+  // e com fatura ja paga — pelo valor da fatura real. Antes daqui saia
+  // `ativas x preco de tabela` com `PREMIUM ? 997 : 397`, o que contava conta
+  // ATIVA que nunca pagou e cobrava o INTERMEDIARIO (R$ 697) como Basico.
+  const { mrr, arr, pagantes, ticketMedio: arpu, ativasSemPagamento } = resumoReceita(empresas);
   const ticketMedioGeral =
-    empresas.length > 0
-      ? empresas.reduce(
-          (s, c) => s + (c.plano === "PREMIUM" ? PRECO_PREMIUM : PRECO_BASICO),
-          0,
-        ) / empresas.length
-      : 0;
+    pagantes.length > 0 ? mrr / pagantes.length : 0;
 
-  // Distribuição por plano (entre ativas)
-  const ativasBasico = ativas.filter((c) => c.plano === "BASICO").length;
-  const ativasPremium = ativas.filter((c) => c.plano === "PREMIUM").length;
+  // Distribuição por plano (entre quem paga)
+  const ativasBasico = pagantes.filter((c) => c.plano === "BASICO").length;
+  const ativasIntermediario = pagantes.filter((c) => c.plano === "INTERMEDIARIO").length;
+  const ativasPremium = pagantes.filter((c) => c.plano === "PREMIUM").length;
 
   // Churn de cliente (mensal): canceladas no mês ÷ ativas no início do mês (aprox.)
   const denomChurn = ativas.length + canceladasNoMes.length;
   const churnPct = denomChurn > 0 ? (canceladasNoMes.length / denomChurn) * 100 : 0;
 
   // MRR Churn: receita perdida no mês
-  const mrrChurn = canceladasNoMes.reduce(
-    (s, c) => s + (c.plano === "PREMIUM" ? PRECO_PREMIUM : PRECO_BASICO),
-    0,
-  );
+  // Receita perdida = o que a conta cancelada REALMENTE pagava por mes.
+  const mrrChurn = canceladasNoMes.reduce((s, c) => s + mensalidadeDaConta(c), 0);
 
   // LTV — null quando amostra < 5 clientes pagantes (evita numero enganoso)
-  const ltv = calcularLtv(arpu, churnPct, ativas.length);
-  const amostraSuficiente = ativas.length >= AMOSTRA_MINIMA_METRICA;
+  const ltv = calcularLtv(arpu, churnPct, pagantes.length);
+  const amostraSuficiente = pagantes.length >= AMOSTRA_MINIMA_METRICA;
 
   // Adimplência por cliente (Regina 24/08).
   //
@@ -132,12 +125,7 @@ export default async function AdminFinanceiroPage() {
         total: consideradas.length,
         pagas,
         emAtraso,
-        mrr:
-          c.statusAssinatura === "ATIVA"
-            ? c.plano === "PREMIUM"
-              ? PRECO_PREMIUM
-              : PRECO_BASICO
-            : 0,
+        mrr: contaEhPagante(c) ? mensalidadeDaConta(c) : 0,
         adimplenciaPct: consideradas.length > 0 ? (pagas / consideradas.length) * 100 : 100,
       };
     })
@@ -193,7 +181,7 @@ export default async function AdminFinanceiroPage() {
               Amostra ainda pequena — métricas de SaaS aparecem, mas sem significância estatística
             </p>
             <p className="mt-1 text-xs text-amber-800">
-              Você tem <strong>{ativas.length} assinatura(s) ativa(s)</strong>. LTV, churn e projeções ficam ocultos até chegar em <strong>5+ clientes pagantes</strong>.
+              Você tem <strong>{pagantes.length} cliente(s) pagante(s)</strong>. LTV, churn e projeções ficam ocultos até chegar em <strong>5+ clientes pagantes</strong>.
               Números pequenos amplificam distorções (ex.: 1 cancelamento vira 100% de churn).
             </p>
           </div>
@@ -202,7 +190,7 @@ export default async function AdminFinanceiroPage() {
 
       {/* KPIs principais */}
       <div className="grid gap-4 lg:grid-cols-4">
-        <Card icone={Wallet} tone="mint" titulo="MRR" valor={brlCompacto(mrr)} sub={`${ativas.length} assinatura${ativas.length === 1 ? "" : "s"} ativa${ativas.length === 1 ? "" : "s"}`} />
+        <Card icone={Wallet} tone="mint" titulo="MRR" valor={brlCompacto(mrr)} sub={`${pagantes.length} cliente${pagantes.length === 1 ? "" : "s"} pagante${pagantes.length === 1 ? "" : "s"}${ativasSemPagamento.length > 0 ? ` · ${ativasSemPagamento.length} sem fatura paga` : ""}`} />
         <Card icone={TrendingUp} tone="sky" titulo="ARR projetado" valor={brlCompacto(arr)} sub="MRR × 12" />
         <Card icone={Target} tone="primary" titulo="Ticket médio" valor={brl(ticketMedioGeral)} sub="ARPU (média por conta ativa)" />
         {ltv === null ? (
@@ -229,8 +217,9 @@ export default async function AdminFinanceiroPage() {
           Distribuição por plano
         </h2>
         <div className="mt-3 grid gap-4 md:grid-cols-2">
-          <PlanoCard tone="sky" titulo="Básico" preco={PRECO_BASICO} ativos={ativasBasico} total={ativas.length} />
-          <PlanoCard tone="lavender" titulo="Premium" preco={PRECO_PREMIUM} ativos={ativasPremium} total={ativas.length} />
+          <PlanoCard tone="sky" titulo="Básico" preco={PRECO_BASE.BASICO} ativos={ativasBasico} total={pagantes.length} />
+          <PlanoCard tone="mint" titulo="Intermediário" preco={PRECO_BASE.INTERMEDIARIO} ativos={ativasIntermediario} total={pagantes.length} />
+          <PlanoCard tone="lavender" titulo="Premium" preco={PRECO_BASE.PREMIUM} ativos={ativasPremium} total={pagantes.length} />
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["gru1"],
+  "regions": [
+    "gru1"
+  ],
   "functions": {
     "src/app/actions/iaExtracao.ts": {
       "maxDuration": 300
@@ -50,6 +52,10 @@
     {
       "path": "/api/cron/limpar-tentativas-login",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/aniversarios",
+      "schedule": "0 12 * * *"
     }
   ]
 }

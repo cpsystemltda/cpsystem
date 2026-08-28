@@ -1,11 +1,11 @@
 import { Users, TrendingUp, DollarSign, AlertTriangle, UserCheck, Building2 } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resumoReceita } from "@/lib/metricasReceita";
 import { brl } from "@/lib/validators";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { Tabs } from "@/components/Tabs";
 
-const PRECOS = { BASICO: 397, PREMIUM: 997 };
 
 function formatarCpf(cpf: string): string {
   const d = cpf.replace(/\D/g, "");
@@ -37,7 +37,7 @@ export default async function AdminPage() {
     prisma.conta.findMany({
       where: semSuperAdmin,
       include: {
-        usuarios: { select: { nome: true, email: true } },
+        usuarios: { select: { nome: true, email: true, superAdmin: true } },
         empresas: { select: { id: true, nomeFantasia: true, razaoSocial: true, cnpj: true } },
         // Última cobrança paga (pra próxima renovação) + próxima pendente
         cobrancas: {
@@ -88,21 +88,33 @@ export default async function AdminPage() {
     }),
   ]);
 
-  const ativas = contas.filter((c) => c.statusAssinatura === "ATIVA");
-  const trial = contas.filter((c) => c.statusAssinatura === "TRIAL");
-  const inadimplentes = contas.filter((c) => c.statusAssinatura === "INADIMPLENTE");
-  const canceladas = contas.filter((c) => c.statusAssinatura === "CANCELADA");
+  // Tudo o que fala de receita e de cliente olha so pra conta de EMPRESA: a
+  // conta de ANALISTA nao assina o sistema (ela recebe comissao) e aparece na
+  // secao de analistas mais abaixo. Misturar as duas era o que fazia o painel
+  // dizer "2 assinantes ativos" tendo 1 cliente pagante.
+  const clientes = contas.filter((c) => c.tipo === "EMPRESA");
+  const ativas = clientes.filter((c) => c.statusAssinatura === "ATIVA");
+  const trial = clientes.filter((c) => c.statusAssinatura === "TRIAL");
+  const inadimplentes = clientes.filter((c) => c.statusAssinatura === "INADIMPLENTE");
+  const canceladas = clientes.filter((c) => c.statusAssinatura === "CANCELADA");
 
-  const mrr = ativas.reduce((s, c) => s + PRECOS[c.plano as keyof typeof PRECOS], 0);
-  const arrProjetado = mrr * 12;
-
-  const ticketMedio = ativas.length > 0 ? mrr / ativas.length : 0;
-  const churnPct = contas.length > 0 ? (canceladas.length / contas.length) * 100 : 0;
-  const conversaoTrial = contas.length > 0 ? (ativas.length / (ativas.length + trial.length || 1)) * 100 : 0;
+  // Receita pela regra unica (lib/metricasReceita): so EMPRESA, so nao-interna,
+  // so ATIVA e so com fatura ja paga, pelo valor da fatura de verdade.
+  // Antes daqui saia `ativas x preco de tabela`, que somava a conta do ANALISTA
+  // — quem nao paga assinatura, recebe comissao — e usava um mapa de precos sem
+  // o plano INTERMEDIARIO (Regina 28/08: "so temos um cliente pagando hoje").
+  const { mrr, arr: arrProjetado, pagantes, ticketMedio, ativasSemPagamento } =
+    resumoReceita(contas);
+  const churnPct = clientes.length > 0 ? (canceladas.length / clientes.length) * 100 : 0;
+  const conversaoTrial =
+    pagantes.length + trial.length > 0
+      ? (pagantes.length / (pagantes.length + trial.length)) * 100
+      : 0;
 
   const distribuicaoPlano = {
-    BASICO: ativas.filter((c) => c.plano === "BASICO").length,
-    PREMIUM: ativas.filter((c) => c.plano === "PREMIUM").length,
+    BASICO: pagantes.filter((c) => c.plano === "BASICO").length,
+    INTERMEDIARIO: pagantes.filter((c) => c.plano === "INTERMEDIARIO").length,
+    PREMIUM: pagantes.filter((c) => c.plano === "PREMIUM").length,
   };
 
   // ============================================================
@@ -165,18 +177,36 @@ export default async function AdminPage() {
       />
 
       <div className="mt-8 grid gap-4 md:grid-cols-4">
-        <Card icone={DollarSign} titulo="MRR" valor={brl(mrr)} sub="Receita recorrente mensal" cor="emerald" />
+        <Card
+          icone={DollarSign}
+          titulo="MRR"
+          valor={brl(mrr)}
+          sub={`${pagantes.length} cliente${pagantes.length === 1 ? "" : "s"} pagante${pagantes.length === 1 ? "" : "s"}`}
+          cor="emerald"
+        />
         <Card icone={TrendingUp} titulo="ARR projetado" valor={brl(arrProjetado)} sub="MRR × 12" cor="blue" />
-        <Card icone={Users} titulo="Assinantes ativos" valor={String(ativas.length)} sub={`${trial.length} em trial`} cor="violet" />
-        <Card icone={DollarSign} titulo="Ticket médio" valor={brl(ticketMedio)} sub="por conta ativa" cor="amber" />
+        <Card
+          icone={Users}
+          titulo="Clientes pagantes"
+          valor={String(pagantes.length)}
+          sub={
+            `${trial.length} em trial` +
+            (ativasSemPagamento.length > 0
+              ? ` · ${ativasSemPagamento.length} ativa(s) sem fatura paga`
+              : "")
+          }
+          cor="violet"
+        />
+        <Card icone={DollarSign} titulo="Ticket médio" valor={brl(ticketMedio)} sub="por cliente pagante" cor="amber" />
       </div>
 
       <div className="mt-8 grid gap-6 md:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Distribuição de planos</h2>
           <div className="mt-4 space-y-3">
-            <Barra label="Básico (R$ 397/mês)" qtd={distribuicaoPlano.BASICO} total={ativas.length} cor="bg-blue-500" />
-            <Barra label="Premium (R$ 997/mês)" qtd={distribuicaoPlano.PREMIUM} total={ativas.length} cor="bg-violet-500" />
+            <Barra label="Básico (R$ 397/mês)" qtd={distribuicaoPlano.BASICO} total={pagantes.length} cor="bg-blue-500" />
+            <Barra label="Intermediário (R$ 697/mês)" qtd={distribuicaoPlano.INTERMEDIARIO} total={pagantes.length} cor="bg-cyan-500" />
+            <Barra label="Premium (R$ 997/mês)" qtd={distribuicaoPlano.PREMIUM} total={pagantes.length} cor="bg-violet-500" />
           </div>
         </section>
 
@@ -184,7 +214,7 @@ export default async function AdminPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Status das contas</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <Pill label="Trial" qtd={trial.length} cor="amber" />
-            <Pill label="Ativas" qtd={ativas.length} cor="emerald" />
+            <Pill label="Pagantes" qtd={pagantes.length} cor="emerald" />
             <Pill label="Inadimplentes" qtd={inadimplentes.length} cor="red" />
             <Pill label="Canceladas" qtd={canceladas.length} cor="slate" />
           </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Crown, Search, ArrowUpRight, AlertTriangle, CheckCircle2, Clock, XCircle, Eye, ShieldCheck } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { contaEhPagante, mensalidadeDaConta } from "@/lib/metricasReceita";
 import { entrarEspionagemAction } from "@/lib/espionagem";
 import { montarLabelEmpresa } from "@/lib/empresaLabel";
 
@@ -175,12 +176,13 @@ export default async function AdminClientesPage({
               // operar a plataforma e nunca gera fatura. Contar o plano dela
               // como receita inflava o numero — a tela ja marcava "Adm CP" no
               // nome e mesmo assim exibia R$ 997. Analista tambem nao paga.
+              // Regra unica (lib/metricasReceita): so entra como receita quem
+              // e EMPRESA, nao e conta interna, esta ATIVA e ja pagou fatura —
+              // pelo valor da fatura real. Antes o preco vinha de
+              // `PREMIUM ? 997 : 397`, e o plano INTERMEDIARIO (R$ 697)
+              // aparecia como R$ 397 na tela.
               const mrr =
-                ehContaAdmin || ehCarteiraImportada || c.tipo === "ANALISTA"
-                  ? 0
-                  : c.plano === "PREMIUM"
-                    ? PRECO_PREMIUM
-                    : PRECO_BASICO;
+                ehContaAdmin || ehCarteiraImportada ? 0 : contaEhPagante(c) ? mensalidadeDaConta(c) : 0;
               const totalCob = c.cobrancas.length;
               const pagas = c.cobrancas.filter((cb) => cb.status === "PAGA").length;
               const adimplenciaPct = totalCob > 0 ? (pagas / totalCob) * 100 : null;

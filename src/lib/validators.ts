@@ -33,6 +33,12 @@ export const signupSchema = z
     // vencimentos, resumo semanal via WhatsApp automatico. Cliente
     // recebe por padrao (pode desligar depois em /conta/notificacoes).
     telefoneWhatsApp: z.string().min(10, "Informe seu WhatsApp com DDD"),
+    // Regina 28/08 — regra de ouro: todo mundo que esta dentro do CP System e
+    // parabenizado no aniversario. So que a data so era pedida no onboarding de
+    // conta migrada, entao cadastro novo nascia sem ela e a regra nunca podia
+    // valer pra quem chegava sozinho. Fica OPCIONAL: e cortesia, e nao vale
+    // colocar atrito no passo mais caro do funil por causa dela.
+    dataNascimento: z.string().optional(),
     senha: z.string().min(10, "Mínimo 10 caracteres"),
     confirmacaoSenha: z.string().min(1, "Confirme a senha"),
 
