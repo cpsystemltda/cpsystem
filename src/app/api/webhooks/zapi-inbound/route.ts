@@ -135,19 +135,52 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Numero que nao casou com nenhum cadastro. NAO auto-responde (pode ser
-  // spam), mas tambem NAO morre em silencio: avisa os admins, porque pode ser
-  // cliente com telefone cadastrado errado — foi exatamente o que aconteceu.
+  // Numero que nao casou com nenhum cadastro — quase sempre LEAD vindo do site.
+  //
+  // Regina 28/08, caso do Patrique: ele escreveu 21h56 perguntando sobre nota
+  // fiscal e ficou SEM NENHUMA resposta ate as 5h07 do dia seguinte. Nao foi
+  // falha de entrega: o codigo so avisava os admins e, de proposito, nao
+  // respondia a quem nao e cadastrado (receio de responder spam). Na pratica,
+  // quem chega pelo site — justamente o lead que a gente paga anuncio pra
+  // atrair — era o unico que ficava no vacuo.
+  //
+  // Regra da Regina: "nunca deixar o cliente sem retorno". Agora o lead recebe
+  // acolhimento imediato com prazo, e a duvida de merito continua indo pro
+  // grupo. O acolhimento NAO promete nada sobre o produto — quem responde o que
+  // o sistema faz ou nao faz e gente, depois de olhar.
   if (!usuario) {
     const nome = String(body.senderName || "desconhecido");
+    const conteudo = mensagem || `[enviou ${midia?.rotulo}]`;
+
+    // Uma resposta automatica por numero a cada 24h. Sem isso, uma rajada de
+    // spam viraria uma rajada de respostas nossas — e foi disparo em rajada que
+    // derrubou o numero do WhatsApp em 12/08.
+    const jaAcolhido = await leadJaAcolhidoHoje(telefone);
+    if (!jaAcolhido) {
+      try {
+        await enviarTexto(
+          telefone,
+          `Olá! Aqui é o *CP System*. Recebemos a sua mensagem e ela já está com a nossa equipe.\n\n` +
+            `Um especialista te responde em até *2 horas úteis* (segunda a sexta, das 9h às 18h).\n\n` +
+            `Se quiser adiantar, me conta o que você precisa resolver — quanto mais detalhe, mais direta a resposta.`,
+        );
+        await registrarLeadAcolhido(telefone, nome, conteudo);
+      } catch (err) {
+        console.error("[zapi-inbound] falha ao acolher lead:", err);
+      }
+    }
+
     await notificarAdmin(
-      `${nome} (NÃO CADASTRADO)`,
+      `${nome} (LEAD — não cadastrado)`,
       telefone,
-      mensagem || `[enviou ${midia?.rotulo}]`,
-      `Número não bate com nenhum cadastro. Se for cliente, corrigir o telefone no perfil dele — ` +
-        `enquanto não bater, ele não recebe resposta automática.`,
+      conteudo,
+      jaAcolhido
+        ? `Lead já acolhido automaticamente nas últimas 24h. Continua aguardando resposta humana.`
+        : `Lead novo vindo de fora da base. Já respondemos confirmando o recebimento e prometemos ` +
+            `retorno em até 2 horas úteis — o relógio está correndo. Se for cliente com telefone ` +
+            `errado no cadastro, vale corrigir o perfil dele.`,
     );
-    return NextResponse.json({ ok: true, escalado: "usuario_nao_cadastrado", telefone });
+    return NextResponse.json({ ok: true, escalado: "lead_nao_cadastrado", telefone });
   }
 
   // 3b) Cliente mandou audio/foto/video sem texto. A IA so lê texto, entao
@@ -318,6 +351,51 @@ export async function POST(req: NextRequest) {
   await notificarAdmin(usuario.nome, telefone, mensagem, decisao.resumoParaAdmin, chamado.id);
 
   return NextResponse.json({ ok: true, ia: "escalado_admin" });
+}
+
+// ==================== LEADS (numero fora da base) ====================
+//
+// Lead nao tem Usuario nem Conta, e os dois sao obrigatorios em
+// ChamadoSuporte. Em vez de criar tabela nova pra isso, o contato fica
+// registrado como chamado da conta interna do CP System, com o telefone no
+// titulo. Serve pra duas coisas: nao acolher o mesmo numero duas vezes no
+// mesmo dia e deixar o historico do lead em algum lugar — hoje ele nao existe
+// em lugar nenhum do sistema.
+
+const TITULO_LEAD = "LEAD WhatsApp";
+
+async function leadJaAcolhidoHoje(telefone: string): Promise<boolean> {
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const achado = await prisma.chamadoSuporte.findFirst({
+    where: {
+      titulo: { startsWith: `${TITULO_LEAD} ${telefone}` },
+      criadoEm: { gte: desde },
+    },
+    select: { id: true },
+  });
+  return !!achado;
+}
+
+async function registrarLeadAcolhido(
+  telefone: string,
+  nome: string,
+  conteudo: string,
+): Promise<void> {
+  const admin = await prisma.usuario.findFirst({
+    where: { superAdmin: true },
+    select: { id: true, contaId: true },
+  });
+  if (!admin) return; // sem conta interna nao ha onde registrar; o acolhimento ja foi enviado
+  await prisma.chamadoSuporte.create({
+    data: {
+      contaId: admin.contaId,
+      usuarioId: admin.id,
+      categoria: "OUTRO",
+      titulo: `${TITULO_LEAD} ${telefone} — ${nome}`.slice(0, 80),
+      descricao: `Lead escreveu pelo WhatsApp:\n\n${conteudo}\n\nAcolhido automaticamente com promessa de retorno em até 2 horas úteis.`,
+      status: "AGUARDANDO_ADMIN",
+    },
+  });
 }
 
 // Notifica admins do chamado escalado. Regina 14/07:
