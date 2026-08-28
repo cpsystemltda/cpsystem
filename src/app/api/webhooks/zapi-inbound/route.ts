@@ -170,17 +170,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await notificarAdmin(
-      `${nome} (LEAD — não cadastrado)`,
-      telefone,
-      conteudo,
-      jaAcolhido
-        ? `Lead já acolhido automaticamente nas últimas 24h. Continua aguardando resposta humana.`
-        : `Lead novo vindo de fora da base. Já respondemos confirmando o recebimento e prometemos ` +
-            `retorno em até 2 horas úteis — o relógio está correndo. Se for cliente com telefone ` +
-            `errado no cadastro, vale corrigir o perfil dele.`,
-    );
-    return NextResponse.json({ ok: true, escalado: "lead_nao_cadastrado", telefone });
+    // Alerta o grupo apenas no PRIMEIRO contato da janela de 24h. Lead que
+    // manda cinco mensagens seguidas nao pode virar cinco alertas — Regina
+    // 28/08: "não envie mil mensagens de uma vez pra não me bloquear". O
+    // chamado ja registra o contato, e as mensagens seguintes chegam no mesmo
+    // fio quando alguem abrir a conversa.
+    if (!jaAcolhido) {
+      await notificarAdmin(
+        `${nome} (LEAD — não cadastrado)`,
+        telefone,
+        conteudo,
+        `Lead novo vindo de fora da base. Já respondemos confirmando o recebimento e prometemos ` +
+          `retorno em até 2 horas úteis — o relógio está correndo. Se for cliente com telefone ` +
+          `errado no cadastro, vale corrigir o perfil dele.`,
+      );
+    }
+    return NextResponse.json({ ok: true, escalado: "lead_nao_cadastrado", telefone, acolhido: !jaAcolhido });
   }
 
   // 3b) Cliente mandou audio/foto/video sem texto. A IA so lê texto, entao
@@ -421,10 +426,20 @@ async function notificarAdmin(nomeCliente: string, telefoneCliente: string, msgO
     }
   }
 
+  // Fallback: manda pra cada super admin com telefone.
+  //
+  // Regina 28/08: aqui havia a segunda causa do silencio. O filtro exigia
+  // `optInWhatsApp: true`, e os tres super admins estao com opt-in FALSE — a
+  // consulta voltava vazia e ninguem era avisado. Opt-in e preferencia sobre
+  // notificacao de PRODUTO (prazo, resumo, cobranca); alerta de operacao
+  // interna, com cliente esperando resposta, nao e opcional.
   const superAdmins = await prisma.usuario.findMany({
-    where: { superAdmin: true, telefoneWhatsApp: { not: null }, optInWhatsApp: true },
+    where: { superAdmin: true, telefoneWhatsApp: { not: null } },
     select: { telefoneWhatsApp: true, nome: true },
   });
+  if (superAdmins.length === 0) {
+    console.error("[zapi-inbound] NENHUM super admin com telefone cadastrado — alerta nao tem pra onde ir");
+  }
   for (const admin of superAdmins) {
     if (!admin.telefoneWhatsApp) continue;
     try {

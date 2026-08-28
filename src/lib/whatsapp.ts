@@ -26,6 +26,22 @@ function getBaseUrl(): string {
 //   "+55 21 99720-9623" -> "5521997209623"
 //   "5521997209623"     -> "5521997209623"
 export function formatarTelefone(raw: string): string {
+  // ID de GRUPO do WhatsApp nao e telefone: vem como "1203634...-group" (ou so
+  // o numerao de 18 digitos). Passa direto, sem formatar.
+  //
+  // Regina 28/08: era exatamente isto que fazia TODO alerta pro grupo de
+  // suporte falhar — a validacao tratava o ID como telefone, estourava
+  // "formato inesperado (18 digitos)" e o alerta morria no log. Foi por isso
+  // que ninguem soube do lead que chegou pelo site.
+  // Corte em 17 digitos de proposito: E.164 permite ate 15 digitos num telefone
+  // internacional, e ID de grupo do WhatsApp tem 18. Nao dá pra confundir os
+  // dois — evita transformar um telefone estrangeiro em "grupo" por engano.
+  const cru = raw.trim();
+  const soDigitos = cru.replace(/\D/g, "");
+  if (cru.endsWith("-group") || soDigitos.length >= 17) {
+    return cru.endsWith("-group") ? cru : `${soDigitos}-group`;
+  }
+
   const digits = raw.replace(/\D/g, "");
   if (digits.length < 10) throw new Error(`Telefone invalido: ${raw}`);
   // Ja tem 55 no comeco?
@@ -119,6 +135,30 @@ export function invalidarCacheStatusZapi(): void {
   statusCache = null;
 }
 
+/**
+ * Destino de um envio: telefone OU id de grupo do WhatsApp.
+ *
+ * Regina 28/08: TODO alerta pro grupo de suporte falhava porque o id do grupo
+ * ("1203634…-group", 18 dígitos) passava por `formatarTelefone`, que o tratava
+ * como telefone e estourava "formato inesperado". O alerta morria no log — foi
+ * por isso que ninguém soube do lead que chegou pelo site.
+ *
+ * A separação é de propósito: `formatarTelefone` continua ESTRITO porque é ele
+ * que valida telefone digitado por gente no cadastro. Se aceitasse id de grupo,
+ * um número digitado errado (repetido, por exemplo) entraria como válido e o
+ * cliente ficaria com telefone impossível de receber mensagem.
+ *
+ * Corte em 17 dígitos: E.164 vai até 15 num telefone internacional e id de grupo
+ * tem 18 — não há como confundir os dois.
+ */
+export function formatarDestino(raw: string): string {
+  const cru = raw.trim();
+  const soDigitos = cru.replace(/\D/g, "");
+  if (cru.endsWith("-group")) return cru;
+  if (soDigitos.length >= 17) return `${soDigitos}-group`;
+  return formatarTelefone(cru);
+}
+
 // Envia mensagem de texto via Z-API. Retorna o messageId.
 // Lanca erro se falhar — o caller decide se propaga ou log-e-segue.
 // SEMPRE checa status de conexao antes (nao enfileira em instancia offline).
@@ -128,7 +168,7 @@ export async function enviarTexto(
 ): Promise<{ messageId: string }> {
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
   await checarConexaoZapi();
-  const phone = formatarTelefone(telefone);
+  const phone = formatarDestino(telefone);
   const r = await fetch(`${getBaseUrl()}/send-text`, {
     method: "POST",
     headers: {
@@ -282,7 +322,7 @@ export async function enviarDocumentoPdf(
 ): Promise<{ messageId: string }> {
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
   await checarConexaoZapi();
-  const phone = formatarTelefone(telefone);
+  const phone = formatarDestino(telefone);
   // Endpoint Z-API: /send-document/{extension}
   const r = await fetch(`${getBaseUrl()}/send-document/pdf`, {
     method: "POST",
@@ -322,7 +362,7 @@ export async function enviarVideo(
 ): Promise<{ messageId: string }> {
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
   await checarConexaoZapi();
-  const phone = formatarTelefone(telefone);
+  const phone = formatarDestino(telefone);
   // Regina 14/08: /send-video devolvia messageId mas a mensagem nunca chegava.
   // /send-document/mp4 e o mesmo caminho que ja entrega os PDFs de NF e o
   // contrato do analista nesta instancia, entao e o que se usa aqui. Chega como
