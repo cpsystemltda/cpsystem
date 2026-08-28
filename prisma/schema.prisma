@@ -2000,6 +2000,10 @@ enum TipoNotificacaoSistema {
   COMISSAO_DISPONIVEL // valor a receber consolidado mensal
   AVISO_VENCIMENTO_FATURA // assinatura SaaS vencendo
   NOVO_INDICADO // Regina 16/07: alguem se cadastrou pelo link ?ref do EMBAIXADOR (nao confundir com VINCULO_CRIADO que e do ANALISTA)
+  // Regina 28/08: recado do CP System pro cliente dentro do proprio sistema.
+  // Nasceu de uma necessidade concreta — a Michelly cadastrou um WhatsApp que
+  // nao existe, e sem este tipo nao havia NENHUM canal pra falar com ela.
+  AVISO_CP_SYSTEM
 }
 
 model NotificacaoSistema {
