@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { criarSessao, destruirSessao, hashSenha, verificarSenha } from "@/lib/auth";
@@ -536,6 +537,23 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     }
   }
 
+  // Boas-vindas ao cliente + aviso pra equipe (Regina 28/08: "foi direto pra
+  // notificacao sem nem dar bom dia pro cara").
+  //
+  // Vai em `after` pra nao somar WhatsApp + e-mail ao tempo do cadastro, que e
+  // o passo mais caro do funil pra deixar o cliente esperando. O Next roda o
+  // callback depois da resposta, e roda mesmo apos o `redirect` abaixo
+  // (node_modules/next/dist/docs/.../after.md).
+  const contaCriadaId = conta.id;
+  after(async () => {
+    try {
+      const { darBoasVindas } = await import("@/lib/boasVindas");
+      await darBoasVindas(contaCriadaId);
+    } catch (e) {
+      console.error("[signup] boas-vindas falharam:", e);
+    }
+  });
+
   await criarSessao(conta.usuarios[0].id);
   // ?novo=1 sinaliza pro dashboard disparar a conversao "cadastro" no Google
   // Ads. O evento vai no client, no primeiro carregamento apos o cadastro —
@@ -767,6 +785,23 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
       },
     },
     include: { usuarios: true },
+  });
+
+  // Boas-vindas ao cliente + aviso pra equipe (Regina 28/08: "foi direto pra
+  // notificacao sem nem dar bom dia pro cara").
+  //
+  // Vai em `after` pra nao somar WhatsApp + e-mail ao tempo do cadastro, que e
+  // o passo mais caro do funil pra deixar o cliente esperando. O Next roda o
+  // callback depois da resposta, e roda mesmo apos o `redirect` abaixo
+  // (node_modules/next/dist/docs/.../after.md).
+  const contaCriadaId = conta.id;
+  after(async () => {
+    try {
+      const { darBoasVindas } = await import("@/lib/boasVindas");
+      await darBoasVindas(contaCriadaId);
+    } catch (e) {
+      console.error("[signup] boas-vindas falharam:", e);
+    }
   });
 
   await criarSessao(conta.usuarios[0].id);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { avisarEquipe } from "@/lib/alertaInterno";
 import { enviarTexto, variantesTelefone } from "@/lib/whatsapp";
 import { decidirRespostaIA, historicoDoUsuario } from "@/lib/ia-suporte";
 import { interpretarMsgAdmin, idCurto } from "@/lib/ia-decisao-grupo";
@@ -415,39 +416,9 @@ async function notificarAdmin(nomeCliente: string, telefoneCliente: string, msgO
     `Resumo IA: ${resumoIA}\n\n` +
     `Respondam aqui no grupo com a decisão (a IA lê e executa) ou abram em cpsystem.app.br/admin/suporte`;
 
-  const grupoId = process.env.SUPORTE_GROUP_ID || "";
-  if (grupoId) {
-    try {
-      await enviarTexto(grupoId, texto);
-      return;
-    } catch (err) {
-      console.error(`[zapi-inbound] falha ao postar no grupo suporte:`, err);
-      // Cai no fallback de admins individuais abaixo
-    }
-  }
-
-  // Fallback: manda pra cada super admin com telefone.
-  //
-  // Regina 28/08: aqui havia a segunda causa do silencio. O filtro exigia
-  // `optInWhatsApp: true`, e os tres super admins estao com opt-in FALSE — a
-  // consulta voltava vazia e ninguem era avisado. Opt-in e preferencia sobre
-  // notificacao de PRODUTO (prazo, resumo, cobranca); alerta de operacao
-  // interna, com cliente esperando resposta, nao e opcional.
-  const superAdmins = await prisma.usuario.findMany({
-    where: { superAdmin: true, telefoneWhatsApp: { not: null } },
-    select: { telefoneWhatsApp: true, nome: true },
-  });
-  if (superAdmins.length === 0) {
-    console.error("[zapi-inbound] NENHUM super admin com telefone cadastrado — alerta nao tem pra onde ir");
-  }
-  for (const admin of superAdmins) {
-    if (!admin.telefoneWhatsApp) continue;
-    try {
-      await enviarTexto(admin.telefoneWhatsApp, texto);
-    } catch (err) {
-      console.error(`[zapi-inbound] falha ao notificar admin ${admin.nome}:`, err);
-    }
-  }
+  // Um caminho so pro alerta interno — o mesmo usado pelo aviso de cadastro
+  // novo. Antes a logica vivia duplicada aqui dentro (ver lib/alertaInterno).
+  await avisarEquipe(texto);
 }
 
 // Processa msg vinda do GRUPO DE SUPORTE — IA interpreta a decisao e executa.

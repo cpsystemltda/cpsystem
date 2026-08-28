@@ -131,7 +131,11 @@ export default async function AdminClientesPage({
       </form>
 
       {/* Tabela — overflow-x-auto pra tabela larga (9 colunas) nao esconder o botao
-          "Ver como cliente" da ultima coluna (Regina 25/07: cliente cortado) */}
+          "Ver como cliente" da ultima coluna (Regina 25/07: cliente cortado).
+          Regina 28/08: "cade o modo espionagem?" — o overflow resolveu o layout
+          mas nao o achado: com 1100px de largura minima, a coluna de Acoes fica
+          fora da tela num notebook e so aparece rolando pro lado. Agora ela e
+          sticky na direita, entao o botao fica visivel sem rolagem nenhuma. */}
       <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
@@ -144,7 +148,9 @@ export default async function AdminClientesPage({
               <th className="px-4 py-3 text-left font-medium">Origem</th>
               <th className="px-4 py-3 text-left font-medium">Adimplência</th>
               <th className="px-4 py-3 text-left font-medium">Criada em</th>
-              <th className="px-4 py-3 text-right font-medium">Ações</th>
+              <th className="sticky right-0 z-10 bg-slate-50 px-4 py-3 text-right font-medium shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)]">
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -239,7 +245,7 @@ export default async function AdminClientesPage({
                   <td className="px-4 py-3 text-xs text-slate-500">
                     {c.criadoEm.toLocaleDateString("pt-BR")}
                   </td>
-                  <td className="px-4 py-3 text-right">
+                  <td className="sticky right-0 z-10 bg-white px-4 py-3 text-right shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)]">
                     {ehMinhaConta ? (
                       <span className="text-[11px] text-slate-400">você</span>
                     ) : (

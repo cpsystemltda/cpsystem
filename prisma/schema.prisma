@@ -222,6 +222,10 @@ enum TipoNotificacaoWhatsApp {
   // Regina 30/07 — lembrete semanal (sexta 10h BRT) pra clientes com
   // conciliacao ativa enviarem o extrato bancario da semana.
   LEMBRETE_EXTRATO_SEMANAL
+  // Regina 28/08 — primeira mensagem que o cliente recebe da gente, no
+  // cadastro. Antes disso o primeiro contato era um aviso automatico de
+  // documento, sem nem cumprimentar quem tinha acabado de entrar.
+  BOAS_VINDAS
 }
 
 enum StatusNotificacaoWhatsApp {
