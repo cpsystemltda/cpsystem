@@ -83,6 +83,7 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
       { href: "/conta/integracoes", label: "Integrações", icon: Plug },
       { href: "/vinculos", label: "Analista vinculado", icon: UserCheck },
       { href: "/equipe", label: "Equipe", icon: Users },
+      { href: "/conta/privacidade", label: "Meus dados / LGPD", icon: ShieldCheck },
       { href: "/termos", label: "Termos / LGPD", icon: ScrollText },
     ],
   },
