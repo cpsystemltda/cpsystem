@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, Receipt, AlertTriangle, Pencil } from "lucide-react";
@@ -24,6 +25,7 @@ import { GarantiasTab } from "@/components/abas/GarantiasTab";
 import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
+import { EmitirNotaFiscal, type NotaDoEmpenho } from "@/components/EmitirNotaFiscal";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { ItensEmpenhoTab } from "@/components/abas/ItensEmpenhoTab";
@@ -81,12 +83,33 @@ export default async function EmpenhoDetalhePage({
       anexos: { orderBy: { criadoEm: "desc" } },
       anotacoes: { orderBy: { criadoEm: "desc" } },
       reajusteRetroativo: true,
+      notasFiscais: { orderBy: { criadoEm: "desc" } },
     },
   });
 
   if (!e) notFound();
 
   const podeEditar = podeEditarDocumento(usuario, e);
+
+  // Emissão de NFS-e (Fase 1). A configuração é por CNPJ, então quem manda é a
+  // empresa dona deste empenho — não a conta.
+  const configFiscal = await prisma.configuracaoFiscal.findUnique({
+    where: { empresaId: e.empresaId },
+    select: { habilitado: true },
+  });
+  const emissaoFiscalLigada = !!configFiscal?.habilitado;
+  const valorTotalItens = e.itens.reduce((s, i) => s + i.valorTotal, 0);
+  const notasParaTela = e.notasFiscais.map((n) => ({
+    id: n.id,
+    status: n.status,
+    numero: n.numero,
+    ambiente: n.ambiente,
+    pdfUrl: n.pdfUrl,
+    linkPrefeitura: n.linkPrefeitura,
+    mensagemErro: n.mensagemErro,
+    valorServicos: n.valorServicos,
+    criadoEm: n.criadoEm.toISOString(),
+  }));
   const itemIds = e.itens.map((i) => i.id);
   const enderecoIds = e.enderecosEntrega.map((x) => x.id);
   const pontoFocalIds = e.pontosFocais.map((p) => p.id);
@@ -304,6 +327,10 @@ export default async function EmpenhoDetalhePage({
                   }}
                   reajusteRetroativo={e.reajusteRetroativo}
                   podeEditar={podeEditar}
+                  emissaoFiscalLigada={emissaoFiscalLigada}
+                  valorTotalItens={valorTotalItens}
+                  notasFiscais={notasParaTela}
+                  podeCancelarNota={usuario.perfil === "ADMIN"}
                 />
               ),
             },
@@ -480,6 +507,10 @@ function Timeline({
   empenho,
   reajusteRetroativo,
   podeEditar,
+  emissaoFiscalLigada,
+  valorTotalItens,
+  notasFiscais,
+  podeCancelarNota,
 }: {
   empenho: {
     id: string;
@@ -506,6 +537,10 @@ function Timeline({
   };
   reajusteRetroativo: ReajusteRetroativoData | null;
   podeEditar: boolean;
+  emissaoFiscalLigada: boolean;
+  valorTotalItens: number;
+  notasFiscais: NotaDoEmpenho[];
+  podeCancelarNota: boolean;
 }) {
   // Prazo-limite tempestivo — extraido pra lib/prazoEntrega pra bater com
   // o dashboard de Logistica (bug Regina 09/06: dashboard mostrava
@@ -581,9 +616,8 @@ function Timeline({
           const isPago = p.marco === "PAGO";
 
           return (
-            <>
+            <Fragment key={p.marco}>
               <li
-                key={p.marco}
                 className={`rounded-xl border p-4 transition ${
                   concluido
                     ? "border-emerald-200 bg-emerald-50/40"
@@ -640,6 +674,17 @@ function Timeline({
                         jaArquivo={arquivo}
                         bloqueado={!concluido && !anterior}
                       />
+                      {/* Emissão da NFS-e fica AO LADO do registro manual, não no
+                          lugar dele: quem emite por fora continua só anexando. */}
+                      {p.marco === "NF_EMITIDA" && (
+                        <EmitirNotaFiscal
+                          empenhoId={empenho.id}
+                          emissaoLigada={emissaoFiscalLigada}
+                          valorTotal={valorTotalItens}
+                          notas={notasFiscais}
+                          podeCancelar={podeCancelarNota}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -675,7 +720,7 @@ function Timeline({
                   </div>
                 </li>
               )}
-            </>
+            </Fragment>
           );
         })}
 

@@ -200,3 +200,52 @@ export async function consultarCnpjsNaReceita(
   );
   return saida;
 }
+
+
+/**
+ * Codigo IBGE do municipio a partir do CNPJ.
+ *
+ * A NFS-e identifica a cidade pelo codigo IBGE, nao pelo nome — e e o campo que
+ * mais gera recusa quando digitado a mao. Como a BrasilAPI ja devolve
+ * `codigo_municipio_ibge` na consulta de CNPJ, da pra preencher sozinho tanto o
+ * municipio do prestador quanto o do orgao tomador.
+ */
+export async function consultarCodigoMunicipioPorCnpj(cnpjBruto: string): Promise<string | null> {
+  const d = await buscar(cnpjBruto.replace(/\D/g, ""));
+  const codigo = d?.codigo_municipio_ibge;
+  return codigo ? String(codigo) : null;
+}
+
+/** Endereco estruturado do CNPJ — o formato que a nota fiscal exige. */
+export type EnderecoDaReceita = {
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  municipio: string | null;
+  uf: string | null;
+  cep: string | null;
+  codigoMunicipio: string | null;
+};
+
+export async function consultarEnderecoPorCnpj(cnpjBruto: string): Promise<EnderecoDaReceita | null> {
+  const d = await buscar(cnpjBruto.replace(/\D/g, ""));
+  if (!d) return null;
+  const texto = (v: unknown) => {
+    const t = String(v ?? "").trim();
+    return t || null;
+  };
+  const cep = String(d.cep ?? "").replace(/\D/g, "");
+  return {
+    logradouro: texto(
+      [d.descricao_tipo_de_logradouro, d.logradouro].filter(Boolean).join(" ").trim(),
+    ),
+    numero: texto(d.numero),
+    complemento: texto(d.complemento),
+    bairro: texto(d.bairro),
+    municipio: texto(d.municipio),
+    uf: texto(d.uf),
+    cep: cep.length === 8 ? cep : null,
+    codigoMunicipio: d.codigo_municipio_ibge ? String(d.codigo_municipio_ibge) : null,
+  };
+}

@@ -22,7 +22,7 @@ import {
   Plug,
   Banknote,
   ShieldCheck,
-} from "lucide-react";
+  Receipt,} from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { SeletorVisao } from "@/components/SeletorVisao";
 import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
@@ -79,6 +79,7 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
       { href: "/notificacoes", label: "Notificações", icon: Bell },
       { href: "/conta/notificacoes", label: "Notificações WhatsApp", icon: Bell },
       { href: "/conta/assinatura", label: "Assinatura", icon: CreditCard },
+      { href: "/conta/fiscal", label: "Dados fiscais · NF", icon: Receipt },
       { href: "/conta/integracoes", label: "Integrações", icon: Plug },
       { href: "/vinculos", label: "Analista vinculado", icon: UserCheck },
       { href: "/equipe", label: "Equipe", icon: Users },

@@ -402,6 +402,8 @@ model Empresa {
   atas                       Ata[]
   contratos                  Contrato[]
   empenhos                   Empenho[]
+  configuracaoFiscal         ConfiguracaoFiscal?
+  notasFiscais               NotaFiscal[]
   documentosAvulsosJuridicos DocumentoAvulsoJuridico[]
 
   @@index([contaId])
@@ -1164,6 +1166,7 @@ model Empenho {
   criadoPor   Usuario? @relation("EmpenhosCriados", fields: [criadoPorId], references: [id])
 
   itens              EmpenhoItem[]
+  notasFiscais       NotaFiscal[]
   enderecosEntrega   EnderecoEntrega[]
   pontosFocais       PontoFocal[]
   termosAditivos     TermoAditivo[]
@@ -2279,4 +2282,138 @@ model TentativaLogin {
   @@index([email, criadoEm])
   @@index([ip, criadoEm])
   @@index([criadoEm]) // pra limpeza
+}
+
+// ============================================================
+// EMISSAO DE NOTA FISCAL (Fase 1 — NFS-e de servico)
+// ============================================================
+//
+// Pedido do Patrique e decisao da Regina (28/08): "vamos fazer isso acontecer".
+// O sistema ja registrava NF_EMITIDA e NF_ENCAMINHADA na esteira do empenho,
+// mas eram marcos preenchidos A MAO — o cliente emitia a nota em outro lugar e
+// vinha aqui dizer que emitiu. Isto aqui e o que faltava no meio: emitir de
+// verdade, com os itens e o orgao que ja estao cadastrados.
+//
+// Escopo desta fase: NFS-e (servico). NF-e de mercadoria e CT-e de transporte
+// exigem SEFAZ, NCM/CFOP/CST e certificado A1 no fluxo — ficam pra fase
+// seguinte, e o modelo aqui ja nasce preparado pra receber os dois.
+
+enum ProvedorFiscal {
+  FOCUS_NFE
+  DEMO
+}
+
+enum AmbienteFiscal {
+  HOMOLOGACAO
+  PRODUCAO
+}
+
+enum RegimeTributarioFiscal {
+  SIMPLES_NACIONAL
+  LUCRO_PRESUMIDO
+  LUCRO_REAL
+  MEI
+}
+
+enum StatusNotaFiscal {
+  PROCESSANDO
+  AUTORIZADA
+  ERRO
+  CANCELADA
+}
+
+// Dados fiscais da empresa do cliente — um por empresa (CNPJ).
+//
+// O certificado A1 NAO fica aqui, e isso e proposital: no provedor fiscal quem
+// guarda o certificado e ele proprio, e a gente segura so um token de API. Um
+// token vazado se revoga; um certificado A1 vazado assina em nome da empresa.
+model ConfiguracaoFiscal {
+  id        String  @id @default(cuid())
+  empresaId String  @unique
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  provedor ProvedorFiscal @default(DEMO)
+  ambiente AmbienteFiscal @default(HOMOLOGACAO)
+  // Token da API fiscal, cifrado em AES-256-GCM (lib/segredos).
+  tokenCifrado String?
+
+  inscricaoMunicipal String?
+  inscricaoEstadual  String?
+  // Codigo IBGE do municipio do prestador — a prefeitura identifica a cidade
+  // por ele, nao pelo nome. Preenchido sozinho a partir do CNPJ da empresa.
+  codigoMunicipio    String?
+  regime             RegimeTributarioFiscal @default(SIMPLES_NACIONAL)
+  optanteSimples     Boolean                @default(true)
+  incentivadorCultural Boolean              @default(false)
+
+  // Parametros do servico prestado — o que a prefeitura exige na NFS-e.
+  itemListaServico          String? // ex: "14.01"
+  codigoTributarioMunicipio String?
+  cnaeServico               String?
+  aliquotaIss               Float? // em % — ex: 2.0
+  issRetidoPadrao           Boolean @default(false)
+  descricaoPadrao           String?
+
+  // So emite quando o cliente confirma que os dados estao certos.
+  habilitado Boolean @default(false)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([empresaId])
+}
+
+model NotaFiscal {
+  id        String  @id @default(cuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  // Nesta fase a nota nasce sempre de um empenho; o campo e opcional pra a
+  // fase seguinte poder emitir a partir de contrato ou avulsa.
+  empenhoId String?
+  empenho   Empenho? @relation(fields: [empenhoId], references: [id], onDelete: SetNull)
+
+  // Chave de idempotencia combinada com o provedor: se a rede cair depois do
+  // envio, reenviar com a MESMA referencia consulta a nota em vez de emitir
+  // outra. Nota fiscal duplicada da trabalho fiscal pra desfazer.
+  referencia String         @unique
+  provedor   ProvedorFiscal
+  ambiente   AmbienteFiscal
+  status     StatusNotaFiscal @default(PROCESSANDO)
+
+  numero            String?
+  serie             String?
+  codigoVerificacao String?
+  linkPrefeitura    String?
+  pdfUrl            String?
+  xmlUrl            String?
+
+  valorServicos Float
+  aliquotaIss   Float?
+  valorIss      Float?
+  issRetido     Boolean @default(false)
+  descricao     String
+
+  // Retrato do tomador no momento do envio. A nota tem que refletir o que foi
+  // transmitido, mesmo que o cadastro do orgao mude depois.
+  tomadorCnpj        String
+  tomadorRazaoSocial String
+  tomadorEndereco    String?
+  tomadorEmail       String?
+
+  mensagemErro     String?
+  respostaProvedor Json?
+
+  criadoPorId   String?
+  criadoPorNome String?
+
+  criadoEm           DateTime  @default(now())
+  atualizadoEm       DateTime  @updatedAt
+  autorizadaEm       DateTime?
+  canceladaEm        DateTime?
+  motivoCancelamento String?
+
+  @@index([empresaId, criadoEm])
+  @@index([empenhoId])
+  @@index([status])
 }
