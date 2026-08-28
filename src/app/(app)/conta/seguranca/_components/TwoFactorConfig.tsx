@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition } from "react";
 import { ShieldCheck, ShieldAlert, KeyRound, RefreshCw, X } from "lucide-react";
 import {
@@ -22,7 +23,15 @@ type Passo =
   | { modo: "recovery-codes"; codes: string[] };
 
 export function TwoFactorConfig(props: Props) {
+  const router = useRouter();
   const [passo, setPasso] = useState<Passo>({ modo: "off" });
+  // Regina 28/08: "cliquei em já salvei e nada aconteceu, o botão não funcionou".
+  //
+  // Não era o botão: ele fechava a tela, e o bloco logo abaixo — que roda a
+  // cada render — via que a action ainda tinha os códigos em mãos e reabria na
+  // mesma hora. Da tela, parecia clique morto. Este sinalizador marca que a
+  // pessoa já dispensou, e só ele encerra o ciclo.
+  const [codigosDispensados, setCodigosDispensados] = useState(false);
   const [modalDesativar, setModalDesativar] = useState(false);
   const [modalRegenerar, setModalRegenerar] = useState(false);
   const [iniciarPending, startIniciar] = useTransition();
@@ -33,11 +42,11 @@ export function TwoFactorConfig(props: Props) {
   const [regenerarState, regenerarAction, regenerarPending] = useActionState(regenerarRecoveryCodesAction, null);
 
   // Se confirmacao ok, mostra os recovery codes
-  if (confirmarState?.recoveryCodes && passo.modo !== "recovery-codes") {
+  if (!codigosDispensados && confirmarState?.recoveryCodes && passo.modo !== "recovery-codes") {
     setPasso({ modo: "recovery-codes", codes: confirmarState.recoveryCodes });
   }
   // Se regenerou, tambem mostra os codes novos
-  if (regenerarState?.recoveryCodes && passo.modo !== "recovery-codes") {
+  if (!codigosDispensados && regenerarState?.recoveryCodes && passo.modo !== "recovery-codes") {
     setModalRegenerar(false);
     setPasso({ modo: "recovery-codes", codes: regenerarState.recoveryCodes });
   }
@@ -48,6 +57,7 @@ export function TwoFactorConfig(props: Props) {
 
   function handleIniciar() {
     setIniciarErro(null);
+    setCodigosDispensados(false);
     startIniciar(async () => {
       const r = await iniciar2FAAction();
       if (r.erro) {
@@ -92,7 +102,13 @@ export function TwoFactorConfig(props: Props) {
               </button>
               <button
                 type="button"
-                onClick={() => setPasso({ modo: "off" })}
+                onClick={() => {
+                  setCodigosDispensados(true);
+                  setPasso({ modo: "off" });
+                  // A tela de fora precisa reler o servidor pra passar a mostrar
+                  // "2FA ativo" — os dados dela foram carregados antes da ativação.
+                  router.refresh();
+                }}
                 className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
               >
                 Já salvei
@@ -227,7 +243,10 @@ export function TwoFactorConfig(props: Props) {
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setModalRegenerar(true)}
+                onClick={() => {
+                  setCodigosDispensados(false);
+                  setModalRegenerar(true);
+                }}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50"
               >
                 <RefreshCw className="h-3.5 w-3.5" /> Regenerar códigos de recuperação
