@@ -217,6 +217,8 @@ enum TipoNotificacaoWhatsApp {
   REAJUSTE_APROVADO
   ANIVERSARIO
   NF_EMITIDA_CLIENTE
+  // Entrega registrada: hora de pedir a nota a contabilidade.
+  SOLICITAR_NOTA
   // Regina 14/07: resumos consolidados semanais (cap 1 msg/semana por
   // destinatario garantido pela chave (usuarioId, tipo, referenciaId=YYYY-Wxx)).
   RESUMO_SEMANAL_EMPRESA
@@ -2312,6 +2314,11 @@ model TentativaLogin {
 enum ProvedorFiscal {
   FOCUS_NFE
   DEMO
+  // Regina 28/08: nota emitida FORA do CP System (pela contabilidade do
+  // cliente) e apenas registrada aqui, com os dados lidos do PDF. E o caminho
+  // que a gente escolheu — o sistema cuida de tudo em volta da nota e nunca
+  // toca no documento fiscal.
+  EXTERNA
 }
 
 enum AmbienteFiscal {

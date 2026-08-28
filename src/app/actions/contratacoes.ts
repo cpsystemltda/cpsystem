@@ -2037,6 +2037,21 @@ export async function registrarMarcoAction(
 
   await prisma.empenho.update({ where: { id: empenhoId }, data: update });
 
+  // Entrega registrada: dispara "hora de solicitar a nota" com os dados prontos
+  // pra contabilidade (Regina 28/08 — controle de notas). Só na TRANSIÇÃO: quem
+  // edita a data da entrega depois não recebe o aviso de novo.
+  //
+  // Best-effort de propósito: falha no aviso não pode derrubar o registro da
+  // entrega, que é o que a pessoa veio fazer.
+  if (marco === "ENTREGUE" && !empenho.dataEntrega) {
+    try {
+      const { avisarParaSolicitarNota } = await import("@/lib/solicitarNota");
+      await avisarParaSolicitarNota(empenhoId);
+    } catch (e) {
+      console.error("[marco] aviso de solicitar nota falhou:", e);
+    }
+  }
+
   // Side-effects de PAGO só rodam na transição (status anterior != PAGO).
   // Sem isso, editar a data de pagamento dispararia notificações duplicadas.
   const ehTransicaoParaPago = marco === "PAGO" && empenho.status !== "PAGO";

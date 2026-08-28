@@ -51,6 +51,7 @@ const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
       { href: "/atas", label: "Atas de Registro de Preços", icon: FileText },
       { href: "/contratos", label: "Contratos", icon: ClipboardList },
       { href: "/execucao", label: "Fornecimento/Execução", icon: Truck },
+      { href: "/notas", label: "Controle de notas", icon: Receipt },
       { href: "/juridico", label: "Consultoria jurídica", icon: Scale },
       { href: "/conciliacao", label: "Conciliação bancária", icon: Banknote },
       { href: "/honorarios", label: "Honorários do analista", icon: Sparkles },

@@ -26,6 +26,7 @@ import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { EmitirNotaFiscal, type NotaDoEmpenho } from "@/components/EmitirNotaFiscal";
+import { blocoParaContabilidade } from "@/lib/blocoNota";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { ItensEmpenhoTab } from "@/components/abas/ItensEmpenhoTab";
@@ -102,8 +103,21 @@ export default async function EmpenhoDetalhePage({
   // plataforma enxerga o botão. Cliente não vê emissão de nota.
   const emissaoFiscalLigada = !!configFiscal?.habilitado && usuario.superAdmin;
   const valorTotalItens = e.itens.reduce((s, i) => s + i.valorTotal, 0);
+  // Texto pronto pra pessoa copiar e mandar pra contabilidade pedindo a nota.
+  const blocoContabilidade = blocoParaContabilidade({
+    numero: e.numero,
+    orgaoNome: e.orgaoNome,
+    orgaoCnpj: e.orgaoCnpj,
+    processoAdministrativo: e.processoAdministrativo,
+    empresaRazaoSocial: e.empresa.razaoSocial,
+    empresaCnpj: e.empresa.cnpj,
+    dataEntrega: e.dataEntrega,
+    itens: e.itens,
+  });
+
   const notasParaTela = e.notasFiscais.map((n) => ({
     id: n.id,
+    provedor: n.provedor,
     status: n.status,
     numero: n.numero,
     ambiente: n.ambiente,
@@ -334,6 +348,7 @@ export default async function EmpenhoDetalhePage({
                   valorTotalItens={valorTotalItens}
                   notasFiscais={notasParaTela}
                   podeCancelarNota={usuario.perfil === "ADMIN"}
+                  blocoContabilidade={blocoContabilidade}
                 />
               ),
             },
@@ -514,6 +529,7 @@ function Timeline({
   valorTotalItens,
   notasFiscais,
   podeCancelarNota,
+  blocoContabilidade,
 }: {
   empenho: {
     id: string;
@@ -544,6 +560,7 @@ function Timeline({
   valorTotalItens: number;
   notasFiscais: NotaDoEmpenho[];
   podeCancelarNota: boolean;
+  blocoContabilidade: string;
 }) {
   // Prazo-limite tempestivo — extraido pra lib/prazoEntrega pra bater com
   // o dashboard de Logistica (bug Regina 09/06: dashboard mostrava
@@ -686,6 +703,7 @@ function Timeline({
                           valorTotal={valorTotalItens}
                           notas={notasFiscais}
                           podeCancelar={podeCancelarNota}
+                          blocoContabilidade={blocoContabilidade}
                         />
                       )}
                     </div>

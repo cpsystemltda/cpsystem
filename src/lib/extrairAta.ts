@@ -87,6 +87,26 @@ export type ModalidadeGarantiaExtraida =
   | "CAUCAO_DINHEIRO"
   | "TITULOS_DIVIDA_PUBLICA";
 
+/**
+ * Nota fiscal de serviço EMITIDA POR FORA, que o cliente anexa no empenho.
+ *
+ * Regina 28/08: o CP System não emite nota — ele cuida de tudo em volta. Ler o
+ * PDF poupa o cliente de redigitar número, data e valor, e é o que permite o
+ * prazo de pagamento do órgão passar a correr sozinho a partir da nota.
+ */
+export type NotaFiscalExtraida = {
+  numero: string | null;
+  serie: string | null;
+  /** YYYY-MM-DD */
+  dataEmissao: string | null;
+  valorTotal: number | null;
+  codigoVerificacao: string | null;
+  prestadorCnpj: string | null;
+  tomadorCnpj: string | null;
+  tomadorNome: string | null;
+  discriminacao: string | null;
+};
+
 export type GarantiaExtraida = {
   modalidade: ModalidadeGarantiaExtraida;
   seguradora: string | null; // só pra SEGURO_GARANTIA
@@ -1241,4 +1261,52 @@ function mockAditivo(filename: string): AditivoExtraido {
     itensNovaVigencia: null,
     observacoes: "Acréscimo dentro do limite de 25% previsto em lei.",
   };
+}
+
+/**
+ * Lê os dados de uma NFS-e já emitida (PDF/DANFSe) que o cliente anexou.
+ *
+ * Devolve `null` em cada campo que não conseguir ler com segurança — melhor
+ * campo vazio para a pessoa preencher do que número inventado numa nota fiscal.
+ */
+export async function extrairNotaFiscalDoPdf(file: File): Promise<NotaFiscalExtraida> {
+  const schema = {
+    type: "object",
+    properties: {
+      numero: { type: ["string", "null"] },
+      serie: { type: ["string", "null"] },
+      dataEmissao: { type: ["string", "null"], format: "date" },
+      valorTotal: { type: ["number", "null"] },
+      codigoVerificacao: { type: ["string", "null"] },
+      prestadorCnpj: { type: ["string", "null"] },
+      tomadorCnpj: { type: ["string", "null"] },
+      tomadorNome: { type: ["string", "null"] },
+      discriminacao: { type: ["string", "null"] },
+    },
+    required: [
+      "numero", "serie", "dataEmissao", "valorTotal", "codigoVerificacao",
+      "prestadorCnpj", "tomadorCnpj", "tomadorNome", "discriminacao",
+    ],
+    additionalProperties: false,
+  };
+  return tentarOuMock<NotaFiscalExtraida>(
+    () =>
+      chamarClaudeComPdf(
+        file,
+        schema,
+        "Este PDF é uma Nota Fiscal de Serviço Eletrônica (NFS-e/DANFSe) brasileira. " +
+          "Extraia os dados conforme o schema. `numero` é o número da nota (não o do RPS, " +
+          "não o do empenho). `valorTotal` é o VALOR TOTAL DA NOTA, em reais, como número " +
+          "(sem R$ e sem separador de milhar). `prestadorCnpj` é quem emitiu; `tomadorCnpj` " +
+          "e `tomadorNome` são de quem recebeu o serviço. `discriminacao` é a descrição do " +
+          "serviço, resumida em no máximo 300 caracteres. " +
+          "Devolva null em qualquer campo que você não conseguir ler com certeza — nunca " +
+          "invente número, data ou valor de documento fiscal.",
+      ) as Promise<NotaFiscalExtraida>,
+    () => ({
+      numero: null, serie: null, dataEmissao: null, valorTotal: null,
+      codigoVerificacao: null, prestadorCnpj: null, tomadorCnpj: null,
+      tomadorNome: null, discriminacao: null,
+    }),
+  );
 }

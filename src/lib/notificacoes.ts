@@ -10,7 +10,8 @@ type Tipo =
   | "VINCULO_ENCERRADO"
   | "COMISSAO_DISPONIVEL"
   | "AVISO_VENCIMENTO_FATURA"
-  | "NOVO_INDICADO";
+  | "NOVO_INDICADO"
+  | "AVISO_CP_SYSTEM";
 
 export async function notificar(opts: {
   usuarioId: string;

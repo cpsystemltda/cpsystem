@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
+  ClipboardCopy,
   CheckCircle2,
   ExternalLink,
   FileText,
@@ -17,9 +18,14 @@ import {
   cancelarNotaFiscalAction,
   type ResultadoEmissao,
 } from "@/app/actions/notaFiscal";
+import {
+  registrarNotaEmitidaAction,
+  type ResultadoNotaRegistrada,
+} from "@/app/actions/notaRegistrada";
 
 export type NotaDoEmpenho = {
   id: string;
+  provedor?: "FOCUS_NFE" | "DEMO" | "EXTERNA";
   status: "PROCESSANDO" | "AUTORIZADA" | "ERRO" | "CANCELADA";
   numero: string | null;
   ambiente: "HOMOLOGACAO" | "PRODUCAO";
@@ -44,12 +50,15 @@ export function EmitirNotaFiscal({
   valorTotal,
   notas,
   podeCancelar,
+  blocoContabilidade,
 }: {
   empenhoId: string;
   emissaoLigada: boolean;
   valorTotal: number;
   notas: NotaDoEmpenho[];
   podeCancelar: boolean;
+  /** Texto pronto pra mandar pra contabilidade pedindo a nota. */
+  blocoContabilidade: string;
 }) {
   const [aberto, setAberto] = useState(false);
   const [estado, emitir, emitindo] = useActionState<ResultadoEmissao | null, FormData>(
@@ -61,6 +70,11 @@ export function EmitirNotaFiscal({
     null,
   );
   const [cancelando, setCancelando] = useState(false);
+  const [copiado, setCopiado] = useState(false);
+  const [registrar, registrarAcao, registrando] = useActionState<
+    ResultadoNotaRegistrada | null,
+    FormData
+  >(registrarNotaEmitidaAction, null);
   const [estadoCancel, cancelar, pendenteCancel] = useActionState<ResultadoEmissao | null, FormData>(
     cancelarNotaFiscalAction,
     null,
@@ -104,7 +118,7 @@ export function EmitirNotaFiscal({
               <ExternalLink className="h-3.5 w-3.5" /> Ver na prefeitura
             </a>
           )}
-          {podeCancelar && !cancelando && (
+          {podeCancelar && autorizada.provedor !== "EXTERNA" && !cancelando && (
             <button
               type="button"
               onClick={() => setCancelando(true)}
@@ -180,22 +194,75 @@ export function EmitirNotaFiscal({
     );
   }
 
-  // ── Emissão desligada ─────────────────────────────────────────────────────
-  if (!emissaoLigada) {
-    return (
-      <p className="mt-2 text-xs text-slate-500">
-        Quer emitir a nota daqui?{" "}
-        <Link href="/conta/fiscal" className="font-semibold text-violet-700 hover:underline">
-          Configure os dados fiscais
-        </Link>{" "}
-        — ou siga anexando a nota emitida por fora, como você já faz.
-      </p>
-    );
-  }
+  // ── Sem nota ainda: pedir à contabilidade e depois anexar a que voltar ────
+  //
+  // Regina 28/08: o CP System não emite a nota — cuida de tudo em volta. Aqui a
+  // pessoa copia os dados prontos pra contabilidade e, quando a nota volta,
+  // anexa: o sistema lê número, data e valor e passa a contar o prazo do órgão.
+  const painelDoCliente = (
+    <div className="mt-2 space-y-2.5">
+      <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+        <p className="text-xs font-semibold text-slate-800">Ainda sem nota registrada</p>
+        <p className="mt-0.5 text-xs text-slate-600">
+          Peça a nota à sua contabilidade e anexe aqui quando ela voltar — o prazo de pagamento
+          do órgão passa a correr a partir dela.
+        </p>
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(blocoContabilidade);
+                setCopiado(true);
+                setTimeout(() => setCopiado(false), 2500);
+              } catch {
+                setCopiado(false);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-violet-400 hover:text-violet-700"
+          >
+            <ClipboardCopy className="h-3.5 w-3.5" />
+            {copiado ? "Copiado!" : "Copiar dados pra contabilidade"}
+          </button>
+        </div>
+      </div>
 
-  // ── Pronto pra emitir ─────────────────────────────────────────────────────
+      <form action={registrarAcao} className="rounded-lg border border-violet-200 bg-violet-50/40 p-3">
+        <input type="hidden" name="empenhoId" value={empenhoId} />
+        <label className="block text-xs font-semibold text-slate-700">
+          Anexar a nota emitida (PDF)
+          <input
+            type="file"
+            name="arquivo"
+            accept="application/pdf,image/jpeg,image/png"
+            required
+            className="mt-1 block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-violet-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-violet-700"
+          />
+        </label>
+        <p className="mt-1.5 text-[11px] text-slate-500">
+          O sistema lê número, data e valor da nota sozinho. O que não conseguir ler fica em
+          branco pra você completar — nota fiscal não se adivinha.
+        </p>
+        {registrar?.erro && <p className="mt-1.5 text-xs text-red-600">{registrar.erro}</p>}
+        {registrar?.aviso && <p className="mt-1.5 text-xs text-amber-700">{registrar.aviso}</p>}
+        <button
+          type="submit"
+          disabled={registrando}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+        >
+          {registrando && <Loader2 className="h-3 w-3 animate-spin" />}
+          {registrando ? "Lendo a nota…" : "Registrar nota"}
+        </button>
+      </form>
+    </div>
+  );
+
+  if (!emissaoLigada) return painelDoCliente;
+
+  // ── Pronto pra emitir (só administração da plataforma) ────────────────────
   return (
     <div className="mt-2">
+      {painelDoCliente}
       {(ultimoErro || estado?.erro) && (
         <div className="mb-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
