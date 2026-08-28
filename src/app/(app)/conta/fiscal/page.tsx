@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, FileText, ShieldCheck } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
+import { segredoConfigurado } from "@/lib/segredos";
 import { prisma } from "@/lib/prisma";
 import { ConfigFiscalForm } from "./ConfigFiscalForm";
 
@@ -27,6 +28,10 @@ export default async function FiscalPage() {
   });
 
   const podeEditar = usuario.perfil === "ADMIN";
+  // O token da casa fiscal é guardado cifrado. Sem a chave de criptografia o
+  // sistema se RECUSA a salvá-lo — melhor descobrir isso aqui do que na hora de
+  // cadastrar, com o contador do cliente esperando do outro lado.
+  const chaveDeCifraOk = segredoConfigurado();
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
@@ -50,6 +55,18 @@ export default async function FiscalPage() {
           vazado assina em nome da sua empresa.
         </div>
       </div>
+
+      {!chaveDeCifraOk && (
+        <div className="mt-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
+          <div className="text-xs leading-relaxed text-red-900">
+            <strong>A chave de criptografia do sistema não está configurada.</strong> Sem ela, o
+            CP System se recusa a guardar o token da casa fiscal — de propósito, porque guardar
+            credencial sem cifra é pior que não guardar. Todo o resto desta tela funciona; só o
+            cadastro do token fica bloqueado. Avise o suporte do CP System.
+          </div>
+        </div>
+      )}
 
       {empresas.length === 0 && (
         <p className="mt-8 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
