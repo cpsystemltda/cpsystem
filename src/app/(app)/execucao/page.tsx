@@ -106,6 +106,14 @@ export default async function ExecucaoPage({
     include: {
       empresa: { select: { nomeFantasia: true, razaoSocial: true } },
       itens: { select: { valorTotal: true } },
+      // Numero da NF na listagem (Igor, 28/08): é o dado que a pessoa procura
+      // pra conferir com o extrato bancário e com o órgão.
+      notasFiscais: {
+        where: { status: "AUTORIZADA" },
+        select: { numero: true },
+        orderBy: { criadoEm: "desc" },
+        take: 1,
+      },
     },
   });
 
@@ -140,9 +148,18 @@ export default async function ExecucaoPage({
             : `${empenhos.length} execução(ões) — empenhos, AE, OS, AC, Cartas-Contrato.`
         }
         cta={
-          <Link href="/contratacoes/nova/fornecimento" className="btn-primary">
-            <Plus className="h-4 w-4" /> Nova execução
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Igor (28/08): "isso já dá pra ver na aba pelo status". Dá pra ver
+                O QUE está em cada etapa — não QUANTO está parado nem HÁ QUANTO
+                TEMPO. O painel responde essas duas, e o atalho fica aqui pra
+                não virar tela paralela que ninguém encontra. */}
+            <Link href="/notas" className="btn-secondary">
+              <Receipt className="h-4 w-4" /> Controle de notas
+            </Link>
+            <Link href="/contratacoes/nova/fornecimento" className="btn-primary">
+              <Plus className="h-4 w-4" /> Nova execução
+            </Link>
+          </div>
         }
       />
 
@@ -245,7 +262,14 @@ export default async function ExecucaoPage({
                         </span>
                       </div>
                       <p className="mt-1 truncate text-sm text-slate-600">{e.objeto}</p>
-                      <p className="mt-2 truncate text-xs text-slate-500">{e.orgaoNome} · {e.empresa.nomeFantasia || e.empresa.razaoSocial}</p>
+                      <p className="mt-2 truncate text-xs text-slate-500">
+                        {e.orgaoNome} · {e.empresa.nomeFantasia || e.empresa.razaoSocial}
+                        {e.notasFiscais[0]?.numero && (
+                          <span className="ms-1 font-semibold text-emerald-700">
+                            · NF nº {e.notasFiscais[0].numero}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="shrink-0 text-right">

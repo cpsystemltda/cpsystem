@@ -115,6 +115,11 @@ export default async function EmpenhoDetalhePage({
     itens: e.itens,
   });
 
+  // Nota vigente do empenho: a autorizada mais recente. Usada no cabeçalho e
+  // no relatório, onde o número precisa estar à mão.
+  const notaPrincipal =
+    e.notasFiscais.find((n) => n.status === "AUTORIZADA") ?? e.notasFiscais[0] ?? null;
+
   const notasParaTela = e.notasFiscais.map((n) => ({
     id: n.id,
     provedor: n.provedor,
@@ -204,6 +209,24 @@ export default async function EmpenhoDetalhePage({
               placeholder="Descrição do objeto"
             />
           </div>
+          {/* Numero da NF no alto da tela — pedido do Igor (28/08): "e importante
+              que o numero da NF fique a mostra em algum lugar da tela da
+              execucao e nos extratos, usa-se bastante". Antes ele so aparecia
+              dentro da etapa da esteira, e so depois de rolar a pagina. */}
+          {notaPrincipal?.numero && (
+            <p className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900">
+              <span>Nota fiscal nº {notaPrincipal.numero}</span>
+              {notaPrincipal.serie && <span className="font-normal">série {notaPrincipal.serie}</span>}
+              {e.dataNfEmitida && (
+                <span className="font-normal">· emitida em {e.dataNfEmitida.toLocaleDateString("pt-BR")}</span>
+              )}
+              {notaPrincipal.pdfUrl && (
+                <a href={notaPrincipal.pdfUrl} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                  abrir PDF
+                </a>
+              )}
+            </p>
+          )}
           <p className="mt-2 text-xs text-slate-500">
             {e.empresa.nomeFantasia || e.empresa.razaoSocial} · {e.orgaoNome}
             {e.contrato && (
@@ -479,6 +502,15 @@ export default async function EmpenhoDetalhePage({
               content: (
                 <RelatorioContratacao
                   rotuloRecurso="Empenho"
+                  notaFiscal={
+                    notaPrincipal
+                      ? {
+                          numero: notaPrincipal.numero,
+                          serie: notaPrincipal.serie,
+                          emitidaEm: e.dataNfEmitida,
+                        }
+                      : null
+                  }
                   contrato={{
                     numero: e.numero,
                     vigenciaInicio: e.vigenciaInicio,

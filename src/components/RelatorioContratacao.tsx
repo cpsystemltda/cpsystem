@@ -1,4 +1,5 @@
-import { TrendingUp, Wallet, Truck, FileSignature, Clock, AlertTriangle, Download } from "lucide-react";
+import { TrendingUp, Wallet, Truck, FileSignature, Clock, AlertTriangle, Download,
+  Receipt} from "lucide-react";
 import Link from "next/link";
 import { brl } from "@/lib/validators";
 import { BotaoImprimirRelatorio } from "@/components/BotaoImprimirRelatorio";
@@ -50,6 +51,7 @@ export function RelatorioContratacao({
   qtdNotificacoes,
   qtdProcedimentos,
   rotuloRecurso,
+  notaFiscal,
   pdfLink,
 }: {
   contrato: DadosContrato;
@@ -63,6 +65,8 @@ export function RelatorioContratacao({
   qtdNotificacoes: number;
   qtdProcedimentos: number;
   rotuloRecurso: "Contrato" | "Empenho" | "Ata";
+  /** Nota fiscal já emitida — Igor (28/08): o número precisa estar no extrato. */
+  notaFiscal?: { numero: string | null; serie: string | null; emitidaEm: Date | null } | null;
   pdfLink?: PdfLink;
 }) {
   const valorContratado = contrato.itens.reduce((s, i) => s + i.valorTotal, 0);
@@ -198,6 +202,14 @@ export function RelatorioContratacao({
             data={null}
             extra={contrato.prazoEntregaDias ? `${contrato.prazoEntregaDias} dias contratuais` : "Não informado"}
           />
+          {notaFiscal?.numero && (
+            <Marco
+              icone={Receipt}
+              titulo="Nota fiscal"
+              data={notaFiscal.emitidaEm}
+              extra={`Nº ${notaFiscal.numero}${notaFiscal.serie ? ` · série ${notaFiscal.serie}` : ""}`}
+            />
+          )}
           <Marco
             icone={Wallet}
             titulo="Prazo de pagamento"
