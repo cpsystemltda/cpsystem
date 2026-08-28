@@ -20,6 +20,7 @@ import {
 } from "@/app/actions/notaFiscal";
 import {
   registrarNotaEmitidaAction,
+  informarNumeroNotaAction,
   type ResultadoNotaRegistrada,
 } from "@/app/actions/notaRegistrada";
 
@@ -51,6 +52,7 @@ export function EmitirNotaFiscal({
   notas,
   podeCancelar,
   blocoContabilidade,
+  notaMarcadaEm,
 }: {
   empenhoId: string;
   emissaoLigada: boolean;
@@ -59,6 +61,8 @@ export function EmitirNotaFiscal({
   podeCancelar: boolean;
   /** Texto pronto pra mandar pra contabilidade pedindo a nota. */
   blocoContabilidade: string;
+  /** Data da nota já marcada à mão no fluxo antigo, sem número registrado. */
+  notaMarcadaEm?: string | null;
 }) {
   const [aberto, setAberto] = useState(false);
   const [estado, emitir, emitindo] = useActionState<ResultadoEmissao | null, FormData>(
@@ -70,6 +74,10 @@ export function EmitirNotaFiscal({
     null,
   );
   const [cancelando, setCancelando] = useState(false);
+  const [informar, informarAcao, informando] = useActionState<
+    ResultadoNotaRegistrada | null,
+    FormData
+  >(informarNumeroNotaAction, null);
   const [copiado, setCopiado] = useState(false);
   const [registrar, registrarAcao, registrando] = useActionState<
     ResultadoNotaRegistrada | null,
@@ -81,6 +89,52 @@ export function EmitirNotaFiscal({
   );
 
   const autorizada = notas.find((n) => n.status === "AUTORIZADA");
+
+  // Nota marcada à mão no fluxo antigo: existe a data, falta o número — que é
+  // justamente o dado que se usa pra conferir com o banco e falar com o órgão
+  // (Igor, 28/08). Pedir o PDF de novo só pra recuperar um número que a pessoa
+  // tem na mão seria atrito à toa: aqui ela digita.
+  const faltaNumero = !!notaMarcadaEm && !autorizada && !informar?.ok;
+  if (faltaNumero) {
+    return (
+      <form action={informarAcao} className="mt-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+        <input type="hidden" name="empenhoId" value={empenhoId} />
+        <p className="text-xs font-semibold text-amber-900">Falta o número da nota</p>
+        <p className="mt-0.5 text-xs text-amber-800">
+          A nota está marcada como emitida em {notaMarcadaEm}, mas sem o número registrado.
+          Informe abaixo — é o dado usado pra conferir com o banco e cobrar o órgão.
+        </p>
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="text-xs font-semibold text-slate-700">
+            Número
+            <input
+              name="numeroNota"
+              required
+              maxLength={30}
+              placeholder="ex.: 1042"
+              className="mt-1 block w-32 rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+            />
+          </label>
+          <label className="text-xs font-semibold text-slate-700">
+            Série <span className="font-normal text-slate-500">(opcional)</span>
+            <input
+              name="serieNota"
+              maxLength={10}
+              className="mt-1 block w-20 rounded-md border border-slate-300 px-2 py-1.5 text-xs outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={informando}
+            className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+          >
+            {informando ? "Salvando…" : "Salvar número"}
+          </button>
+        </div>
+        {informar?.erro && <p className="mt-1.5 text-xs text-red-600">{informar.erro}</p>}
+      </form>
+    );
+  }
   const processando = notas.find((n) => n.status === "PROCESSANDO");
   const ultimoErro = notas.find((n) => n.status === "ERRO");
 

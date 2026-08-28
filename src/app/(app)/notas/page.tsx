@@ -168,11 +168,15 @@ export default async function NotasPage() {
         ) : (
           <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full min-w-[620px] text-sm">
+              {/* Igor 28/08: "o número da nota fiscal é o número mais importante
+                  pra aparecer" — e a coluna do empenho competia com ele por
+                  atenção. A nota virou a primeira coluna; o empenho continua
+                  presente, discreto, embaixo do órgão, porque é por ele que se
+                  navega pro detalhe. */}
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium">Empenho</th>
+                  <th className="px-4 py-3 text-left font-medium">Nota fiscal</th>
                   <th className="px-4 py-3 text-left font-medium">Órgão</th>
-                  <th className="px-4 py-3 text-left font-medium">Nota</th>
                   <th className="px-4 py-3 text-left font-medium">Prazo do órgão</th>
                   <th className="px-4 py-3 text-right font-medium">Valor</th>
                 </tr>
@@ -188,18 +192,32 @@ export default async function NotasPage() {
                   return (
                     <tr key={e.id} className="border-t border-slate-100">
                       <td className="px-4 py-3">
-                        <Link href={`/execucao/${e.id}`} className="font-semibold text-violet-700 hover:underline">
-                          {e.numero}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{e.orgaoNome}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {nf?.numero ? `nº ${nf.numero}` : "—"}
+                        {nf?.numero ? (
+                          <span className="text-base font-bold tabular-nums text-slate-900">
+                            nº {nf.numero}
+                          </span>
+                        ) : (
+                          <Link
+                            href={`/execucao/${e.id}`}
+                            className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                          >
+                            informar número
+                          </Link>
+                        )}
                         {nf?.pdfUrl && (
                           <a href={nf.pdfUrl} target="_blank" rel="noreferrer" className="ms-2 text-xs font-medium text-violet-700 hover:underline">
                             PDF
                           </a>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {e.orgaoNome}
+                        <Link
+                          href={`/execucao/${e.id}`}
+                          className="mt-0.5 block text-[11px] text-slate-400 hover:text-violet-700 hover:underline"
+                        >
+                          empenho {e.numero}
+                        </Link>
                       </td>
                       <td className={`px-4 py-3 ${atrasado ? "font-semibold text-red-700" : "text-slate-600"}`}>
                         {limite ? limite.toLocaleDateString("pt-BR") : "—"}

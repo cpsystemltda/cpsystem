@@ -372,6 +372,11 @@ export default async function EmpenhoDetalhePage({
                   notasFiscais={notasParaTela}
                   podeCancelarNota={usuario.perfil === "ADMIN"}
                   blocoContabilidade={blocoContabilidade}
+                  notaMarcadaEm={
+                    e.dataNfEmitida && !notaPrincipal
+                      ? e.dataNfEmitida.toLocaleDateString("pt-BR")
+                      : null
+                  }
                 />
               ),
             },
@@ -562,6 +567,7 @@ function Timeline({
   notasFiscais,
   podeCancelarNota,
   blocoContabilidade,
+  notaMarcadaEm,
 }: {
   empenho: {
     id: string;
@@ -593,6 +599,7 @@ function Timeline({
   notasFiscais: NotaDoEmpenho[];
   podeCancelarNota: boolean;
   blocoContabilidade: string;
+  notaMarcadaEm: string | null;
 }) {
   // Prazo-limite tempestivo — extraido pra lib/prazoEntrega pra bater com
   // o dashboard de Logistica (bug Regina 09/06: dashboard mostrava
@@ -736,6 +743,7 @@ function Timeline({
                           notas={notasFiscais}
                           podeCancelar={podeCancelarNota}
                           blocoContabilidade={blocoContabilidade}
+                          notaMarcadaEm={notaMarcadaEm}
                         />
                       )}
                     </div>

@@ -150,3 +150,87 @@ export async function registrarNotaEmitidaAction(
     lido: { numero: lido.numero, dataEmissao: lido.dataEmissao, valorTotal: lido.valorTotal },
   };
 }
+
+/**
+ * Informa apenas o NÚMERO da nota, sem anexar PDF.
+ *
+ * Igor 28/08, olhando o painel: "o número da nota fiscal não está aparecendo,
+ * e eu acho que é o número mais importante pra aparecer". Ele estava certo, e a
+ * causa é histórica: o fluxo antigo só registrava DATA e arquivo da nota —
+ * número nunca foi pedido. Os oito empenhos com nota do Léo estão todos assim.
+ *
+ * Pedir o PDF de novo pra recuperar um número que a pessoa tem na mão seria
+ * atrito à toa. Aqui ela digita e pronto.
+ */
+export async function informarNumeroNotaAction(
+  _prev: ResultadoNotaRegistrada | null,
+  formData: FormData,
+): Promise<ResultadoNotaRegistrada> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+
+  const empenhoId = String(formData.get("empenhoId") || "").trim();
+  const numero = String(formData.get("numeroNota") || "").trim();
+  const serie = String(formData.get("serieNota") || "").trim() || null;
+  if (!numero) return { erro: "Informe o número da nota." };
+  if (numero.length > 30) return { erro: "Número de nota muito longo." };
+
+  const empenho = await prisma.empenho.findFirst({
+    where: { id: empenhoId, empresa: { contaId: usuario.contaId } },
+    select: {
+      id: true, numero: true, orgaoNome: true, orgaoCnpj: true, orgaoEndereco: true,
+      orgaoEmail: true, dataNfEmitida: true, arquivoNfEmitida: true,
+      empresa: { select: { id: true } },
+      itens: { select: { valorTotal: true } },
+      notasFiscais: { select: { id: true }, take: 1, orderBy: { criadoEm: "desc" } },
+    },
+  });
+  if (!empenho) return { erro: "Empenho não encontrado." };
+
+  const valorItens = empenho.itens.reduce((s, i) => s + i.valorTotal, 0);
+
+  if (empenho.notasFiscais[0]) {
+    await prisma.notaFiscal.update({
+      where: { id: empenho.notasFiscais[0].id },
+      data: { numero, serie },
+    });
+  } else {
+    await prisma.notaFiscal.create({
+      data: {
+        empresaId: empenho.empresa.id,
+        empenhoId: empenho.id,
+        referencia: `ext-${empenho.id}-manual`,
+        provedor: "EXTERNA",
+        ambiente: "PRODUCAO",
+        status: "AUTORIZADA",
+        numero,
+        serie,
+        pdfUrl: empenho.arquivoNfEmitida,
+        valorServicos: valorItens,
+        issRetido: false,
+        descricao: `Nota do empenho ${empenho.numero}`,
+        tomadorCnpj: empenho.orgaoCnpj,
+        tomadorRazaoSocial: empenho.orgaoNome,
+        tomadorEndereco: empenho.orgaoEndereco,
+        tomadorEmail: empenho.orgaoEmail,
+        autorizadaEm: empenho.dataNfEmitida ?? new Date(),
+        criadoPorId: usuario.id,
+        criadoPorNome: usuario.nome,
+      },
+    });
+  }
+
+  await registrarAuditoria({
+    contaId: usuario.contaId,
+    usuarioId: usuario.id,
+    acao: "ATUALIZAR",
+    recurso: "Empenho",
+    recursoId: empenho.id,
+    resumo: `Informou o número da nota fiscal do empenho ${empenho.numero}: ${numero}`,
+  });
+
+  revalidatePath(`/execucao/${empenho.id}`);
+  revalidatePath("/execucao");
+  revalidatePath("/notas");
+  return { ok: true, lido: { numero, dataEmissao: null, valorTotal: null } };
+}
