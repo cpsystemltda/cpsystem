@@ -110,6 +110,8 @@ model Conta {
 
   // O indice do FK de cupom ja existe no banco desde sempre; faltava estar
   // declarado aqui, o que fazia schema e banco divergirem sem motivo.
+  arquivos                Arquivo[]
+
   @@index([cupomAplicadoId])
   @@index([indicadoPorContaId])
   // Busca do exportador de conversoes offline: contas vindas de anuncio que
@@ -2416,4 +2418,38 @@ model NotaFiscal {
   @@index([empresaId, criadoEm])
   @@index([empenhoId])
   @@index([status])
+}
+
+// ============================================================
+// ARQUIVOS DO CLIENTE (Regina 28/08 — revisao de seguranca)
+// ============================================================
+//
+// Ate agora todo anexo ia pro armazenamento como PUBLICO. Nao havia listagem e
+// o caminho tem 32 caracteres aleatorios, entao ninguem adivinha — mas quem
+// recebesse o link abria o arquivo, sem login. E aqui nao sao fotos: sao
+// contratos, notas fiscais, empenhos e pareceres.
+//
+// Agora o arquivo sobe PRIVADO e so e servido por /api/arquivo/<id>, que exige
+// sessao e confere se o arquivo e da conta de quem pede. Esta tabela e o que
+// permite essa conferencia: sem ela, saber de quem e um arquivo exigiria
+// varrer dezenas de colunas espalhadas pelo schema.
+model Arquivo {
+  id       String @id @default(cuid())
+  // Caminho dentro do armazenamento (nunca exposto ao navegador).
+  pathname String @unique
+
+  contaId String
+  conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
+
+  nomeOriginal String
+  contentType  String
+  tamanhoBytes Int
+
+  criadoPorId String?
+  criadoEm    DateTime @default(now())
+  // Ultimo acesso — ajuda a responder "quem baixou o quê" numa eventual
+  // investigacao, sem guardar um log por download.
+  ultimoAcessoEm DateTime?
+
+  @@index([contaId, criadoEm])
 }

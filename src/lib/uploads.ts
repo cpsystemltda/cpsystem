@@ -12,19 +12,30 @@ const TIPOS_PERMITIDOS: Record<string, string> = {
 
 export type ArquivoSalvo = {
   nome: string;
-  url: string; // URL pública do Vercel Blob
+  /** Endereço interno servido por /api/arquivo/<id> — exige sessão. */
+  url: string;
   mimeType: string;
   tamanhoBytes: number;
 };
 
 /**
- * Persiste o arquivo no Vercel Blob (cpsystem-anexos store, public access).
- * Antes usava filesystem local — não funcionava em prod porque Vercel
- * Functions têm filesystem ephemeral.
+ * Guarda o arquivo do cliente — PRIVADO, servido só por rota autenticada.
  *
- * URL retornada é pública, mas com hash de 16 bytes (32 hex chars) ela é
- * essencialmente unguessable. Atas e Contratos são documentos PNCP-públicos
- * por natureza (Lei 14.133), então OK.
+ * Regina 28/08, na revisão de segurança: até aqui todo anexo subia como
+ * público. Não havia listagem e o caminho tem 32 caracteres aleatórios, então
+ * ninguém adivinhava — mas quem recebesse o link abria o documento sem login
+ * nenhum. O comentário antigo dizia que "ata e contrato são públicos por
+ * natureza (Lei 14.133)", e isso é verdade para o INSTRUMENTO, não para o que
+ * o cliente anexa: nota fiscal, parecer jurídico, comprovante de pagamento e
+ * documento interno da empresa dele não são públicos por natureza nenhuma.
+ *
+ * Agora: o arquivo sobe privado, entra no registro `Arquivo` amarrado à conta
+ * de quem enviou, e o que vai pro banco é `/api/arquivo/<id>` — a rota confere
+ * sessão e dono antes de entregar um byte.
+ *
+ * A conta vem da sessão de propósito, não por parâmetro: assim nenhum dos
+ * chamadores precisou mudar, e não existe caminho onde alguém "esqueça" de
+ * informar o dono do arquivo.
  */
 export async function salvarArquivo(file: File): Promise<ArquivoSalvo> {
   if (!file || file.size === 0) throw new Error("Arquivo vazio.");
@@ -35,18 +46,35 @@ export async function salvarArquivo(file: File): Promise<ArquivoSalvo> {
     throw new Error("Tipo de arquivo não permitido. Use PDF, PNG ou JPG.");
   }
 
+  const { getUsuarioAtual } = await import("@/lib/auth");
+  const usuario = await getUsuarioAtual();
+  if (!usuario) throw new Error("Faça login novamente para enviar arquivos.");
+
   const id = randomBytes(16).toString("hex");
   const pathname = `anexos/${id}${ext}`;
 
-  const blob = await put(pathname, file, {
-    access: "public",
+  await put(pathname, file, {
+    access: "private",
     contentType: file.type,
     addRandomSuffix: false, // já temos hash random no path
   });
 
+  const { prisma } = await import("@/lib/prisma");
+  const registro = await prisma.arquivo.create({
+    data: {
+      pathname,
+      contaId: usuario.contaId,
+      nomeOriginal: file.name.slice(0, 255),
+      contentType: file.type,
+      tamanhoBytes: file.size,
+      criadoPorId: usuario.id,
+    },
+    select: { id: true },
+  });
+
   return {
     nome: file.name,
-    url: blob.url,
+    url: `/api/arquivo/${registro.id}`,
     mimeType: file.type,
     tamanhoBytes: file.size,
   };
