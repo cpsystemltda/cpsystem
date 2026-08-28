@@ -117,7 +117,14 @@ export function TwoFactorConfig(props: Props) {
 
         <ol className="mt-4 space-y-4 text-sm text-slate-700">
           <li>
-            <strong>1.</strong> Instale um app authenticator no celular (Google Authenticator, Authy, 1Password, Microsoft Authenticator).
+            <strong>1.</strong> Instale um app autenticador no celular — Google Authenticator,
+            Authy, 1Password ou Microsoft Authenticator.
+            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              <strong>Escaneie pelo app autenticador, não pela câmera do iPhone.</strong> A câmera
+              abre o app Senhas da Apple, que pede pra escolher uma senha já salva onde guardar o
+              código — e se você não tem o CP System salvo lá, ele não sabe onde pôr. Se cair nessa
+              tela, é só fechar e usar o código escrito abaixo do QR.
+            </div>
           </li>
           <li>
             <strong>2.</strong> Abra o app e escaneie esse QR code:
@@ -125,9 +132,20 @@ export function TwoFactorConfig(props: Props) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={passo.qrCodeDataUri} alt="QR code 2FA" className="h-56 w-56" />
             </div>
-            <div className="mt-2 text-xs text-slate-500">
-              Se não conseguir escanear, digite este código manualmente no app:
-              <code className="ml-1 rounded bg-slate-100 px-2 py-0.5 font-mono text-slate-900">{passo.secret}</code>
+            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <p className="text-xs font-semibold text-slate-700">
+                Sem câmera: digite este código no app, em “inserir chave manualmente”
+              </p>
+              <code className="mt-1 block break-all rounded bg-white px-2 py-1.5 font-mono text-sm tracking-wider text-slate-900">
+                {passo.secret}
+              </code>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(passo.secret)}
+                className="mt-2 text-xs font-semibold text-violet-700 hover:underline"
+              >
+                Copiar código
+              </button>
             </div>
           </li>
           <li>
