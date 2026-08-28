@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, FileText, ShieldCheck } from "lucide-react";
+import { notFound } from "next/navigation";
 import { exigirUsuario } from "@/lib/auth";
 import { segredoConfigurado } from "@/lib/segredos";
 import { prisma } from "@/lib/prisma";
@@ -13,6 +14,14 @@ import { ConfigFiscalForm } from "./ConfigFiscalForm";
  */
 export default async function FiscalPage() {
   const usuario = await exigirUsuario();
+
+  // Regina 28/08: "freie esse processo até que a gente tenha certeza de que essa
+  // opção não gera prejuízo algum. Por enquanto, nem coloque botão de emissão."
+  //
+  // A tela continua existindo e funcionando — o que muda é quem alcança: só
+  // quem administra a plataforma, enquanto a avaliação de risco não termina.
+  // Cliente nenhum vê menu, tela ou botão de emissão de nota.
+  if (!usuario.superAdmin) notFound();
 
   const empresas = await prisma.empresa.findMany({
     where: { contaId: usuario.contaId },

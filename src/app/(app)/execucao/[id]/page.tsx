@@ -97,7 +97,10 @@ export default async function EmpenhoDetalhePage({
     where: { empresaId: e.empresaId },
     select: { habilitado: true },
   });
-  const emissaoFiscalLigada = !!configFiscal?.habilitado;
+  // Duplamente travado enquanto a avaliação de risco não termina (Regina
+  // 28/08): além de exigir o cadastro fiscal ligado, só quem administra a
+  // plataforma enxerga o botão. Cliente não vê emissão de nota.
+  const emissaoFiscalLigada = !!configFiscal?.habilitado && usuario.superAdmin;
   const valorTotalItens = e.itens.reduce((s, i) => s + i.valorTotal, 0);
   const notasParaTela = e.notasFiscais.map((n) => ({
     id: n.id,

@@ -79,7 +79,6 @@ const GRUPOS_EMPRESA_CONTA: Grupo[] = [
       { href: "/notificacoes", label: "Notificações", icon: Bell },
       { href: "/conta/notificacoes", label: "Notificações WhatsApp", icon: Bell },
       { href: "/conta/assinatura", label: "Assinatura", icon: CreditCard },
-      { href: "/conta/fiscal", label: "Dados fiscais · NF", icon: Receipt },
       { href: "/conta/integracoes", label: "Integrações", icon: Plug },
       { href: "/vinculos", label: "Analista vinculado", icon: UserCheck },
       { href: "/equipe", label: "Equipe", icon: Users },
