@@ -126,6 +126,7 @@ export default async function FiscalPage() {
                       optanteSimples: e.configuracaoFiscal.optanteSimples,
                       incentivadorCultural: e.configuracaoFiscal.incentivadorCultural,
                       itemListaServico: e.configuracaoFiscal.itemListaServico,
+                      naturezaOperacao: e.configuracaoFiscal.naturezaOperacao,
                       codigoTributarioMunicipio: e.configuracaoFiscal.codigoTributarioMunicipio,
                       cnaeServico: e.configuracaoFiscal.cnaeServico,
                       aliquotaIss: e.configuracaoFiscal.aliquotaIss,

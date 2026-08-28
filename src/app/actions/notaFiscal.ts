@@ -178,6 +178,7 @@ export async function emitirNotaFiscalAction(
     r = await provedor.emitir({
       referencia,
       dataEmissao: new Date(),
+      naturezaOperacao: config.naturezaOperacao,
       prestador: {
         cnpj: empenho.empresa.cnpj,
         inscricaoMunicipal: config.inscricaoMunicipal,

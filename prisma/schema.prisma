@@ -2359,6 +2359,9 @@ model ConfiguracaoFiscal {
 
   // Parametros do servico prestado — o que a prefeitura exige na NFS-e.
   itemListaServico          String? // ex: "14.01"
+  // "1" tributacao no municipio (padrao), "2" fora do municipio, "3" isencao...
+  // Obrigatorio na API fiscal; muda quando o servico e prestado fora da cidade.
+  naturezaOperacao          String  @default("1")
   codigoTributarioMunicipio String?
   cnaeServico               String?
   aliquotaIss               Float? // em % — ex: 2.0

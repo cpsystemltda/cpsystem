@@ -49,6 +49,8 @@ export type EmitirNfseInput = {
   /** Chave de idempotência: reenviar a mesma referência consulta, não duplica. */
   referencia: string;
   dataEmissao: Date;
+  /** "1" tributação no município (padrão), "2" fora do município, 3 isenção... */
+  naturezaOperacao?: string | null;
   prestador: DadosPrestador;
   tomador: DadosTomador;
   servico: DadosServico;

@@ -106,6 +106,9 @@ export async function salvarConfigFiscalAction(
     optanteSimples: limpar(formData.get("optanteSimples")) === "on",
     incentivadorCultural: limpar(formData.get("incentivadorCultural")) === "on",
     itemListaServico: limpar(formData.get("itemListaServico")) || null,
+    naturezaOperacao: ["1", "2", "3", "4", "5", "6"].includes(limpar(formData.get("naturezaOperacao")))
+      ? limpar(formData.get("naturezaOperacao"))
+      : "1",
     codigoTributarioMunicipio: limpar(formData.get("codigoTributarioMunicipio")) || null,
     cnaeServico: limpar(formData.get("cnaeServico")) || null,
     aliquotaIss,

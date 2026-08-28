@@ -20,6 +20,17 @@ import type {
  * Docs: https://focusnfe.com.br/doc/
  */
 
+/**
+ * Data no formato ISO 8601 com o fuso de Brasília (-03:00).
+ *
+ * `toISOString()` devolve UTC, e a Focus interpreta o que chega: sem o offset
+ * uma nota emitida às 21h de Brasília sairia datada do dia seguinte.
+ */
+function emBrasilia(d: Date): string {
+  const brt = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+  return `${brt.toISOString().slice(0, 19)}-03:00`;
+}
+
 const BASE: Record<AmbienteFiscalNome, string> = {
   PRODUCAO: "https://api.focusnfe.com.br",
   HOMOLOGACAO: "https://homologacao.focusnfe.com.br",
@@ -40,7 +51,8 @@ type RespostaFocus = {
   codigo_verificacao?: string;
   url?: string;
   caminho_xml_nota_fiscal?: string;
-  caminho_danfse?: string;
+  /** URL absoluta do PDF (DANFSe). Nao confundir com os "caminho_*", que sao relativos. */
+  url_danfse?: string;
   erros?: Array<{ mensagem?: string; codigo?: string }>;
   mensagem?: string;
   status_sefaz?: string;
@@ -99,7 +111,7 @@ export class ProvedorFocusNfe implements ProvedorNfse {
       serie: corpo.serie != null ? String(corpo.serie) : null,
       codigoVerificacao: corpo.codigo_verificacao ?? null,
       linkPrefeitura: corpo.url ?? null,
-      pdfUrl: abs(corpo.caminho_danfse),
+      pdfUrl: corpo.url_danfse ?? null,
       xmlUrl: abs(corpo.caminho_xml_nota_fiscal),
       mensagemErro: status === "ERRO" ? erro || "Erro não detalhado pelo provedor." : null,
       bruto: corpo,
@@ -109,12 +121,16 @@ export class ProvedorFocusNfe implements ProvedorNfse {
   async emitir(input: EmitirNfseInput): Promise<ResultadoNota> {
     const e = input.tomador.endereco;
     const corpo = {
-      // Sem fuso: a prefeitura interpreta como horário local do prestador.
-      data_emissao: input.dataEmissao.toISOString().slice(0, 19),
+      // ISO 8601 COM fuso. Sem o offset a nota sai com hora de Londres — e a
+      // data/hora de emissão é o que define a competência do imposto.
+      data_emissao: emBrasilia(input.dataEmissao),
+      // Obrigatório pela API. "1" = tributação no município do prestador, que é
+      // o caso da esmagadora maioria; fica configurável porque serviço prestado
+      // fora do município muda esse código.
+      natureza_operacao: input.naturezaOperacao || "1",
       prestador: {
         cnpj: input.prestador.cnpj,
         inscricao_municipal: input.prestador.inscricaoMunicipal || undefined,
-        codigo_municipio: input.prestador.codigoMunicipio || undefined,
       },
       tomador: {
         cnpj: input.tomador.cnpj,
@@ -135,12 +151,18 @@ export class ProvedorFocusNfe implements ProvedorNfse {
           : {}),
       },
       servico: {
-        aliquota: input.servico.aliquotaIss ?? undefined,
+        // A API espera FRAÇÃO, não porcentagem: 5% vai como 0.05. Mandar "5"
+        // aqui emitiria a nota com 500% de ISS.
+        aliquota:
+          input.servico.aliquotaIss != null ? input.servico.aliquotaIss / 100 : undefined,
         discriminacao: input.servico.discriminacao,
         iss_retido: input.servico.issRetido,
         item_lista_servico: input.servico.itemListaServico || undefined,
-        codigo_tributario_municipio: input.servico.codigoTributarioMunicipio || undefined,
+        codigo_tributacao_municipio: input.servico.codigoTributarioMunicipio || undefined,
         codigo_cnae: input.servico.cnae || undefined,
+        // Código IBGE do município do PRESTADOR — a API espera dentro de
+        // `servico`, não em `prestador`.
+        codigo_municipio: input.prestador.codigoMunicipio || undefined,
         valor_servicos: input.servico.valorServicos,
       },
       optante_simples_nacional: input.prestador.optanteSimples,

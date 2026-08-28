@@ -16,6 +16,7 @@ type Config = {
   optanteSimples: boolean;
   incentivadorCultural: boolean;
   itemListaServico: string | null;
+  naturezaOperacao: string;
   codigoTributarioMunicipio: string | null;
   cnaeServico: string | null;
   aliquotaIss: number | null;
@@ -132,7 +133,18 @@ export function ConfigFiscalForm({
         <Campo label="Item da lista de serviço" ajuda='Ex.: "14.01". Sua contabilidade sabe qual é.' erro={e.itemListaServico}>
           <input name="itemListaServico" defaultValue={config?.itemListaServico ?? ""} placeholder="14.01" disabled={!podeEditar} className={entrada} />
         </Campo>
-        <Campo label="Alíquota de ISS (%)" erro={e.aliquotaIss}>
+        <Campo label="Natureza da operação" ajuda="Onde o serviço é tributado.">
+          <select name="naturezaOperacao" defaultValue={config?.naturezaOperacao ?? "1"} disabled={!podeEditar} className={entrada}>
+            <option value="1">Tributação no município</option>
+            <option value="2">Tributação fora do município</option>
+            <option value="3">Isenção</option>
+            <option value="4">Imune</option>
+            <option value="5">Exigibilidade suspensa por decisão judicial</option>
+            <option value="6">Exigibilidade suspensa por procedimento administrativo</option>
+          </select>
+        </Campo>
+
+        <Campo label="Alíquota de ISS (%)" ajuda="Informe em porcentagem — ex.: 2 para 2%." erro={e.aliquotaIss}>
           <input name="aliquotaIss" defaultValue={config?.aliquotaIss ?? ""} placeholder="2" inputMode="decimal" disabled={!podeEditar} className={entrada} />
         </Campo>
       </div>
