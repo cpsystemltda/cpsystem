@@ -59,7 +59,14 @@ export async function atualizarPerfilAction(
     dadosUsuario.nome = nomeRaw;
   }
   if (telefoneWaRaw) {
-    if (telefoneWaRaw.length < 10) return { erro: "Telefone inválido.", campos: { telefoneWhatsApp: "DDD + numero" } };
+    // 11 digitos: celular brasileiro com DDD + 9. Numero de dez digitos passa a
+    // validacao de formato mas nao existe no WhatsApp — falha silenciosa.
+    if (telefoneWaRaw.length !== 11) {
+      return {
+        erro: "WhatsApp inválido.",
+        campos: { telefoneWhatsApp: "11 dígitos: DDD + 9 + número (ex.: 61 98335-0607)" },
+      };
+    }
     dadosUsuario.telefoneWhatsApp = telefoneWaRaw;
   }
   if (cargoRaw) dadosUsuario.cargo = cargoRaw;

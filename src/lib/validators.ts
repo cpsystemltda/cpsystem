@@ -32,7 +32,17 @@ export const signupSchema = z
     // WhatsApp obrigatorio (Regina 02/07): sistema notifica prazos,
     // vencimentos, resumo semanal via WhatsApp automatico. Cliente
     // recebe por padrao (pode desligar depois em /conta/notificacoes).
-    telefoneWhatsApp: z.string().min(10, "Informe seu WhatsApp com DDD"),
+    // Regina 28/08: a Michelly se cadastrou com "61 8335-0607" — dez digitos, sem
+    // o 9 do celular. O `min(10)` aceitava, e o numero resultante NAO EXISTE no
+    // WhatsApp: ela ficou tres dias sem receber uma mensagem sequer, e ninguem
+    // percebeu porque a falha e silenciosa (numero valido em formato, inexistente
+    // na pratica). Celular brasileiro tem 11 digitos com DDD — e este campo e de
+    // WhatsApp, entao fixo nao serve.
+    telefoneWhatsApp: z
+      .string()
+      .refine((v) => v.replace(/\D/g, "").length === 11, {
+        message: "WhatsApp precisa ter 11 dígitos: DDD + 9 + número (ex.: 61 98335-0607)",
+      }),
     // Regina 28/08 — regra de ouro: todo mundo que esta dentro do CP System e
     // parabenizado no aniversario. So que a data so era pedida no onboarding de
     // conta migrada, entao cadastro novo nascia sem ela e a regra nunca podia

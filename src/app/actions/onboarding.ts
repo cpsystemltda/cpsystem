@@ -37,11 +37,19 @@ export async function salvarDadosPessoaisAction(
   if (senha !== confirmacao) campos.confirmacaoSenha = "Senhas não conferem";
   if (!aceite) campos.aceiteTermos = "Você precisa aceitar os termos pra continuar";
   let telefone: string;
-  try {
-    telefone = formatarTelefone(telefoneRaw);
-  } catch {
-    campos.telefone = "WhatsApp inválido — inclua DDD";
+  // 11 digitos (DDD + 9 + numero): `formatarTelefone` aceita 10 porque tambem
+  // serve pra fixo, mas este campo e de WhatsApp. Numero de dez digitos passa
+  // no formato e simplesmente nao existe no WhatsApp — a falha e silenciosa.
+  if (telefoneRaw.replace(/\D/g, "").replace(/^55/, "").length !== 11) {
+    campos.telefone = "WhatsApp precisa ter 11 dígitos: DDD + 9 + número";
     telefone = "";
+  } else {
+    try {
+      telefone = formatarTelefone(telefoneRaw);
+    } catch {
+      campos.telefone = "WhatsApp inválido — inclua DDD";
+      telefone = "";
+    }
   }
   if (Object.keys(campos).length > 0) return { erro: "Verifique os campos", campos };
 
