@@ -135,7 +135,7 @@ export async function extrairAtaPdfAction(formData: FormData): Promise<ExtracaoA
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
-    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+    return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
   }
 }
 
@@ -160,7 +160,7 @@ export async function extrairContratoPdfAction(formData: FormData): Promise<Extr
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
-    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+    return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
   }
 }
 
@@ -185,7 +185,7 @@ export async function extrairEmpenhoPdfAction(formData: FormData): Promise<Extra
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
-    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+    return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
   }
 }
 
@@ -215,7 +215,7 @@ export async function extrairGarantiaPdfAction(formData: FormData): Promise<Extr
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
-    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+    return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
   }
 }
 
@@ -244,7 +244,7 @@ export async function extrairAditivoPdfAction(formData: FormData): Promise<Extra
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
-    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+    return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
   }
 }
 
@@ -273,7 +273,7 @@ export async function extrairProcedimentoPdfAction(formData: FormData): Promise<
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
-    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+    return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
   }
 }
 
@@ -301,6 +301,21 @@ export async function extrairApostilamentoPdfAction(formData: FormData): Promise
     return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
-    return { ok: false, erro: err instanceof Error ? err.message : "Erro ao extrair." };
+    return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
   }
+}
+
+/**
+ * Mensagem de erro da leitura de PDF, em português de gente — e aviso pra
+ * equipe no mesmo movimento.
+ *
+ * Regina 28/08, quando a API ficou sem crédito: "não deixe nada parar". Não dá
+ * pra impedir a queda do fornecedor; dá pra impedir que ela seja silenciosa e
+ * que o cliente leve na cara um erro técnico que não diz o que fazer.
+ */
+async function mensagemDeFalhaDaIa(err: unknown): Promise<string> {
+  const { avisarFalhaDeIa, ehFalhaDeCredito, mensagemParaCliente } = await import("@/lib/falhaIa");
+  await avisarFalhaDeIa("leitura de PDF", err);
+  if (ehFalhaDeCredito(err)) return mensagemParaCliente();
+  return err instanceof Error ? err.message : "Erro ao extrair.";
 }

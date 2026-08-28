@@ -84,7 +84,11 @@ export async function registrarNotaEmitidaAction(
     }
   } catch (e) {
     console.error("[nota-registrada] leitura do PDF falhou:", e);
-    aviso = "A nota foi anexada, mas não consegui ler os dados dela. Preencha manualmente.";
+    const { avisarFalhaDeIa, ehFalhaDeCredito } = await import("@/lib/falhaIa");
+    await avisarFalhaDeIa("leitura de nota fiscal", e);
+    aviso = ehFalhaDeCredito(e)
+      ? "A leitura automática está indisponível no momento. A nota foi anexada — informe o número abaixo e seguimos normalmente."
+      : "A nota foi anexada, mas não consegui ler os dados dela. Preencha manualmente.";
   }
 
   const valorItens = empenho.itens.reduce((s, i) => s + i.valorTotal, 0);

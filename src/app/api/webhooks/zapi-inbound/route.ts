@@ -295,6 +295,25 @@ export async function POST(req: NextRequest) {
         iaAcaoResumo: "IA falhou ao processar — escalado por default",
       },
     });
+
+    // O CLIENTE não pode ficar sem resposta (Regina: "nenhum cliente vai ficar
+    // sem resposta"). Até aqui, quando a IA falhava, a equipe era avisada e o
+    // cliente ficava no vácuo — que é o mesmo silêncio de antes, só que por
+    // outro motivo.
+    try {
+      const primeiro = usuario.nome.split(" ")[0] || usuario.nome;
+      await enviarTexto(
+        telefone,
+        `${primeiro}, recebemos sua mensagem. Nossa equipe vai responder pessoalmente em ` +
+          `até 2 horas úteis (seg a sex, 9h às 18h).\n\nContato CP System`,
+      );
+    } catch (e2) {
+      console.error("[zapi-inbound] falha ao avisar o cliente:", e2);
+    }
+
+    const { avisarFalhaDeIa } = await import("@/lib/falhaIa");
+    await avisarFalhaDeIa("atendimento no WhatsApp", err);
+
     await notificarAdmin(usuario.nome, telefone, mensagem, "IA falhou — precisa resposta manual", chamado.id);
     return NextResponse.json({ ok: true, ia: "erro", escalado: true });
   }
