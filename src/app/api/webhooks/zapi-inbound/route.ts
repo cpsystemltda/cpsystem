@@ -86,6 +86,30 @@ export async function POST(req: NextRequest) {
   const messageId = String(body.messageId || "");
   const documento = body.document;
 
+  // 1b) Idempotencia — ANTES de qualquer processamento.
+  //
+  // Regina 31/08, com print de duas respostas pra uma pergunta so: a trava
+  // antiga ficava la embaixo, no passo 4, e procurava o messageId dentro do
+  // conteudo de MensagemChamado. So que o que se grava ali e o texto do
+  // cliente; o messageId nunca entrou nesse campo. A condicao nunca casou e a
+  // trava nunca barrou nada — cada reentrega do webhook chamava a IA de novo
+  // e mandava mais uma resposta, com redacao levemente diferente porque era
+  // outra geracao.
+  //
+  // Aqui a garantia e do banco: as duas entregas chegam em paralelo, as duas
+  // tentam inserir o mesmo messageId, e a segunda quebra na constraint. Um
+  // SELECT antes do INSERT nao resolveria — as duas leriam "nao existe".
+  //
+  // Fica antes do desvio de grupo, de midia e de lead: todos esses caminhos
+  // respondem ao cliente e todos duplicavam.
+  if (messageId) {
+    try {
+      await prisma.mensagemInboundWhatsApp.create({ data: { messageId, telefone } });
+    } catch {
+      return NextResponse.json({ ok: true, skipped: "duplicate" });
+    }
+  }
+
   // 2) Grupo: aceita SO se for o grupo de suporte (env SUPORTE_GROUP_ID).
   //    Outros grupos = ignorados. Regina 14/07: admins decidem no grupo.
   const SUPORTE_GROUP_ID = process.env.SUPORTE_GROUP_ID || "";
@@ -242,14 +266,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, midia: midia.rotulo, escalado: true });
   }
 
-  // 4) Idempotencia: ja processamos essa messageId?
-  if (messageId) {
-    const jaProcessado = await prisma.mensagemChamado.findFirst({
-      where: { autor: "CLIENTE", conteudo: { contains: messageId.slice(0, 20) } },
-      select: { id: true },
-    });
-    if (jaProcessado) return NextResponse.json({ ok: true, skipped: "duplicate" });
-  }
+  // (a idempotencia subiu pro passo 1b — aqui embaixo ela ja chegava tarde
+  // demais pros caminhos de grupo, midia e lead, que tambem duplicavam)
 
   // 5) Reaproveita chamado ABERTO/IA_ANALISANDO/AGUARDANDO_ADMIN do
   //    ultimo dia — nova msg entra como MensagemChamado no mesmo chamado.

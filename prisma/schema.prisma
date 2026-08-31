@@ -247,6 +247,26 @@ enum StatusNotificacaoWhatsApp {
   FALHOU
 }
 
+/// Mensagem recebida do WhatsApp que ja foi processada.
+///
+/// Regina 31/08, com print: o cliente pergunta uma coisa e recebe DUAS
+/// respostas, com redacao diferente. A trava que existia procurava o
+/// messageId dentro do texto de MensagemChamado — texto onde o messageId
+/// nunca foi gravado. Nunca casou, nunca barrou nada: toda reentrega do
+/// webhook rodava a IA de novo e mandava outra resposta.
+///
+/// A unicidade e do banco de proposito. Duas entregas do mesmo webhook
+/// chegam com segundos de diferenca e rodam em paralelo — um SELECT antes
+/// do INSERT deixa as duas passarem. Aqui a segunda quebra na constraint.
+model MensagemInboundWhatsApp {
+  id        String   @id @default(cuid())
+  messageId String   @unique
+  telefone  String
+  criadoEm  DateTime @default(now())
+
+  @@index([criadoEm])
+}
+
 model NotificacaoWhatsApp {
   id           String                    @id @default(cuid())
   usuarioId    String
