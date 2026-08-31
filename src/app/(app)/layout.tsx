@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { contarNaoLidas } from "@/lib/notificacoes";
 import { SinoNotificacoes } from "@/components/SinoNotificacoes";
+import { ConviteInstalarApp } from "@/components/ConviteInstalarApp";
 import { lerVisao, type Visao } from "@/lib/visao";
 import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
 import { lerEspionagemAtual } from "@/lib/espionagem";
@@ -268,6 +269,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <FlutuanteIAsystem plano={usuario.conta.plano} superAdmin={usuario.superAdmin} />
       <ComandoRapido visao={visao} superAdmin={usuario.superAdmin} />
       <div className="app-content flex flex-1 w-full overflow-hidden">
+        <ConviteInstalarApp />
         <SinoNotificacoes
           naoLidas={qtdNotificacoes}
           avisos={avisosRecentes.map((a) => ({

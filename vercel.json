@@ -56,6 +56,10 @@
     {
       "path": "/api/cron/aniversarios",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/ativacao",
+      "schedule": "0 13 * * *"
     }
   ]
 }

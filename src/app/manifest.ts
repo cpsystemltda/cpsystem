@@ -10,7 +10,12 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "CP System",
     description:
       "Gestão de Atas, Contratos e Empenhos sob a Lei 14.133/2021 — para empresas fornecedoras e analistas de licitação.",
-    start_url: "/",
+    // Regina 31/08: "cliquei no aplicativo e demorou uma eternidade pra abrir".
+    // A causa era esta linha: o icone abria a PAGINA DE VENDAS — com video,
+    // animacoes e imagens pesadas — e so depois a pessoa navegava pro sistema.
+    // Quem instalou o app ja e cliente; ele tem que cair direto no painel.
+    // Quem nao estiver logado e mandado pro login pelo proprio sistema.
+    start_url: "/dashboard",
     display: "standalone",
     orientation: "portrait",
     background_color: "#ffffff",

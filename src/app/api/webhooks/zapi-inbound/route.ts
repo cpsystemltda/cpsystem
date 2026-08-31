@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { avisarEquipe } from "@/lib/alertaInterno";
-import { enviarTexto, variantesTelefone } from "@/lib/whatsapp";
+import { enviarTexto, enviarAudio, variantesTelefone } from "@/lib/whatsapp";
 import { decidirRespostaIA, historicoDoUsuario } from "@/lib/ia-suporte";
 import { interpretarMsgAdmin, idCurto } from "@/lib/ia-decisao-grupo";
 import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
@@ -225,6 +225,20 @@ export async function POST(req: NextRequest) {
       `Cliente mandou ${midia.rotulo}, que a IA não lê. Precisa de resposta humana.`,
       chamadoMidia.id,
     );
+
+    // Encaminha o arquivo em si pro grupo — Regina 31/08: o alerta com a URL
+    // "ficou excelente", mas ela teve que baixar e reenviar o audio na mao pra
+    // alguem conseguir ouvir. Link nao se escuta dentro da conversa: ou alguem
+    // sai do WhatsApp pra abrir no navegador, ou o cliente espera. Agora o
+    // audio chega tocavel logo abaixo do alerta.
+    const grupoSuporte = process.env.SUPORTE_GROUP_ID || "";
+    if (grupoSuporte && midia.url && midia.rotulo === "áudio") {
+      await enviarAudio(grupoSuporte, midia.url).catch((err) =>
+        // Falhou o encaminhamento? O alerta acima ja saiu com a URL, entao
+        // ninguem fica sem saber do chamado — so perde a comodidade.
+        console.error("[zapi-inbound] falha ao encaminhar audio pro grupo:", err),
+      );
+    }
     return NextResponse.json({ ok: true, midia: midia.rotulo, escalado: true });
   }
 

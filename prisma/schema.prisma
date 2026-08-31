@@ -233,6 +233,12 @@ enum TipoNotificacaoWhatsApp {
   // cadastro. Antes disso o primeiro contato era um aviso automatico de
   // documento, sem nem cumprimentar quem tinha acabado de entrar.
   BOAS_VINDAS
+  // Regina 31/08 — resgate de quem entrou e parou. Os crons de vencimento só
+  // falam com quem já cadastrou algo; quem lançou um contrato e sumiu não
+  // gerava aviso nenhum e ia embora no fim do teste sem ninguém perceber.
+  // O estágio do resgate vai no referenciaId ("cadastro-parado-<contaId>"),
+  // o que limita cada estágio a uma única mensagem na vida da conta.
+  ATIVACAO
 }
 
 enum StatusNotificacaoWhatsApp {

@@ -219,6 +219,48 @@ async function contarEnviadasHoje(usuarioId: string): Promise<number> {
   });
 }
 
+/**
+ * Ate quantos dias apos o cadastro a rede de seguranca das boas-vindas vale.
+ * Depois disso a conta ja e cliente estabelecido, e o padrao volta a ser a
+ * mensagem normal do sistema.
+ */
+const JANELA_BOAS_VINDAS_DIAS = 7;
+
+/**
+ * Garante que a conta do destinatario ja foi recebida antes do primeiro aviso.
+ *
+ * Best-effort de proposito: se as boas-vindas falharem, a notificacao original
+ * segue mesmo assim — segurar um aviso de prazo por causa de cortesia seria
+ * trocar um problema de etiqueta por um de prejuizo.
+ *
+ * O import e dinamico porque boasVindas.ts importa este modulo; estatico daria
+ * ciclo. darBoasVindas dispara com tipo BOAS_VINDAS, que o guard ignora — nao
+ * ha recursao.
+ */
+async function garantirBoasVindas(usuarioId: string): Promise<void> {
+  try {
+    const u = await prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { contaId: true, superAdmin: true, conta: { select: { criadoEm: true } } },
+    });
+    // Conta interna do CP System opera o sistema, nao e cliente dele.
+    if (!u || u.superAdmin || !u.conta) return;
+
+    // SO pra cadastro novo — Regina 31/08: "essa regra de boas-vindas antes de
+    // notificacao so e valida pra novos cadastros, nunca pra cadastros que ja
+    // estao um tempo na plataforma, que ai fica o padrao de mensagem normal
+    // como ja esta hoje". Mandar "bem-vindo" pra quem usa o sistema ha meses
+    // nao acolhe ninguem: soa como se a gente nao soubesse quem e o cliente.
+    const diasDeConta = (Date.now() - u.conta.criadoEm.getTime()) / 86_400_000;
+    if (diasDeConta > JANELA_BOAS_VINDAS_DIAS) return;
+
+    const { darBoasVindas } = await import("@/lib/boasVindas");
+    await darBoasVindas(u.contaId);
+  } catch (e) {
+    console.error("[whatsapp] boas-vindas previas falharam:", e);
+  }
+}
+
 export async function dispararNotificacao(opts: {
   usuarioId: string;
   tipo: TipoNotificacaoWhatsApp;
@@ -236,6 +278,23 @@ export async function dispararNotificacao(opts: {
   if (!usuario) return { enviado: false, motivo: "usuario_nao_encontrado" };
   if (!opts.bypassCap && !usuario.optInWhatsApp) return { enviado: false, motivo: "sem_opt_in" };
   if (!usuario.telefoneWhatsApp) return { enviado: false, motivo: "sem_telefone" };
+
+  // Boas-vindas antes de qualquer aviso automatico — Regina 31/08:
+  // "todo cliente, antes mesmo de receber notificacao, recebe mensagem de
+  // boas-vindas". A Michelly e o Marcos conheceram o CP System por um aviso de
+  // documento: o primeiro contato da empresa com eles foi um robo falando de
+  // prazo, sem ninguem ter dado bom dia. A rotina de boas-vindas existe desde
+  // 28/08, mas nada impedia que uma notificacao chegasse primeiro — quem se
+  // cadastrou antes dela, ou por um caminho que nao a chamava, seguia
+  // descoberto. Aqui a ordem passa a ser garantida no unico ponto por onde
+  // todo disparo automatico passa.
+  //
+  // Alerta de seguranca (bypassCap) fica de fora de proposito: login suspeito
+  // nao espera cortesia.
+  if (opts.tipo !== "BOAS_VINDAS" && !opts.bypassCap) {
+    await garantirBoasVindas(opts.usuarioId);
+  }
+
   if (!opts.bypassCap) {
     // Cap diario — protege cliente de flood mesmo se tiver bug no cron.
     const enviadasHoje = await contarEnviadasHoje(opts.usuarioId);
@@ -355,6 +414,62 @@ export async function enviarDocumentoPdf(
  *
  * `videoUrl` precisa ser publica: a Z-API baixa o arquivo pelo endereco.
  */
+/**
+ * Encaminha um audio (o que o cliente mandou) pra um destino — na pratica, o
+ * grupo de suporte.
+ *
+ * Regina 31/08: "quando um cliente manda audio e voce nao conseguir ouvir,
+ * alem de comunicar no suporte (...) encaminha o audio pra que a gente possa
+ * ouvir la no grupo de suporte. Dessa vez eu ja encaminhei de forma manual".
+ * O alerta ja levava a URL do arquivo, mas link nao se escuta na conversa: ou
+ * alguem abre o navegador, ou o cliente espera. Agora o audio chega tocavel
+ * dentro do grupo, junto do alerta.
+ *
+ * Tenta /send-audio e, se a instancia recusar, reenvia como documento — o
+ * mesmo caminho que ja entrega PDF e video nesta instancia (ver enviarVideo).
+ */
+export async function enviarAudio(
+  telefone: string,
+  audioUrl: string,
+): Promise<{ messageId: string }> {
+  if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
+  await checarConexaoZapi();
+  const phone = formatarDestino(telefone);
+  const headers = {
+    "Content-Type": "application/json",
+    "Client-Token": CLIENT_TOKEN,
+  };
+
+  const r = await fetch(`${getBaseUrl()}/send-audio`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ phone, audio: audioUrl }),
+  });
+  if (r.ok) {
+    const data = (await r.json()) as ZapiResponse;
+    return { messageId: data.messageId || data.zaapId || data.id || "" };
+  }
+
+  const motivo = (await r.text()).slice(0, 200);
+  console.warn(`[whatsapp] /send-audio recusou (${r.status}: ${motivo}) — tentando como documento`);
+
+  const alt = await fetch(`${getBaseUrl()}/send-document/ogg`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      phone,
+      document: audioUrl,
+      fileName: "audio-do-cliente.ogg",
+    }),
+  });
+  if (!alt.ok) {
+    const txt = await alt.text();
+    throw new Error(`Z-API send-audio ${r.status} e send-document ${alt.status}: ${txt.slice(0, 200)}`);
+  }
+  const data = (await alt.json()) as ZapiResponse;
+  return { messageId: data.messageId || data.zaapId || data.id || "" };
+}
+
 export async function enviarVideo(
   telefone: string,
   videoUrl: string,
