@@ -7,6 +7,7 @@
     "build": "prisma generate && DATABASE_URL=\"$DATABASE_URL_UNPOOLED\" prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint",
+    "verificar": "bash scripts/verificar-integridade.sh",
     "postinstall": "prisma generate"
   },
   "dependencies": {
