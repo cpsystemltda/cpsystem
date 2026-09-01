@@ -49,11 +49,27 @@ export default async function NotasPage() {
       take: 30,
       select: {
         id: true, numero: true, orgaoNome: true, dataNfEmitida: true, prazoPagamentoDias: true,
+        // Igor 31/08: o prazo do órgão corre do ENCAMINHAMENTO, não da
+        // emissão. Sem esse campo aqui, "nota emitida esperando pagamento"
+        // misturava duas coisas de dono diferente: a que está parada com a
+        // gente porque ninguém mandou pro órgão, e a que já foi mandada e
+        // depende dele. A primeira a empresa resolve hoje; a segunda ela cobra.
+        dataNfEncaminhada: true,
         notasFiscais: { select: { numero: true, valorServicos: true, pdfUrl: true }, take: 1, orderBy: { criadoEm: "desc" } },
         itens: { select: { valorTotal: true } },
       },
     }),
   ]);
+
+  // Emitida e ainda não encaminhada: o relógio do órgão nem começou, e a bola
+  // está com a empresa. É o buraco que o fallback antigo escondia — ele
+  // marcava esses empenhos como "pagamento em atraso pelo órgão", cobrando
+  // quem ainda não tinha recebido a nota.
+  const naoEncaminhadas = comNota.filter((e) => !e.dataNfEncaminhada);
+  const totalNaoEncaminhado = naoEncaminhadas.reduce(
+    (s, e) => s + (e.notasFiscais[0]?.valorServicos ?? e.itens.reduce((t, i) => t + i.valorTotal, 0)),
+    0,
+  );
 
   const totalPendente = pendentes.reduce(
     (s, e) => s + e.itens.reduce((t, i) => t + i.valorTotal, 0),
@@ -73,11 +89,12 @@ export default async function NotasPage() {
         Notas a emitir e a receber
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-slate-600">
-        Entrega feita sem nota é dinheiro entregue que ainda não pode ser cobrado — enquanto a nota
-        não sai, o prazo de pagamento do órgão nem começou a correr.
+        Entrega feita sem nota é dinheiro entregue que ainda não pode ser cobrado. E emitir não
+        basta: o prazo de pagamento do órgão só começa a correr quando a nota é <strong>encaminhada
+        a ele</strong>.
       </p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="mt-6 grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
           <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
             Entregue, sem nota
@@ -87,6 +104,21 @@ export default async function NotasPage() {
           </p>
           <p className="text-xs text-amber-800">
             {pendentes.length} {pendentes.length === 1 ? "empenho" : "empenhos"}
+          </p>
+        </div>
+        {/* O relógio do órgão só liga no encaminhamento — enquanto a nota não
+            sai daqui, quem está segurando o dinheiro é a própria empresa. */}
+        <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-rose-800">
+            Emitida, não encaminhada
+          </p>
+          <p className="mt-1 text-3xl font-extrabold tabular-nums text-rose-900">
+            {brl(totalNaoEncaminhado)}
+          </p>
+          <p className="text-xs text-rose-800">
+            {naoEncaminhadas.length === 0
+              ? "nenhuma parada aqui"
+              : `${naoEncaminhadas.length} ${naoEncaminhadas.length === 1 ? "nota" : "notas"} · o prazo do órgão nem começou`}
           </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5">
@@ -185,8 +217,11 @@ export default async function NotasPage() {
                 {comNota.map((e) => {
                   const nf = e.notasFiscais[0];
                   const dias = e.prazoPagamentoDias ?? 30;
-                  const limite = e.dataNfEmitida
-                    ? new Date(e.dataNfEmitida.getTime() + dias * 86400000)
+                  // Conta do encaminhamento ao órgão, nunca da emissão (Igor,
+                  // 31/08). Sem encaminhamento não há prazo a vencer: o órgão
+                  // não recebeu a nota, então não está atrasado.
+                  const limite = e.dataNfEncaminhada
+                    ? new Date(e.dataNfEncaminhada.getTime() + dias * 86400000)
                     : null;
                   const atrasado = limite ? limite.getTime() < Date.now() : false;
                   return (

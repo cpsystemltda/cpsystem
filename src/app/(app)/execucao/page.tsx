@@ -91,12 +91,19 @@ export default async function ExecucaoPage({
           | "PAGO",
       }),
       ...(orgao && { orgaoNome: orgao }),
+      // Atraso de pagamento conta do ENCAMINHAMENTO da NF ao órgão, nunca da
+      // emissão — Igor, 31/08: "o prazo de pagamento começa a correr a partir
+      // do envio da NF ao órgão, e não da emissão".
+      //
+      // Havia aqui um fallback pra dataNfEmitida quando não existia
+      // encaminhamento. Ele inventava atraso: a contabilidade emite a nota, o
+      // relógio do órgão era ligado na hora, e o empenho aparecia como
+      // "pagamento em atraso" sem que o órgão tivesse sequer recebido a nota.
+      // Enquanto a NF não é encaminhada, o órgão não deve nada — quem está
+      // devendo somos nós, e isso é outro alerta (ver notas pendentes).
       ...(soAtrasadas && {
-        status: { in: ["NF_EMITIDA", "NF_ENCAMINHADA"] as const },
-        OR: [
-          { dataNfEncaminhada: { lte: limiteAtraso } },
-          { dataNfEncaminhada: null, dataNfEmitida: { lte: limiteAtraso } },
-        ],
+        status: "NF_ENCAMINHADA" as const,
+        dataNfEncaminhada: { lte: limiteAtraso },
       }),
       ...(dataEmissaoFiltro && { dataEmissao: dataEmissaoFiltro }),
       ...(ataId && { ataId }),

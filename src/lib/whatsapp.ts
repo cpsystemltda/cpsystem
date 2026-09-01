@@ -249,8 +249,24 @@ async function garantirBoasVindas(usuarioId: string): Promise<void> {
     // SO pra cadastro novo — Regina 31/08: "essa regra de boas-vindas antes de
     // notificacao so e valida pra novos cadastros, nunca pra cadastros que ja
     // estao um tempo na plataforma, que ai fica o padrao de mensagem normal
-    // como ja esta hoje". Mandar "bem-vindo" pra quem usa o sistema ha meses
-    // nao acolhe ninguem: soa como se a gente nao soubesse quem e o cliente.
+    // como ja esta hoje". Mandar "bem-vindo" pra quem ja usa o sistema nao
+    // acolhe ninguem: soa como se a gente nao soubesse quem e o cliente.
+    //
+    // A idade da conta sozinha NAO serve de criterio, e isso custou caro:
+    // em 01/09 o Marcos (cadastro 28/08) e a Michelly (25/08) receberam
+    // "Bem-vindo ao CP System" no meio da rotina de ativacao. Os dois estavam
+    // dentro da janela de dias, mas os dois ja vinham recebendo notificacao
+    // havia dias — de novo eles nao tinham nada.
+    //
+    // O criterio certo e este: a rede de seguranca so vale pra quem NUNCA
+    // recebeu nada nossa. E exatamente o buraco que ela existe pra tapar —
+    // cadastro cujo acolhimento nao disparou — e exclui, por construcao, quem
+    // ja esta no fluxo.
+    const jaRecebeuAlgo = await prisma.notificacaoWhatsApp.count({
+      where: { usuarioId, status: "ENVIADA" },
+    });
+    if (jaRecebeuAlgo > 0) return;
+
     const diasDeConta = (Date.now() - u.conta.criadoEm.getTime()) / 86_400_000;
     if (diasDeConta > JANELA_BOAS_VINDAS_DIAS) return;
 

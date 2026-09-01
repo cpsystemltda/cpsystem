@@ -270,7 +270,7 @@ export default async function EmpenhoDetalhePage({
               )}
               {pagamentoAtrasado && (
                 <Alerta cor="red">
-                  Pagamento em atraso pelo órgão — prazo era {prazoPagamento!.toLocaleDateString("pt-BR")} ({e.prazoPagamentoDias} dias após NF).
+                  Pagamento em atraso pelo órgão — prazo era {prazoPagamento!.toLocaleDateString("pt-BR")} ({e.prazoPagamentoDias} dias após o encaminhamento da NF ao órgão).
                 </Alerta>
               )}
             </>

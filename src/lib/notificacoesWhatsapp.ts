@@ -624,18 +624,21 @@ async function blocoFinanceiroDoCliente(opts: {
   const emAtraso = await prisma.empenho.findMany({
     where: {
       empresa: { contaId },
-      status: { in: ["NF_EMITIDA", "NF_ENCAMINHADA"] },
-      // Conta pela data que o cliente tem: a de encaminhamento quando existe,
-      // senao a de emissao.
-      OR: [
-        { dataNfEncaminhada: { lt: limiteAtraso } },
-        { dataNfEncaminhada: null, dataNfEmitida: { lt: limiteAtraso } },
-      ],
+      // So o que ja foi ENCAMINHADO ao orgao — Igor, 31/08: "o prazo de
+      // pagamento comeca a correr a partir do envio da NF ao orgao, e nao da
+      // emissao".
+      //
+      // Aqui estava o pior efeito do fallback antigo: ele caia pra data de
+      // emissao e mandava, no WhatsApp do cliente, "orgao X deve R$ Y ha Z
+      // dias" por nota que o orgao nunca recebeu. O comentario logo acima ja
+      // dizia o motivo de nao inventar atraso — "faz o analista cobrar orgao
+      // que nao deve nada ainda" — e a query fazia exatamente isso.
+      status: "NF_ENCAMINHADA",
+      dataNfEncaminhada: { lt: limiteAtraso },
     },
     select: {
       orgaoNome: true,
       dataNfEncaminhada: true,
-      dataNfEmitida: true,
       itens: { select: { valorTotal: true } },
     },
   });
@@ -991,15 +994,18 @@ export async function notificarNfSemPagamento30d(hoje: Date = new Date()): Promi
 
   const empenhos = await prisma.empenho.findMany({
     where: {
-      status: { in: ["NF_EMITIDA", "NF_ENCAMINHADA"] },
-      OR: [
-        { dataNfEncaminhada: { lte: ha30d } },
-        { AND: [{ dataNfEncaminhada: null }, { dataNfEmitida: { lte: ha30d } }] },
-      ],
+      // Igor 31/08: o prazo corre do encaminhamento, nao da emissao. O
+      // fallback pra dataNfEmitida que existia aqui era o mais grave dos tres:
+      // a propria mensagem afirma "teve NF ENCAMINHADA ha mais de 30 dias" e
+      // manda o cliente acionar cobranca com juros do art. 141 — por uma nota
+      // que o orgao nunca recebeu. Cliente cobrando orgao indevidamente, com
+      // citacao de lei, no nome do CP System.
+      status: "NF_ENCAMINHADA",
+      dataNfEncaminhada: { lte: ha30d },
     },
     select: {
       id: true, numero: true, orgaoNome: true, instrumento: true,
-      dataNfEmitida: true, dataNfEncaminhada: true,
+      dataNfEncaminhada: true,
       itens: { select: { valorTotal: true } },
       empresa: { select: { contaId: true } },
     },
@@ -1010,7 +1016,7 @@ export async function notificarNfSemPagamento30d(hoje: Date = new Date()): Promi
     const usuarios = await destinatariosDaConta(e.empresa.contaId);
     if (!usuarios.length) continue;
     const valorTotal = e.itens.reduce((s, i) => s + i.valorTotal, 0);
-    const dataNf = e.dataNfEncaminhada ?? e.dataNfEmitida;
+    const dataNf = e.dataNfEncaminhada;
     const diasSemPago = dataNf ? Math.floor((inicioHoje.getTime() - dataNf.getTime()) / 86400000) : 30;
     for (const u of usuarios) {
       const msg =

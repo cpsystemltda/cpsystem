@@ -252,14 +252,21 @@ export function EmitirNotaFiscal({
   //
   // Regina 28/08: o CP System não emite a nota — cuida de tudo em volta. Aqui a
   // pessoa copia os dados prontos pra contabilidade e, quando a nota volta,
-  // anexa: o sistema lê número, data e valor e passa a contar o prazo do órgão.
+  // anexa: o sistema lê número, data e valor.
+  //
+  // Igor 31/08: o texto dizia que o prazo do órgão passava a correr a partir da
+  // nota anexada. Não é. O relógio do órgão só começa quando a NF é
+  // ENCAMINHADA a ele — registrar a emissão aqui não cobra ninguém. Emitir e
+  // esquecer de encaminhar é justamente o buraco caro que o sistema existe pra
+  // fechar, e o texto antigo dava a entender que já estava resolvido.
   const painelDoCliente = (
     <div className="mt-2 space-y-2.5">
       <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
         <p className="text-xs font-semibold text-slate-800">Ainda sem nota registrada</p>
         <p className="mt-0.5 text-xs text-slate-600">
-          Peça a nota à sua contabilidade e anexe aqui quando ela voltar — o prazo de pagamento
-          do órgão passa a correr a partir dela.
+          Peça a nota à sua contabilidade e anexe aqui quando ela voltar. Depois é só encaminhar
+          a nota ao órgão e registrar esse envio — <strong>é dele que o prazo de pagamento
+          começa a correr</strong>, não da emissão.
         </p>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <button
