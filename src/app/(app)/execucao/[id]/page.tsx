@@ -732,6 +732,11 @@ function Timeline({
                         ja={data}
                         jaArquivo={arquivo}
                         bloqueado={!concluido && !anterior}
+                        // Na etapa da nota, quem anexa é o painel de notas logo
+                        // abaixo — ele lê o PDF, aceita várias e deixa remover.
+                        // Ter os dois anexadores na mesma etapa confundia quem
+                        // olhava (Igor, 07/09).
+                        semArquivo={p.marco === "NF_EMITIDA"}
                       />
                       {/* Emissão da NFS-e fica AO LADO do registro manual, não no
                           lugar dele: quem emite por fora continua só anexando. */}

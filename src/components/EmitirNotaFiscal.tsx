@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -11,6 +11,8 @@ import {
   Loader2,
   RefreshCw,
   Receipt,
+  UploadCloud,
+  X,
 } from "lucide-react";
 import {
   emitirNotaFiscalAction,
@@ -21,6 +23,7 @@ import {
 import {
   registrarNotaEmitidaAction,
   informarNumeroNotaAction,
+  excluirNotaRegistradaAction,
   type ResultadoNotaRegistrada,
 } from "@/app/actions/notaRegistrada";
 
@@ -89,6 +92,10 @@ export function EmitirNotaFiscal({
   );
 
   const autorizada = notas.find((n) => n.status === "AUTORIZADA");
+  // Notas já guardadas neste empenho — quantas forem.
+  const notasRegistradas = notas.filter(
+    (n) => n.status === "AUTORIZADA" || n.status === "PROCESSANDO",
+  );
 
   // Nota marcada à mão no fluxo antigo: existe a data, falta o número — que é
   // justamente o dado que se usa pra conferir com o banco e falar com o órgão
@@ -139,7 +146,10 @@ export function EmitirNotaFiscal({
   const ultimoErro = notas.find((n) => n.status === "ERRO");
 
   // ── Nota autorizada ───────────────────────────────────────────────────────
-  if (autorizada) {
+  // Só a NFS-e emitida PELO sistema encerra o painel: ela tem consulta,
+  // cancelamento e link da prefeitura. Nota externa (anexada) segue no fluxo
+  // normal, para caber outra ao lado — Igor 07/09.
+  if (autorizada && autorizada.provedor !== "EXTERNA") {
     return (
       <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -172,7 +182,7 @@ export function EmitirNotaFiscal({
               <ExternalLink className="h-3.5 w-3.5" /> Ver na prefeitura
             </a>
           )}
-          {podeCancelar && autorizada.provedor !== "EXTERNA" && !cancelando && (
+          {podeCancelar && !cancelando && (
             <button
               type="button"
               onClick={() => setCancelando(true)}
@@ -261,6 +271,10 @@ export function EmitirNotaFiscal({
   // fechar, e o texto antigo dava a entender que já estava resolvido.
   const painelDoCliente = (
     <div className="mt-2 space-y-2.5">
+      {/* Igor 07/09: um empenho pode ter várias notas. A lista fica em cima e o
+          campo de anexo continua disponível embaixo, para acrescentar mais. */}
+      <ListaDeNotas notas={notas} podeCancelar={podeCancelar} />
+      {notasRegistradas.length === 0 && (
       <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
         <p className="text-xs font-semibold text-slate-800">Ainda sem nota registrada</p>
         <p className="mt-0.5 text-xs text-slate-600">
@@ -287,21 +301,14 @@ export function EmitirNotaFiscal({
           </button>
         </div>
       </div>
+      )}
 
       <form action={registrarAcao} className="rounded-lg border border-violet-200 bg-violet-50/40 p-3">
         <input type="hidden" name="empenhoId" value={empenhoId} />
-        <label className="block text-xs font-semibold text-slate-700">
-          Anexar a nota emitida (PDF)
-          <input
-            type="file"
-            name="arquivo"
-            accept="application/pdf,image/jpeg,image/png"
-            required
-            className="mt-1 block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-violet-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-violet-700"
-          />
-        </label>
+        <p className="text-xs font-semibold text-slate-700">Anexar a nota emitida</p>
+        <SoltarNotas registrando={registrando} />
         <p className="mt-1.5 text-[11px] text-slate-500">
-          O sistema lê número, data e valor da nota sozinho. O que não conseguir ler fica em
+          O sistema lê número, data e valor de cada nota sozinho. O que não conseguir ler fica em
           branco pra você completar — nota fiscal não se adivinha.
         </p>
         {registrar?.erro && <p className="mt-1.5 text-xs text-red-600">{registrar.erro}</p>}
@@ -312,7 +319,7 @@ export function EmitirNotaFiscal({
           className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
         >
           {registrando && <Loader2 className="h-3 w-3 animate-spin" />}
-          {registrando ? "Lendo a nota…" : "Registrar nota"}
+          {registrando ? "Lendo as notas…" : "Registrar nota"}
         </button>
       </form>
     </div>
@@ -417,6 +424,246 @@ export function EmitirNotaFiscal({
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+/**
+ * Campo de anexo das notas: arrastar e soltar, vários arquivos, e cada um
+ * removível antes de enviar.
+ *
+ * Igor 07/09, três pedidos que são o mesmo campo:
+ *   · "voltar o arrastar e soltar" — a função existia no anexo da etapa, mas
+ *     aqui, no painel de notas, nunca houve: era um <input type="file"> cru;
+ *   · "aceitar vários arquivos, sem limite" — entrega parcelada gera uma nota
+ *     por entrega;
+ *   · "poder retirar um arquivo já anexado" — errar o PDF acontece.
+ *
+ * O <input> real fica escondido e é alimentado por DataTransfer, para o form
+ * continuar enviando os arquivos por `name="arquivo"` sem JavaScript de envio.
+ * Assim o botão "Registrar nota" segue sendo um submit comum.
+ */
+function SoltarNotas({ registrando }: { registrando: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const [arrastando, setArrastando] = useState(false);
+  const [recusados, setRecusados] = useState<string[]>([]);
+
+  const TIPOS = ["application/pdf", "image/jpeg", "image/png"];
+  const MAX = 25 * 1024 * 1024;
+
+  function sincronizar(lista: File[]) {
+    setArquivos(lista);
+    if (inputRef.current) {
+      const dt = new DataTransfer();
+      for (const f of lista) dt.items.add(f);
+      inputRef.current.files = dt.files;
+    }
+  }
+
+  function acrescentar(novos: FileList | null) {
+    if (!novos?.length) return;
+    const recusa: string[] = [];
+    const aceitos: File[] = [];
+    for (const f of Array.from(novos)) {
+      if (!TIPOS.includes(f.type)) { recusa.push(`${f.name} — só PDF, JPG ou PNG`); continue; }
+      if (f.size > MAX) { recusa.push(`${f.name} — passa de 25 MB`); continue; }
+      // Mesmo arquivo arrastado duas vezes não vira nota duplicada.
+      if (arquivos.some((a) => a.name === f.name && a.size === f.size)) continue;
+      aceitos.push(f);
+    }
+    setRecusados(recusa);
+    if (aceitos.length) sincronizar([...arquivos, ...aceitos]);
+  }
+
+  function remover(i: number) {
+    sincronizar(arquivos.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="mt-1.5">
+      <div
+        onDragOver={(e) => { e.preventDefault(); setArrastando(true); }}
+        onDragLeave={() => setArrastando(false)}
+        onDrop={(e) => { e.preventDefault(); setArrastando(false); acrescentar(e.dataTransfer.files); }}
+        onClick={() => inputRef.current?.click()}
+        className={`cursor-pointer rounded-md border border-dashed px-3 py-3 transition ${
+          arrastando
+            ? "border-violet-500 bg-violet-100/70"
+            : "border-violet-300 bg-white/70 hover:border-violet-400 hover:bg-violet-50"
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <UploadCloud className={`h-4 w-4 shrink-0 ${arrastando ? "text-violet-700" : "text-violet-400"}`} />
+          <p className="text-[11px] text-slate-600">
+            {arrastando ? (
+              <span className="font-medium text-violet-700">Solte as notas aqui</span>
+            ) : (
+              <>
+                Arraste as notas <span className="text-slate-400">ou</span>{" "}
+                <span className="font-medium text-violet-700">clique pra selecionar</span>
+                <span className="ml-1 text-slate-400">· PDF, JPG ou PNG · até 25 MB cada</span>
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      <input
+        ref={inputRef}
+        type="file"
+        name="arquivo"
+        multiple
+        accept="application/pdf,image/jpeg,image/png"
+        className="hidden"
+        onChange={(e) => acrescentar(e.target.files)}
+      />
+
+      {arquivos.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {arquivos.map((f, i) => (
+            <li
+              key={`${f.name}-${f.size}-${i}`}
+              className="flex items-center justify-between gap-2 rounded-md border border-violet-200 bg-white px-2.5 py-1.5"
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5 shrink-0 text-violet-600" />
+                <span className="truncate text-[11px] font-medium text-slate-800">{f.name}</span>
+                <span className="shrink-0 text-[10px] text-slate-400">
+                  {(f.size / 1024 / 1024).toFixed(1)} MB
+                </span>
+              </span>
+              <button
+                type="button"
+                disabled={registrando}
+                onClick={(ev) => { ev.stopPropagation(); remover(i); }}
+                className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                title="Tirar este arquivo"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </li>
+          ))}
+          <li className="pt-0.5 text-[10px] text-slate-500">
+            {arquivos.length} {arquivos.length === 1 ? "nota selecionada" : "notas selecionadas"}
+          </li>
+        </ul>
+      )}
+
+      {recusados.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5">
+          {recusados.map((r) => (
+            <li key={r} className="text-[11px] text-red-600">⚠ {r}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * As notas já guardadas no empenho, cada uma com o PDF e a opção de remover.
+ *
+ * Igor 07/09: "adicionar opção de retirar/remover um arquivo já anexado".
+ * A remoção vale só para nota anexada (provedor EXTERNA). NFS-e emitida pelo
+ * sistema existe na prefeitura — some daqui e o sistema passa a mostrar coisa
+ * diferente do que o fisco tem. Essa se cancela, com justificativa.
+ */
+function ListaDeNotas({
+  notas,
+  podeCancelar,
+}: {
+  notas: NotaDoEmpenho[];
+  podeCancelar: boolean;
+}) {
+  const [excluir, excluirAcao, excluindo] = useActionState<
+    ResultadoNotaRegistrada | null,
+    FormData
+  >(excluirNotaRegistradaAction, null);
+
+  const guardadas = notas.filter(
+    (n) => n.status === "AUTORIZADA" || n.status === "PROCESSANDO",
+  );
+  if (guardadas.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+      <p className="text-xs font-semibold text-emerald-900">
+        {guardadas.length === 1 ? "Nota registrada" : `${guardadas.length} notas registradas`}
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {guardadas.map((n) => (
+          <li
+            key={n.id}
+            className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-emerald-200 bg-white px-2.5 py-1.5"
+          >
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              {n.numero ? `Nota nº ${n.numero}` : "Nota sem número informado"}
+            </span>
+            <span className="text-[11px] text-slate-500">
+              {n.valorServicos.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </span>
+            {n.ambiente === "HOMOLOGACAO" && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                HOMOLOGAÇÃO · sem valor fiscal
+              </span>
+            )}
+            {n.pdfUrl && (
+              <a
+                href={n.pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-emerald-800 hover:underline"
+              >
+                <FileText className="h-3.5 w-3.5" /> PDF
+              </a>
+            )}
+            {n.linkPrefeitura && (
+              <a
+                href={n.linkPrefeitura}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-emerald-800 hover:underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Ver na prefeitura
+              </a>
+            )}
+            {n.provedor === "EXTERNA" ? (
+              <form
+                action={excluirAcao}
+                className="ms-auto"
+                onSubmit={(e) => {
+                  if (
+                    !window.confirm(
+                      "Remover esta nota do empenho? O arquivo anexado deixa de aparecer aqui.",
+                    )
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <input type="hidden" name="notaId" value={n.id} />
+                <button
+                  type="submit"
+                  disabled={excluindo}
+                  className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-slate-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-40"
+                  title="Remover esta nota"
+                >
+                  <X className="h-3.5 w-3.5" /> Remover
+                </button>
+              </form>
+            ) : (
+              podeCancelar && (
+                <span className="ms-auto text-[10px] text-slate-400">
+                  emitida pelo sistema — use “Cancelar nota”
+                </span>
+              )
+            )}
+          </li>
+        ))}
+      </ul>
+      {excluir?.erro && <p className="mt-1.5 text-xs text-red-600">{excluir.erro}</p>}
     </div>
   );
 }

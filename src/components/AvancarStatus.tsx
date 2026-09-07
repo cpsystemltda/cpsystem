@@ -10,6 +10,16 @@ type Props = {
   ja?: Date | null;
   jaArquivo?: string | null;
   bloqueado?: boolean;
+  /**
+   * Esconde o campo de anexo desta etapa.
+   *
+   * Igor 07/09: na etapa da nota fiscal apareciam DOIS anexadores na mesma
+   * tela — este e o do painel de notas, cada um com regra própria. Quem olhava
+   * não sabia em qual soltar o arquivo. O painel de notas é o dono do anexo ali
+   * (lê o PDF, extrai número e valor, aceita várias notas), então este some e
+   * a etapa fica só com a data.
+   */
+  semArquivo?: boolean;
 };
 
 const TIPOS_PERMITIDOS = ["application/pdf", "image/jpeg", "image/png"];
@@ -27,7 +37,7 @@ function formatarTamanho(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Props) {
+export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado, semArquivo }: Props) {
   const [aberto, setAberto] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -103,7 +113,7 @@ export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Pr
               Cancelar
             </button>
           </div>
-          <DropZoneArquivo jaTem={!!jaArquivo} onErro={setErro} />
+          {!semArquivo && <DropZoneArquivo jaTem={!!jaArquivo} onErro={setErro} />}
           {erro && <p className="text-xs text-red-600">{erro}</p>}
         </form>
       );
@@ -192,7 +202,7 @@ export function AvancarStatus({ empenhoId, marco, ja, jaArquivo, bloqueado }: Pr
             </button>
           </div>
 
-          <DropZoneArquivo jaTem={false} onErro={setErro} />
+          {!semArquivo && <DropZoneArquivo jaTem={false} onErro={setErro} />}
 
           {erro && <p className="text-xs text-red-600">{erro}</p>}
         </form>

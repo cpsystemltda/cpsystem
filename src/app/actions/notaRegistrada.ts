@@ -29,6 +29,21 @@ export type ResultadoNotaRegistrada = {
   };
 };
 
+/** O empenho como as funções auxiliares abaixo precisam dele. */
+type EmpenhoParaNota = {
+  id: string;
+  numero: string;
+  status: string;
+  orgaoNome: string;
+  orgaoCnpj: string;
+  orgaoEndereco: string | null;
+  orgaoEmail: string | null;
+  dataNfEmitida: Date | null;
+  empresa: { id: string; cnpj: string };
+  itens: { valorTotal: number }[];
+  notasFiscais: { id: string }[];
+};
+
 export async function registrarNotaEmitidaAction(
   _prev: ResultadoNotaRegistrada | null,
   formData: FormData,
@@ -49,8 +64,56 @@ export async function registrarNotaEmitidaAction(
   });
   if (!empenho) return { erro: "Empenho não encontrado." };
 
-  const file = formData.get("arquivo") as File | null;
-  if (!file || file.size === 0) return { erro: "Anexe o PDF da nota fiscal." };
+  // Igor 07/09: "o mesmo empenho pode ter mais de uma nota fiscal emitida; o
+  // campo deve aceitar vários arquivos, sem limite de quantidade". Entrega
+  // parcelada gera uma nota por entrega, e antes só cabia uma — a segunda nota
+  // não tinha onde ser guardada.
+  const arquivos = formData
+    .getAll("arquivo")
+    .filter((a): a is File => a instanceof File && a.size > 0);
+  if (arquivos.length === 0) return { erro: "Anexe o PDF da nota fiscal." };
+
+  const registradas: string[] = [];
+  const falhas: string[] = [];
+  let avisoGeral: string | undefined;
+  let primeiroUrl: string | null = null;
+  let primeiraData: Date | null = null;
+  let seq = empenho.notasFiscais.length;
+
+  for (const file of arquivos) {
+    const r = await registrarUmArquivo(file, empenho, usuario, ++seq);
+    if (r.erro) {
+      falhas.push(`${file.name}: ${r.erro}`);
+      seq--;
+      continue;
+    }
+    registradas.push(file.name);
+    if (r.aviso && !avisoGeral) avisoGeral = r.aviso;
+    if (!primeiroUrl && r.url) primeiroUrl = r.url;
+    if (!primeiraData && r.data) primeiraData = r.data;
+  }
+
+  if (registradas.length === 0) {
+    return { erro: falhas[0] ?? "Não consegui registrar a nota." };
+  }
+
+  return await concluirRegistro({
+    empenho, usuario, url: primeiroUrl ?? "", data: primeiraData ?? new Date(),
+    quantas: registradas.length, falhas, aviso: avisoGeral,
+  });
+}
+
+/**
+ * Registra UM arquivo como nota do empenho. Isolado para que uma nota com
+ * problema não derrube o lote inteiro: o cliente que anexou cinco notas e tem
+ * uma ilegível fica com quatro registradas e um aviso, não com zero.
+ */
+async function registrarUmArquivo(
+  file: File,
+  empenho: EmpenhoParaNota,
+  usuario: { id: string; nome: string },
+  sequencial: number,
+): Promise<{ erro?: string; aviso?: string; url?: string; data?: Date }> {
 
   let salvo;
   try {
@@ -99,7 +162,7 @@ export async function registrarNotaEmitidaAction(
     data: {
       empresaId: empenho.empresa.id,
       empenhoId: empenho.id,
-      referencia: `ext-${empenho.id}-${empenho.notasFiscais.length + 1}`,
+      referencia: `ext-${empenho.id}-${sequencial}`,
       provedor: "EXTERNA",
       ambiente: "PRODUCAO",
       status: "AUTORIZADA",
@@ -120,17 +183,41 @@ export async function registrarNotaEmitidaAction(
     },
   });
 
+  return { aviso, url: salvo.url, data: dataValida };
+}
+
+/**
+ * Fecha o lote: avança o empenho, registra auditoria e revalida as telas.
+ *
+ * Roda UMA vez por lote, não por arquivo — cinco notas anexadas juntas são um
+ * único avanço de etapa e uma única linha de auditoria.
+ */
+async function concluirRegistro(a: {
+  empenho: EmpenhoParaNota;
+  usuario: { id: string; nome: string; contaId: string };
+  url: string;
+  data: Date;
+  quantas: number;
+  falhas: string[];
+  aviso?: string;
+}): Promise<ResultadoNotaRegistrada> {
+  const { empenho, usuario } = a;
+
   const ORDEM: Record<string, number> = {
     EMPENHADO: 0, PEDIDO_RECEBIDO: 1, EM_TRANSITO: 2, ENTREGUE: 3,
     NF_EMITIDA: 4, NF_ENCAMINHADA: 5, PAGO: 6,
   };
-  const dados: Record<string, unknown> = {
-    arquivoNfEmitida: salvo.url,
-    // Não sobrescreve data já registrada à mão: a do cliente é a que vale.
-    ...(empenho.dataNfEmitida ? {} : { dataNfEmitida: dataValida }),
-    ...((ORDEM[empenho.status] ?? 0) < ORDEM.NF_EMITIDA ? { status: "NF_EMITIDA" } : {}),
-  };
-  await prisma.empenho.update({ where: { id: empenho.id }, data: dados });
+  await prisma.empenho.update({
+    where: { id: empenho.id },
+    data: {
+      // Guarda o primeiro anexo do lote como referência rápida da etapa; a
+      // lista completa vive em NotaFiscal, que aceita quantas forem.
+      arquivoNfEmitida: a.url,
+      // Não sobrescreve data já registrada à mão: a do cliente é a que vale.
+      ...(empenho.dataNfEmitida ? {} : { dataNfEmitida: a.data }),
+      ...((ORDEM[empenho.status] ?? 0) < ORDEM.NF_EMITIDA ? { status: "NF_EMITIDA" } : {}),
+    },
+  });
 
   await registrarAuditoria({
     contaId: usuario.contaId,
@@ -139,20 +226,21 @@ export async function registrarNotaEmitidaAction(
     recurso: "Empenho",
     recursoId: empenho.id,
     resumo:
-      `Registrou a nota fiscal do empenho ${empenho.numero}` +
-      (lido.numero ? ` (nº ${lido.numero})` : "") +
-      (lido.valorTotal ? ` — R$ ${lido.valorTotal.toFixed(2)}` : ""),
+      a.quantas === 1
+        ? `Registrou a nota fiscal do empenho ${empenho.numero}`
+        : `Registrou ${a.quantas} notas fiscais do empenho ${empenho.numero}`,
   });
 
   revalidatePath(`/execucao/${empenho.id}`);
   revalidatePath("/execucao");
   revalidatePath("/notas");
 
-  return {
-    ok: true,
-    aviso,
-    lido: { numero: lido.numero, dataEmissao: lido.dataEmissao, valorTotal: lido.valorTotal },
-  };
+  const partes: string[] = [];
+  if (a.quantas > 1) partes.push(`${a.quantas} notas registradas.`);
+  if (a.falhas.length) partes.push(`Não consegui registrar: ${a.falhas.join("; ")}`);
+  if (a.aviso) partes.push(a.aviso);
+
+  return { ok: true, aviso: partes.length ? partes.join(" ") : undefined };
 }
 
 /**
@@ -237,4 +325,73 @@ export async function informarNumeroNotaAction(
   revalidatePath("/execucao");
   revalidatePath("/notas");
   return { ok: true, lido: { numero, dataEmissao: null, valorTotal: null } };
+}
+
+/**
+ * Remove uma nota anexada ao empenho.
+ *
+ * Igor 07/09: "adicionar opção de retirar/remover um arquivo já anexado no
+ * registro da execução". Anexar o PDF errado acontece, e até agora não havia
+ * saída — a nota errada ficava lá para sempre.
+ *
+ * Só apaga nota de provedor EXTERNA, isto é, a que o cliente emitiu por fora e
+ * apenas anexou aqui. NFS-e emitida através do sistema não se apaga: ela existe
+ * na prefeitura, e sumir com o registro criaria divergência entre o que o CP
+ * System mostra e o que o fisco tem. Essa se cancela, com justificativa.
+ */
+export async function excluirNotaRegistradaAction(
+  _prev: ResultadoNotaRegistrada | null,
+  formData: FormData,
+): Promise<ResultadoNotaRegistrada> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+
+  const notaId = String(formData.get("notaId") || "").trim();
+  const nota = await prisma.notaFiscal.findFirst({
+    where: { id: notaId, empresa: { contaId: usuario.contaId } },
+    select: {
+      id: true, numero: true, provedor: true, pdfUrl: true,
+      empenho: { select: { id: true, numero: true, arquivoNfEmitida: true } },
+    },
+  });
+  if (!nota) return { erro: "Nota não encontrada." };
+  if (nota.provedor !== "EXTERNA") {
+    return {
+      erro: "Esta nota foi emitida pelo sistema e existe na prefeitura. Use 'Cancelar nota', com justificativa.",
+    };
+  }
+
+  await prisma.notaFiscal.delete({ where: { id: nota.id } });
+
+  // O empenho guarda o anexo da etapa. Se era justamente este, aponta para
+  // outra nota que tenha sobrado — ou limpa, para a etapa não exibir link
+  // quebrado de arquivo que não existe mais.
+  const empenhoId = nota.empenho?.id;
+  if (empenhoId && nota.empenho?.arquivoNfEmitida === nota.pdfUrl) {
+    const restante = await prisma.notaFiscal.findFirst({
+      where: { empenhoId, pdfUrl: { not: null } },
+      select: { pdfUrl: true },
+      orderBy: { criadoEm: "asc" },
+    });
+    await prisma.empenho.update({
+      where: { id: empenhoId },
+      data: { arquivoNfEmitida: restante?.pdfUrl ?? null },
+    });
+  }
+
+  await registrarAuditoria({
+    contaId: usuario.contaId,
+    usuarioId: usuario.id,
+    acao: "EXCLUIR",
+    recurso: "NotaFiscal",
+    recursoId: nota.id,
+    resumo:
+      `Removeu a nota anexada${nota.numero ? ` nº ${nota.numero}` : ""}` +
+      (nota.empenho ? ` do empenho ${nota.empenho.numero}` : ""),
+  });
+
+  if (empenhoId) revalidatePath(`/execucao/${empenhoId}`);
+  revalidatePath("/execucao");
+  revalidatePath("/notas");
+  return { ok: true };
 }
