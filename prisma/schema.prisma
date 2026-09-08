@@ -267,6 +267,72 @@ model MensagemInboundWhatsApp {
   @@index([criadoEm])
 }
 
+/// Lead de prospeccao ativa — a lista que a closer trabalha por telefone.
+///
+/// Regina 08/09: a closer nao usa Claude, entao o acompanhamento nao podia
+/// viver num link de fora. Mora aqui dentro, com o login dela, e Regina e Igor
+/// veem o andamento na mesma tela, ao vivo.
+///
+/// Os dados do contrato vem do Portal Nacional de Contratacoes Publicas e do
+/// cadastro da Receita — nao sao dados de cliente nosso, sao dado publico.
+model LeadProspeccao {
+  id        String @id @default(cuid())
+  empresa   String
+  cnpj      String @unique
+  uf        String
+  municipio String?
+
+  telefone String?
+  email    String?
+
+  /// Contrato que vence primeiro — o gancho da ligacao.
+  venceEm            DateTime
+  valorDoContrato    Float
+  orgao              String?
+  objeto             String?
+  /// Somado de todos os contratos publicos que a empresa tem.
+  valorTotal         Float
+  qtdContratos       Int    @default(1)
+  porte              String?
+  /// Perfil resumido pra closer decidir a abordagem.
+  perfil             String?
+  /// Marca as empresas de melhor encaixe (micro e pequeno porte, dono decide).
+  alvoIdeal          Boolean @default(false)
+
+  situacao  SituacaoLead @default(NAO_CONTATADO)
+  anotacoes String?      @db.Text
+
+  /// Quando a closer falou com a empresa pela primeira vez.
+  dataPrimeiroContato DateTime?
+  /// Quando ela falou pela última vez — o que importa pro follow-up.
+  dataUltimoContato   DateTime?
+  /// A empresa respondeu (ligou de volta, respondeu e-mail, apareceu na demo)?
+  teveRetorno         Boolean   @default(false)
+  /// Data combinada pra voltar a falar. É o que a tela usa pra cobrar retorno.
+  retornarEm          DateTime?
+  /// Nome de quem atendeu, quando a closer conseguiu falar com o decisor.
+  contatoNome         String?
+
+  atualizadoPorId   String?
+  atualizadoPorNome String?
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  @@index([situacao])
+  @@index([venceEm])
+}
+
+enum SituacaoLead {
+  NAO_CONTATADO
+  TENTOU_NAO_FALOU
+  FALOU_COM_DECISOR
+  DEMONSTRACAO_MARCADA
+  CLIENTE
+  RETORNAR_DEPOIS
+  NAO_E_CLIENTE
+  NAO_PERTURBAR
+}
+
 model NotificacaoWhatsApp {
   id           String                    @id @default(cuid())
   usuarioId    String

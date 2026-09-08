@@ -30,7 +30,8 @@ export type ChaveModulo =
   | "EXECUCAO"
   | "JURIDICO"
   | "RELATORIOS"
-  | "FINANCEIRO";
+  | "FINANCEIRO"
+  | "PROSPECCAO";
 
 export type Modulo = {
   chave: ChaveModulo;
@@ -83,6 +84,13 @@ export const MODULOS: Modulo[] = [
     descricao:
       "Bloco financeiro do dashboard, conciliação bancária, honorários e comissões do analista e a assinatura do CP System. Deixe desmarcado para quem não deve ver o seu dinheiro.",
     rotas: ["/conciliacao", "/honorarios", "/vinculos", "/conta/assinatura", "/conta/checkout"],
+  },
+  {
+    chave: "PROSPECCAO",
+    label: "Prospecção (uso interno)",
+    descricao:
+      "Lista de empresas com contrato público vencendo, para ligação, com o registro de cada contato. Só faz sentido para quem trabalha a prospecção do CP System.",
+    rotas: ["/prospeccao"],
   },
 ];
 
