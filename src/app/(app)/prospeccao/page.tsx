@@ -128,18 +128,110 @@ export default async function ProspeccaoPage() {
       <Secao icone={<BookOpen className="h-4 w-4" />} titulo="1 · O que é a CP System">
         <p className="text-sm text-slate-700">
           Sistema para <strong>empresas que vendem para o governo</strong>. Cuida do que acontece{" "}
-          <strong>depois</strong> que a empresa ganha a licitação — que é onde o dinheiro se perde:
-          o prazo de prorrogação que passa e encerra o contrato, a entrega que atrasa e vira multa,
-          a entrega feita cuja nota não saiu, a nota que ninguém encaminhou ao órgão, o saldo de ata
-          que nunca foi executado.
+          <strong>depois</strong> que a empresa ganha a licitação — que é onde o dinheiro se perde.
+          Ganhar todo mundo acompanha; o que quase ninguém controla é a execução.
         </p>
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-[13px] text-amber-900">
+
+        <h3 className="mt-5 text-sm font-bold text-slate-800">Os cinco jeitos de perder dinheiro que a gente evita</h3>
+        <p className="text-[13.5px] text-slate-600">
+          Decore estes cinco. São eles que você usa na ligação, não a lista de funcionalidades.
+        </p>
+        <ol className="mt-2 space-y-2 text-[13.5px] text-slate-700">
+          <li><strong>1. O prazo de prorrogação passa.</strong> O contrato encerra e a empresa precisa disputar tudo de novo, do zero. É a perda mais cara e a mais silenciosa.</li>
+          <li><strong>2. A entrega atrasa.</strong> Vira multa de até 10% do contrato e, na reincidência, penalidade que impede de participar de novas licitações.</li>
+          <li><strong>3. A entrega é feita e a nota não sai.</strong> Dinheiro entregue que não pode nem ser cobrado.</li>
+          <li><strong>4. A nota sai e ninguém encaminha ao órgão.</strong> O prazo de pagamento nem começou a correr — e a empresa acha que o órgão está atrasado.</li>
+          <li><strong>5. Sobra saldo na ata.</strong> Receita que estava disponível e ninguém executou até a vigência acabar.</li>
+        </ol>
+
+        <h3 className="mt-5 text-sm font-bold text-slate-800">O nível de controle que ele passa a ter</h3>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {[
+            ["Todos os CNPJs numa tela só", "Grupo com várias empresas vê o consolidado ou filtra por CNPJ."],
+            ["Cada contrato com data e responsável", "Some a dependência de “o fulano sabe”."],
+            ["Saldo em tempo real", "Quanto de cada ata e contrato já foi executado e quanto falta."],
+            ["Cada empenho rastreado ponta a ponta", "Pedido, entrega, nota emitida, nota encaminhada, pago."],
+            ["Histórico completo", "Quem registrou o quê e quando. Serve para auditoria e para cobrar internamente."],
+            ["Documentos anexados no lugar certo", "Empenho, nota e comprovante ficam no próprio registro, não no e-mail de alguém."],
+          ].map(([t, d]) => (
+            <div key={t} className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-[13.5px] font-bold text-slate-900">{t}</p>
+              <p className="text-[12.5px] text-slate-600">{d}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+          <p className="text-sm font-bold text-emerald-900">O argumento mais forte: os avisos no WhatsApp</p>
+          <p className="mt-1 text-[13.5px] text-emerald-900">
+            <strong>A pessoa não precisa entrar no sistema para ser protegida.</strong> O aviso chega
+            no celular dela, no número dela, antes do prazo. Essa é a diferença entre a CP System e
+            uma planilha caprichada — planilha registra, mas não avisa.
+          </p>
+          <p className="mt-2 text-[13px] text-emerald-900">O que chega por WhatsApp, sozinho:</p>
+          <ul className="mt-1 space-y-1 text-[13px] text-emerald-900">
+            <li>▸ Contrato ou ata se aproximando do fim da vigência</li>
+            <li>▸ Entrega com prazo vencendo, e entrega vencida</li>
+            <li>▸ Nota emitida há mais de 30 dias sem o órgão pagar, com o valor</li>
+            <li>▸ Saldo de ata baixo, antes de a oportunidade acabar</li>
+            <li>▸ Resumo semanal da operação, toda segunda</li>
+            <li>▸ Alerta de segurança quando alguém entra na conta de um aparelho novo</li>
+          </ul>
+          <p className="mt-2 text-[12.5px] text-emerald-800">
+            Na ligação: <em>“o senhor não precisa lembrar de nada, nem abrir o sistema. Ele te avisa
+            no WhatsApp antes de virar problema.”</em>
+          </p>
+        </div>
+
+        <h3 className="mt-5 text-sm font-bold text-slate-800">O que cada aba faz</h3>
+        <div className="rolar mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                <th className="px-3 py-2.5">Aba</th><th className="px-3 py-2.5">O que ela resolve</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-700">
+              {[
+                ["Dashboard", "A primeira tela: tudo que vence nos próximos dias, o que está atrasado e quanto há a receber. É por aqui que a demonstração começa."],
+                ["Empresas (CNPJs)", "Cadastro dos CNPJs do grupo. Quem tem várias empresas alterna entre elas ou vê o consolidado."],
+                ["Atas de Registro de Preços", "Ata, itens, órgãos participantes e — o que mais importa — o saldo por vigência: quanto ainda pode ser executado de cada item."],
+                ["Contratos", "Vigência, prorrogação, aditivos, apostilamentos, reajuste e garantia. Avisa antes de a janela de prorrogação fechar."],
+                ["Fornecimento/Execução", "O coração do sistema. Cada empenho anda por etapas: pedido recebido, em trânsito, entregue, nota emitida, nota encaminhada, pago. Cada etapa com data e documento anexado."],
+                ["Controle de notas", "Toda entrega concluída que ainda está sem nota, com o valor que não pode ser cobrado. E as notas emitidas que o órgão ainda não pagou."],
+                ["Consultoria jurídica", "Dúvida sobre a Lei 14.133 respondida por IA dentro do sistema, com o contexto dos contratos da empresa. Intermediário e Premium."],
+                ["Conciliação bancária", "O cliente manda o extrato em PDF — pelo sistema ou pelo WhatsApp — e o sistema cruza com o que está em aberto, apontando o que já foi pago. Intermediário e Premium."],
+                ["Relatórios", "Relatórios gerenciais e exportação, para prestação de contas e reunião de sócios."],
+                ["Notificações WhatsApp", "Onde ele escolhe o número e quais avisos quer receber."],
+              ].map(([aba, faz]) => (
+                <tr key={aba} className="border-b border-slate-100 last:border-0">
+                  <td className="px-3 py-2.5 font-semibold text-slate-900">{aba}</td>
+                  <td className="px-3 py-2.5">{faz}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 className="mt-5 text-sm font-bold text-slate-800">Perguntas que o cliente faz e você precisa responder na hora</h3>
+        <ul className="mt-2 space-y-1.5 text-[13.5px] text-slate-700">
+          <li><strong>“Precisa instalar?”</strong> Não. Funciona no navegador, e dá para instalar como aplicativo no celular.</li>
+          <li><strong>“Quantas pessoas podem usar?”</strong> Dois colaboradores inclusos em qualquer plano; do terceiro em diante, R$ 10,90 cada. E dá para escolher o que cada um enxerga — o financeiro pode ficar só com o dono.</li>
+          <li><strong>“Meus dados ficam seguros?”</strong> Cada empresa só enxerga os próprios dados, arquivos não ficam em endereço público, acesso com senha e verificação em duas etapas disponível.</li>
+          <li><strong>“Preciso digitar tudo?”</strong> Não. Ele anexa o PDF da ata, do contrato ou da nota e o sistema lê número, datas, valores e itens sozinho. O que não conseguir ler fica em branco para completar.</li>
+          <li><strong>“E se eu quiser sair?”</strong> Sem fidelidade. Cancela quando quiser e os dados podem ser exportados.</li>
+          <li><strong>“Serve para quem vende para prefeitura pequena?”</strong> Serve. O que muda é o órgão, não a regra — a Lei 14.133 é a mesma.</li>
+        </ul>
+
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-[13px] text-amber-900">
           <p className="font-semibold">Três coisas para não prometer errado:</p>
           <p className="mt-1">
             <strong>Não emitimos nota fiscal</strong> — a emissão fica no emissor fiscal do cliente,
-            por decisão de risco. <strong>Não somos portal de licitação</strong> — começamos depois
-            que ele ganhou. <strong>Não substituímos o contador</strong> — ele cuida do fiscal, que
-            vem depois; nós cuidamos do prazo e da execução, que vêm antes.
+            por decisão de risco: envolve certificado digital e regra que muda por município, e quem
+            responde perante o fisco é a empresa dele. <strong>Não somos portal de licitação</strong> —
+            não avisamos de edital nem ajudamos a disputar; começamos depois que ele ganhou.{" "}
+            <strong>Não substituímos o contador</strong> — ele cuida do fiscal, que vem depois; nós
+            cuidamos do prazo e da execução, que vêm antes.
           </p>
         </div>
       </Secao>

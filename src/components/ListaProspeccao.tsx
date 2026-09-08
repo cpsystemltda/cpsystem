@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Phone, Check, Loader2 } from "lucide-react";
 import { atualizarLeadAction } from "@/app/actions/prospeccao";
 
@@ -74,6 +74,24 @@ function CardLead({ lead }: { lead: LeadNaTela }) {
   const [quem, setQuem] = useState(lead.contatoNome ?? "");
   const [marca, setMarca] = useState<string>("");
   const [pendente, iniciar] = useTransition();
+  // Anotação é o registro mais caro da ligação: não pode depender de a closer
+  // lembrar de clicar fora do campo (Regina 08/09: "o que ela registrar não
+  // pode se perder"). Salva sozinho 1,2 s depois da última tecla.
+  const naoSalvo = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    // Rede caiu, aba fechada, computador desligado no meio: o navegador
+    // pergunta antes de sair enquanto houver texto não gravado.
+    function avisar(e: BeforeUnloadEvent) {
+      if (naoSalvo.current) e.preventDefault();
+    }
+    window.addEventListener("beforeunload", avisar);
+    return () => {
+      window.removeEventListener("beforeunload", avisar);
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
 
   function salvar(campos: {
     situacao?: string; anotacoes?: string; teveRetorno?: boolean;
@@ -88,8 +106,15 @@ function CardLead({ lead }: { lead: LeadNaTela }) {
     if (campos.contatoNome !== undefined) fd.set("contatoNome", campos.contatoNome);
     iniciar(async () => {
       const r = await atualizarLeadAction(null, fd);
-      setMarca(r?.erro ? r.erro : "salvo");
-      if (!r?.erro) setTimeout(() => setMarca(""), 2200);
+      if (r?.erro) {
+        // Mantém a marca de pendente: o texto continua na tela e o aviso de
+        // saída continua armado até gravar de verdade.
+        setMarca(`${r.erro} — o texto continua aqui, tente de novo`);
+      } else {
+        naoSalvo.current = false;
+        setMarca("salvo");
+        setTimeout(() => setMarca(""), 2200);
+      }
     });
   }
 
@@ -211,9 +236,17 @@ function CardLead({ lead }: { lead: LeadNaTela }) {
 
       <textarea
         value={nota}
-        onChange={(e) => setNota(e.target.value)}
+        onChange={(e) => {
+          const v = e.target.value;
+          setNota(v);
+          naoSalvo.current = true;
+          setMarca("digitando…");
+          if (timer.current) clearTimeout(timer.current);
+          timer.current = setTimeout(() => salvar({ anotacoes: v }), 1200);
+        }}
         onBlur={() => {
-          if (nota !== (lead.anotacoes ?? "")) salvar({ anotacoes: nota });
+          if (timer.current) clearTimeout(timer.current);
+          if (naoSalvo.current) salvar({ anotacoes: nota });
         }}
         placeholder="Com quem falou, em que pergunta travou, o que usa hoje, quando retornar…"
         rows={2}
@@ -232,8 +265,8 @@ function CardLead({ lead }: { lead: LeadNaTela }) {
 
 export function ListaProspeccao({ leads }: { leads: LeadNaTela[] }) {
   const [filtro, setFiltro] = useState<
-    "quentes" | "pendentes" | "retornar" | "andamento" | "todos"
-  >("quentes");
+    "quentes" | "pendentes" | "retornar" | "andamento" | "todas"
+  >("todas");
   const [busca, setBusca] = useState("");
 
   const hojeIso = new Date().toISOString().slice(0, 10);
@@ -251,7 +284,7 @@ export function ListaProspeccao({ leads }: { leads: LeadNaTela[] }) {
         ? (l.empresa + " " + (l.perfil ?? "") + " " + l.uf).toLowerCase().includes(busca.toLowerCase())
         : true,
     )
-    .slice(0, filtro === "todos" && !busca.trim() ? 120 : 500);
+    .slice(0, 200);
 
   const botao = (v: typeof filtro, rotulo: string, n: number) => (
     <button
@@ -289,8 +322,13 @@ export function ListaProspeccao({ leads }: { leads: LeadNaTela[] }) {
           ).length,
         )}
         {botao("pendentes", "Nunca contatadas", leads.filter((l) => l.situacao === "NAO_CONTATADO").length)}
-        {botao("todos", "Todas", leads.length)}
+        {botao("todas", "Todas", leads.length)}
       </div>
+      <p className="mb-3 text-[13px] text-slate-600">
+        <strong>{leads.length} empresas</strong> na base, todas com contrato público ativo e
+        contato levantado. Mostrando {visiveis.length}
+        {visiveis.length === 200 ? " (as 200 primeiras — use a busca para achar uma específica)" : ""}.
+      </p>
       <input
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
