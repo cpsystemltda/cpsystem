@@ -499,6 +499,14 @@ export async function notificarVencimentosPlano(hoje: Date = new Date()): Promis
 //
 // Avisa em D-3 e D-1. Usa VENCIMENTO_PLANO (tipo que ja existe no enum) com
 // referenciaId proprio — evita migration de enum em producao.
+//
+// Regina 09/09: o texto dizia "a assinatura segue automaticamente no cartao
+// cadastrado — voce nao precisa fazer nada pra continuar". Era verdade quando o
+// signup exigia cartao, e virou MENTIRA em 24/08, quando o Igor pediu trial sem
+// cartao. Nao existe cartao pra cobrar: o cliente PRECISA cadastrar a forma de
+// pagamento, e a mensagem dizia o contrario.
+//
+// O Marcos recebeu essa versao e parou de usar o sistema. Dificil culpar ele.
 export async function notificarTrialVencendo(hoje: Date = new Date()): Promise<{
   avisados: number;
 }> {
@@ -537,13 +545,12 @@ export async function notificarTrialVencendo(hoje: Date = new Date()): Promise<{
           referenciaId: `trial-fim-${conta.id}-d${diasAntes}`,
           mensagem:
             `⏳ *Seu período de teste termina ${quando}*\n\n` +
-            `Olá, ${primeiroNome(u.nome)}! Passando pra avisar com antecedência: ` +
-            `seu teste gratuito do CP System encerra ${quando}.\n\n` +
-            `A partir daí, a assinatura do plano *${conta.plano}* segue automaticamente ` +
-            `por *${brl(breakdown.valorTotal)}/mês* no cartão cadastrado — ` +
-            `você não precisa fazer nada pra continuar.\n\n` +
-            `Se preferir não seguir, é só cancelar antes em ` +
-            `https://cpsystem.app.br/conta/assinatura — sem multa e sem burocracia.\n\n` +
+            `Olá, ${primeiroNome(u.nome)}! Seu teste gratuito do CP System encerra ${quando}.\n\n` +
+            `*Para continuar usando, cadastre a forma de pagamento:*\n` +
+            `https://cpsystem.app.br/conta/assinatura\n\n` +
+            `O plano *${conta.plano}* fica em *${brl(breakdown.valorTotal)}/mês*. ` +
+            `Enquanto o pagamento não for cadastrado, o acesso ao sistema fica suspenso ` +
+            `— seus dados continuam guardados e voltam assim que você regularizar.\n\n` +
             `Qualquer dúvida, responda esta mensagem que a gente ajuda.`,
         });
         if (r.enviado) avisados++;

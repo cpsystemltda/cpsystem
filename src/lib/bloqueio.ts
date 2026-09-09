@@ -12,6 +12,16 @@ import { prisma } from "@/lib/prisma";
  * de a cobrança virar ATRASADA — na prática, dez dias de uso sem pagar. Agora a
  * regra é avaliada também no acesso: a régua continua marcando status, mas quem
  * decide se a tela abre é esta função, no momento em que o cliente entra.
+ *
+ * O QUE NUNCA BLOQUEIA — Regina 09/09: "caso a pessoa faça o pagamento e não
+ * utilize a plataforma, ela em hipótese alguma pode ser bloqueada; enquanto ela
+ * pagar, ela pode usar a plataforma".
+ *
+ * Repare que nenhuma condição abaixo olha para USO. Todas olham para pagamento:
+ * cobrança vencida além da tolerância, conta inadimplente, conta cancelada, ou
+ * trial que terminou sem assinatura. Conta ATIVA e em dia passa direto, tenha
+ * entrado ontem ou há seis meses — o dinheiro dela comprou o direito de usar
+ * quando quiser. Não acrescente aqui nenhuma regra de inatividade.
  */
 
 export const TOLERANCIA_ATRASO_DIAS = 3;
