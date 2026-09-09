@@ -226,9 +226,10 @@ export default async function ProspeccaoPage() {
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-[13px] text-amber-900">
           <p className="font-semibold">Três coisas para não prometer errado:</p>
           <p className="mt-1">
-            <strong>Não emitimos nota fiscal</strong> — a emissão fica no emissor fiscal do cliente,
-            por decisão de risco: envolve certificado digital e regra que muda por município, e quem
-            responde perante o fisco é a empresa dele. <strong>Não somos portal de licitação</strong> —
+            <strong>O sistema não emite a nota fiscal do cliente</strong> — a emissão fica no emissor
+            fiscal dele, por decisão de risco: envolve certificado digital e regra que muda por
+            município, e quem responde perante o fisco é a empresa dele. (Atenção: a CP System,
+            como empresa, <strong>emite sim</strong> a nota da assinatura para quem assina.) <strong>Não somos portal de licitação</strong> —
             não avisamos de edital nem ajudamos a disputar; começamos depois que ele ganhou.{" "}
             <strong>Não substituímos o contador</strong> — ele cuida do fiscal, que vem depois; nós
             cuidamos do prazo e da execução, que vêm antes.
@@ -295,13 +296,37 @@ export default async function ProspeccaoPage() {
           <br />
           <br />
           Aqui é [seu nome], da CP System, de Brasília. Não é venda por telefone, é um aviso rápido:
-          consultando o Portal Nacional de Contratações Públicas, o contrato de vocês com a{" "}
-          <strong>[órgão]</strong>, de <strong>[R$ valor]</strong>, tem vigência até{" "}
-          <strong>[data]</strong> — faltam <strong>[N] dias</strong>.
-          <br />
-          <br />
-          <strong>A prorrogação já está encaminhada?</strong>
+          consultando o Portal Nacional de Contratações Públicas, o{" "}
+          <strong>contrato (ou ata de registro de preços)</strong> de vocês com o{" "}
+          <strong>[órgão]</strong> tem vigência até <strong>[data]</strong> — faltam{" "}
+          <strong>[N] dias</strong>.
         </Fala>
+
+        <div className="mt-3 rounded-lg border border-red-200 bg-red-50/70 p-3 text-[13px] text-red-900">
+          <p className="font-semibold">
+            Não pergunte “a prorrogação já está encaminhada?” logo de cara — Igor, 08/09
+          </p>
+          <p className="mt-1">
+            <strong>Nem todo contrato ou ata pode ser prorrogado.</strong> Perguntar isso de
+            imediato, sem saber o caso, denuncia desconhecimento do assunto para quem vive disso —
+            e você perde a autoridade que a ligação tinha ganhado no primeiro parágrafo.
+          </p>
+        </div>
+
+        <h3 className="mt-4 text-sm font-bold text-slate-800">Depois da abertura, escolha uma destas</h3>
+        <p className="text-[13.5px] text-slate-700">
+          Todas são seguras: valem para contrato e para ata, e nenhuma pressupõe nada.
+        </p>
+        <ul className="mt-2 space-y-1.5 text-[13.5px] text-slate-700">
+          <li>• Quantos outros contratos ou atas de vocês vencem nos próximos 60 dias?</li>
+          <li>• Todo o quantitativo desse contrato (ou dessa ata) já foi executado?</li>
+          <li>• Quanto falta executar?</li>
+          <li>• Essa ata de registro de preços será prorrogada?</li>
+        </ul>
+        <p className="mt-2 text-[13px] text-slate-600">
+          Repare que a última pergunta continua existindo — a diferença é que ela vem{" "}
+          <strong>depois</strong>, como pergunta, e não como suposição na abertura.
+        </p>
         <div className="mt-3 rounded-lg border border-red-200 bg-red-50/70 p-3 text-[13px] text-red-900">
           <strong>Nunca invente um dado do contrato.</strong> Sem certeza do órgão, do valor ou da
           data, não fale. Se ele disser que está errado:{" "}
@@ -374,9 +399,41 @@ export default async function ProspeccaoPage() {
         />
         <Objecao
           p="“Vocês emitem nota fiscal?”"
-          r="Não, e é decisão nossa: envolve certificado digital e regra que muda por município, e quem responde perante o fisco é a sua empresa. O que fazemos é o controle em volta — apontamos toda entrega sem nota e, a partir do encaminhamento dela ao órgão, contamos o prazo de pagamento."
-          nota="Apresente como proteção, nunca como limitação."
+          r="Antes de responder, descubra qual das duas ele está perguntando — são coisas diferentes e a resposta muda (Igor, 08/09). Pergunte: “o senhor diz emitir a nota dos SEUS contratos, ou a nota da assinatura do CP System?”"
+          nota="A pergunta tem dois sentidos. Responder o errado passa informação falsa."
         />
+        <div className="-mt-1 mb-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-xl border border-red-200 bg-red-50/60 p-3.5">
+            <p className="text-[13px] font-bold text-red-900">
+              “O sistema emite a nota da MINHA empresa depois da execução?”
+            </p>
+            <p className="mt-1 text-[13px] font-bold text-red-900">NÃO.</p>
+            <p className="mt-1 text-[13px] text-red-900">
+              A emissão continua no emissor fiscal da empresa dele. É decisão nossa: envolve
+              certificado digital e regra que muda de município para município, e quem responde
+              perante o fisco é a empresa dele — não colocamos cliente nesse risco.
+            </p>
+            <p className="mt-1.5 text-[13px] text-red-900">
+              O que fazemos é o controle em volta: apontamos toda entrega concluída sem nota, ele
+              registra a nota, e a partir do <strong>encaminhamento dela ao órgão</strong> contamos
+              o prazo de pagamento e avisamos quando o órgão atrasa.
+            </p>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5">
+            <p className="text-[13px] font-bold text-emerald-900">
+              “A CP System me dá nota fiscal da mensalidade?”
+            </p>
+            <p className="mt-1 text-[13px] font-bold text-emerald-900">SIM.</p>
+            <p className="mt-1 text-[13px] text-emerald-900">
+              A CP System emite nota fiscal da assinatura para todo cliente da plataforma,
+              normalmente, como qualquer fornecedor.
+            </p>
+            <p className="mt-1.5 text-[13px] text-emerald-900">
+              Vale dizer isso sem ser perguntada quando o cliente for empresa que precisa lançar a
+              despesa — tira uma dúvida antes que ela vire objeção.
+            </p>
+          </div>
+        </div>
         <Objecao
           p="“Me manda por e-mail.”"
           r="Mando agora. Só que e-mail não mostra o que interessa, que é como ficariam os contratos de vocês dentro do sistema. São 15 minutos — amanhã de manhã ou no fim da tarde?"
