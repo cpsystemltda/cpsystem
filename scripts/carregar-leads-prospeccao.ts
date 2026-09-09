@@ -29,6 +29,25 @@ const FORA = [
   "CRISTALIA", "ALTERMED", "CIRURGICA UNIAO", "SOMA/PR", "SULTEPA",
 ];
 
+/**
+ * Telefone no formato que se disca.
+ *
+ * A Receita devolve "5432243800" e, pior, devolve celular antigo de 8 dígitos —
+ * que desde 2016 não completa mais a ligação. 192 dos primeiros 552 leads
+ * vieram assim. Sem esta função, um terço da lista é telefone morto.
+ */
+function telefoneUtil(bruto: string): string | null {
+  const d = (bruto || "").split("/")[0].replace(/\D/g, "");
+  const sem55 = d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
+  if (sem55.length < 10 || sem55.length > 11) return null;
+  const ddd = sem55.slice(0, 2);
+  let n = sem55.slice(2);
+  if (n.length === 8 && /^[6-9]/.test(n)) n = `9${n}`;
+  return n.length === 9
+    ? `(${ddd}) ${n.slice(0, 5)}-${n.slice(5)}`
+    : `(${ddd}) ${n.slice(0, 4)}-${n.slice(4)}`;
+}
+
 /** Micro e pequeno porte: quem decide é o dono, e decide na hora. */
 function ehAlvoIdeal(porte: string, valorTotal: number): boolean {
   const p = porte.toUpperCase();
@@ -87,7 +106,7 @@ async function main() {
       empresa: nome,
       uf: r.uf || "",
       municipio: r.municipio || null,
-      telefone: (r.telefone_receita || "").split("/")[0].trim() || null,
+      telefone: telefoneUtil(r.telefone_receita || ""),
       email: r.email || null,
       venceEm: vence,
       valorDoContrato: Number(r.valor_do_contrato_que_vence || 0),
