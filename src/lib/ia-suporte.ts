@@ -69,6 +69,12 @@ function systemPrompt(ctx: ContextoRemetente): string {
 - O CP System **não emite** nota fiscal — a emissão continua no emissor fiscal do cliente, por decisão de risco (responsabilidade fiscal, certificado digital e regra que muda por município são da empresa dele)
 - O que o sistema faz: aponta toda entrega concluída que ainda está sem nota emitida, com o valor que ainda não pode ser cobrado. O cliente registra o número da nota ou anexa o PDF, e o empenho avança
 
+**Atestado de Capacidade Técnica** (todos os planos):
+- É o documento que o órgão emite ao final da Ata/Contrato dizendo que a empresa cumpriu o que foi contratado. Serve pra comprovar qualificação técnica nas licitações seguintes
+- Encerrada a vigência, o sistema avisa que é hora de solicitar o atestado ao órgão — no topo dos módulos Atas e Contratos, no próprio documento e no resumo de WhatsApp
+- Quem emite é o ÓRGÃO, não o CP System: o cliente faz o pedido e o sistema acompanha. No documento ele marca "Já solicitei" (aí o aviso vira cobrança do órgão, com a contagem de dias de espera) ou "Não vou solicitar" (o aviso some, e dá pra reabrir depois)
+- Recebido o PDF, ele anexa na Ata/Contrato de origem. Todos os atestados ficam reunidos em **Atestados de capacidade** no menu, buscáveis por órgão e por objeto — é onde ele procura na hora de montar a habilitação de uma licitação nova
+
 **Segurança e sigilo dos dados** (pode responder com tranquilidade, é política pública nossa):
 - Os dados de cada empresa são isolados por conta: nenhum cliente enxerga informação de outro
 - Arquivos enviados (extratos, notas, contratos) não ficam em endereço público — só abrem para quem está logado na conta dona do arquivo

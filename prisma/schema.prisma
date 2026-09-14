@@ -811,6 +811,18 @@ model Ata {
   idAtaPncp     String?
   arquivoPdfUrl String?
 
+  // Atestado de Capacidade Tecnica — acompanhamento do pedido ao orgao
+  // (Regina 11/09). Encerrada a vigencia, o sistema cobra o atestado. Estes
+  // dois campos existem pra cobranca parar de aparecer quando ja nao cabe:
+  //   solicitadoEm → pedido feito, aguardando o orgao (o aviso vira cobranca
+  //                  do orgao, nao do cliente);
+  //   dispensadoEm → o cliente decidiu que nao vai pedir (nada executado,
+  //                  valor irrelevante, execucao problematica) e o aviso some.
+  // Ambos null = encerrada e ninguem fez nada ainda: e o caso que alerta.
+  atestadoSolicitadoEm  DateTime?
+  atestadoDispensadoEm  DateTime?
+  atestadoDispensaMotivo String?
+
   // Google Calendar sync (Regina 23/07 — SEG P1 expandido).
   // Event ID retornado pelo Google. Null = nunca sincronizado ainda.
   googleEventId String?
@@ -990,6 +1002,11 @@ model Contrato {
   arquivoOfUrl            String?
 
   arquivoPdfUrl String?
+
+  // Atestado de Capacidade Tecnica — ver comentario igual no model Ata.
+  atestadoSolicitadoEm   DateTime?
+  atestadoDispensadoEm   DateTime?
+  atestadoDispensaMotivo String?
 
   // Google Calendar sync (Regina 23/07 — SEG P1 expandido).
   googleEventId String?

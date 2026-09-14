@@ -18,13 +18,24 @@ import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
 import { AtestadoCapacidadeTab } from "@/components/abas/AtestadoCapacidadeTab";
+import { AlertaAtestado } from "@/components/AlertaAtestado";
+import { situacaoAtestado } from "@/lib/atestados";
 import { RelatorioContratacao } from "@/components/RelatorioContratacao";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 import { LerMais } from "@/components/LerMais";
 
-export default async function AtaDetalhePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function AtaDetalhePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  // `?aba=` abre o detalhe já na aba certa. Serve ao alerta de atestado, que
+  // precisa levar o cliente direto pro lugar onde ele anexa o PDF, e de quebra
+  // torna cada aba um link que dá pra mandar pra alguém.
+  searchParams: Promise<{ aba?: string }>;
+}) {
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const usuario = await exigirUsuario();
 
   const ata = await prisma.ata.findFirst({
@@ -97,6 +108,18 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
   });
 
   const venceEmDias = Math.ceil((ata.vigenciaFim.getTime() - Date.now()) / 86400000);
+
+  // Atestado de Capacidade Técnica (Regina 11/09).
+  const situacaoAtest = situacaoAtestado(ata);
+  const mostrarAlertaAtestado =
+    situacaoAtest.estado !== "VIGENTE" && situacaoAtest.estado !== "ANEXADO";
+  // Quando o alerta de atestado está cobrando, ele já diz a data em que a Ata
+  // encerrou e há quantos dias. Repetir isso num segundo banner vermelho logo
+  // abaixo só faz o cliente ler menos — o aviso de vencida fica pro caso de
+  // vigência ainda correndo (ou já resolvida do ponto de vista do atestado).
+  const mostrarAlertaVigencia =
+    venceEmDias < 60 && !(venceEmDias < 0 && situacaoAtest.estado === "PENDENTE");
+
   const reajusteEmDias = ata.marcoOrcamentoEstimado
     ? Math.ceil((new Date(ata.marcoOrcamentoEstimado.getTime() + 365 * 86400000).getTime() - Date.now()) / 86400000)
     : null;
@@ -166,9 +189,17 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
         </p>
       </section>
 
-      {(venceEmDias < 60 || (reajusteEmDias !== null && reajusteEmDias < 60)) && (
+      {(mostrarAlertaVigencia || mostrarAlertaAtestado || (reajusteEmDias !== null && reajusteEmDias < 60)) && (
         <div className="mt-6 space-y-2">
-          {venceEmDias < 60 && (
+          {mostrarAlertaAtestado && (
+            <AlertaAtestado
+              situacao={situacaoAtest}
+              ataId={ata.id}
+              rotulo="Ata"
+              hrefAnexar={`/atas/${ata.id}?aba=atestados`}
+            />
+          )}
+          {mostrarAlertaVigencia && (
             <Alerta cor={venceEmDias < 0 ? "red" : "amber"}>
               {venceEmDias < 0
                 ? `Esta Ata venceu há ${-venceEmDias} dias.`
@@ -187,6 +218,7 @@ export default async function AtaDetalhePage({ params }: { params: Promise<{ id:
 
       <div className="mt-8">
         <Tabs
+          defaultKey={sp.aba}
           abas={[
             {
               key: "saldo",

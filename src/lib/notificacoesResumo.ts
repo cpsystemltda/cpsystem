@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { dispararNotificacao } from "@/lib/whatsapp";
 import { janelaExecucao } from "@/lib/prazoEntrega";
+import { CADENCIA_COBRANCA_DIAS, CADENCIA_ESPERA_DIAS } from "@/lib/atestados";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
 // Nova arquitetura de notificacoes diarias — Regina 08/07/2026 apos incidente
@@ -366,6 +367,111 @@ async function coletarLembretesConciliacao(inicioHoje: Date): Promise<MapaUsuari
   return mapa;
 }
 
+/**
+ * Atestado de Capacidade Técnica — na NOITE, junto do planejamento.
+ *
+ * Regina 11/09: encerrada a Ata/Contrato, avisar que é hora de pedir o
+ * atestado ao órgão. Entra no resumo consolidado e não como mensagem própria:
+ * mensagem avulsa some no meio das outras, consome o cap diário e, em volume,
+ * é exatamente o que derruba número no WhatsApp.
+ *
+ * A janela é a NOITE porque isto é planejamento, não emergência — ninguém
+ * protocola pedido em órgão no susto. E a cadência (1, 15, 30 e 60 dias) evita
+ * o pior desfecho possível pra um alerta: aparecer todo dia, virar paisagem e
+ * levar junto a atenção que o cliente dá aos avisos que são urgentes.
+ */
+async function coletarAtestadosPendentes(inicioHoje: Date): Promise<MapaUsuarios> {
+  const mapa: MapaUsuarios = new Map();
+
+  // Recorte de um dia de calendário, `dias` atrás. As datas envolvidas são
+  // gravadas em horas diferentes (vigência em 00:00 UTC, solicitação em 12:00),
+  // então o corte é por faixa do dia e não por igualdade.
+  //
+  // Ancorado em UTC e não no `inicioHoje` recebido: a produção roda em UTC e a
+  // máquina de desenvolvimento em BRT, e uma janela de 3h de diferença faz o
+  // aviso aparecer no teste local e não aparecer em produção — ou o contrário.
+  const hojeUtc = Math.floor(inicioHoje.getTime() / 86400000) * 86400000;
+  function diaAtras(dias: number): { gte: Date; lt: Date } {
+    const gte = new Date(hojeUtc - dias * 86400000);
+    return { gte, lt: new Date(gte.getTime() + 86400000) };
+  }
+
+  const selecao = {
+    id: true,
+    numero: true,
+    orgaoNome: true,
+    empresa: { select: { contaId: true } },
+  } as const;
+
+  // 1. Encerradas e ninguém pediu nada ainda.
+  for (const dias of CADENCIA_COBRANCA_DIAS) {
+    const janela = diaAtras(dias);
+    const base = {
+      atestadoSolicitadoEm: null,
+      atestadoDispensadoEm: null,
+      atestados: { none: {} },
+      vigenciaFim: janela,
+    };
+
+    const [atas, contratos] = await Promise.all([
+      prisma.ata.findMany({ where: base, select: selecao }),
+      prisma.contrato.findMany({ where: base, select: selecao }),
+    ]);
+
+    const quando = dias === 1 ? "ontem" : `há ${dias} dias`;
+    for (const doc of [
+      ...atas.map((a) => ({ ...a, rotulo: "Ata" })),
+      ...contratos.map((c) => ({ ...c, rotulo: "Contrato" })),
+    ]) {
+      const usuarios = await destinatariosDaConta(doc.empresa.contaId);
+      for (const u of usuarios) {
+        addItem(mapa, u.id, {
+          categoria: "atestado",
+          // Sobe de prioridade com o tempo: quanto mais velho o encerramento,
+          // mais difícil fica arrancar o documento do órgão.
+          urgencia: dias >= 30 ? 3 : 2,
+          linha:
+            `🏅 ${doc.rotulo} ${doc.numero} (${doc.orgaoNome}) encerrou ${quando} — ` +
+            `peça o Atestado de Capacidade Técnica ao órgão`,
+        });
+      }
+    }
+  }
+
+  // 2. Pediu e o órgão não entregou. Aqui a cobrança é do órgão, não dele.
+  for (const dias of CADENCIA_ESPERA_DIAS) {
+    const janela = diaAtras(dias);
+    const base = {
+      atestadoSolicitadoEm: janela,
+      atestadoDispensadoEm: null,
+      atestados: { none: {} },
+    };
+
+    const [atas, contratos] = await Promise.all([
+      prisma.ata.findMany({ where: base, select: selecao }),
+      prisma.contrato.findMany({ where: base, select: selecao }),
+    ]);
+
+    for (const doc of [
+      ...atas.map((a) => ({ ...a, rotulo: "Ata" })),
+      ...contratos.map((c) => ({ ...c, rotulo: "Contrato" })),
+    ]) {
+      const usuarios = await destinatariosDaConta(doc.empresa.contaId);
+      for (const u of usuarios) {
+        addItem(mapa, u.id, {
+          categoria: "atestado",
+          urgencia: 2,
+          linha:
+            `🏅 Atestado da ${doc.rotulo} ${doc.numero} (${doc.orgaoNome}) foi pedido há ${dias} dias ` +
+            `e o órgão ainda não emitiu — vale cobrar o fiscal do contrato`,
+        });
+      }
+    }
+  }
+
+  return mapa;
+}
+
 // Aniversarios — na MANHA.
 async function coletarAniversarios(hoje: Date): Promise<MapaUsuarios> {
   const mapa: MapaUsuarios = new Map();
@@ -475,7 +581,11 @@ export async function executarResumoDaJanela(
   } else if (janela === "TARDE") {
     mapa = await coletarAcaoImediata(inicioHoje);
   } else if (janela === "NOITE") {
-    mapa = await coletarPlanejamento(inicioHoje);
+    const [planejamento, atestados] = await Promise.all([
+      coletarPlanejamento(inicioHoje),
+      coletarAtestadosPendentes(inicioHoje),
+    ]);
+    mapa = mergeMapas(planejamento, atestados);
   }
 
   // Busca dados dos usuarios coletados de uma vez (evita N queries)

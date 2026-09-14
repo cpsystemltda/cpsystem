@@ -22,6 +22,8 @@ import { AlertaReajuste } from "@/components/AlertaReajuste";
 import { AditivosTab } from "@/components/abas/AditivosTab";
 import { ApostilamentosTab } from "@/components/abas/ApostilamentosTab";
 import { AtestadoCapacidadeTab } from "@/components/abas/AtestadoCapacidadeTab";
+import { AlertaAtestado } from "@/components/AlertaAtestado";
+import { situacaoAtestado } from "@/lib/atestados";
 import { ReajustesTab } from "@/components/abas/ReajustesTab";
 import { GarantiasTab } from "@/components/abas/GarantiasTab";
 import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
@@ -35,8 +37,15 @@ import { BotaoExcluirContrato } from "@/components/BotaoExcluirContrato";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
-export default async function ContratoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function ContratoDetalhePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  // `?aba=` abre o detalhe já na aba certa — ver comentário igual em /atas/[id].
+  searchParams: Promise<{ aba?: string }>;
+}) {
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const usuario = await exigirUsuario();
 
   const contrato = await prisma.contrato.findFirst({
@@ -146,10 +155,22 @@ export default async function ContratoDetalhePage({ params }: { params: Promise<
         contratoId={contrato.id}
       />
 
+      {/* Atestado de Capacidade Técnica (Regina 11/09) — encerrado o contrato,
+          é hora de pedir ao órgão o documento que comprova a execução. */}
+      <div className="mt-4">
+        <AlertaAtestado
+          situacao={situacaoAtestado(contrato)}
+          contratoId={contrato.id}
+          rotulo="Contrato"
+          hrefAnexar={`/contratos/${contrato.id}?aba=atestados`}
+        />
+      </div>
+
       <KpisSaldoVigencia saldo={saldo} />
 
       <div className="mt-8">
         <Tabs
+          defaultKey={sp.aba}
           abas={[
             {
               key: "saldo",

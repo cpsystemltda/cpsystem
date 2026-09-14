@@ -22,7 +22,9 @@ import {
   Plug,
   Banknote,
   ShieldCheck,
-  Receipt,} from "lucide-react";
+  Receipt,
+  Award,
+} from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { SeletorVisao } from "@/components/SeletorVisao";
 import { SeletorEmpresa, type EmpresaOpcao } from "@/components/SeletorEmpresa";
@@ -52,6 +54,9 @@ const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
       { href: "/contratos", label: "Contratos", icon: ClipboardList },
       { href: "/execucao", label: "Fornecimento/Execução", icon: Truck },
       { href: "/notas", label: "Controle de notas", icon: Receipt },
+      // Vem logo depois das contratações porque é o que sobra delas: o acervo
+      // que comprova qualificação técnica na licitação seguinte (Regina 11/09).
+      { href: "/atestados", label: "Atestados de capacidade", icon: Award },
       { href: "/juridico", label: "Consultoria jurídica", icon: Scale },
       { href: "/conciliacao", label: "Conciliação bancária", icon: Banknote },
       { href: "/honorarios", label: "Honorários do analista", icon: Sparkles },

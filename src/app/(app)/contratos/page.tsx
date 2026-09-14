@@ -9,6 +9,8 @@ import { KpiVencimentos } from "@/components/KpiVencimentos";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 import { PainelFinanceiroExpansivel } from "@/components/PainelFinanceiroExpansivel";
+import { BannerAtestadosPendentes } from "@/components/BannerAtestadosPendentes";
+import { whereAtestadoPendente } from "@/lib/atestados";
 
 function classifica(vigenciaFim: Date): ContratoCard["status"] {
   const hoje = new Date();
@@ -21,7 +23,15 @@ function classifica(vigenciaFim: Date): ContratoCard["status"] {
 export default async function ContratosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; orgao?: string; aba?: string; v?: string; alerta?: string; status?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    orgao?: string;
+    aba?: string;
+    v?: string;
+    alerta?: string;
+    status?: string;
+    atestado?: string;
+  }>;
 }) {
   const [usuario, sp] = await Promise.all([exigirUsuario(), searchParams]);
   const filtroEmpresa = await filtroEmpresaWhere(usuario.contaId);
@@ -30,6 +40,7 @@ export default async function ContratosPage({
   const orgaoFiltro = sp.orgao || "";
   const alertaDias = sp.alerta ? Number(sp.alerta) : 0;
   const statusQs = sp.status || "";
+  const soAtestadoPendente = sp.atestado === "pendente";
   const abaSelecionada =
     statusQs === "vigentes" ? "vigentes" : statusQs === "vencidas" ? "vencidos" : sp.aba || "vigentes";
 
@@ -44,6 +55,8 @@ export default async function ContratosPage({
     ...(orgaoFiltro && { orgaoNome: orgaoFiltro }),
     ...(statusQs === "vencidas" && { vigenciaFim: { lt: hojeDate } }),
     ...(limiteAlertaContrato && { vigenciaFim: { gte: hojeDate, lte: limiteAlertaContrato } }),
+    // Por último: o recorte do banner de atestado manda sobre os de vigência.
+    ...(soAtestadoPendente ? whereAtestadoPendente(hojeDate) : {}),
   };
   const d30 = new Date(hojeDate.getTime() + 30 * 86400000);
   const d60 = new Date(hojeDate.getTime() + 60 * 86400000);
@@ -54,8 +67,18 @@ export default async function ContratosPage({
   // contratosTodosFin é a fonte pro bloco financeiro: pega *todos* os Contratos
   // (vigentes + expirados) da empresa, ignorando filtros de busca/status da UI.
   // Vigentes deriva em memória.
-  const [todos, orgaosDistintos, qtdContratosVigentes, qtdContratosFinalizados, venc30c, venc60c, venc90c, venc120c, contratosTodosFin] =
-    await Promise.all([
+  const [
+    todos,
+    orgaosDistintos,
+    qtdContratosVigentes,
+    qtdContratosFinalizados,
+    venc30c,
+    venc60c,
+    venc90c,
+    venc120c,
+    contratosTodosFin,
+    qtdAtestadoPendente,
+  ] = await Promise.all([
       prisma.contrato.findMany({
         where: whereQuery,
         orderBy: { vigenciaFim: "asc" },
@@ -91,6 +114,7 @@ export default async function ContratosPage({
           },
         },
       }),
+      prisma.contrato.count({ where: { ...whereBase, ...whereAtestadoPendente(hojeDate) } }),
     ]);
 
   // ============================================================
@@ -184,7 +208,9 @@ export default async function ContratosPage({
   // mostramos TUDO que voltou do whereQuery — o whereQuery já fez o corte
   // por janela de vencimento. Aplicar o filtro de aba em cima descartaria
   // os "vencimento_proximo" quando a aba default é "vigentes".
-  const filtrados = alertaDias > 0
+  // O filtro de atestado entra na mesma exceção: o recorte já veio do banco e
+  // é todo de contratos encerrados, que a aba padrão ("vigentes") descartaria.
+  const filtrados = alertaDias > 0 || soAtestadoPendente
     ? contratosCard
     : contratosCard.filter((c) => {
         if (abaSelecionada === "finalizados") return c.pctExecutado >= 100;
@@ -251,9 +277,27 @@ export default async function ContratosPage({
         <TimelineVencimentos itens={itensTimeline} />
       </div>
 
+      {!soAtestadoPendente && (
+        <BannerAtestadosPendentes
+          quantidade={qtdAtestadoPendente}
+          href="/contratos?atestado=pendente"
+          rotuloPlural="Contratos"
+          rotuloSingular="Contrato"
+        />
+      )}
+
       {alertaDias > 0 && (
         <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
           Filtrando por vencimento em até {alertaDias} dias · {todos.length} contrato(s) ·{" "}
+          <Link href="/contratos" className="underline">
+            limpar
+          </Link>
+        </p>
+      )}
+
+      {soAtestadoPendente && (
+        <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+          Contratos encerrados aguardando solicitação do Atestado · {todos.length} contrato(s) ·{" "}
           <Link href="/contratos" className="underline">
             limpar
           </Link>

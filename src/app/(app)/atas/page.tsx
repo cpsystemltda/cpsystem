@@ -10,11 +10,19 @@ import { KpiVencimentos } from "@/components/KpiVencimentos";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 import { PainelFinanceiroExpansivel } from "@/components/PainelFinanceiroExpansivel";
+import { BannerAtestadosPendentes } from "@/components/BannerAtestadosPendentes";
+import { whereAtestadoPendente } from "@/lib/atestados";
 
 export default async function AtasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; orgao?: string; alerta?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    orgao?: string;
+    alerta?: string;
+    atestado?: string;
+  }>;
 }) {
   const [usuario, sp] = await Promise.all([exigirUsuario(), searchParams]);
   const filtroEmpresa = await filtroEmpresaWhere(usuario.contaId);
@@ -23,6 +31,7 @@ export default async function AtasPage({
   const status = sp.status || "";
   const orgao = sp.orgao || "";
   const alertaDias = sp.alerta ? Number(sp.alerta) : 0;
+  const soAtestadoPendente = sp.atestado === "pendente";
 
   const hoje = new Date();
   const limiteAlerta = alertaDias > 0 ? new Date(hoje.getTime() + alertaDias * 86400000) : null;
@@ -39,11 +48,23 @@ export default async function AtasPage({
     ...(status === "vencidas" && { vigenciaFim: { lt: hoje } }),
     ...(limiteAlerta && { vigenciaFim: { gte: hoje, lte: limiteAlerta } }),
     ...(orgao && { orgaoNome: orgao }),
+    // Por último de propósito: quando o cliente clica no banner de atestado,
+    // esse recorte manda — sobrescreve qualquer vigenciaFim posto acima.
+    ...(soAtestadoPendente ? whereAtestadoPendente(hoje) : {}),
   };
 
   // Tudo em paralelo — sem N+1
-  const [atas, orgaosDistintos, qtdVigentes, qtdFinalizadas, venc30, venc60, venc90, venc120] =
-    await Promise.all([
+  const [
+    atas,
+    orgaosDistintos,
+    qtdVigentes,
+    qtdFinalizadas,
+    venc30,
+    venc60,
+    venc90,
+    venc120,
+    qtdAtestadoPendente,
+  ] = await Promise.all([
       prisma.ata.findMany({
         where: whereQuery,
         orderBy: { criadoEm: "desc" },
@@ -67,6 +88,7 @@ export default async function AtasPage({
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d60 } } }),
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d90 } } }),
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d120 } } }),
+      prisma.ata.count({ where: { ...whereBase, ...whereAtestadoPendente(hoje) } }),
     ]);
 
   // Saldo calculado em memória — zero queries extras
@@ -228,6 +250,15 @@ export default async function AtasPage({
         <TimelineVencimentos itens={itensTimeline} />
       </div>
 
+      {!soAtestadoPendente && (
+        <BannerAtestadosPendentes
+          quantidade={qtdAtestadoPendente}
+          href="/atas?atestado=pendente"
+          rotuloPlural="Atas"
+          rotuloSingular="Ata"
+        />
+      )}
+
       {alertaDias > 0 && (
         <p
           className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold"
@@ -238,6 +269,22 @@ export default async function AtasPage({
           }}
         >
           Filtrando por vencimento em até {alertaDias} dias · {atasComSaldo.length} ata(s) ·{" "}
+          <Link href="/atas" className="underline">
+            limpar
+          </Link>
+        </p>
+      )}
+
+      {soAtestadoPendente && (
+        <p
+          className="mt-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold"
+          style={{
+            background: "rgba(212,175,55,0.18)",
+            border: "0.5px solid rgba(168,137,71,0.4)",
+            color: "var(--primary-deep)",
+          }}
+        >
+          Atas encerradas aguardando solicitação do Atestado · {atasComSaldo.length} ata(s) ·{" "}
           <Link href="/atas" className="underline">
             limpar
           </Link>
