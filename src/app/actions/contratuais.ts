@@ -924,6 +924,43 @@ export async function excluirTermoAditivoAction(_p: Result | null, formData: For
       await reverterSideEffects(atual.dadosAnteriores as unknown as DadosAnteriores, link);
     }
 
+    // Desfaz também a Vigência que este aditivo criou.
+    //
+    // Igor 15/09/2026, na Ata 39 da C.L.A dos Santos: "cadastrei o termo
+    // aditivo e depois excluí, mas ainda assim a nova vigência não sumiu.
+    // Essa ata está desconfigurada."
+    //
+    // O snapshot acima só devolve `vigenciaFim` e os valores dos itens. A linha
+    // de `Vigencia` criada pela prorrogação não estava em lugar nenhum desse
+    // caminho, e a FK é `onDelete: SetNull` — apagar o aditivo apenas soltava o
+    // vínculo e deixava a vigência para trás, sem dono e sem como remover pela
+    // tela. Pior: a prorrogação seguinte copia os itens da ÚLTIMA vigência, que
+    // agora é a órfã vazia, então o aditivo seguinte nascia sem item nenhum.
+    //
+    // Vigência com empenho é outra história: ali existe execução registrada, e
+    // apagar apagaria histórico. Nesse caso a vigência fica e o usuário é
+    // avisado, em vez de perder dado em silêncio.
+    const vigenciaDoAditivo = await prisma.vigencia.findUnique({
+      where: { termoAditivoId: aditivoId },
+      select: { id: true, ordem: true, _count: { select: { empenhos: true } } },
+    });
+
+    if (vigenciaDoAditivo) {
+      if (vigenciaDoAditivo._count.empenhos > 0) {
+        return {
+          erro:
+            `Este aditivo criou a vigência ${vigenciaDoAditivo.ordem}, que já tem ` +
+            `${vigenciaDoAditivo._count.empenhos} execução(ões) lançada(s). ` +
+            `Remova ou realoque essas execuções antes de excluir o aditivo — ` +
+            `senão o histórico de execução ficaria sem vigência.`,
+        };
+      }
+      // Os itens da vigência foram cópias feitas pela prorrogação: somem com ela.
+      await prisma.ataItem.deleteMany({ where: { vigenciaId: vigenciaDoAditivo.id } });
+      await prisma.contratoItem.deleteMany({ where: { vigenciaId: vigenciaDoAditivo.id } });
+      await prisma.vigencia.delete({ where: { id: vigenciaDoAditivo.id } });
+    }
+
     await prisma.termoAditivo.delete({ where: { id: aditivoId } });
 
     await registrarAuditoria({
