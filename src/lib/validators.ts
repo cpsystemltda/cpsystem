@@ -1,8 +1,48 @@
 import { z } from "zod";
 import { validarCnpj } from "@/lib/cnpj";
+import { checarEmail } from "@/lib/emailValido";
 
 const cnpjRegex = /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/;
 const cepRegex = /^\d{5}-?\d{3}$/;
+
+/**
+ * E-mail que precisa FUNCIONAR, e não só ter formato de e-mail.
+ *
+ * Igor 18/09/2026: "não permita que a pessoa avance com cadastro em caso de
+ * dados errados", depois da HMD se cadastrar em `@gmial.com` e ficar sem
+ * receber nada. O `.email()` sozinho aprova `gmial.com` — é estruturalmente
+ * impecável, o domínio até existe, e a mensagem some sem erro nenhum.
+ *
+ * Usar em cadastro. **Nunca no login**: quem já entrou com um endereço torto
+ * precisa continuar conseguindo entrar, senão a validação nova tranca do lado
+ * de fora justamente quem ela deveria ajudar.
+ */
+function emailUtilizavel(rotulo = "E-mail") {
+  return z
+    .string()
+    .email(`${rotulo} inválido`)
+    .superRefine((valor, ctx) => {
+      const problema = checarEmail(valor);
+      if (problema) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: problema.mensagem });
+      }
+    });
+}
+
+/** Igual ao de cima, mas para campo que pode ficar em branco. */
+function emailUtilizavelOpcional() {
+  return z
+    .string()
+    .email()
+    .superRefine((valor, ctx) => {
+      const problema = checarEmail(valor);
+      if (problema) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: problema.mensagem });
+      }
+    })
+    .optional()
+    .or(z.literal(""));
+}
 
 export const portes = ["MEI", "ME", "EPP", "MEDIA", "GRANDE"] as const;
 
@@ -28,7 +68,7 @@ export const signupSchema = z
   .object({
     // Usuário
     nome: z.string().min(2, "Nome muito curto"),
-    email: z.string().email("E-mail inválido"),
+    email: emailUtilizavel(),
     // WhatsApp obrigatorio (Regina 02/07): sistema notifica prazos,
     // vencimentos, resumo semanal via WhatsApp automatico. Cliente
     // recebe por padrao (pode desligar depois em /conta/notificacoes).
@@ -78,7 +118,7 @@ export const signupSchema = z
     // O array vem como FormData.getAll("emailEmpresa[]") na action — convertemos
     // pra string única (1ª entrada) pra cair aqui, mas guardamos array completo
     // em emailsExtras pra persistir todos.
-    emailEmpresa: z.string().email("E-mail da empresa inválido"),
+    emailEmpresa: emailUtilizavel("E-mail da empresa"),
     telefones: z.string().min(8, "Informe ao menos um telefone"),
     responsavel: z.string().min(2, "Informe o responsável"),
     // Aceite obrigatorio do contrato (Regina 03/07). Checkbox HTML manda
@@ -141,7 +181,7 @@ export const signupAnalistaSchema = z
     // Pessoais (obrigatórios)
     nome: z.string().min(2, "Nome muito curto"),
     cpf: z.string().regex(cpfRegex, "CPF inválido"),
-    email: z.string().email("E-mail inválido"),
+    email: emailUtilizavel(),
     senha: z.string().min(10, "Mínimo 10 caracteres"),
     confirmacaoSenha: z.string().min(1, "Confirme a senha"),
     telefone: z.string().min(8, "Telefone obrigatório"),
@@ -217,7 +257,7 @@ export const novaEmpresaSchema = z
     naturezaJuridica: z.enum(naturezasJuridicas),
     endereco: z.string().min(5),
     cep: z.string().regex(cepRegex, "CEP inválido"),
-    email: z.string().email(),
+    email: emailUtilizavel(),
     telefones: z.string().min(8),
     responsavel: z.string().min(2),
     // Senha do "usuário-responsável" desta empresa (opcional). Quando preenchida, o sistema
@@ -303,7 +343,7 @@ const contratacaoBase = z.object({
     .regex(cnpjRegex, "CNPJ do órgão inválido")
     .refine((v) => validarCnpj(v), "CNPJ inválido — verifique os dígitos verificadores"),
   orgaoEndereco: z.string().min(5, "Endereço do órgão obrigatório"),
-  orgaoEmail: z.string().email().optional().or(z.literal("")),
+  orgaoEmail: emailUtilizavelOpcional(),
   orgaoTelefone: z.string().optional(),
   objeto: z.string().min(2, "Objeto obrigatório"),
   vigenciaInicio: z.coerce.date(),
@@ -352,7 +392,7 @@ const pontoFocalSchema = z.object({
   funcao: z.enum(funcoesPontoFocal),
   funcaoDescricao: z.string().optional(), // quando funcao = OUTRO
   nome: z.string().min(2, "Informe o nome"),
-  email: z.string().email().optional().or(z.literal("")),
+  email: emailUtilizavelOpcional(),
   telefone: z.string().optional(),
 });
 
@@ -375,7 +415,7 @@ const orgaoNaAtaSchema = z.object({
   nome: z.string().min(2, "Nome do órgão obrigatório"),
   cnpj: z.string().regex(cnpjRegex, "CNPJ inválido").refine((v) => validarCnpj(v), "CNPJ inválido — verifique os dígitos verificadores"),
   endereco: z.string().min(5, "Endereço obrigatório"),
-  email: z.string().email().optional().or(z.literal("")),
+  email: emailUtilizavelOpcional(),
   telefone: z.string().optional(),
 });
 
