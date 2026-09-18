@@ -172,15 +172,54 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
       valorTotal: true,
       descricao: true,
       ataItemId: true,
+      empenhoId: true,
       empenho: { select: { vigenciaId: true } },
     },
   });
 
+  // De qual vigência é cada AtaItem.
+  const vigenciaDoAtaItem = new Map(itensTodos.map((it) => [it.id, it.vigenciaId]));
+
+  /**
+   * Execuções que consomem item de MAIS DE UMA vigência (Igor 15/09/2026, Ata
+   * 39 da C.L.A dos Santos: 743,75 M² sendo 200 da 1ª vigência e 543,75 da 2ª).
+   *
+   * Só nessas a atribuição passa a ser por item. E a restrição é proposital,
+   * não preguiça: quando o formulário mostrava apenas a vigência corrente, o
+   * usuário era OBRIGADO a escolher o item da vigência errada para lançar
+   * execução retroativa — foi o caso que o Igor relatou em 09/06. Nessas
+   * execuções antigas o `ataItemId` aponta para a vigência errada de propósito,
+   * e cobrar por ele moveria consumo já conciliado de lugar. Como elas tocam
+   * uma vigência só, continuam sendo atribuídas pelo empenho, exatamente como
+   * antes.
+   */
+  const empenhosQueAtravessamVigencias = new Set<string>();
+  {
+    const vigenciasPorEmpenho = new Map<string, Set<string>>();
+    for (const ei of empenhoItensDaAta) {
+      const vigDoItem = ei.ataItemId ? vigenciaDoAtaItem.get(ei.ataItemId) : null;
+      if (!vigDoItem) continue;
+      const atual = vigenciasPorEmpenho.get(ei.empenhoId) ?? new Set<string>();
+      atual.add(vigDoItem);
+      vigenciasPorEmpenho.set(ei.empenhoId, atual);
+    }
+    for (const [empenhoId, vigs] of vigenciasPorEmpenho) {
+      if (vigs.size > 1) empenhosQueAtravessamVigencias.add(empenhoId);
+    }
+  }
+
   const saldosPorVig: SaldoVigencia[] = vigencias.map((vig) => {
     const itensDaVig = itensTodos.filter((it) => it.vigenciaId === vig.id);
-    const empenhosDaVig = empenhoItensDaAta.filter(
-      (e) => e.empenho.vigenciaId === vig.id,
-    );
+
+    const empenhosDaVig = empenhoItensDaAta.filter((e) => {
+      if (empenhosQueAtravessamVigencias.has(e.empenhoId)) {
+        // Execução partida: cada linha é cobrada da vigência do item que ela
+        // consome. Sem isso, os 743,75 caíam inteiros numa vigência só —
+        // estourando o saldo de uma e deixando a outra intacta.
+        return vigenciaDoAtaItem.get(e.ataItemId!) === vig.id;
+      }
+      return e.empenho.vigenciaId === vig.id;
+    });
 
     // Alocacao cascata (espelho do calcularSaldoContrato):
     //  1) ataItemId aponta pra item DESSA vigencia → match direto

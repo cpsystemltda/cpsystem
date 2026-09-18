@@ -52,13 +52,36 @@ export default async function Page({
         label: vencida
           ? `Ata ${a.numero} — ${a.orgaoNome} · VENCIDA (${a.vigenciaFim.toLocaleDateString("pt-BR")})`
           : `Ata ${a.numero} — ${a.orgaoNome}`,
-        itens: saldo.itens.map((it) => ({
-          id: it.ataItemId,
-          descricao: it.descricao,
-          unidade: it.unidade,
-          quantidadeDisponivel: it.quantidadeDisponivel,
-          valorUnitario: it.valorUnitario,
-        })),
+        // Itens de TODAS as vigências que ainda têm saldo, e não só os da
+        // vigência atual.
+        //
+        // Igor 15/09/2026, Ata 39 da C.L.A dos Santos: uma execução de
+        // 743,75 M² que consome 200 do que sobrou da 1ª vigência e 543,75 da
+        // 2ª. Oferecendo só a vigência atual, não havia como lançar isso — e
+        // a saída manual (duas execuções) obriga a inventar dois números de
+        // empenho para o que o órgão emitiu como um só.
+        //
+        // Cada linha diz de que vigência veio: são itens de mesma descrição e
+        // preços diferentes (o da vigência nova já vem reajustado), então sem
+        // o rótulo a escolha viraria sorteio.
+        itens: saldo.vigencias
+          .flatMap((v) =>
+            v.itens.map((it) => ({
+              id: it.ataItemId,
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidadeDisponivel: it.quantidadeDisponivel,
+              valorUnitario: it.valorUnitario,
+              vigenciaOrdem: v.ordem,
+              vigenciaRotulo:
+                `Vigência ${v.ordem} (${v.dataInicio.toLocaleDateString("pt-BR")} a ` +
+                `${v.dataFim.toLocaleDateString("pt-BR")})`,
+            })),
+          )
+          // Item zerado só polui a lista — quem tem saldo é que pode ser usado.
+          .filter((it) => it.quantidadeDisponivel > 0)
+          // Vigência corrente primeiro: é de onde sai a maioria das execuções.
+          .sort((a, b) => b.vigenciaOrdem - a.vigenciaOrdem),
         // Pontos focais e enderecos cadastrados na Ata — sao herdados
         // pelos empenhos derivados (Igor 08/06).
         enderecosEntrega: a.enderecosEntrega,

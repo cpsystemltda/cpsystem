@@ -17,6 +17,15 @@ export type AtaItemRef = {
   unidade: string;
   quantidadeDisponivel: number;
   valorUnitario: number;
+  /**
+   * De qual vigência é este saldo. Opcional porque nem toda origem tem
+   * vigência (contrato sem aditivo, item avulso), mas quando vem, aparece na
+   * lista: a mesma descrição pode existir em duas vigências com preços
+   * diferentes — o da vigência nova já vem reajustado — e sem o rótulo a
+   * escolha viraria sorteio (Igor 15/09/2026).
+   */
+  vigenciaOrdem?: number;
+  vigenciaRotulo?: string;
 };
 
 export type LinhaItem = {
@@ -450,6 +459,7 @@ export function ItensEditor({
                             <option value="">— Livre —</option>
                             {ataItens.map((a) => (
                               <option key={a.id} value={a.id} disabled={a.quantidadeDisponivel <= 0}>
+                                {a.vigenciaOrdem ? `V${a.vigenciaOrdem} · ` : ""}
                                 {a.descricao.slice(0, 30)}
                                 {a.descricao.length > 30 ? "…" : ""} ({a.quantidadeDisponivel} {a.unidade})
                               </option>
