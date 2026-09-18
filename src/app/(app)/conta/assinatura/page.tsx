@@ -93,8 +93,16 @@ export default async function AssinaturaPage() {
                 : bloqueio.motivo === "CANCELADA"
                   ? "Sua assinatura está cancelada. "
                   : "Sua assinatura está com pagamento pendente. "}
-            Assim que o pagamento for confirmado, o acesso volta automaticamente — em segundos, no
-            caso do PIX.
+            {/* Sem forma de pagamento cadastrada, "assim que o pagamento for
+                confirmado" não diz o que fazer — não há pagamento nenhum a
+                caminho. Quem cai aqui vindo do fim do teste precisa ler a ação,
+                não a consequência dela (Regina 18/09). */}
+            {conta.metodosPagamento.length === 0
+              ? "Para voltar a usar o sistema, cadastre abaixo uma forma de pagamento válida. O acesso é liberado assim que o pagamento for confirmado — em segundos, no caso do PIX."
+              : "Assim que o pagamento for confirmado, o acesso volta automaticamente — em segundos, no caso do PIX."}
+          </p>
+          <p className="mt-2 text-sm text-red-900">
+            Seus dados continuam guardados e voltam exatamente como estavam.
           </p>
         </div>
       )}
