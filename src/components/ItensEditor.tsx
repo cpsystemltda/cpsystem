@@ -194,6 +194,24 @@ export function ItensEditor({
     setValoresFormatados((v) => (v.length === 1 ? v : v.filter((_, i) => i !== idx)));
   }
 
+  /**
+   * Itens da origem agrupados por vigência, na ordem em que chegaram.
+   *
+   * Quando a origem tem uma vigência só (ou nenhuma), devolve um grupo sem
+   * rótulo e a lista sai lisa, igual a antes.
+   */
+  const gruposDeVigencia = (() => {
+    const lista = ataItens ?? [];
+    if (!lista.some((a) => a.vigenciaRotulo)) return [{ rotulo: null, itens: lista }];
+
+    const porRotulo = new Map<string, AtaItemRef[]>();
+    for (const a of lista) {
+      const chave = a.vigenciaRotulo ?? "Sem vigência definida";
+      porRotulo.set(chave, [...(porRotulo.get(chave) ?? []), a]);
+    }
+    return Array.from(porRotulo, ([rotulo, itens]) => ({ rotulo, itens }));
+  })();
+
   function update(idx: number, patch: Partial<LinhaItem>) {
     setLinhas((l) => l.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
@@ -457,13 +475,34 @@ export function ItensEditor({
                             }
                           >
                             <option value="">— Livre —</option>
-                            {ataItens.map((a) => (
-                              <option key={a.id} value={a.id} disabled={a.quantidadeDisponivel <= 0}>
-                                {a.vigenciaOrdem ? `V${a.vigenciaOrdem} · ` : ""}
-                                {a.descricao.slice(0, 30)}
-                                {a.descricao.length > 30 ? "…" : ""} ({a.quantidadeDisponivel} {a.unidade})
-                              </option>
-                            ))}
+                            {/* Agrupado por vigência quando a origem tem mais de
+                                uma. Igor 15/09/2026, Ata 39: a MESMA descrição
+                                aparece duas vezes, com preços diferentes, e sem
+                                separação não dá para saber qual linha é da 1ª e
+                                qual é da 2ª vigência — foi assim que ele acabou
+                                escolhendo a vigência errada nas duas tentativas.
+                                O prefixo "V1 ·" fica no texto da opção porque o
+                                <select> fechado mostra só ela, não o grupo. */}
+                            {gruposDeVigencia.map((g) =>
+                              g.rotulo ? (
+                                <optgroup key={g.rotulo} label={g.rotulo}>
+                                  {g.itens.map((a) => (
+                                    <option key={a.id} value={a.id} disabled={a.quantidadeDisponivel <= 0}>
+                                      {`V${a.vigenciaOrdem} · `}
+                                      {a.descricao.slice(0, 28)}
+                                      {a.descricao.length > 28 ? "…" : ""} ({a.quantidadeDisponivel} {a.unidade})
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ) : (
+                                g.itens.map((a) => (
+                                  <option key={a.id} value={a.id} disabled={a.quantidadeDisponivel <= 0}>
+                                    {a.descricao.slice(0, 30)}
+                                    {a.descricao.length > 30 ? "…" : ""} ({a.quantidadeDisponivel} {a.unidade})
+                                  </option>
+                                ))
+                              ),
+                            )}
                           </select>
                           {isAuto && (
                             <span

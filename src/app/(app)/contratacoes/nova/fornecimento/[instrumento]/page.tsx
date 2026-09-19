@@ -74,8 +74,8 @@ export default async function Page({
               valorUnitario: it.valorUnitario,
               vigenciaOrdem: v.ordem,
               vigenciaRotulo:
-                `Vigência ${v.ordem} (${v.dataInicio.toLocaleDateString("pt-BR")} a ` +
-                `${v.dataFim.toLocaleDateString("pt-BR")})`,
+                `Vigência ${v.ordem} (${v.dataInicio.toLocaleDateString("pt-BR", { timeZone: "UTC" })} a ` +
+                `${v.dataFim.toLocaleDateString("pt-BR", { timeZone: "UTC" })})`,
             })),
           )
           // Item zerado só polui a lista — quem tem saldo é que pode ser usado.

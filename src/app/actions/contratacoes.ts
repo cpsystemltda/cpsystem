@@ -1396,15 +1396,35 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
     }
   } else if (v.ataId) {
     const saldo = await calcularSaldoAta(v.ataId);
+
+    // Confere contra os itens de TODAS as vigências, não só os da corrente.
+    //
+    // Igor 15/09/2026, Ata 39 da C.L.A dos Santos: execução de 743,75 M² que
+    // tira 200 do que sobrou da 1ª vigência e o resto da 2ª. `saldo.itens` é
+    // atalho para a vigência corrente — o item da 2ª vigência não estava nessa
+    // lista, então a execução partida era barrada na gravação mesmo depois de
+    // o formulário passar a oferecer as duas. Consertar só a tela não adiantou:
+    // a trava estava aqui.
+    //
+    // O saldo continua sendo conferido POR ITEM, ou seja, por vigência: cada
+    // linha só pode consumir o que existe na vigência dela. Ninguém passa a
+    // gastar saldo futuro para cobrir a vigência que acabou.
+    const itensDeTodasAsVigencias = saldo.vigencias.flatMap((vig) =>
+      vig.itens.map((i) => ({ ...i, vigenciaOrdem: vig.ordem })),
+    );
+
     for (const item of itensEfetivos) {
       if (!item.ataItemId) {
         return { erro: "Itens de Empenho derivado de Ata precisam selecionar o item da Ata." };
       }
-      const linha = saldo.itens.find((s) => s.ataItemId === item.ataItemId);
+      const linha = itensDeTodasAsVigencias.find((s) => s.ataItemId === item.ataItemId);
       if (!linha) return { erro: "Item da Ata não encontrado." };
       if (item.quantidade > linha.quantidadeDisponivel) {
         return {
-          erro: `Saldo insuficiente: "${linha.descricao}" tem ${linha.quantidadeDisponivel} ${linha.unidade} disponíveis.`,
+          erro:
+            `Saldo insuficiente na vigência ${linha.vigenciaOrdem}: "${linha.descricao}" tem ` +
+            `${linha.quantidadeDisponivel} ${linha.unidade} disponíveis, você pediu ${item.quantidade}. ` +
+            `Se a quantidade atravessa duas vigências, lance uma linha para cada uma.`,
         };
       }
     }
@@ -1716,9 +1736,16 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
         );
       }
     }
+    // Todas as vigências, e não só a corrente — mesma razão do cadastro
+    // (Igor 15/09/2026): execução partida entre duas vigências tem linha de
+    // item que não existe na vigência corrente, e editá-la travava aqui.
+    const itensDeTodasAsVigencias = saldo.vigencias.flatMap((vig) =>
+      vig.itens.map((i) => ({ ...i, vigenciaOrdem: vig.ordem })),
+    );
+
     for (const itemNovo of itensEfetivos) {
       if (!itemNovo.ataItemId) continue;
-      const linha = saldo.itens.find((s) => s.ataItemId === itemNovo.ataItemId);
+      const linha = itensDeTodasAsVigencias.find((s) => s.ataItemId === itemNovo.ataItemId);
       if (!linha) {
         return { erro: "Item da Ata não encontrado.", valores: dados };
       }
@@ -1726,7 +1753,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
       const saldoReal = linha.quantidadeDisponivel + qtyAntiga;
       if (itemNovo.quantidade > saldoReal) {
         return {
-          erro: `Quantidade excede o saldo disponível na ARP. "${linha.descricao}" tem ${saldoReal} ${linha.unidade} disponíveis (incluindo este empenho). Solicitado: ${itemNovo.quantidade}.`,
+          erro: `Quantidade excede o saldo disponível na ARP, vigência ${linha.vigenciaOrdem}. "${linha.descricao}" tem ${saldoReal} ${linha.unidade} disponíveis (incluindo este empenho). Solicitado: ${itemNovo.quantidade}.`,
           valores: dados,
         };
       }

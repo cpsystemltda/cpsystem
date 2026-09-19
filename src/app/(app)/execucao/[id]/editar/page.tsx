@@ -80,13 +80,24 @@ export default async function EditarEmpenhoPage({ params }: { params: Promise<{ 
       return {
         value: a.id,
         label: `Ata ${a.numero} — ${a.orgaoNome}`,
-        itens: saldo.itens.map((it) => ({
-          id: it.ataItemId,
-          descricao: it.descricao,
-          unidade: it.unidade,
-          quantidadeDisponivel: it.quantidadeDisponivel,
-          valorUnitario: it.valorUnitario,
-        })),
+        // Itens de todas as vigências, igual ao cadastro — senão a execução
+        // que consome duas vigências não consegue ser reaberta e reeditada
+        // (Igor 15/09/2026).
+        itens: saldo.vigencias
+          .flatMap((v) =>
+            v.itens.map((it) => ({
+              id: it.ataItemId,
+              descricao: it.descricao,
+              unidade: it.unidade,
+              quantidadeDisponivel: it.quantidadeDisponivel,
+              valorUnitario: it.valorUnitario,
+              vigenciaOrdem: v.ordem,
+              vigenciaRotulo:
+                `Vigência ${v.ordem} (${v.dataInicio.toLocaleDateString("pt-BR", { timeZone: "UTC" })} a ` +
+                `${v.dataFim.toLocaleDateString("pt-BR", { timeZone: "UTC" })})`,
+            })),
+          )
+          .sort((a, b) => b.vigenciaOrdem - a.vigenciaOrdem),
       };
     }),
   );
