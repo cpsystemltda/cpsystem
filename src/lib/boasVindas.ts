@@ -90,15 +90,32 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
     // direta". O que saía antes era um roteiro de configuração — dizia o que a
     // pessoa tinha que fazer, nunca o que ela ganhava com isso.
     const texto = ehAnalista
-      ? `👋 *Bem-vindo ao CP System, ${primeiro}!*\n\n` +
+      ? // Regina 21/09/2026: o analista precisa entender COMO a comissão nasce
+        // e QUANDO o dinheiro entra — senão ele se cadastra, não indica
+        // ninguém e some. O ponto que ninguém adivinha sozinho é que a
+        // comissão não vem do cadastro DELE: vem da empresa dele se cadastrar
+        // e apontá-lo como analista no momento do cadastro.
+        `👋 *Bem-vindo ao CP System, ${primeiro}!*\n\n` +
         `É um prazer ter você conosco. Nossa intenção é direta: ampliar seus resultados ` +
         `e proteger sua carteira de prejuízos.\n\n` +
-        `*O que você passa a ter:*\n\n` +
-        `▸ Os prazos de todos os seus clientes em um só painel\n` +
-        `▸ Avisos de risco da carteira direto neste número\n` +
-        `▸ R$ 29,90 por mês, vitalício, por cliente ativo vinculado a você\n\n` +
-        `Comece montando sua carteira: cpsystem.app.br/painel-analista\n\n` +
-        `Desejamos um excelente começo. Qualquer dúvida, é só responder esta mensagem.\n\n` +
+        `*Como funciona a sua comissão — e este é o ponto mais importante:*\n\n` +
+        `Você recebe *R$ 29,90 por mês, por cliente ativo* vinculado a você. É *vitalício* ` +
+        `e *cumulativo*: cada empresa nova que entra soma. Dez clientes ativos são ` +
+        `R$ 299,00 todo mês, sem teto.\n\n` +
+        `Para o vínculo existir, *a empresa precisa se cadastrar e indicar você como ` +
+        `analista dela no momento do cadastro*. É esse apontamento que gera a sua ` +
+        `comissão — sem ele, o cliente entra e a indicação não é contabilizada.\n\n` +
+        `*Quando o dinheiro entra:*\n\n` +
+        `▸ Cliente que paga por *PIX* — sua comissão é liberada *no mesmo dia*\n` +
+        `▸ Cliente que paga no *cartão* — em *32 dias após o débito*, que é o prazo em ` +
+        `que a operadora repassa o valor para nós\n\n` +
+        `*Seus dois primeiros passos:*\n\n` +
+        `1. Acesse cpsystem.app.br/painel-analista e confira seus dados de recebimento\n` +
+        `2. Oriente cada empresa da sua carteira a se cadastrar em cpsystem.app.br ` +
+        `indicando você como analista\n\n` +
+        `Quanto mais empresas você trouxer, maior fica o valor fixo que entra todo mês.\n\n` +
+        `Desejamos um excelente começo. Qualquer dúvida sobre comissão ou cadastro, ` +
+        `é só responder esta mensagem.\n\n` +
         `Contato CP System`
       : `👋 *Bem-vindo ao CP System, ${primeiro}!*\n\n` +
         `É um prazer ter a *${empresa?.nomeFantasia || empresa?.razaoSocial || "sua empresa"}* ` +
@@ -206,12 +223,21 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
       texto:
         `Bem-vindo ao CP System, ${primeiro}!\n\n` +
         (ehAnalista
-          ? `É um prazer ter você conosco. Nossa intenção é direta: ampliar seus resultados e proteger sua carteira de prejuízos.\n\n` +
-            `O que você passa a ter:\n` +
-            `- Os prazos de todos os seus clientes em um só painel\n` +
-            `- Avisos de risco da carteira por WhatsApp\n` +
-            `- R$ 29,90 por mês, vitalício, por cliente ativo vinculado a você\n\n` +
-            `Comece montando sua carteira em https://cpsystem.app.br/painel-analista\n\n`
+          ? // Mesmo conteúdo da mensagem de WhatsApp. E aqui pesa mais: analista
+            // se cadastra sem informar WhatsApp com frequência (os dois que
+            // entraram em 18/09 não informaram), então o e-mail é o único canal
+            // que chega até ele.
+            `É um prazer ter você conosco. Nossa intenção é direta: ampliar seus resultados e proteger sua carteira de prejuízos.\n\n` +
+            `COMO FUNCIONA A SUA COMISSÃO — e este é o ponto mais importante:\n\n` +
+            `Você recebe R$ 29,90 por mês, por cliente ativo vinculado a você. É vitalício e cumulativo: cada empresa nova que entra soma. Dez clientes ativos são R$ 299,00 todo mês, sem teto.\n\n` +
+            `Para o vínculo existir, a empresa precisa se cadastrar e indicar você como analista dela no momento do cadastro. É esse apontamento que gera a sua comissão — sem ele, o cliente entra e a indicação não é contabilizada.\n\n` +
+            `QUANDO O DINHEIRO ENTRA:\n` +
+            `- Cliente que paga por PIX: sua comissão é liberada no mesmo dia\n` +
+            `- Cliente que paga no cartão: em 32 dias após o débito, que é o prazo em que a operadora repassa o valor para nós\n\n` +
+            `SEUS DOIS PRIMEIROS PASSOS:\n` +
+            `1. Acesse https://cpsystem.app.br/painel-analista e confira seus dados de recebimento\n` +
+            `2. Oriente cada empresa da sua carteira a se cadastrar em https://cpsystem.app.br indicando você como analista\n\n` +
+            `Quanto mais empresas você trouxer, maior fica o valor fixo que entra todo mês.\n\n`
           : `É um prazer ter a ${empresa?.nomeFantasia || empresa?.razaoSocial || "sua empresa"} conosco. ` +
             `Nossa intenção é direta: otimizar seus resultados e diminuir seus prejuízos no contrato público.\n\n` +
             `O que o sistema passa a fazer por você:\n` +
