@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { asaasBaseUrl } from "@/lib/asaas-env";
 
 // GET /api/admin/verificar-subscription/[id]?secret=<CRON_SECRET>
 // Consulta o Asaas via API pra confirmar que a subscription foi criada com
@@ -22,7 +23,13 @@ export async function GET(
   const ambiente = process.env.ASAAS_AMBIENTE || "sandbox";
   if (!apiKey) return NextResponse.json({ erro: "ASAAS_API_KEY nao configurado" }, { status: 500 });
 
-  const base = ambiente === "producao" ? "https://api.asaas.com/v3" : "https://sandbox.asaas.com/api/v3";
+  // `ASAAS_AMBIENTE` em produção vale "production", e a comparação daqui era
+  // com "producao" — então este diagnóstico consultava o SANDBOX e devolvia
+  // `payments: []` para uma assinatura que tem cobranças de verdade. Ferramenta
+  // de diagnóstico que mente é pior que não ter ferramenta: foi assim que a
+  // assinatura do Léo pareceu não ter cobrança nenhuma (21/09/2026).
+  // `asaasBaseUrl` já aceita production/producao/prod.
+  const base = asaasBaseUrl(ambiente);
   const baseSandbox = "https://sandbox.asaas.com/api/v3";
   const baseProd = "https://api.asaas.com/v3";
 
@@ -71,7 +78,7 @@ export async function GET(
         : undefined,
       // Faturas geradas
       totalPayments: paymentsJson.totalCount,
-      payments: (paymentsJson.data ?? []).slice(0, 5).map((p: { id: string; status: string; dueDate: string; value: number; billingType: string; invoiceUrl: string }) => ({
+      payments: (paymentsJson.data ?? []).map((p: { id: string; status: string; dueDate: string; value: number; billingType: string; invoiceUrl: string }) => ({
         id: p.id,
         status: p.status,
         dueDate: p.dueDate,
