@@ -132,6 +132,12 @@ export type CriarAssinaturaInput = {
 
 export type CriarAssinaturaResultado = {
   subscriptionId: string;
+  /**
+   * Cartão tokenizado pelo gateway. O Asaas só devolve isto na criação — é a
+   * única chance de guardar. Sem ele, assinatura que perde o cartão não tem
+   * como ser religada sem pedir o número ao cliente de novo (caso Léo, 21/09).
+   */
+  creditCardToken?: string;
   // primeira cobrança já gerada pela subscription
   primeiraCobranca: CriarCobrancaResultado;
 };

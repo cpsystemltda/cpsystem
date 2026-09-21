@@ -313,6 +313,9 @@ export async function completarCadastroAction(
         ultimosDigitos: cartao.ultimos4,
         validadeMes: cartao.validadeMes,
         validadeAno: cartao.validadeAno,
+        // Token do cartao no gateway — e o que permite religar a
+        // assinatura sem pedir o numero de novo (Regina 21/09/2026).
+        gatewayTokenId: sub.creditCardToken ?? null,
         padrao: true,
         ativo: true,
       },

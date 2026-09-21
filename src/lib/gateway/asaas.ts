@@ -219,6 +219,13 @@ export class GatewayAsaas implements GatewayPagamento {
       id: string;
       status: string;
       nextDueDate: string;
+      // O Asaas devolve o cartão tokenizado AQUI, e só aqui — é a única chance
+      // de guardar o token (Regina 21/09/2026).
+      creditCard?: {
+        creditCardNumber?: string;
+        creditCardBrand?: string;
+        creditCardToken?: string;
+      };
     };
     type FirstPaymentResp = {
       data: Array<{
@@ -267,6 +274,16 @@ export class GatewayAsaas implements GatewayPagamento {
 
     return {
       subscriptionId: sub.id,
+      // Guardar o token é o que permite RECOLOCAR o cartão na assinatura sem
+      // pedir o número ao cliente de novo.
+      //
+      // Caso Léo, 21/09/2026: a assinatura dele cobrou no cartão em julho e
+      // depois ficou SEM cartão — as cobranças de setembro e outubro nasceram
+      // `billingType: CREDIT_CARD` com `creditCard: null` e apenas
+      // acumularam como PENDING, sem ninguém perceber. Como o token nunca foi
+      // guardado, não havia como religar a recorrência: só pedindo o cartão
+      // outra vez a um cliente que já tinha cadastrado.
+      creditCardToken: sub.creditCard?.creditCardToken,
       primeiraCobranca: {
         chargeId: first.id,
         invoiceUrl: first.invoiceUrl,

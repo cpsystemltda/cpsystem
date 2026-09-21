@@ -136,6 +136,9 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
     let result: import("@/lib/gateway").CriarCobrancaResultado;
     let subscriptionId: string | null = null;
 
+    // Token do cartão devolvido pelo gateway — vive fora do `if` porque o
+    // registro do método de pagamento acontece depois dele.
+    let tokenCartao: string | undefined;
     if (forma === "CARTAO_CREDITO" && cartao && gateway.criarAssinatura) {
       // Cartão: cria Subscription Asaas pra cobrança recorrente automática.
       // Asaas tokeniza o cartão e cobra todo mês. Regina 23/06.
@@ -166,6 +169,7 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
       });
 
       subscriptionId = sub.subscriptionId;
+      tokenCartao = sub.creditCardToken;
       result = sub.primeiraCobranca;
     } else {
       // PIX/Boleto: cobrança única (renovação automática gera próximas via régua).
@@ -213,6 +217,9 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
           ultimosDigitos: ultimos,
           validadeMes: cartao.validadeMes,
           validadeAno: cartao.validadeAno,
+          // Token do cartão no gateway — é o que permite religar a assinatura
+          // sem pedir o número de novo (Regina 21/09/2026).
+          gatewayTokenId: tokenCartao ?? null,
           padrao: true,
         },
       });
