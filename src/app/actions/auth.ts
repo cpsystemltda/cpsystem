@@ -781,7 +781,19 @@ export async function signupAnalistaAction(_prev: ActionResult | null, formData:
       termosAceitosVersao: "1.0",
       ...atribuicaoDoForm(formData),
       usuarios: {
-        create: { nome, email, senhaHash, perfil: "ADMIN" },
+        // O telefone do cadastro vira o WhatsApp do analista, com opt-in
+        // ligado. Antes ficava só no perfil de Analista e o usuário nascia sem
+        // `telefoneWhatsApp` — resultado: os dois analistas que entraram em
+        // 18/09/2026 não recebiam mensagem nenhuma, nem boas-vindas nem aviso
+        // de carteira, e ninguém percebia (Regina 21/09).
+        create: {
+          nome,
+          email,
+          senhaHash,
+          perfil: "ADMIN",
+          telefoneWhatsApp: telefone.replace(/\D/g, ""),
+          optInWhatsApp: true,
+        },
       },
       analista: {
         create: {

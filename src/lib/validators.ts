@@ -184,7 +184,18 @@ export const signupAnalistaSchema = z
     email: emailUtilizavel(),
     senha: z.string().min(10, "Mínimo 10 caracteres"),
     confirmacaoSenha: z.string().min(1, "Confirme a senha"),
-    telefone: z.string().min(8, "Telefone obrigatório"),
+    // WhatsApp OBRIGATÓRIO e válido, igual ao cadastro de empresa (Regina
+    // 21/09/2026: "um número de telefone válido tem que ser obrigatório na hora
+    // do cadastro, isso não pode ser opcional").
+    //
+    // `min(8)` aceitava fixo e celular sem o 9 — número que existe no papel e
+    // não existe no WhatsApp. É a mesma falha silenciosa do cadastro da
+    // Michelly: a pessoa entra, o sistema acha que avisa, e nada chega.
+    telefone: z
+      .string()
+      .refine((v) => v.replace(/\D/g, "").length === 11, {
+        message: "Informe um WhatsApp com 11 dígitos: DDD + 9 + número (ex.: 61 98335-0607)",
+      }),
     endereco: z.string().min(5, "Endereço muito curto"),
     complemento: z.string().optional(),
     cep: z.string().regex(cepRegex, "CEP inválido"),
