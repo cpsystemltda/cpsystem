@@ -80,5 +80,12 @@ passa("fulano@empresa-de-nome-grande.com.br");
 passa("nome.sobrenome+tag@gmail.com");
 passa("a@b.co"); // domínio curto e legítimo
 
+console.log("\nE-mails temporários (robô) — todos devem ser barrados:");
+barra("lwkypzakon@ghostinbox.store");
+barra("teste@mailinator.com");
+barra("x@10minutemail.com");
+barra("y@yopmail.com");
+barra("z@temp-mail.org");
+
 console.log(`\n${falhas === 0 ? "TUDO PASSOU" : `${falhas} FALHA(S)`}\n`);
 process.exit(falhas === 0 ? 0 : 1);

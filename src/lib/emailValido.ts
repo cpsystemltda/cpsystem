@@ -109,6 +109,67 @@ const TYPOS_CONHECIDOS: Record<string, string> = {
 };
 
 /**
+ * E-mail descartável — caixa temporária que se autodestrói.
+ *
+ * Regina 21/09/2026, ao ver um cadastro de analista em `@ghostinbox.store`:
+ * *"me parece um robô. Fique atento a ataques de robô na nossa plataforma.
+ * Não permita que isso aconteça."*
+ *
+ * Quem usa esse tipo de endereço não pretende ser encontrado. Num SaaS de
+ * contrato público isso é duas coisas ruins ao mesmo tempo: cadastro falso
+ * enchendo a base de analista fantasma, e alguém entrando sem rastro. Perfil
+ * de analista é mais sensível que o de empresa, porque analista vê carteira de
+ * cliente e recebe comissão.
+ *
+ * Lista curada de propósito, com os provedores conhecidos. Não uso heurística
+ * de "nome aleatório" nem de TLD incomum: barraria cliente legítimo, e barrar
+ * cliente de verdade custa mais que deixar passar um cadastro falso.
+ */
+const DOMINIOS_DESCARTAVEIS = new Set<string>([
+  "ghostinbox.store",
+  "mailinator.com",
+  "guerrillamail.com",
+  "guerrillamail.info",
+  "sharklasers.com",
+  "grr.la",
+  "spam4.me",
+  "10minutemail.com",
+  "10minutemail.net",
+  "tempmail.com",
+  "temp-mail.org",
+  "tempmailo.com",
+  "yopmail.com",
+  "yopmail.fr",
+  "throwawaymail.com",
+  "getnada.com",
+  "nada.email",
+  "dispostable.com",
+  "maildrop.cc",
+  "trashmail.com",
+  "trashmail.de",
+  "fakeinbox.com",
+  "mohmal.com",
+  "inboxkitten.com",
+  "emailondeck.com",
+  "mailnesia.com",
+  "mytemp.email",
+  "burnermail.io",
+  "moakt.com",
+  "tmpmail.org",
+  "minuteinbox.com",
+  "harakirimail.com",
+  "spambog.com",
+  "mailcatch.com",
+  "discard.email",
+  "anonbox.net",
+  "tempr.email",
+  "mail-temporaire.fr",
+  "correotemporal.org",
+  "emailtemporario.com.br",
+  "gerador-email.com",
+]);
+
+/**
  * Distância de Damerau-Levenshtein: edições simples MAIS troca de duas letras
  * vizinhas.
  *
@@ -182,6 +243,16 @@ export function checarEmail(bruto: string): ProblemaEmail | null {
     mensagem: `O e-mail parece ter um erro de digitação. Você quis dizer ${local}@${certo}?`,
     sugestao: `${local}@${certo}`,
   });
+
+  // 0. Caixa temporária: barra antes de qualquer outra checagem, e sem sugerir
+  // correção — não há o que corrigir, o endereço é descartável por natureza.
+  if (DOMINIOS_DESCARTAVEIS.has(dominio)) {
+    return {
+      mensagem:
+        "Este é um endereço de e-mail temporário. Informe um e-mail permanente — " +
+        "é por ele que enviamos acesso, cobrança e avisos da sua conta.",
+    };
+  }
 
   // 1. Erro conhecido: a correção é certa.
   const conhecido = TYPOS_CONHECIDOS[dominio];
