@@ -109,6 +109,44 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     return { erro: senhaCheck.erro, campos: { senha: senhaCheck.erro }, valores };
   }
 
+  // O CNPJ existe mesmo e está ativo na Receita?
+  //
+  // Regina 21/09/2026, depois do cadastro falso de analista: *"pessoas com
+  // cadastro falso não podem acessar nosso sistema. Ela pode usar isso para
+  // roubar nossa ideia."*
+  //
+  // O dígito verificador só prova que o número é bem formado — qualquer um
+  // gera um CNPJ válido em segundos. A consulta à Receita é o que separa
+  // empresa de verdade de número inventado, e é a barreira mais alta contra
+  // concorrente entrando disfarçado de cliente.
+  //
+  // FALHA ABERTA de propósito: se a Receita estiver fora do ar ou demorar, o
+  // cadastro passa. Derrubar o funil inteiro porque uma API de terceiro caiu
+  // custaria mais caro que o risco que ela cobre — e o cadastro fica com o
+  // CNPJ registrado para conferência posterior.
+  try {
+    const { consultarCnpjNaReceita } = await import("@/lib/receitaCnpj");
+    const naReceita = await consultarCnpjNaReceita(cnpj);
+    if (naReceita) {
+      const situacao = (naReceita.situacao ?? "").toUpperCase();
+      if (situacao && situacao !== "ATIVA") {
+        return {
+          erro: `Este CNPJ consta na Receita Federal como "${naReceita.situacao}". Para usar o CP System, a inscrição precisa estar ativa.`,
+          campos: { cnpj: `Situação na Receita: ${naReceita.situacao}` },
+          valores,
+        };
+      }
+    } else {
+      return {
+        erro: "Não encontramos este CNPJ na Receita Federal. Confira o número informado.",
+        campos: { cnpj: "CNPJ não localizado na Receita Federal" },
+        valores,
+      };
+    }
+  } catch (e) {
+    console.error("[signup] consulta de CNPJ na Receita indisponível — seguindo:", e);
+  }
+
   // Regina 24/08 (pedido do Igor): o trial não exige mais cartão. Quem escolhe
   // "decidir depois" entra no teste sem meio de pagamento e escolhe PIX, boleto
   // ou cartão no fim dos 14 dias — a trava por falta de pagamento já existe e

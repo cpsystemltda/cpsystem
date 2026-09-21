@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { validarCnpj } from "@/lib/cnpj";
+import { validarCpf } from "@/lib/cpf";
 import { checarEmail } from "@/lib/emailValido";
 
 const cnpjRegex = /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/;
@@ -180,7 +181,13 @@ export const signupAnalistaSchema = z
   .object({
     // Pessoais (obrigatórios)
     nome: z.string().min(2, "Nome muito curto"),
-    cpf: z.string().regex(cpfRegex, "CPF inválido"),
+    // CPF com dígito verificador, não só formato. Regex aceita qualquer
+    // sequência inventada — e perfil de analista enxerga carteira de cliente e
+    // recebe comissão em conta bancária (Regina 21/09/2026).
+    cpf: z
+      .string()
+      .regex(cpfRegex, "CPF inválido")
+      .refine((v) => validarCpf(v), "CPF inválido — verifique os dígitos"),
     email: emailUtilizavel(),
     senha: z.string().min(10, "Mínimo 10 caracteres"),
     confirmacaoSenha: z.string().min(1, "Confirme a senha"),
