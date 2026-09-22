@@ -140,11 +140,17 @@ function montarMensagem(l: {
     : `Nessa fase o dinheiro escapa em três pontos: prazo de entrega que vence e vira multa, nota emitida que passa meses sem o órgão pagar, e contrato que encerra sem o Atestado de Capacidade Técnica.\n\n` +
       `O CP System acompanha os três e avisa antes, aqui pelo WhatsApp.`;
 
+  // O caminho pra agir vai NA mensagem. Regina 22/09: *"você nem sequer pensou
+  // em enviar o link do site, para a pessoa conhecer, para a pessoa talvez já
+  // cadastrar"*. Abordagem sem link obriga quem se interessou a procurar a
+  // gente — e quem está ocupado simplesmente não procura. O teste gratuito
+  // entra junto porque é o que tira o risco da decisão.
   return (
     `Olá! Aqui é do CP System.\n\n` +
     `${nome}, ${abertura}\n\n` +
     `${miolo}\n\n` +
-    `Faz sentido 15 minutos para eu mostrar com os contratos de vocês?\n\n` +
+    `Dá pra conhecer e já testar grátis por 14 dias em *cpsystem.app.br* — sem compromisso.\n\n` +
+    `Se preferir, eu mostro em 15 minutos com os contratos de vocês. Faz sentido?\n\n` +
     `Se não for do interesse, é só dizer.\n\n` +
     `Contato CP System`
   );
@@ -224,6 +230,22 @@ async function main() {
     } else {
       falhas++;
       console.log(`  ✗ ${String(i + 1).padStart(2)}/${fila.length}  ${l.empresa.slice(0, 32).padEnd(32)} ${l.telefone}  — ${r.erro}`);
+
+      // Número sem conta no WhatsApp não é "ainda não contatado": é beco sem
+      // saída. Deixar como NAO_CONTATADO faz o mesmo número entupir o lote do
+      // dia seguinte e roubar a vaga de um alvo de verdade — foi o que ia
+      // acontecer com dois números do lote de 22/09.
+      if (/não tem conta no WhatsApp|not on WhatsApp/i.test(r.erro ?? "")) {
+        const nota = `[${new Date().toLocaleDateString("pt-BR")}] Número sem conta no WhatsApp — contato só por telefone ou e-mail.`;
+        await prisma.leadProspeccao.update({
+          where: { id: l.id },
+          data: {
+            situacao: "RETORNAR_DEPOIS",
+            anotacoes: l.anotacoes ? `${l.anotacoes}\n${nota}` : nota,
+            atualizadoPorNome: "CP System (WhatsApp automático)",
+          },
+        });
+      }
     }
 
     if (i < fila.length - 1) {
