@@ -203,6 +203,19 @@ function killSwitchAtivo(): boolean {
   return process.env.WHATSAPP_KILL_SWITCH === "1";
 }
 
+/**
+ * Quem entrega o WhatsApp: a ponte (padrão) ou a Z-API.
+ *
+ * Padrão é a ponte de propósito. A Z-API venceu em 18/09 e derrubou em
+ * silêncio o resumo diário, os avisos de prazo e a cobrança de plano atrasado
+ * — quatro dias de cliente sem receber nada, sem ninguém saber. Depender de
+ * variável configurada pra funcionar é o que produziu esse silêncio; o padrão
+ * tem que ser o canal que está de pé. Para voltar à Z-API: WHATSAPP_TRANSPORTE=zapi.
+ */
+export function transportePonte(): boolean {
+  return (process.env.WHATSAPP_TRANSPORTE || "ponte") !== "zapi";
+}
+
 // CAP diario por usuario — Regina 08/07: no maximo 4 msgs por dia por
 // destinatario, contando TUDO (cron + event-driven). Se atingiu 4, para.
 export const LIMITE_MSGS_DIARIAS_POR_USUARIO = 4;
@@ -357,6 +370,21 @@ export async function dispararNotificacao(opts: {
       erro: null,
     },
   });
+
+  // Transporte pela PONTE: o registro fica PENDENTE e a ponte vem buscar.
+  //
+  // Regina, 22/09/2026: *"os clientes não estão recebendo as mensagens com
+  // resumo, com os avisos"*. Estavam sendo geradas e morrendo na porta — todo
+  // envio voltava `Z-API /status 400` desde 18/09, quando a assinatura venceu.
+  // Cron rodando, mensagem pronta, ninguém recebendo, e ninguém sabendo.
+  //
+  // A regra dela é antiga e clara: WhatsApp é pelo MCP. O que faltava era o
+  // caminho de VOLTA — a Vercel não alcança a ponte, que roda em localhost.
+  // Resolve-se invertendo quem liga: a ponte pergunta "tem mensagem pra
+  // mandar?" de minuto em minuto e entrega. Sem túnel, sem porta aberta.
+  if (transportePonte()) {
+    return { enviado: true, messageId: `fila:${registro.id}` };
+  }
 
   try {
     const r = await enviarTexto(usuario.telefoneWhatsApp, opts.mensagem);
