@@ -56,6 +56,43 @@ function nomeCurtoEmpresa(razao: string): string {
   return escolhidos.join(" ") || razao;
 }
 
+/**
+ * Nome do órgão apresentável.
+ *
+ * A base traz caixa alta e nome cortado no meio pelo limite do portal:
+ * "INSTITUTO FEDERAL DE EDUCACAO, CIENCIA E TECNOLOGIA DO RIO GRANDE DO S".
+ * Mandar isso numa abordagem entrega cópia de planilha. Corta no primeiro
+ * segmento (antes da vírgula) e volta pra caixa de texto normal, preservando
+ * siglas.
+ */
+function nomeOrgao(bruto: string): string {
+  // O portal guarda tudo sem acento. "Instituto Federal de Educacao" numa
+  // abordagem comercial denuncia copiar-e-colar de planilha, então as palavras
+  // que mais aparecem voltam escritas certo.
+  const ACENTOS: Record<string, string> = {
+    educacao: "Educação", ciencia: "Ciência", tecnologia: "Tecnologia",
+    saude: "Saúde", policia: "Polícia", municipio: "Município",
+    fundacao: "Fundação", universidade: "Universidade", federal: "Federal",
+    servicos: "Serviços", producao: "Produção", administracao: "Administração",
+    gestao: "Gestão", regiao: "Região", distrito: "Distrito",
+    comercio: "Comércio", transito: "Trânsito", agua: "Água",
+    infraestrutura: "Infraestrutura", habitacao: "Habitação",
+  };
+  const CONECTIVOS = /^(DE|DA|DO|DAS|DOS|E|EM|NO|NA)$/i;
+  const primeiro = bruto.split(",")[0].trim();
+  return primeiro
+    .split(/\s+/)
+    .map((p, i) => {
+      if (i > 0 && CONECTIVOS.test(p)) return p.toLowerCase();
+      // Sigla curta em caixa alta continua sigla: UnB, DPU, IFRS.
+      if (p.length <= 4 && p === p.toUpperCase() && /^[A-ZÀ-Ý]+$/.test(p)) return p;
+      const acentuada = ACENTOS[p.toLowerCase()];
+      if (acentuada) return acentuada;
+      return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
 /** Só celular tem WhatsApp: depois do DDD, 9 dígitos começando em 9. */
 function ehCelular(tel: string | null): boolean {
   const d = (tel || "").replace(/\D/g, "");
@@ -76,7 +113,7 @@ function montarMensagem(l: {
 }): string {
   const nome = nomeCurtoEmpresa(l.empresa);
   const dias = Math.ceil((l.venceEm.getTime() - Date.now()) / 86400000);
-  const orgao = l.orgao ?? "o órgão";
+  const orgao = l.orgao ? nomeOrgao(l.orgao) : "o órgão";
   const vencido = dias < 0;
 
   const valor =
