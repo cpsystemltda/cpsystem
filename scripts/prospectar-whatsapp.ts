@@ -50,9 +50,10 @@ function nomeCurtoEmpresa(razao: string): string {
     .split(" ")
     .filter((t) => t && !/^(DE|DA|DO|DAS|DOS|E)$/i.test(t));
 
-  const escolhidos = tokens.slice(0, 2).map((t) =>
-    t.length <= 3 ? t.toUpperCase() : t.charAt(0).toUpperCase() + t.slice(1).toLowerCase(),
-  );
+  const escolhidos = tokens.slice(0, 2).map((t) => {
+    if (t.length <= 3) return t.toUpperCase();
+    return ACENTOS[t.toLowerCase()] ?? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+  });
   return escolhidos.join(" ") || razao;
 }
 
@@ -65,19 +66,27 @@ function nomeCurtoEmpresa(razao: string): string {
  * segmento (antes da vírgula) e volta pra caixa de texto normal, preservando
  * siglas.
  */
+/**
+ * O portal guarda tudo em caixa alta e sem acento. "Instituto Federal de
+ * Educacao" ou "Ambar Servicos" numa abordagem comercial denuncia
+ * copiar-e-colar de planilha — vale tanto para o órgão quanto para o nome da
+ * empresa de quem vai ler.
+ */
+const ACENTOS: Record<string, string> = {
+  educacao: "Educação", ciencia: "Ciência", tecnologia: "Tecnologia",
+  saude: "Saúde", policia: "Polícia", municipio: "Município",
+  fundacao: "Fundação", universidade: "Universidade", federal: "Federal",
+  servicos: "Serviços", servico: "Serviço", producao: "Produção",
+  administracao: "Administração", gestao: "Gestão", regiao: "Região",
+  distrito: "Distrito", comercio: "Comércio", transito: "Trânsito",
+  agua: "Água", infraestrutura: "Infraestrutura", habitacao: "Habitação",
+  construcao: "Construção", construcoes: "Construções", solucoes: "Soluções",
+  alimenticios: "Alimentícios", eletrico: "Elétrico", eletrica: "Elétrica",
+  medicos: "Médicos", hospitalar: "Hospitalar", industria: "Indústria",
+  maquinas: "Máquinas", tecnicos: "Técnicos", tecnica: "Técnica",
+};
+
 function nomeOrgao(bruto: string): string {
-  // O portal guarda tudo sem acento. "Instituto Federal de Educacao" numa
-  // abordagem comercial denuncia copiar-e-colar de planilha, então as palavras
-  // que mais aparecem voltam escritas certo.
-  const ACENTOS: Record<string, string> = {
-    educacao: "Educação", ciencia: "Ciência", tecnologia: "Tecnologia",
-    saude: "Saúde", policia: "Polícia", municipio: "Município",
-    fundacao: "Fundação", universidade: "Universidade", federal: "Federal",
-    servicos: "Serviços", producao: "Produção", administracao: "Administração",
-    gestao: "Gestão", regiao: "Região", distrito: "Distrito",
-    comercio: "Comércio", transito: "Trânsito", agua: "Água",
-    infraestrutura: "Infraestrutura", habitacao: "Habitação",
-  };
   const CONECTIVOS = /^(DE|DA|DO|DAS|DOS|E|EM|NO|NA)$/i;
   const primeiro = bruto.split(",")[0].trim();
   return primeiro
@@ -135,10 +144,10 @@ function montarMensagem(l: {
   // Técnica. Quem não pede na hora descobre que precisa dele no meio da
   // próxima licitação, com o processo já arquivado.
   const miolo = vencido
-    ? `Vocês já pediram ao órgão o *Atestado de Capacidade Técnica* dessa contratação? É o que comprova qualificação técnica na próxima licitação, e quem deixa passar costuma descobrir com o processo já arquivado.\n\n` +
-      `O CP System avisa a hora de pedir, guarda todos os atestados num lugar só e ainda aponta as notas que o órgão não pagou.`
-    : `Nessa fase o dinheiro escapa em três pontos: prazo de entrega que vence e vira multa, nota emitida que passa meses sem o órgão pagar, e contrato que encerra sem o Atestado de Capacidade Técnica.\n\n` +
-      `O CP System acompanha os três e avisa antes, aqui pelo WhatsApp.`;
+    ? `Vocês já pediram ao órgão o *Atestado de Capacidade Técnica* dessa contratação? É o documento que comprova qualificação técnica na próxima licitação. Quem deixa passar costuma descobrir no meio de um certame — com o servidor que acompanhou a execução já fora do setor e o processo arquivado.\n\n` +
+      `O CP System avisa a hora de pedir, reúne todos os atestados num lugar só, buscáveis por órgão e por objeto na hora de montar a habilitação, e ainda aponta as notas que o órgão não pagou, com valor e dias de atraso.`
+    : `Quem vende para o governo perde dinheiro sempre nos mesmos três pontos: prazo de entrega que vence e vira multa, nota emitida que fica meses parada no órgão sem ninguém cobrar, e contrato que encerra sem o Atestado de Capacidade Técnica — e aí falta comprovação na licitação seguinte.\n\n` +
+      `O CP System existe só para essa fase, a de depois que a empresa ganhou: acompanha o saldo de cada item da ata, avisa o prazo antes de vencer e aponta cada nota que já deveria ter sido paga, com valor e dias de atraso. Tudo chega aqui no WhatsApp, sem precisar abrir sistema nenhum.`;
 
   // O caminho pra agir vai NA mensagem. Regina 22/09: *"você nem sequer pensou
   // em enviar o link do site, para a pessoa conhecer, para a pessoa talvez já
@@ -149,7 +158,7 @@ function montarMensagem(l: {
     `Olá! Aqui é do CP System.\n\n` +
     `${nome}, ${abertura}\n\n` +
     `${miolo}\n\n` +
-    `Dá pra conhecer e já testar grátis por 14 dias em *cpsystem.app.br* — sem compromisso.\n\n` +
+    `Dá para conhecer e já testar grátis por 14 dias em *cpsystem.app.br*, sem precisar cadastrar cartão.\n\n` +
     `Se preferir, eu mostro em 15 minutos com os contratos de vocês. Faz sentido?\n\n` +
     `Se não for do interesse, é só dizer.\n\n` +
     `Contato CP System`
