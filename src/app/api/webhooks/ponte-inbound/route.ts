@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { avisarEquipe } from "@/lib/alertaInterno";
 import { decidirRespostaIA, historicoDoUsuario } from "@/lib/ia-suporte";
 
 /**
@@ -29,9 +28,51 @@ type Payload = {
   messageId?: string;
   chatJid?: string;
   sender?: string;
+  /** Telefone de verdade. `sender` pode vir como LID, que não casa com cadastro. */
+  senderTelefone?: string;
   pushName?: string;
   texto?: string;
+  /** Alguém da equipe está atendendo esta conversa agora. */
+  humanoNoComando?: boolean;
+  /** O fio da conversa no WhatsApp, do mais antigo pro mais novo. */
+  conversa?: { autor?: string; texto?: string; quando?: string }[];
 };
+
+/**
+ * Aviso interno sai pela PONTE, não pela Z-API.
+ *
+ * `avisarEquipe` usa `enviarTexto`, que é Z-API — vencida desde 18/09. O aviso
+ * de "cliente pedindo reunião" foi postado lá e morreu no caminho, sem erro
+ * visível para ninguém. Aqui o aviso volta no corpo da resposta e quem entrega
+ * é a ponte, que é o canal que está de pé.
+ */
+function avisoParaEquipe(texto: string): { destino: string; texto: string }[] {
+  const grupo = process.env.SUPORTE_GROUP_ID || "";
+  return grupo ? [{ destino: grupo, texto }] : [];
+}
+
+/**
+ * Já prometemos retorno nesta conversa?
+ *
+ * Quando a IA escala, a única coisa que ela tem pra dizer ao cliente é "a
+ * equipe retorna". Dita duas vezes, isso deixa de ser atendimento e vira
+ * insistência — foi o que a Claudiamara recebeu, a mesma frase repetida
+ * enquanto negociava horário com a Regina.
+ *
+ * Instrução no prompt não basta: o modelo preenche o campo por hábito. Aqui a
+ * regra é de código, e o cliente continua atendido — a equipe é avisada do
+ * mesmo jeito, só não recebe mais um bilhete automático dizendo o óbvio.
+ */
+function jaPrometemosRetorno(
+  conversa: { autor: string; conteudo: string }[],
+): boolean {
+  const nossas = conversa.filter((m) => m.autor === "sistema").slice(-3);
+  return nossas.some((m) =>
+    /(retorn|verificando a disponibilidade|em breve|nossa equipe|um administrador|assume esta conversa)/i.test(
+      m.conteudo,
+    ),
+  );
+}
 
 export async function POST(req: NextRequest) {
   const segredo = process.env.PONTE_INBOUND_SECRET;
@@ -68,9 +109,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Quem está falando? O remetente vem como telefone; o cadastro pode ter o
-  // número com ou sem o nono dígito, então tenta as duas formas.
-  const cru = (body.sender ?? "").replace(/\D/g, "").replace(/^55/, "");
+  // Conversa com gente da equipe dentro: o robô não fala por cima.
+  //
+  // Regina, 21/09/2026, negociando horário com a C2Vendas enquanto a resposta
+  // automática repetia "um de nós assume esta conversa em instantes" para a
+  // mesma cliente: *"você está prejudicando a sequência que já tinha dado
+  // certo."* A equipe continua sendo avisada — o que para é a fala do robô.
+  if (body.humanoNoComando) {
+    return NextResponse.json({ resposta: null, motivo: "humano_no_comando" });
+  }
+
+  // Quem está falando? O telefone vem em `senderTelefone`; `sender` pode ser um
+  // LID (`280431333220532`), que não é telefone de ninguém e não casa com
+  // cadastro nenhum. Foi assim que a Claudiamara, cliente em teste, caiu como
+  // desconhecida e recebeu o texto fixo em vez da IA com o contexto dela.
+  const cru = (body.senderTelefone || body.sender || "")
+    .replace(/\D/g, "")
+    .replace(/^55/, "");
   const ddd = cru.slice(0, 2);
   const resto = cru.slice(2);
   const variantes = Array.from(
@@ -94,63 +149,78 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Desconhecido = lead de prospecção que respondeu. Também não fica sem
-  // resposta: a equipe assume, porque é conversa de venda e não de suporte.
-  if (!usuario) {
-    await avisarEquipe(
-      `💬 *Resposta de quem não é cliente*\n\n` +
-        `De: ${body.pushName || "—"} (${body.sender})\n\n` +
-        `"${texto.slice(0, 400)}"\n\n` +
-        `Provavelmente lead da prospecção. Assumam a conversa.`,
-    ).catch(() => {});
-    return NextResponse.json({
-      resposta:
-        `Obrigado pelo retorno! Aqui é do CP System. ` +
-        `Um de nós assume esta conversa em instantes para te atender direito.\n\n` +
-        `Se a mensagem chegou por engano ou não for do seu interesse, é só dizer que encerramos por aqui.\n\n` +
-        `Contato CP System`,
-    });
-  }
+  // O fio da conversa como está no WhatsApp. É o que impede a IA de tratar
+  // "Ideal seria 17 na quarta" como se fosse a primeira frase de um estranho.
+  const conversa = (body.conversa ?? [])
+    .filter((m) => (m.texto ?? "").trim())
+    .slice(-14)
+    .map((m) => ({
+      autor: m.autor === "nos" ? ("sistema" as const) : ("cliente" as const),
+      conteudo: String(m.texto).slice(0, 700),
+    }));
+
+  const quemEscreve = body.pushName || "—";
 
   try {
     const decisao = await decidirRespostaIA(texto, {
-      usuarioId: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
+      usuarioId: usuario?.id ?? "",
+      nome: usuario?.nome ?? quemEscreve,
+      email: usuario?.email ?? "",
       telefone: cru,
-      tipoConta: usuario.conta?.tipo === "ANALISTA" ? "ANALISTA" : "EMPRESA",
-      isSuperAdmin: usuario.superAdmin,
-      empresaRazao: usuario.conta?.empresas[0]?.razaoSocial ?? undefined,
-      statusAssinatura: usuario.conta?.statusAssinatura ?? undefined,
-      proximoVencimento: usuario.conta?.proximoVencimento ?? null,
-      // Histórico: sem ele a IA responde cada mensagem como se fosse a
-      // primeira, e o cliente tem que repetir o contexto toda vez.
-      ultimasMensagens: await historicoDoUsuario(usuario.id).catch(() => []),
+      tipoConta: usuario?.conta?.tipo === "ANALISTA" ? "ANALISTA" : "EMPRESA",
+      isSuperAdmin: usuario?.superAdmin ?? false,
+      empresaRazao: usuario?.conta?.empresas[0]?.razaoSocial ?? undefined,
+      statusAssinatura: usuario?.conta?.statusAssinatura ?? undefined,
+      proximoVencimento: usuario?.conta?.proximoVencimento ?? null,
+      // Quem não está no cadastro é lead: a IA responde do mesmo jeito, mas
+      // sabendo que não pode falar de conta, fatura ou dado de ninguém.
+      semCadastro: !usuario,
+      // Duas memórias, e as duas importam: o que o sistema já mandou por
+      // notificação, e a conversa real deste WhatsApp.
+      ultimasMensagens: [
+        ...conversa,
+        ...(usuario ? await historicoDoUsuario(usuario.id).catch(() => []) : []),
+      ],
     });
 
+    const avisos: { destino: string; texto: string }[] = [];
+    // Escalar de novo numa conversa onde já prometemos retorno: a equipe é
+    // avisada, o cliente não recebe a mesma frase pela segunda vez.
+    const calar =
+      decisao.acao === "escalar_admin" && jaPrometemosRetorno(conversa);
     if (decisao.acao === "escalar_admin") {
-      await avisarEquipe(
-        `🆘 *Suporte precisa de vocês*\n\n` +
-          `Cliente: ${usuario.nome} (${usuario.email})\n` +
-          `Categoria: ${decisao.categoria}\n\n` +
-          `Mensagem: "${texto.slice(0, 400)}"\n\n` +
-          `${decisao.resumoParaAdmin}`,
-      ).catch(() => {});
+      avisos.push(
+        ...avisoParaEquipe(
+          `🆘 *Suporte precisa de vocês*\n\n` +
+            `${usuario ? `Cliente: ${usuario.nome} (${usuario.email})` : `Fora do cadastro: ${quemEscreve} (${cru})`}\n` +
+            `Categoria: ${decisao.categoria}\n\n` +
+            `Mensagem: "${texto.slice(0, 400)}"\n\n` +
+            `${decisao.resumoParaAdmin}\n\n` +
+            (calar
+              ? `Nada foi respondido a ele — já prometemos retorno antes nesta conversa. Ele está esperando gente.`
+              : `Respondido a ele: "${decisao.resposta.slice(0, 200)}"`),
+        ),
+      );
     }
 
-    return NextResponse.json({ resposta: decisao.resposta });
+    return NextResponse.json({
+      resposta: calar ? null : decisao.resposta,
+      avisos,
+    });
   } catch (e) {
     console.error("[ponte-inbound] IA falhou:", e);
-    await avisarEquipe(
-      `⚠️ *IA de suporte falhou* — responder na mão\n\n` +
-        `Cliente: ${usuario.nome}\n"${texto.slice(0, 300)}"`,
-    ).catch(() => {});
-    // Falha da IA não pode virar silêncio: o cliente recebe o aviso de que a
-    // equipe assumiu, que é melhor do que não receber nada.
+    const primeiroNome = (usuario?.nome ?? quemEscreve).split(" ")[0];
+    // Falha da IA não pode virar silêncio: a equipe é chamada e o cliente
+    // recebe uma linha honesta, sem prometer prazo que ninguém garantiu.
     return NextResponse.json({
       resposta:
-        `Recebemos sua mensagem, ${usuario.nome.split(" ")[0]}! ` +
+        `Recebemos sua mensagem, ${primeiroNome}! ` +
         `Nossa equipe responde em instantes.\n\nContato CP System`,
+      avisos: avisoParaEquipe(
+        `⚠️ *IA de suporte falhou* — responder na mão\n\n` +
+          `${usuario ? `Cliente: ${usuario.nome}` : `Fora do cadastro: ${quemEscreve} (${cru})`}\n` +
+          `"${texto.slice(0, 300)}"`,
+      ),
     });
   }
 }
