@@ -120,32 +120,59 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
   // empresa de verdade de número inventado, e é a barreira mais alta contra
   // concorrente entrando disfarçado de cliente.
   //
-  // FALHA ABERTA de propósito: se a Receita estiver fora do ar ou demorar, o
-  // cadastro passa. Derrubar o funil inteiro porque uma API de terceiro caiu
-  // custaria mais caro que o risco que ela cobre — e o cadastro fica com o
-  // CNPJ registrado para conferência posterior.
-  try {
-    const { consultarCnpjNaReceita } = await import("@/lib/receitaCnpj");
-    const naReceita = await consultarCnpjNaReceita(cnpj);
-    if (naReceita) {
-      const situacao = (naReceita.situacao ?? "").toUpperCase();
-      if (situacao && situacao !== "ATIVA") {
-        return {
-          erro: `Este CNPJ consta na Receita Federal como "${naReceita.situacao}". Para usar o CP System, a inscrição precisa estar ativa.`,
-          campos: { cnpj: `Situação na Receita: ${naReceita.situacao}` },
-          valores,
-        };
-      }
-    } else {
-      return {
-        erro: "Não encontramos este CNPJ na Receita Federal. Confira o número informado.",
-        campos: { cnpj: "CNPJ não localizado na Receita Federal" },
-        valores,
-      };
-    }
-  } catch (e) {
-    console.error("[signup] consulta de CNPJ na Receita indisponível — seguindo:", e);
+  // NÃO FALHA MAIS ABERTO. Regina 22/09/2026: *"não dá para seguir com
+  // empresas sendo cadastradas de maneira falsa, com CNPJ inválido,
+  // informações mentirosas ou fraudulentas."*
+  //
+  // Antes, erro de rede e "CNPJ não existe" chegavam aqui como a mesma
+  // resposta, e o cadastro passava na dúvida — era a porta aberta. Agora são
+  // três respostas distintas, e cada uma tem um desfecho próprio.
+  //
+  // Barrar por indisponibilidade é incômodo e é de propósito: ficar de fora
+  // por dez minutos é reversível; concorrente dentro do sistema com empresa
+  // inventada não é.
+  let razaoOficial: string | null = null;
+  const { verificarCnpjNaReceita } = await import("@/lib/receitaCnpj");
+  const verificacao = await verificarCnpjNaReceita(cnpj);
+
+  if (!verificacao.ok && verificacao.motivo === "nao_encontrado") {
+    return {
+      erro: "Não encontramos este CNPJ na Receita Federal. Confira o número informado.",
+      campos: { cnpj: "CNPJ não localizado na Receita Federal" },
+      valores,
+    };
   }
+
+  if (!verificacao.ok) {
+    // Nenhuma das fontes respondeu. Isso é problema nosso, não do cliente —
+    // então a equipe fica sabendo na hora, porque cada minuto assim é funil
+    // parado.
+    const { avisarEquipe } = await import("@/lib/alertaInterno");
+    await avisarEquipe(
+      `⚠️ *Cadastro barrado: Receita fora do ar*\n\n` +
+        `CNPJ ${cnpj} — ${v.nome} (${emailNorm})\n\n` +
+        `As duas fontes de consulta falharam. Se isso se repetir, é a hora de ` +
+        `conferir na mão e liberar o cadastro.`,
+    ).catch(() => {});
+    return {
+      erro: "Não conseguimos confirmar seu CNPJ na Receita Federal agora. Tente de novo em alguns minutos — nossa equipe já foi avisada.",
+      campos: { cnpj: "Verificação indisponível no momento" },
+      valores,
+    };
+  }
+
+  const situacao = (verificacao.empresa.situacao ?? "").toUpperCase();
+  if (situacao && situacao !== "ATIVA") {
+    return {
+      erro: `Este CNPJ consta na Receita Federal como "${verificacao.empresa.situacao}". Para usar o CP System, a inscrição precisa estar ativa.`,
+      campos: { cnpj: `Situação na Receita: ${verificacao.empresa.situacao}` },
+      valores,
+    };
+  }
+
+  // A razão social passa a ser a da Receita, não a digitada. Fecha o outro
+  // lado da fraude: CNPJ real de terceiro com nome inventado por cima.
+  razaoOficial = verificacao.empresa.razaoSocial;
 
   // Regina 24/08 (pedido do Igor): o trial não exige mais cartão. Quem escolhe
   // "decidir depois" entra no teste sem meio de pagamento e escolhe PIX, boleto
@@ -351,7 +378,10 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
       },
       empresas: {
         create: {
-          razaoSocial: v.razaoSocial,
+          // A razão social é a que a Receita informa para este CNPJ. O que a
+          // pessoa digitou serve de rascunho, não de verdade: CNPJ real com
+          // nome inventado por cima era a outra metade da fraude.
+          razaoSocial: razaoOficial || v.razaoSocial,
           nomeFantasia: v.nomeFantasia || null,
           cnpj,
           porte: v.porte,

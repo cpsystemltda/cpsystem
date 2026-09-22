@@ -26,14 +26,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ erro: "unauthorized" }, { status: 401 });
   }
   const customer = url.searchParams.get("customer");
-  if (!customer) {
-    return NextResponse.json({ erro: "informe ?customer=cus_..." }, { status: 400 });
+  const invoice = url.searchParams.get("invoice");
+  if (!customer && !invoice) {
+    return NextResponse.json({ erro: "informe ?customer=cus_... ou ?invoice=inv_..." }, { status: 400 });
   }
 
   const apiKey = process.env.ASAAS_API_KEY;
   if (!apiKey) return NextResponse.json({ erro: "ASAAS_API_KEY ausente" }, { status: 500 });
 
   const base = asaasBaseUrl();
+
+  // Uma nota específica: é daqui que sai o PDF para entregar ao cliente.
+  if (invoice) {
+    const ri = await fetch(`${base}/invoices/${invoice}`, {
+      headers: { access_token: apiKey, "User-Agent": "CP System" },
+    });
+    if (!ri.ok) return NextResponse.json({ erro: `Asaas HTTP ${ri.status}` }, { status: 502 });
+    const inv = (await ri.json()) as Record<string, unknown>;
+    return NextResponse.json({
+      id: inv.id,
+      status: inv.status,
+      numero: inv.number,
+      valor: inv.value,
+      emitidaEm: inv.effectiveDate ?? null,
+      pdf: inv.pdfUrl ?? null,
+      xml: inv.xmlUrl ?? null,
+      link: inv.rpsSerie ? null : (inv.pdfUrl ?? null),
+    });
+  }
   const r = await fetch(`${base}/payments?customer=${customer}&limit=20&order=desc`, {
     headers: { access_token: apiKey, "User-Agent": "CP System" },
   });

@@ -137,17 +137,96 @@ async function buscar(cnpj: string): Promise<Record<string, unknown> | null> {
   return null;
 }
 
-export async function consultarCnpjNaReceita(cnpjBruto: string): Promise<EmpresaDaReceita | null> {
+/**
+ * Segunda fonte, só como reserva.
+ *
+ * Existe por um motivo específico: com UMA fonte, "não consegui consultar" e
+ * "CNPJ não existe" viravam a mesma resposta, e o cadastro tinha que passar na
+ * dúvida — era a porta por onde empresa inventada entraria. Com duas, a
+ * indisponibilidade total vira exceção, e aí dá pra barrar sem derrubar o
+ * funil a cada soluço de API de terceiro.
+ */
+async function buscarReserva(cnpj: string): Promise<Record<string, unknown> | null> {
+  const r = await fetch(`https://receitaws.com.br/v1/cnpj/${cnpj}`, {
+    headers: { accept: "application/json", "user-agent": USER_AGENT },
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!r.ok) return null;
+  const d = (await r.json()) as Record<string, unknown>;
+  if (String(d.status ?? "").toUpperCase() === "ERROR") return null;
+  // Formato diferente do da BrasilAPI: traduz só o que o cadastro precisa.
+  return {
+    razao_social: d.nome,
+    nome_fantasia: d.fantasia,
+    descricao_situacao_cadastral: d.situacao,
+    cep: d.cep,
+    email: d.email,
+    municipio: d.municipio,
+    uf: d.uf,
+    logradouro: d.logradouro,
+    numero: d.numero,
+    bairro: d.bairro,
+  };
+}
+
+export type ResultadoCnpj =
+  | { ok: true; empresa: EmpresaDaReceita }
+  /** A Receita respondeu e este CNPJ não existe. Resposta definitiva. */
+  | { ok: false; motivo: "nao_encontrado" }
+  /** Nenhuma fonte respondeu. NÃO é prova de nada — nem a favor, nem contra. */
+  | { ok: false; motivo: "indisponivel" };
+
+/**
+ * Igual a `consultarCnpjNaReceita`, mas diz POR QUE não achou.
+ *
+ * Regina 22/09/2026: *"não dá para seguir com empresas sendo cadastradas de
+ * maneira falsa, com CNPJ inválido, informações mentirosas ou fraudulentas."*
+ *
+ * A distinção é o que permite obedecer isso sem quebrar o cadastro de quem é
+ * legítimo: "não existe" barra na hora; "não consegui consultar" é tratado
+ * como falha nossa, não como aval ao cadastro.
+ */
+export async function verificarCnpjNaReceita(cnpjBruto: string): Promise<ResultadoCnpj> {
   const cnpj = cnpjBruto.replace(/\D/g, "");
-  if (!validarCnpj(cnpj)) return null;
+  if (!validarCnpj(cnpj)) return { ok: false, motivo: "nao_encontrado" };
 
   let d: Record<string, unknown> | null = null;
+  let alcancouAlguma = false;
+
   try {
     d = await buscar(cnpj);
+    alcancouAlguma = true;
   } catch {
-    return null; // sem rede / timeout: degrada pra preenchimento manual
+    // fonte principal fora — tenta a reserva
   }
-  if (!d) return null;
+
+  if (!d) {
+    try {
+      d = await buscarReserva(cnpj);
+      alcancouAlguma = true;
+    } catch {
+      /* reserva também fora */
+    }
+  }
+
+  if (!d) {
+    return { ok: false, motivo: alcancouAlguma ? "nao_encontrado" : "indisponivel" };
+  }
+
+  const empresa = await montarEmpresa(cnpj, d);
+  return empresa ? { ok: true, empresa } : { ok: false, motivo: "nao_encontrado" };
+}
+
+export async function consultarCnpjNaReceita(cnpjBruto: string): Promise<EmpresaDaReceita | null> {
+  const r = await verificarCnpjNaReceita(cnpjBruto);
+  return r.ok ? r.empresa : null;
+}
+
+async function montarEmpresa(
+  cnpj: string,
+  d: Record<string, unknown>,
+): Promise<EmpresaDaReceita | null> {
+  void cnpj;
 
   const razao = String(d.razao_social ?? "").trim();
   const fantasia = String(d.nome_fantasia ?? "").trim();
