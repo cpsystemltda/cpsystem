@@ -79,37 +79,36 @@ function montarMensagem(l: {
   const orgao = l.orgao ?? "o órgão";
   const vencido = dias < 0;
 
-  const carteira =
+  const valor =
     l.qtdContratos > 1
-      ? `Somando os ${l.qtdContratos} contratos que aparecem no portal, são ${brl(l.valorTotal)}.`
-      : `São ${brl(l.valorTotal)} em contrato.`;
+      ? `${brl(l.valorTotal)} em ${l.qtdContratos} contratos`
+      : `${brl(l.valorTotal)}`;
 
   const abertura = vencido
-    ? `o contrato de vocês com ${orgao} encerrou em ${dataBr(l.venceEm)}. ${carteira}`
+    ? `o contrato de vocês com ${orgao} encerrou em ${dataBr(l.venceEm)} — ${valor}.`
     : dias <= 60
-      ? `o contrato de vocês com ${orgao} vence em ${dataBr(l.venceEm)} — daqui a ${dias} dias. ${carteira}`
-      : `vocês têm contrato com ${orgao} vigente até ${dataBr(l.venceEm)}. ${carteira}`;
+      ? `o contrato de vocês com ${orgao} vence em ${dataBr(l.venceEm)}, daqui a ${dias} dias — ${valor}.`
+      : `vocês têm contrato com ${orgao} até ${dataBr(l.venceEm)} — ${valor}.`;
 
-  // Contrato encerrado tem outra dor, e a mais cara delas: o Atestado de
-  // Capacidade Técnica. Quem não pede na hora descobre que precisa dele no
-  // meio da próxima licitação, com o processo já arquivado.
+  // Curta de propósito. Regina 21/09: *"estou achando a mensagem muito longa,
+  // precisa ser mais objetiva"*. Mensagem de venda que pede rolagem não é
+  // lida; o lugar de explicar o produto é a conversa que ela abre.
+  //
+  // Contrato encerrado tem outra dor, e a mais cara: o Atestado de Capacidade
+  // Técnica. Quem não pede na hora descobre que precisa dele no meio da
+  // próxima licitação, com o processo já arquivado.
   const miolo = vencido
-    ? `Uma pergunta direta: vocês já pediram ao órgão o *Atestado de Capacidade Técnica* dessa contratação?\n\n` +
-      `É o documento que comprova qualificação técnica na próxima licitação. Quem não pede logo depois do encerramento costuma descobrir que precisa dele no meio de um certame — e aí o servidor que acompanhou a execução já saiu do setor e o processo está arquivado.\n\n` +
-      `Além disso, é comum sobrar nota emitida sem pagamento mesmo depois de o contrato acabar.\n\n` +
-      `O CP System avisa quando a contratação encerra e é hora de pedir o atestado, guarda todos eles num lugar só, e aponta cada nota que já deveria ter sido paga, com valor e dias de atraso.`
-    : `Três coisas costumam custar caro a quem vende para o governo:\n\n` +
-      `▸ prazo de entrega que vence sem ninguém lembrar, e vira multa;\n` +
-      `▸ nota fiscal emitida que passa meses sem pagamento, sem ninguém cobrar o órgão;\n` +
-      `▸ contrato que encerra sem pedir o Atestado de Capacidade Técnica — e depois falta comprovação na próxima licitação.\n\n` +
-      `O CP System acompanha isso sozinho: avisa o prazo antes de vencer, mostra o saldo de cada ata e aponta toda nota que já deveria ter sido paga, com valor e dias de atraso.`;
+    ? `Vocês já pediram ao órgão o *Atestado de Capacidade Técnica* dessa contratação? É o que comprova qualificação técnica na próxima licitação, e quem deixa passar costuma descobrir com o processo já arquivado.\n\n` +
+      `O CP System avisa a hora de pedir, guarda todos os atestados num lugar só e ainda aponta as notas que o órgão não pagou.`
+    : `Nessa fase o dinheiro escapa em três pontos: prazo de entrega que vence e vira multa, nota emitida que passa meses sem o órgão pagar, e contrato que encerra sem o Atestado de Capacidade Técnica.\n\n` +
+      `O CP System acompanha os três e avisa antes, aqui pelo WhatsApp.`;
 
   return (
     `Olá! Aqui é do CP System.\n\n` +
     `${nome}, ${abertura}\n\n` +
     `${miolo}\n\n` +
-    `Faz sentido uma conversa de 15 minutos para eu mostrar com os contratos de vocês?\n\n` +
-    `Se não for do seu interesse, é só me dizer que não insisto.\n\n` +
+    `Faz sentido 15 minutos para eu mostrar com os contratos de vocês?\n\n` +
+    `Se não for do interesse, é só dizer.\n\n` +
     `Contato CP System`
   );
 }
@@ -120,7 +119,10 @@ async function enviarPelaPonte(telefone: string, texto: string): Promise<{ ok: b
     const r = await fetch(`${PONTE}/api/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ recipient: numero, message: texto }),
+      // `automatico`: disparo de script não é gente atendendo. Sem isso a
+      // ponte trancaria a resposta automática justamente em quem a gente
+      // acabou de abordar — e quem respondesse ficaria sem retorno.
+      body: JSON.stringify({ recipient: numero, message: texto, automatico: true }),
     });
     const corpo = await r.json().catch(() => ({}));
     if (!r.ok || corpo?.success === false) {

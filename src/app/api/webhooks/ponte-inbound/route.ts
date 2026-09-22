@@ -116,7 +116,19 @@ export async function POST(req: NextRequest) {
   // mesma cliente: *"você está prejudicando a sequência que já tinha dado
   // certo."* A equipe continua sendo avisada — o que para é a fala do robô.
   if (body.humanoNoComando) {
-    return NextResponse.json({ resposta: null, motivo: "humano_no_comando" });
+    // Calar não é abandonar: a equipe vê a mensagem no grupo e segue a
+    // conversa. Silêncio sem registro seria a regra de "ninguém fica sem
+    // resposta" quebrando pela porta dos fundos.
+    return NextResponse.json({
+      resposta: null,
+      motivo: "humano_no_comando",
+      avisos: avisoParaEquipe(
+        `💬 *Mensagem numa conversa que vocês estão atendendo*\n\n` +
+          `De: ${body.pushName || "—"} (${body.senderTelefone || body.sender})\n\n` +
+          `"${texto.slice(0, 400)}"\n\n` +
+          `Não respondi automaticamente para não atravessar o atendimento.`,
+      ),
+    });
   }
 
   // Quem está falando? O telefone vem em `senderTelefone`; `sender` pode ser um
