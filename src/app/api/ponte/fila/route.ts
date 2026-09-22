@@ -41,6 +41,19 @@ const LOTE = 10;
  */
 const POR_PESSOA_NA_RODADA = 2;
 
+/**
+ * Marca de quem já saiu da fila por ter sido substituída.
+ *
+ * Detalhe que custou três mensagens repetidas pro César na primeira hora: o
+ * descarte gravava status FALHOU, e FALHOU é justamente o que a fila recolhe.
+ * As descartadas voltavam na rodada seguinte, uma por vez. Sem status próprio
+ * no enum, a marca fica no texto do erro — e é ela que exclui daqui pra frente.
+ */
+const MARCA_DESCARTE = "substituída por versão mais recente";
+
+/** Teto diário por pessoa, o mesmo do disparo (Regina 08/07, depois do flood). */
+const LIMITE_DIARIO_POR_PESSOA = 4;
+
 function autorizado(req: NextRequest): boolean {
   const segredo = process.env.PONTE_INBOUND_SECRET;
   if (!segredo) return true; // sem segredo configurado, não trava a entrega
@@ -58,6 +71,7 @@ export async function GET(req: NextRequest) {
       // isso, o cliente que ficou sem o aviso continuaria sem ele.
       status: { in: ["PENDENTE", "FALHOU"] },
       criadoEm: { gte: new Date(Date.now() - VALIDADE_HORAS * 3600_000) },
+      NOT: { erro: { startsWith: MARCA_DESCARTE } },
     },
     orderBy: { criadoEm: "desc" }, // a mais nova de cada assunto é a que vale
     select: { id: true, usuarioId: true, telefone: true, mensagem: true, tipo: true },
@@ -66,6 +80,21 @@ export async function GET(req: NextRequest) {
   // Mesma pessoa, mesmo assunto: só a versão mais recente vai. As anteriores
   // saem da fila — quatro avisos do mesmo empenho não informam quatro vezes
   // mais, só queimam a paciência de quem recebe.
+  // Quanto cada um já recebeu hoje. O teto diário é do disparo, mas a entrega
+  // agora acontece depois e em outro lugar — se não contar aqui também, a fila
+  // vira a porta dos fundos do limite que existe justamente pra não afogar
+  // ninguém.
+  const inicioDoDia = new Date();
+  inicioDoDia.setHours(0, 0, 0, 0);
+  const enviadasHoje = await prisma.notificacaoWhatsApp.groupBy({
+    by: ["usuarioId"],
+    where: { status: "ENVIADA", enviadaEm: { gte: inicioDoDia } },
+    _count: { _all: true },
+  });
+  const jaRecebeuHoje = new Map(
+    enviadasHoje.map((r) => [r.usuarioId, r._count._all]),
+  );
+
   const jaTem = new Set<string>();
   const porPessoa = new Map<string, number>();
   const escolhidas: typeof candidatas = [];
@@ -79,7 +108,9 @@ export async function GET(req: NextRequest) {
     }
     jaTem.add(assunto);
 
+    const hoje = jaRecebeuHoje.get(m.usuarioId) ?? 0;
     const quantas = porPessoa.get(m.usuarioId) ?? 0;
+    if (hoje + quantas >= LIMITE_DIARIO_POR_PESSOA) continue; // teto do dia
     if (quantas >= POR_PESSOA_NA_RODADA) continue; // fica pra próxima rodada
     porPessoa.set(m.usuarioId, quantas + 1);
 
@@ -90,7 +121,7 @@ export async function GET(req: NextRequest) {
   if (descartadas.length > 0) {
     await prisma.notificacaoWhatsApp.updateMany({
       where: { id: { in: descartadas } },
-      data: { status: "FALHOU", erro: "substituída por versão mais recente do mesmo aviso" },
+      data: { status: "FALHOU", erro: `${MARCA_DESCARTE} do mesmo aviso` },
     });
   }
 
