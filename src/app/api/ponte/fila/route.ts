@@ -51,6 +51,23 @@ const POR_PESSOA_NA_RODADA = 2;
  */
 const MARCA_DESCARTE = "substituída por versão mais recente";
 
+/**
+ * Avisos que se substituem, e só eles.
+ *
+ * Resumo e lembrete são retratos do mesmo estado: o de hoje torna o de ontem
+ * inútil, e mandar os dois é ruído. Já COMISSAO_LIBERADA e NF_EMITIDA_CLIENTE
+ * são FATOS distintos — três comissões são três dinheiros, e colapsar isso
+ * sumiria com dois avisos que o analista tem direito de receber. Fora desta
+ * lista, nada é descartado por duplicidade.
+ */
+const SUBSTITUIVEIS = new Set([
+  "RESUMO_SEMANAL_EMPRESA",
+  "RESUMO_SEMANAL_ANALISTA",
+  "VENCIMENTO_EMPENHO",
+  "PLANO_ATRASADO",
+  "ATIVACAO",
+]);
+
 /** Teto diário por pessoa, o mesmo do disparo (Regina 08/07, depois do flood). */
 const LIMITE_DIARIO_POR_PESSOA = 4;
 
@@ -123,11 +140,13 @@ export async function GET(req: NextRequest) {
 
   for (const m of candidatas) {
     const assunto = `${m.usuarioId}:${m.tipo}`;
-    if (jaTem.has(assunto)) {
-      descartadas.push(m.id);
-      continue;
+    if (SUBSTITUIVEIS.has(m.tipo)) {
+      if (jaTem.has(assunto)) {
+        descartadas.push(m.id);
+        continue;
+      }
+      jaTem.add(assunto);
     }
-    jaTem.add(assunto);
 
     const hoje = jaRecebeuHoje.get(m.usuarioId) ?? 0;
     const quantas = porPessoa.get(m.usuarioId) ?? 0;
