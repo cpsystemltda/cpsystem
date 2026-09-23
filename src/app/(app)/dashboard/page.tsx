@@ -283,6 +283,26 @@ export default async function DashboardPage({
           { dataEntregaCerta: { gte: mesAgenda, lt: fimMesAgenda } },
           { dataPrevistaExecucao: { gte: mesAgenda, lt: fimMesAgenda } },
           { vigenciaFim: { gte: mesAgenda, lt: fimMesAgenda } },
+          // Prazo RELATIVO ("entregar em 30 dias") não tem coluna com a data
+          // limite: ela é `dataPedidoRecebido + prazoEntregaDias`, e só existe
+          // depois da conta, em `janelaExecucao`. Sem este ramo o empenho
+          // sumia de TODO mês: não era buscado no mês em que a entrega cai, e
+          // no mês da vigência era buscado e descartado pelo filtro do JS,
+          // porque a janela dele apontava pra frente.
+          //
+          // Foi o caso da C2Vendas em 23/09: empenho 444, pedido recebido em
+          // 04/09 com 30 dias de prazo — entrega em 04/10, e invisível no
+          // calendário inteiro. Primeiro empenho que a cliente lançou.
+          {
+            prazoEntregaModo: "RELATIVO",
+            dataPedidoRecebido: {
+              // Teto: pedido recebido antes do fim do mês exibido — entrega
+              // nunca é anterior ao pedido. Piso: dois anos, que cobre prazo
+              // em meses e anos sem varrer a base inteira.
+              lt: fimMesAgenda,
+              gte: new Date(mesAgenda.getTime() - 730 * 86400000),
+            },
+          },
         ],
       },
       select: {
