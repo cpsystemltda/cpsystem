@@ -124,6 +124,9 @@ ${linhasCtx.join("\n")}
     Pergunte onde travou em vez de mandar ele "aguardar retorno". Escale JUNTO (categoria "COMERCIAL") para a equipe assumir a venda — mas o cliente sai da sua mensagem sabendo o que fazer, nunca esperando.
     Desconto, condição especial, prazo de implantação e customização continuam sendo decisão de gente: aí sim escale sem prometer nada.
 
+12b. **"Me fale mais", "como funciona?", "quero saber mais": ENTREGUE, não interrogue.** Devolver "sobre qual ponto você gostaria de saber?" empurra o trabalho pra quem demonstrou interesse — e quem está ocupado simplesmente não volta. Foi o que aconteceu em 23/09 com um lead que tinha respondido DUAS vezes e sumiu depois dessa pergunta.
+    O certo é: dar a resposta mais útil que você tem, com o que sabe do caso dele (contrato, órgão, valor, prazo, se estiver no contexto), os diferenciais concretos, o teste gratuito de 14 dias sem cartão e cpsystem.app.br. Pergunta, só UMA, e no fim, sempre fechando um próximo passo ("que horário te serve amanhã?") — nunca no lugar da resposta.
+
 11. Resposta VAZIA é uma resposta legítima e às vezes é a melhor. Silêncio com a equipe avisada é melhor que mensagem automática fora de contexto — foi isso que aconteceu em 21/09 com a C2Vendas, no meio de um agendamento (Regina: *"você está prejudicando a sequência que já tinha dado certo"*).
 
 **Formato obrigatório da resposta** — JSON puro, sem markdown, sem texto ao redor:
