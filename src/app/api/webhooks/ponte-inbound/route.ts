@@ -47,8 +47,18 @@ type Payload = {
  * é a ponte, que é o canal que está de pé.
  */
 function avisoParaEquipe(texto: string): { destino: string; texto: string }[] {
-  const grupo = process.env.SUPORTE_GROUP_ID || "";
-  return grupo ? [{ destino: grupo, texto }] : [];
+  const grupo = (process.env.SUPORTE_GROUP_ID || "").trim();
+  if (!grupo) return [];
+
+  // `SUPORTE_GROUP_ID` está gravado no formato da Z-API (`...-group`), que é
+  // invenção dela — a ponte fala JID. Sem esta tradução o aviso era gerado,
+  // devolvido e entregue em um endereço que não existe: o grupo de suporte
+  // passou três dias mudo enquanto o sistema achava que estava avisando.
+  const destino = grupo.includes("@")
+    ? grupo
+    : `${grupo.replace(/-group$/, "").replace(/\D/g, "")}@g.us`;
+
+  return [{ destino, texto }];
 }
 
 /**
