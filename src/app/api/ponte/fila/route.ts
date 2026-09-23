@@ -65,17 +65,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ erro: "unauthorized" }, { status: 401 });
   }
 
-  const candidatas = await prisma.notificacaoWhatsApp.findMany({
+  const brutas = await prisma.mensagemSaidaWhatsApp.findMany({
     where: {
       // FALHOU entra junto: é exatamente o que a Z-API deixou para trás. Sem
       // isso, o cliente que ficou sem o aviso continuaria sem ele.
       status: { in: ["PENDENTE", "FALHOU"] },
       criadoEm: { gte: new Date(Date.now() - VALIDADE_HORAS * 3600_000) },
-      NOT: { erro: { startsWith: MARCA_DESCARTE } },
+      // `NOT` sozinho descartaria toda linha com `erro` nulo — que são
+      // justamente as novas, nunca tentadas. Em SQL, NOT(NULL LIKE 'x%') é
+      // NULL, e NULL não é verdadeiro. Custou uma fila que parecia vazia com
+      // três mensagens dentro.
+      OR: [{ erro: null }, { NOT: { erro: { startsWith: MARCA_DESCARTE } } }],
+      tentativas: { lt: 5 },
     },
     orderBy: { criadoEm: "desc" }, // a mais nova de cada assunto é a que vale
-    select: { id: true, usuarioId: true, telefone: true, mensagem: true, tipo: true },
+    select: {
+      id: true, usuarioId: true, destino: true, texto: true, tipo: true,
+      documentoUrl: true, nomeArquivo: true,
+    },
   });
+
+  // Aviso interno (grupo de suporte) não tem usuário nem assunto, e não pode
+  // ser silenciado por teto nenhum: é a equipe descobrindo que um cliente está
+  // esperando. Vai sempre, e na frente.
+  const candidatas = brutas.map((m) => ({
+    id: m.id,
+    usuarioId: m.usuarioId ?? `avulso:${m.id}`,
+    telefone: m.destino,
+    mensagem: m.texto,
+    tipo: m.tipo ?? `avulso:${m.id}`,
+    documentoUrl: m.documentoUrl,
+    nomeArquivo: m.nomeArquivo,
+  }));
 
   // Mesma pessoa, mesmo assunto: só a versão mais recente vai. As anteriores
   // saem da fila — quatro avisos do mesmo empenho não informam quatro vezes
@@ -119,15 +140,31 @@ export async function GET(req: NextRequest) {
   }
 
   if (descartadas.length > 0) {
-    await prisma.notificacaoWhatsApp.updateMany({
+    await prisma.mensagemSaidaWhatsApp.updateMany({
       where: { id: { in: descartadas } },
       data: { status: "FALHOU", erro: `${MARCA_DESCARTE} do mesmo aviso` },
     });
   }
 
+  // Conta a tentativa antes de entregar. Mensagem que derruba a ponte no meio
+  // do caminho volta pra fila, e sem este contador voltaria pra sempre.
+  if (escolhidas.length > 0) {
+    await prisma.mensagemSaidaWhatsApp.updateMany({
+      where: { id: { in: escolhidas.map((m) => m.id) } },
+      data: { tentativas: { increment: 1 } },
+    });
+  }
+
   return NextResponse.json({
-    mensagens: escolhidas.map(({ id, telefone, mensagem, tipo }) => ({
-      id, telefone, mensagem, tipo,
+    mensagens: escolhidas.map((m) => ({
+      id: m.id,
+      telefone: m.telefone,
+      mensagem: m.mensagem,
+      tipo: m.tipo,
+      // Anexo: a ponte baixa e manda como documento. É o que faltava pra nota
+      // fiscal chegar em PDF, e não como link (Regina 07/07 e de novo 22/09).
+      documentoUrl: m.documentoUrl ?? undefined,
+      nomeArquivo: m.nomeArquivo ?? undefined,
     })),
   });
 }
@@ -152,12 +189,23 @@ export async function POST(req: NextRequest) {
   for (const r of resultados) {
     if (!r?.id) continue;
     try {
-      await prisma.notificacaoWhatsApp.update({
+      const dados = r.ok
+        ? { status: "ENVIADA" as const, enviadaEm: new Date(), erro: null }
+        : { status: "FALHOU" as const, erro: (r.erro || "ponte não entregou").slice(0, 500) };
+
+      const linha = await prisma.mensagemSaidaWhatsApp.update({
         where: { id: r.id },
-        data: r.ok
-          ? { status: "ENVIADA", enviadaEm: new Date(), erro: null }
-          : { status: "FALHOU", erro: (r.erro || "ponte não entregou").slice(0, 500) },
+        data: dados,
+        select: { notificacaoId: true },
       });
+
+      // O registro de negócio anda junto. Sem isso, `NotificacaoWhatsApp`
+      // ficaria eternamente PENDENTE e a idempotência mandaria de novo.
+      if (linha.notificacaoId) {
+        await prisma.notificacaoWhatsApp
+          .update({ where: { id: linha.notificacaoId }, data: dados })
+          .catch(() => {});
+      }
       if (r.ok) entregues++;
     } catch {
       // Registro apagado entre o GET e o POST não invalida o resto do lote.

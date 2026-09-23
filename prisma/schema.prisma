@@ -333,6 +333,51 @@ enum SituacaoLead {
   NAO_PERTURBAR
 }
 
+/// Fila de saída do WhatsApp: TUDO que o sistema manda passa por aqui.
+///
+/// Regina, 22/09/2026: *"quando que você vai finalmente corrigir todos os
+/// caminhos que estão Z-API, sem estragar o fluxo, sem estragar o padrão das
+/// mensagens, sem alterar a inteligência por trás disso? Apenas mudando a
+/// forma de envio."*
+///
+/// É exatamente o que esta tabela faz. `enviarTexto` e `enviarDocumentoPdf`
+/// são os dois gargalos por onde todo envio já passava — resumo diário, aviso
+/// de prazo, cobrança, nota fiscal, resposta de suporte, aviso interno. Em vez
+/// de reescrever cada chamador, eles gravam aqui e a ponte vem buscar. Nenhum
+/// texto muda, nenhuma decisão muda: muda só quem entrega.
+///
+/// `NotificacaoWhatsApp` continua sendo o registro de negócio (idempotência,
+/// opt-in, teto diário). Esta aqui é só transporte, e aponta pra lá em
+/// `notificacaoId` para o status dos dois andar junto.
+model MensagemSaidaWhatsApp {
+  id        String @id @default(cuid())
+  /// Telefone E.164 sem "+", ou JID de grupo (...@g.us).
+  destino   String
+  texto     String @db.Text
+
+  /// Anexo. A ponte baixa a URL e manda como documento no WhatsApp — foi o que
+  /// faltou pro Léo receber a nota fiscal em anexo em 22/09.
+  documentoUrl String?
+  nomeArquivo  String?
+
+  /// Quem vai receber, quando há um usuário por trás. Serve pro teto diário.
+  usuarioId String?
+  /// Tipo do aviso, pra não mandar dois do mesmo assunto na mesma rodada.
+  tipo      String?
+
+  /// Espelha o status no registro de negócio quando existe.
+  notificacaoId String?
+
+  status    StatusNotificacaoWhatsApp @default(PENDENTE)
+  erro      String?
+  tentativas Int                      @default(0)
+  criadoEm  DateTime                  @default(now())
+  enviadaEm DateTime?
+
+  @@index([status, criadoEm])
+  @@index([usuarioId])
+}
+
 model NotificacaoWhatsApp {
   id           String                    @id @default(cuid())
   usuarioId    String

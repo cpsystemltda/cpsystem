@@ -162,10 +162,67 @@ export function formatarDestino(raw: string): string {
 // Envia mensagem de texto via Z-API. Retorna o messageId.
 // Lanca erro se falhar — o caller decide se propaga ou log-e-segue.
 // SEMPRE checa status de conexao antes (nao enfileira em instancia offline).
+/**
+ * Endereço no dialeto da ponte.
+ *
+ * Grupo, para a ponte, é JID (`120363...@g.us`) — que é como o WhatsApp
+ * identifica de verdade. O `-group` da Z-API é invenção dela.
+ */
+function destinoParaPonte(raw: string): string {
+  const cru = raw.trim();
+  if (cru.includes("@")) return cru; // já é JID
+  if (cru.endsWith("-group")) return `${cru.replace(/-group$/, "")}@g.us`;
+  const soDigitos = cru.replace(/\D/g, "");
+  if (soDigitos.length >= 17) return `${soDigitos}@g.us`;
+  return formatarTelefone(cru);
+}
+
+/**
+ * Enfileira para a ponte entregar.
+ *
+ * Este é o ponto onde a Z-API sai do caminho de TODO envio — e sai sem que
+ * nenhum chamador precise mudar. Regina 22/09/2026: *"apenas mudando a forma
+ * de envio"*, sem estragar o fluxo, o padrão das mensagens nem a inteligência
+ * por trás delas. Texto, decisão e destinatário continuam vindo de quem
+ * chamou; muda só quem leva.
+ */
+async function enfileirarParaPonte(opts: {
+  destino: string;
+  texto: string;
+  documentoUrl?: string;
+  nomeArquivo?: string;
+  usuarioId?: string;
+  tipo?: string;
+  notificacaoId?: string;
+}): Promise<{ messageId: string }> {
+  const { prisma: db } = await import("@/lib/prisma");
+  const linha = await db.mensagemSaidaWhatsApp.create({
+    data: {
+      // Endereço na forma que a PONTE entende, não a da Z-API.
+      // `formatarDestino` transforma grupo em "…-group", que é dialeto da
+      // Z-API: a ponte fala JID (`…@g.us`) e o aviso interno ia parar em
+      // lugar nenhum.
+      destino: destinoParaPonte(opts.destino),
+      texto: opts.texto,
+      documentoUrl: opts.documentoUrl ?? null,
+      nomeArquivo: opts.nomeArquivo ?? null,
+      usuarioId: opts.usuarioId ?? null,
+      tipo: opts.tipo ?? null,
+      notificacaoId: opts.notificacaoId ?? null,
+    },
+    select: { id: true },
+  });
+  return { messageId: `fila:${linha.id}` };
+}
+
 export async function enviarTexto(
   telefone: string,
   mensagem: string,
+  meta?: { usuarioId?: string; tipo?: string; notificacaoId?: string },
 ): Promise<{ messageId: string }> {
+  if (transportePonte()) {
+    return enfileirarParaPonte({ destino: telefone, texto: mensagem, ...meta });
+  }
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
   await checarConexaoZapi();
   const phone = formatarDestino(telefone);
@@ -382,12 +439,18 @@ export async function dispararNotificacao(opts: {
   // caminho de VOLTA — a Vercel não alcança a ponte, que roda em localhost.
   // Resolve-se invertendo quem liga: a ponte pergunta "tem mensagem pra
   // mandar?" de minuto em minuto e entrega. Sem túnel, sem porta aberta.
-  if (transportePonte()) {
-    return { enviado: true, messageId: `fila:${registro.id}` };
-  }
-
   try {
-    const r = await enviarTexto(usuario.telefoneWhatsApp, opts.mensagem);
+    const r = await enviarTexto(usuario.telefoneWhatsApp, opts.mensagem, {
+      usuarioId: opts.usuarioId,
+      tipo: opts.tipo,
+      notificacaoId: registro.id,
+    });
+    // Pela ponte a entrega é assíncrona: quem confirma é a própria ponte,
+    // depois de o WhatsApp aceitar. Marcar ENVIADA aqui seria repetir o erro
+    // da Z-API, que devolvia sucesso com a instância fora do ar.
+    if (r.messageId.startsWith("fila:")) {
+      return { enviado: true, messageId: r.messageId };
+    }
     await prisma.notificacaoWhatsApp.update({
       where: { id: registro.id },
       data: { status: "ENVIADA", enviadaEm: new Date(), erro: null },
@@ -422,7 +485,17 @@ export async function enviarDocumentoPdf(
   pdfUrl: string,
   fileName: string,
   caption?: string,
+  meta?: { usuarioId?: string; tipo?: string; notificacaoId?: string },
 ): Promise<{ messageId: string }> {
+  if (transportePonte()) {
+    return enfileirarParaPonte({
+      destino: telefone,
+      texto: caption ?? "",
+      documentoUrl: pdfUrl,
+      nomeArquivo: fileName,
+      ...meta,
+    });
+  }
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
   await checarConexaoZapi();
   const phone = formatarDestino(telefone);
@@ -610,7 +683,11 @@ export async function dispararNotificacaoComPdf(opts: {
       opts.pdfUrl,
       opts.fileName,
       opts.caption,
+      { usuarioId: opts.usuarioId, tipo: opts.tipo, notificacaoId: registro.id },
     );
+    if (r.messageId.startsWith("fila:")) {
+      return { enviado: true, messageId: r.messageId };
+    }
     await prisma.notificacaoWhatsApp.update({
       where: { id: registro.id },
       data: { status: "ENVIADA", enviadaEm: new Date(), erro: null },
