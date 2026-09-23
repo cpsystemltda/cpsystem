@@ -68,7 +68,10 @@ export const getUsuarioAtual = cache(async function getUsuarioAtual() {
     return null;
   }
 
-  const usuarioReal = sessao.usuario;
+  // `espionando` acompanha o usuário em TODOS os caminhos, não só no do
+  // espião: como união de tipos, quem lê o campo precisa que ele exista nos
+  // dois lados, senão o TypeScript recusa a leitura e a proteção não é usada.
+  const usuarioReal = { ...sessao.usuario, espionando: false as boolean };
 
   // Modo espionagem: super admin "entra como cliente" e vê o sistema em
   // somente leitura. O swap substitui contaId/conta pelo alvo e zera os
@@ -84,12 +87,22 @@ export const getUsuarioAtual = cache(async function getUsuarioAtual() {
   });
   if (!contaAlvo) return usuarioReal;
 
-  const usuarioEspiao: typeof usuarioReal = {
+  // `espionando` existe porque o swap NÃO troca o id do usuário — e isso é
+  // proposital, pra auditoria registrar quem espionou. O efeito colateral é
+  // que toda busca por `usuarioId: usuario.id` devolve dado PESSOAL do super
+  // admin dentro da tela do cliente: em 23/09 a página de Integrações do
+  // cliente mostrou "Conectado como regina@cpsystem.app.br".
+  //
+  // Quem exibe dado de pessoa (Google conectado, sessões, preferências de
+  // notificação) precisa saber que está em espionagem e não mostrar o do
+  // espião. A alternativa — trocar o id — quebraria a auditoria.
+  const usuarioEspiao = {
     ...usuarioReal,
     contaId: contaAlvo.id,
     conta: contaAlvo,
     superAdmin: false,
-    perfil: "VISUALIZADOR",
+    perfil: "VISUALIZADOR" as const,
+    espionando: true,
   };
   return usuarioEspiao;
 });

@@ -23,6 +23,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { podeAcessarModulo } from "@/lib/modulosAcesso";
 import { AvisoColaboradores } from "@/components/AvisoColaboradores";
 import { prisma } from "@/lib/prisma";
+import { ondeDoUsuario } from "@/lib/escopoUsuario";
 import { dadosPorUf, extrairUf } from "@/lib/agregacaoUf";
 import { coletarPinsOrgaos } from "@/lib/pinsOrgaos";
 import { coletarPinsEntregas } from "@/lib/pinsEntregas";
@@ -482,8 +483,8 @@ export default async function DashboardPage({
 
   // Verifica se o usuario tem conta Google conectada — usado pra
   // mostrar botao "Conectar Google Agenda" no header da AgendaMes.
-  const googleConectado = !!(await prisma.googleAccount.findUnique({
-    where: { usuarioId: usuario.id },
+  const googleConectado = !!(await prisma.googleAccount.findFirst({
+    where: ondeDoUsuario(usuario),
     select: { id: true },
   }));
 

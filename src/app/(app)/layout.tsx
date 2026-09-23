@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ondeDoUsuario } from "@/lib/escopoUsuario";
 import { Sidebar } from "@/components/Sidebar";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { contarNaoLidas } from "@/lib/notificacoes";
@@ -73,7 +74,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Últimos avisos pro sino. Oito é o que cabe no painel sem virar rolagem
   // infinita — o resto fica na tela de notificações.
   const avisosRecentes = await prisma.notificacaoSistema.findMany({
-    where: { usuarioId: usuario.id },
+    where: ondeDoUsuario(usuario),
     orderBy: { criadoEm: "desc" },
     take: 8,
     select: { id: true, titulo: true, descricao: true, link: true, lida: true, criadoEm: true },

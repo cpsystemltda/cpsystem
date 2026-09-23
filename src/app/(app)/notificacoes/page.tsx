@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Bell, BellOff, Check } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ondeDoUsuario } from "@/lib/escopoUsuario";
 import { marcarLidaAction, marcarTodasLidasAction, gerarAlertasPrazoAction } from "@/app/actions/notificacoesSistema";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 
@@ -29,7 +30,7 @@ export default async function NotificacoesPage() {
   const usuario = await exigirUsuario();
 
   const notificacoes = await prisma.notificacaoSistema.findMany({
-    where: { usuarioId: usuario.id },
+    where: ondeDoUsuario(usuario),
     orderBy: { criadoEm: "desc" },
     take: 200,
   });

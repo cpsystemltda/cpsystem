@@ -2,6 +2,7 @@ import { Bell, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ondeDoUsuario } from "@/lib/escopoUsuario";
 import { PreferenciasWhatsAppForm } from "./PreferenciasWhatsAppForm";
 import { TesteWhatsAppPanel } from "./TesteWhatsAppPanel";
 
@@ -14,7 +15,7 @@ export default async function NotificacoesPage() {
   });
 
   const ultimasNotificacoes = await prisma.notificacaoWhatsApp.findMany({
-    where: { usuarioId: usuario.id },
+    where: ondeDoUsuario(usuario),
     orderBy: { criadoEm: "desc" },
     take: 10,
     select: {

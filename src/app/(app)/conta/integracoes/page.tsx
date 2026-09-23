@@ -22,8 +22,15 @@ export default async function IntegracoesPage({
   const usuario = await exigirUsuario();
   const sp = await searchParams;
 
-  const conta = await prisma.googleAccount.findUnique({
-    where: { usuarioId: usuario.id },
+  // Em espionagem, o id continua sendo o do super admin (proposital, pra
+  // auditoria) — então buscar por `usuarioId` traria a conexão Google DELE.
+  // Foi o que a Regina viu em 23/09: "Conectado como regina@cpsystem.app.br"
+  // dentro da tela de um cliente. Aqui a busca passa a ser pela CONTA que
+  // está sendo olhada, que é de quem a tela fala.
+  const conta = await prisma.googleAccount.findFirst({
+    where: usuario.espionando
+      ? { usuario: { contaId: usuario.contaId } }
+      : { usuarioId: usuario.id },
     select: {
       googleEmail: true,
       criadoEm: true,
