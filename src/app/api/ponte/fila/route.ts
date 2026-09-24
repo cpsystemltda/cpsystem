@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolverSaudacao } from "@/lib/saudacao";
 
 /**
  * Fila de saída do WhatsApp — a ponte vem buscar o que há pra entregar.
@@ -192,7 +193,10 @@ export async function GET(req: NextRequest) {
     mensagens: escolhidas.map((m) => ({
       id: m.id,
       telefone: m.telefone,
-      mensagem: m.mensagem,
+      // A saudação é resolvida AQUI, na entrega — não quando o texto foi
+      // montado. Resumo escrito às 14h e entregue às 19h chegava com "Boa
+      // tarde" (Regina, 24/09: "é uma coisinha básica, e você tem errado").
+      mensagem: resolverSaudacao(m.mensagem),
       tipo: m.tipo,
       // Anexo: a ponte baixa e manda como documento. É o que faltava pra nota
       // fiscal chegar em PDF, e não como link (Regina 07/07 e de novo 22/09).

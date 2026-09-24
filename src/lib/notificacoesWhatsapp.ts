@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { dispararNotificacao } from "@/lib/whatsapp";
 import { janelaExecucao, prazoLimiteOuVigencia } from "@/lib/prazoEntrega";
+import { TOKEN_SAUDACAO } from "@/lib/saudacao";
 import type {
   Empenho,
   StatusExecucao,
@@ -930,9 +931,9 @@ export async function enviarResumoSemanal(hoje: Date = new Date()): Promise<{
         `📊 *Resumo da semana — CP System*`,
         ``,
         conta.tipo === "ANALISTA"
-          ? `Bom dia, ${primeiroNome(u.nome)}! Panorama da sua carteira ` +
+          ? `${TOKEN_SAUDACAO}, ${primeiroNome(u.nome)}! Panorama da sua carteira ` +
             `(${clientesNaCarteira} cliente${clientesNaCarteira > 1 ? "s" : ""}):`
-          : `Bom dia, ${primeiroNome(u.nome)}! Panorama da sua carteira ` +
+          : `${TOKEN_SAUDACAO}, ${primeiroNome(u.nome)}! Panorama da sua carteira ` +
             `(${contaIdsCarteira.length} CNPJ${contaIdsCarteira.length > 1 ? "s" : ""}):`,
         ``,
         blocosClientes.join("\n\n"),

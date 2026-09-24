@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { saudacaoBrt } from "@/lib/saudacao";
 
 // IA de suporte (Regina 14/07). Recebe uma mensagem inbound de WA, junto
 // com o contexto do remetente (nome, tipo de conta, se tem assinatura, se
@@ -44,7 +45,11 @@ export type DecisaoIA =
     };
 
 function systemPrompt(ctx: ContextoRemetente): string {
+  const agora = new Date();
   const linhasCtx: string[] = [
+    // A IA escreve e a mensagem sai na hora, então a saudação certa é a de
+    // agora. Sem isto ela chutava "bom dia" às seis da tarde.
+    `AGORA são ${agora.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" })} em Brasília — o cumprimento correto neste momento é "${saudacaoBrt(agora)}". Use exatamente esse, nunca outro.`,
     ctx.semCadastro
       ? `ATENÇÃO: este número NÃO está no nosso cadastro. Pode ser um lead que respondeu a prospecção, ou outra pessoa da empresa de um cliente. Você NÃO sabe de quem é a conta — não fale de fatura, plano, vencimento nem dado de conta nenhuma com quem escreve daqui.`
       : "",

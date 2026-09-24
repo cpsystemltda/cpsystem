@@ -4,6 +4,7 @@ import { dispararNotificacao } from "@/lib/whatsapp";
 import { janelaExecucao } from "@/lib/prazoEntrega";
 import { CADENCIA_COBRANCA_DIAS, CADENCIA_ESPERA_DIAS } from "@/lib/atestados";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
+import { TOKEN_SAUDACAO } from "@/lib/saudacao";
 
 // Nova arquitetura de notificacoes diarias — Regina 08/07/2026 apos incidente
 // de flood do Leo (11+ msgs individuais em 1s no cron matinal).
@@ -498,10 +499,13 @@ async function coletarAniversarios(hoje: Date): Promise<MapaUsuarios> {
 // MONTAGEM DE MENSAGEM CONSOLIDADA
 // ============================================================
 
+// A saudação vai como marcador, não escrita: o resumo é MONTADO numa hora e
+// ENTREGUE em outra — se a fila segurar, "Boa tarde" chega de noite. Quem
+// resolve é a entrega. Ver `src/lib/saudacao.ts`.
 const JANELA_TITULO: Record<Janela, string> = {
-  MANHA: "Bom dia — o que precisa da sua atenção HOJE",
-  TARDE: "Boa tarde — alertas de ação nos próximos dias",
-  NOITE: "Boa noite — resumo pra você planejar a semana",
+  MANHA: `${TOKEN_SAUDACAO} — o que precisa da sua atenção HOJE`,
+  TARDE: `${TOKEN_SAUDACAO} — alertas de ação nos próximos dias`,
+  NOITE: `${TOKEN_SAUDACAO} — resumo pra você planejar a semana`,
 };
 
 const JANELA_INTRO: Record<Janela, string> = {
