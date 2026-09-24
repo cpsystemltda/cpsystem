@@ -2035,6 +2035,22 @@ export async function registrarMarcoAction(
   const data = parseDataInputBr(dataIso);
   if (!data) return { erro: "Data inválida." };
 
+  // Inexecução total tranca a esteira daqui pra frente (demanda de cliente
+  // 23/09/2026). Não existe nota fiscal, encaminhamento nem pagamento de coisa
+  // que não foi entregue — e a trava mora aqui, no servidor, porque esconder o
+  // botão na tela não impede quem chama a etapa por outro caminho.
+  if (["NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(marco)) {
+    const inexecucao = await prisma.entregaEmpenho.findFirst({
+      where: { empenhoId, tipo: "INEXECUCAO_TOTAL" },
+      select: { data: true },
+    });
+    if (inexecucao) {
+      return {
+        erro: `Este fornecimento está marcado como inexecução total em ${inexecucao.data.toLocaleDateString("pt-BR")}. Desfaça esse registro na etapa de entrega para seguir com a esteira.`,
+      };
+    }
+  }
+
   // Edição de etapa já concluída: se o status atual está MAIS adiantado que
   // o marco sendo registrado, mantém o status atual (não regride). Só avança
   // status quando o marco é igual ou posterior ao atual.

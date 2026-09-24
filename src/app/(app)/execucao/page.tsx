@@ -121,6 +121,10 @@ export default async function ExecucaoPage({
         orderBy: { criadoEm: "desc" },
         take: 1,
       },
+      // Etiqueta de inexecução e de entrega em andamento na listagem — é aqui
+      // que a pessoa vê a carteira inteira de uma vez (demanda de cliente
+      // 23/09/2026). Só o tipo: a contagem por item fica no detalhe.
+      entregas: { select: { tipo: true } },
     },
   });
 
@@ -264,6 +268,23 @@ export default async function ExecucaoPage({
                         <h3 className="truncate font-semibold text-slate-900">
                           {labelInstrumento(e.instrumento)} {e.numero}
                         </h3>
+                        {e.entregas.some((x) => x.tipo === "INEXECUCAO_TOTAL") && (
+                          <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700" title="Inexecução total registrada — esteira travada">
+                            ⛔ Inexecução total
+                          </span>
+                        )}
+                        {e.entregas.some((x) => x.tipo === "INEXECUCAO_PARCIAL") && (
+                          <span className="shrink-0 rounded bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700" title="Inexecução parcial registrada">
+                            ⚠ Inexecução parcial
+                          </span>
+                        )}
+                        {!e.dataEntrega &&
+                          e.entregas.some((x) => x.tipo === "PARCIAL") &&
+                          !e.entregas.some((x) => x.tipo === "INEXECUCAO_TOTAL") && (
+                            <span className="shrink-0 rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800" title="Entrega em parcelas, ainda em andamento">
+                              Entrega parcial
+                            </span>
+                          )}
                         <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${COR_STATUS[e.status]}`}>
                           {ROTULO_STATUS[e.status]}
                         </span>

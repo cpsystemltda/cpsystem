@@ -32,6 +32,8 @@ import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { ItensEmpenhoTab } from "@/components/abas/ItensEmpenhoTab";
 import { ComissoesNoEmpenhoTab } from "@/components/abas/ComissoesNoEmpenhoTab";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
+import { situacaoEntrega, faltaPorItem } from "@/lib/entregas";
+import { RegistrarEntrega } from "@/components/RegistrarEntrega";
 
 const PASSOS = [
   { marco: "PEDIDO_RECEBIDO", label: "Pedido recebido", campo: "dataPedidoRecebido" },
@@ -85,6 +87,10 @@ export default async function EmpenhoDetalhePage({
       anotacoes: { orderBy: { criadoEm: "desc" } },
       reajusteRetroativo: true,
       notasFiscais: { orderBy: { criadoEm: "desc" } },
+      entregas: {
+        orderBy: { ordem: "asc" },
+        include: { itens: { select: { itemId: true, quantidade: true } } },
+      },
     },
   });
 
@@ -364,6 +370,8 @@ export default async function EmpenhoDetalhePage({
                     arquivoNfEncaminhada: e.arquivoNfEncaminhada,
                     dataPagamento: e.dataPagamento,
                     arquivoPagamento: e.arquivoPagamento,
+                    entregas: e.entregas,
+                    itens: e.itens.map((i) => ({ id: i.id, descricao: i.descricao, unidade: i.unidade, quantidade: i.quantidade })),
                   }}
                   reajusteRetroativo={e.reajusteRetroativo}
                   podeEditar={podeEditar}
@@ -591,6 +599,17 @@ function Timeline({
     arquivoNfEncaminhada: string | null;
     dataPagamento: Date | null;
     arquivoPagamento: string | null;
+    /** Eventos de entrega/inexecução, do mais antigo pro mais novo. */
+    entregas: {
+      id: string;
+      ordem: number;
+      tipo: "TOTAL" | "PARCIAL" | "INEXECUCAO_TOTAL" | "INEXECUCAO_PARCIAL";
+      data: Date;
+      observacao: string | null;
+      arquivoUrl: string | null;
+      itens: { itemId: string; quantidade: number }[];
+    }[];
+    itens: { id: string; descricao: string; unidade: string; quantidade: number }[];
   };
   reajusteRetroativo: ReajusteRetroativoData | null;
   podeEditar: boolean;
@@ -604,6 +623,12 @@ function Timeline({
   // Prazo-limite tempestivo — extraido pra lib/prazoEntrega pra bater com
   // o dashboard de Logistica (bug Regina 09/06: dashboard mostrava
   // vigenciaFim ao inves de dataEntregaCerta).
+  // Entrega em parcelas e inexecução (demanda de cliente 23/09/2026). A etapa
+  // "Entregue" deixou de ser um carimbo: é uma sequência de eventos, e a nota
+  // fiscal só destrava quando a última fecha a conta por item.
+  const situacao = situacaoEntrega(empenho.itens, empenho.entregas);
+  const faltas = faltaPorItem(empenho.itens, situacao);
+
   const prazoLimiteEntrega = calcularPrazoLimiteEntrega({
     prazoEntregaModo: empenho.prazoEntregaModo ?? "RELATIVO",
     dataEntregaCerta: empenho.dataEntregaCerta ?? null,
@@ -666,12 +691,13 @@ function Timeline({
         {PASSOS.map((p, idx) => {
           const data = empenho[p.campo as keyof typeof empenho] as Date | null;
           const arquivo = empenho[CAMPO_ARQUIVO_ETAPA[p.marco] as keyof typeof empenho] as string | null;
-          const concluido = !!data;
+          const isEntrega = p.marco === "ENTREGUE";
+
+          // A entrega fecha pelos eventos, não pela data solta: parcela
+          // lançada não conclui a etapa enquanto faltar quantidade.
+          const concluido = isEntrega ? situacao.completa : !!data;
           const anterior = idx === 0 ? true : !!empenho[PASSOS[idx - 1].campo as keyof typeof empenho];
           const podeFazer = !concluido && anterior;
-
-          // Alerta de entrega com atraso
-          const isEntrega = p.marco === "ENTREGUE";
           const isPago = p.marco === "PAGO";
 
           return (
@@ -711,8 +737,25 @@ function Timeline({
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`text-sm font-semibold ${concluido ? "text-slate-800" : podeFazer ? "text-slate-900" : "text-slate-400"}`}>
-                        {p.label}
+                        {isEntrega && !situacao.completa && situacao.proximaOrdem > 1
+                          ? `Entrega ${situacao.proximaOrdem}`
+                          : p.label}
                       </span>
+                      {isEntrega && situacao.inexecucaoTotal && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
+                          ⛔ Inexecução total — esteira travada
+                        </span>
+                      )}
+                      {isEntrega && situacao.inexecucaoParcial && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700">
+                          ⚠ Inexecução parcial
+                        </span>
+                      )}
+                      {isEntrega && !situacao.completa && situacao.percentual > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                          {situacao.percentual}% entregue
+                        </span>
+                      )}
                       {isEntrega && entregaComAtraso && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
                           ⚠ Entregue com atraso
@@ -726,6 +769,65 @@ function Timeline({
                     </div>
 
                     <div className="mt-2">
+                      {isEntrega ? (
+                        // A entrega virou um livro de eventos: cada parcela
+                        // registrada vira uma linha "Entrega N", e a próxima
+                        // fica logo abaixo esperando. A nota fiscal só aparece
+                        // desbloqueada quando a última fecha a conta.
+                        <div className="space-y-3">
+                          {empenho.entregas.map((ent) => (
+                            <div key={ent.id} className="rounded-lg border border-slate-200 bg-white p-2.5">
+                              <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                                Entrega {ent.ordem}
+                              </p>
+                              <RegistrarEntrega
+                                empenhoId={empenho.id}
+                                ordem={ent.ordem}
+                                itens={faltas.map((f) => ({
+                                  id: f.item.id,
+                                  descricao: f.item.descricao,
+                                  unidade: f.item.unidade,
+                                  quantidade: f.item.quantidade,
+                                  entregue: f.entregue,
+                                  falta: f.falta,
+                                }))}
+                                registrada={ent}
+                              />
+                            </div>
+                          ))}
+
+                          {!situacao.completa && !situacao.inexecucaoTotal && (
+                            <div>
+                              {situacao.proximaOrdem > 1 && (
+                                <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                                  Entrega {situacao.proximaOrdem} · pendente
+                                </p>
+                              )}
+                              <RegistrarEntrega
+                                empenhoId={empenho.id}
+                                ordem={situacao.proximaOrdem}
+                                itens={faltas.map((f) => ({
+                                  id: f.item.id,
+                                  descricao: f.item.descricao,
+                                  unidade: f.item.unidade,
+                                  quantidade: f.item.quantidade,
+                                  entregue: f.entregue,
+                                  falta: f.falta,
+                                }))}
+                                registrada={null}
+                                bloqueado={!anterior}
+                              />
+                            </div>
+                          )}
+
+                          {situacao.inexecucaoTotal && (
+                            <p className="rounded-md bg-red-50 px-2.5 py-2 text-[11px] text-red-800">
+                              Enquanto a inexecução total estiver registrada, as etapas de nota fiscal e
+                              pagamento ficam bloqueadas. Desfaça o registro acima para liberar.
+                            </p>
+                          )}
+                        </div>
+                      ) : (
                       <AvancarStatus
                         empenhoId={empenho.id}
                         marco={p.marco}
@@ -738,6 +840,7 @@ function Timeline({
                         // olhava (Igor, 07/09).
                         semArquivo={p.marco === "NF_EMITIDA"}
                       />
+                      )}
                       {/* Emissão da NFS-e fica AO LADO do registro manual, não no
                           lugar dele: quem emite por fora continua só anexando. */}
                       {p.marco === "NF_EMITIDA" && (

@@ -182,6 +182,7 @@ model Usuario {
   atasCriadas                 Ata[]                     @relation("AtasCriadas")
   contratosCriados            Contrato[]                @relation("ContratosCriados")
   empenhosCriados             Empenho[]                 @relation("EmpenhosCriados")
+  entregasRegistradas         EntregaEmpenho[]          @relation("EntregasRegistradas")
   pareceresCriados            ParecerJuridico[]         @relation("ParecresCriados")
   avulsosJuridicosCriados     DocumentoAvulsoJuridico[] @relation("AvulsosCriados")
   reajustesRetroativosCriados ReajusteRetroativo[]      @relation("ReajustesRetroativosCriados")
@@ -1338,12 +1339,69 @@ model Empenho {
   comissoes          ComissaoExecucao[]
   pareceres          ParecerJuridico[]
   reajusteRetroativo ReajusteRetroativo?
+  entregas           EntregaEmpenho[]
 
   @@index([empresaId])
   @@index([ataId])
   @@index([contratoId])
   @@index([vigenciaId])
   @@index([criadoPorId])
+}
+
+/// Como a empresa cumpriu (ou não) aquela contratação, evento a evento.
+///
+/// Demanda de cliente, 23/09/2026: a entrega raramente é um carimbo único. Ela
+/// sai em parcelas, e às vezes não sai — e o sistema tratava tudo como uma
+/// data só, "Entregue". Faltava registrar o que foi entregue, quando, e o que
+/// deixou de ser.
+///
+/// Cada linha é um evento datado. Entrega parcial guarda o quantitativo por
+/// item em `itens`; entrega total dispensa, porque é tudo. Inexecução total
+/// TRAVA a esteira: não existe nota fiscal de coisa que não foi entregue.
+/// Inexecução parcial deixa seguir, mas fica marcada no documento — é
+/// informação que reaparece em fiscalização e em licitação futura.
+model EntregaEmpenho {
+  id        String             @id @default(cuid())
+  empenhoId String
+  empenho   Empenho            @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  /// 1, 2, 3… — é o que vira "Entrega 2" na linha do tempo.
+  ordem     Int
+  tipo      TipoEntregaEmpenho
+  data      DateTime
+  observacao String?           @db.Text
+  arquivoUrl String?
+
+  criadoPorId String?
+  criadoPor   Usuario? @relation("EntregasRegistradas", fields: [criadoPorId], references: [id])
+  criadoEm    DateTime @default(now())
+
+  itens EntregaEmpenhoItem[]
+
+  @@unique([empenhoId, ordem])
+  @@index([empenhoId])
+  @@index([criadoPorId])
+}
+
+/// Quanto de cada item saiu naquela entrega. A soma por item, comparada com
+/// `EmpenhoItem.quantidade`, é o que diz se ainda falta entrega.
+model EntregaEmpenhoItem {
+  id         String         @id @default(cuid())
+  entregaId  String
+  entrega    EntregaEmpenho @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  itemId     String
+  item       EmpenhoItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  quantidade Float
+
+  @@unique([entregaId, itemId])
+  @@index([entregaId])
+  @@index([itemId])
+}
+
+enum TipoEntregaEmpenho {
+  TOTAL
+  PARCIAL
+  INEXECUCAO_TOTAL
+  INEXECUCAO_PARCIAL
 }
 
 model EmpenhoItem {
@@ -1361,6 +1419,8 @@ model EmpenhoItem {
 
   ataItemId String?
   ataItem   AtaItem? @relation(fields: [ataItemId], references: [id])
+
+  entregas EntregaEmpenhoItem[]
 
   @@index([empenhoId])
   @@index([ataItemId])
