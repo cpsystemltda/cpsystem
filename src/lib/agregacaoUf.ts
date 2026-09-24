@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { DadosUf } from "@/components/MapaBrasil";
+import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
 
 const UFS = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
@@ -130,9 +131,11 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
   // (não só da sede da fornecedora). Atas e Contratos vigentes; Empenhos sem
   // filtro de vigência (histórico financeiro entra na ranqueamento por UF).
   const hoje = new Date();
+  // Vigência é dia, não instante — ver `diaVigencia.ts`.
+  const diaVigencia = inicioDoDiaVigencia();
   const [contratos, empenhos, atas] = await Promise.all([
     prisma.contrato.findMany({
-      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
+      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia } },
       select: {
         orgaoNome: true,
         orgaoCnpj: true,
@@ -150,7 +153,7 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
       },
     }),
     prisma.ata.findMany({
-      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
+      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia } },
       select: {
         orgaoNome: true,
         orgaoCnpj: true,

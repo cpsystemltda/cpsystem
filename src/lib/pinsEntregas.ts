@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
 import {
   aplicarJitter,
   geocodificarEnderecosEmBatch,
@@ -44,12 +45,16 @@ export async function coletarPinsEntregas(
 
   const hoje = new Date();
 
+  // Vigência é dia, não instante — ver `diaVigencia.ts`.
+
+  const diaVigencia = inicioDoDiaVigencia();
+
   // Puxa endereços ligados a Atas/Contratos/Empenhos da conta
   const enderecos = await prisma.enderecoEntrega.findMany({
     where: {
       OR: [
-        { ata: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } } },
-        { contrato: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } } },
+        { ata: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia } } },
+        { contrato: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia } } },
         { empenho: { empresaId: { in: empresaIds } } },
       ],
     },

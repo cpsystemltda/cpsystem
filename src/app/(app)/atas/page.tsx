@@ -12,6 +12,7 @@ import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 import { PainelFinanceiroExpansivel } from "@/components/PainelFinanceiroExpansivel";
 import { BannerAtestadosPendentes } from "@/components/BannerAtestadosPendentes";
 import { whereAtestadoPendente } from "@/lib/atestados";
+import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
 
 export default async function AtasPage({
   searchParams,
@@ -34,6 +35,10 @@ export default async function AtasPage({
   const soAtestadoPendente = sp.atestado === "pendente";
 
   const hoje = new Date();
+
+  // Vigência é dia, não instante — ver `diaVigencia.ts`.
+
+  const diaVigencia = inicioDoDiaVigencia();
   const limiteAlerta = alertaDias > 0 ? new Date(hoje.getTime() + alertaDias * 86400000) : null;
   const d30 = new Date(hoje.getTime() + 30 * 86400000);
   const d60 = new Date(hoje.getTime() + 60 * 86400000);
@@ -44,8 +49,8 @@ export default async function AtasPage({
   const whereQuery = {
     empresa: filtroEmpresa,
     ...(q && { OR: [{ numero: { contains: q } }, { objeto: { contains: q } }, { processoAdministrativo: { contains: q } }, { orgaoNome: { contains: q } }, { idAtaPncp: { contains: q } }] }),
-    ...(status === "vigentes" && { vigenciaFim: { gte: hoje } }),
-    ...(status === "vencidas" && { vigenciaFim: { lt: hoje } }),
+    ...(status === "vigentes" && { vigenciaFim: { gte: diaVigencia } }),
+    ...(status === "vencidas" && { vigenciaFim: { lt: diaVigencia } }),
     ...(limiteAlerta && { vigenciaFim: { gte: hoje, lte: limiteAlerta } }),
     ...(orgao && { orgaoNome: orgao }),
     // Por último de propósito: quando o cliente clica no banner de atestado,
@@ -82,8 +87,8 @@ export default async function AtasPage({
         },
       }),
       prisma.ata.groupBy({ by: ["orgaoNome"], where: whereBase, orderBy: { orgaoNome: "asc" } }),
-      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje } } }),
-      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { lt: hoje } } }),
+      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: diaVigencia } } }),
+      prisma.ata.count({ where: { ...whereBase, vigenciaFim: { lt: diaVigencia } } }),
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d30 } } }),
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d60 } } }),
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d90 } } }),

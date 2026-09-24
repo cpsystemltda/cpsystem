@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { aplicarJitter, geocodificarOrgaosEmBatch } from "@/lib/geocode";
+import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
 
 export type PinOrgao = {
   cnpj: string;
@@ -45,9 +46,13 @@ export async function coletarPinsOrgaos(
   );
 
   const hoje = new Date();
+
+  // Vigência é dia, não instante — ver `diaVigencia.ts`.
+
+  const diaVigencia = inicioDoDiaVigencia();
   const [atas, contratos, empenhos] = await Promise.all([
     prisma.ata.findMany({
-      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
+      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia } },
       select: {
         orgaoNome: true,
         orgaoCnpj: true,
@@ -57,7 +62,7 @@ export async function coletarPinsOrgaos(
       },
     }),
     prisma.contrato.findMany({
-      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
+      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia } },
       select: {
         orgaoNome: true,
         orgaoCnpj: true,

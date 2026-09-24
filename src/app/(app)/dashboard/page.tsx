@@ -45,6 +45,7 @@ import { AgendaMes, parseMesAgenda, type EmpenhoAgenda } from "@/components/Agen
 import { labelCurtoInstrumento, labelInstrumento } from "@/lib/instrumentoLabel";
 import { ConversaoCadastro } from "@/components/ConversaoCadastro";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
+import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -106,6 +107,8 @@ export default async function DashboardPage({
   const filtroEmpresa = await filtroEmpresaWhere(contaId);
   const empresaIdSelecionada = await lerEmpresaSelecionada();
   const hoje = new Date();
+  // Vigência é dia, não instante — ver `diaVigencia.ts`.
+  const diaVigencia = inicioDoDiaVigencia();
   const fimAno = new Date(hoje.getFullYear(), 11, 31);
   const em30dias = new Date(hoje.getTime() + 30 * 86400000);
 
@@ -135,10 +138,10 @@ export default async function DashboardPage({
     empenhosAgendaMes,
   ] = await Promise.all([
     prisma.empresa.findMany({ where: { contaId }, select: { id: true, cnpj: true } }),
-    prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
-    prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } } }),
-    prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { lt: hoje } } }),
-    prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { lt: hoje } } }),
+    prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: diaVigencia } } }),
+    prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { gte: diaVigencia } } }),
+    prisma.ata.count({ where: { empresa: filtroEmpresa, vigenciaFim: { lt: diaVigencia } } }),
+    prisma.contrato.count({ where: { empresa: filtroEmpresa, vigenciaFim: { lt: diaVigencia } } }),
     prisma.empenho.findMany({
       where: { empresa: filtroEmpresa },
       select: {
@@ -160,7 +163,7 @@ export default async function DashboardPage({
       },
     }),
     prisma.contrato.findMany({
-      where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } },
+      where: { empresa: filtroEmpresa, vigenciaFim: { gte: diaVigencia } },
       select: {
         id: true,
         numero: true,
@@ -174,7 +177,7 @@ export default async function DashboardPage({
       },
     }),
     prisma.ata.findMany({
-      where: { empresa: filtroEmpresa, vigenciaFim: { gte: hoje } },
+      where: { empresa: filtroEmpresa, vigenciaFim: { gte: diaVigencia } },
       select: {
         id: true,
         numero: true,
@@ -248,7 +251,7 @@ export default async function DashboardPage({
     prisma.ata.count({
       where: {
         empresa: filtroEmpresa,
-        vigenciaFim: { gte: hoje },
+        vigenciaFim: { gte: diaVigencia },
         marcoOrcamentoEstimado: { gte: hoje, lte: em30dias },
       },
     }).catch(() => 0),
@@ -449,7 +452,7 @@ export default async function DashboardPage({
   const contratosEmExecucao = await prisma.contrato.count({
     where: {
       empresa: filtroEmpresa,
-      vigenciaFim: { gte: hoje },
+      vigenciaFim: { gte: diaVigencia },
       empenhos: { some: { status: { not: "PAGO" } } },
     },
   });

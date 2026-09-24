@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
 
 // Resumos semanais consolidados (Regina 14/07).
 // Chave semana ISO: yyyy-Www (ex "2026-W29"). Idempotencia via
@@ -47,6 +48,10 @@ export async function montarResumoEmpresa(contaId: string): Promise<ResumoEmpres
   if (!usuario.telefoneWhatsApp) return null;
 
   const agora = new Date();
+
+  // Vigência é dia, não instante — ver `diaVigencia.ts`.
+
+  const diaVigencia = inicioDoDiaVigencia();
   const em30 = new Date(agora.getTime() + 30 * 24 * 60 * 60 * 1000);
   const em7 = new Date(agora.getTime() + 7 * 24 * 60 * 60 * 1000);
   const empresaIds = conta.empresas.map((e) => e.id);
@@ -71,7 +76,7 @@ export async function montarResumoEmpresa(contaId: string): Promise<ResumoEmpres
     // e a mesma regua do resumo de sexta: a execucao so fecha quando o orgao
     // paga.
     prisma.empenho.count({
-      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: agora }, status: { not: "PAGO" } },
+      where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia }, status: { not: "PAGO" } },
     }),
   ]);
 

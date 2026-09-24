@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
 
 export type ResumoComissaoEmpresa = {
   contaId: string;
@@ -103,13 +104,15 @@ export async function calcularComissaoAnalista(analistaId: string): Promise<Resu
 
     // Carteira contratada: TODOS os contratos+atas vigentes (independente de quando criados)
     const hoje = new Date();
+    // Vigência é dia, não instante — ver `diaVigencia.ts`.
+    const diaVigencia = inicioDoDiaVigencia();
     const [atas, contratos] = await Promise.all([
       prisma.ata.findMany({
-        where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
+        where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia } },
         include: { itens: { select: { valorTotal: true } } },
       }),
       prisma.contrato.findMany({
-        where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: hoje } },
+        where: { empresaId: { in: empresaIds }, vigenciaFim: { gte: diaVigencia } },
         include: { itens: { select: { valorTotal: true } } },
       }),
     ]);
