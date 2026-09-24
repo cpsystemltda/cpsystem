@@ -6,6 +6,12 @@ import { PageHeader } from "@/components/ui/SecaoGlass";
 export default async function EquipePage() {
   const usuario = await exigirUsuario();
 
+  // O plano decide quantos colaboradores vêm inclusos (Regina 24/09).
+  const conta = await prisma.conta.findUnique({
+    where: { id: usuario.contaId },
+    select: { plano: true },
+  });
+
   const membros = await prisma.usuario.findMany({
     where: { contaId: usuario.contaId },
     orderBy: { criadoEm: "asc" },
@@ -39,6 +45,7 @@ export default async function EquipePage() {
           meuId={usuario.id}
           ehAdmin={usuario.perfil === "ADMIN"}
           titularId={titularId}
+          plano={conta?.plano ?? "BASICO"}
         />
       </div>
     </div>

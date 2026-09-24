@@ -183,6 +183,7 @@ model Usuario {
   contratosCriados            Contrato[]                @relation("ContratosCriados")
   empenhosCriados             Empenho[]                 @relation("EmpenhosCriados")
   entregasRegistradas         EntregaEmpenho[]          @relation("EntregasRegistradas")
+  empenhosAcompanhados        Empenho[]                 @relation("EmpenhosAcompanhados")
   pareceresCriados            ParecerJuridico[]         @relation("ParecresCriados")
   avulsosJuridicosCriados     DocumentoAvulsoJuridico[] @relation("AvulsosCriados")
   reajustesRetroativosCriados ReajusteRetroativo[]      @relation("ReajustesRetroativosCriados")
@@ -1334,6 +1335,19 @@ model Empenho {
   criadoPorId String?
   criadoPor   Usuario? @relation("EmpenhosCriados", fields: [criadoPorId], references: [id])
 
+  /// Colaborador da EMPRESA que acompanha este fornecimento.
+  ///
+  /// Demanda de cliente 24/09/2026: em empresa com equipe, cada contratação
+  /// tem um dono — quem cobra o órgão, junta a nota e lembra do prazo. Sem
+  /// esse campo, "quem está cuidando disto?" só se respondia perguntando.
+  ///
+  /// Opcional de propósito: contratação sem dono definido continua válida, e
+  /// exigir o preenchimento travaria o cadastro de quem trabalha sozinho.
+  /// `onDelete: SetNull` porque perder o colaborador não pode apagar o
+  /// fornecimento — ele só volta a ficar sem responsável.
+  responsavelId String?
+  responsavel   Usuario? @relation("EmpenhosAcompanhados", fields: [responsavelId], references: [id], onDelete: SetNull)
+
   itens              EmpenhoItem[]
   notasFiscais       NotaFiscal[]
   enderecosEntrega   EnderecoEntrega[]
@@ -1356,6 +1370,7 @@ model Empenho {
   @@index([contratoId])
   @@index([vigenciaId])
   @@index([criadoPorId])
+  @@index([responsavelId])
 }
 
 /// Como a empresa cumpriu (ou não) aquela contratação, evento a evento.

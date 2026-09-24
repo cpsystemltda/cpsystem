@@ -537,6 +537,11 @@ export const novoEmpenhoSchema = contratacaoBase
     instrumento: z.enum(instrumentosContratuais).default("NOTA_EMPENHO"),
     ataId: z.string().optional(),
     contratoId: z.string().optional(),
+    // Colaborador da empresa que acompanha o fornecimento (demanda de cliente
+    // 24/09/2026). Opcional: quem trabalha sozinho não tem a quem indicar, e
+    // exigir travaria o cadastro. A dona do vínculo é a conta — quem valida
+    // que o id pertence à conta é a action, não este schema.
+    responsavelId: z.string().optional(),
     numeroOrdemFornecimento: z.string().optional(),
     dataEmissao: z.coerce.date(),
     // Procedimento de seleção: opcional pro Empenho (decisão Igor M3.3).

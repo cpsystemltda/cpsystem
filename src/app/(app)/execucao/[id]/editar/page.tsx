@@ -110,6 +110,7 @@ export default async function EditarEmpenhoPage({ params }: { params: Promise<{ 
 
   const valoresIniciais: EmpenhoValoresIniciais = {
     empresaId: empenho.empresaId,
+    responsavelId: empenho.responsavelId,
     ataId: empenho.ataId,
     contratoId: empenho.contratoId,
     instrumento: empenho.instrumento,
@@ -167,6 +168,14 @@ export default async function EditarEmpenhoPage({ params }: { params: Promise<{ 
     })),
   };
 
+  const colaboradores = (
+    await prisma.usuario.findMany({
+      where: { contaId: usuario.contaId },
+      orderBy: { criadoEm: "asc" },
+      select: { id: true, nome: true, email: true },
+    })
+  ).map((u) => ({ value: u.id, label: `${u.nome} · ${u.email}` }));
+
   return (
     <NovoEmpenhoForm
       empresas={empresas.map((e) => ({ value: e.id, label: montarLabelEmpresa(e) }))}
@@ -179,6 +188,7 @@ export default async function EditarEmpenhoPage({ params }: { params: Promise<{ 
       modo="editar"
       empenhoId={empenho.id}
       valoresIniciais={valoresIniciais}
+      colaboradores={colaboradores}
     />
   );
 }

@@ -1326,6 +1326,26 @@ export async function excluirEmpenhoAction(formData: FormData) {
 // ============================================================
 // EMPENHO
 // ============================================================
+/**
+ * Confere se o colaborador indicado é mesmo da conta.
+ *
+ * O `<select>` só oferece a equipe certa, mas o campo chega por formulário —
+ * e formulário é entrada do usuário, não verdade. Sem esta conferência daria
+ * para apontar um id de outra empresa como responsável e vazar o nome dela na
+ * tela do fornecimento.
+ */
+async function responsavelValido(
+  id: string | undefined,
+  contaId: string,
+): Promise<string | null> {
+  if (!id) return null;
+  const u = await prisma.usuario.findFirst({
+    where: { id, contaId },
+    select: { id: true },
+  });
+  return u?.id ?? null;
+}
+
 export async function criarEmpenhoAction(_prev: ActionResult | null, formData: FormData): Promise<ActionResult> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
@@ -1470,6 +1490,7 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
       data: {
         empresaId: v.empresaId,
         criadoPorId: usuario.id,
+        responsavelId: await responsavelValido(v.responsavelId, usuario.contaId),
         ataId: v.ataId || null,
         contratoId: v.contratoId || null,
         vigenciaId: vigenciaIdResolvida,
@@ -1784,6 +1805,7 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
         where: { id: empenhoId },
         data: {
           empresaId: v.empresaId,
+          responsavelId: await responsavelValido(v.responsavelId, usuario.contaId),
           ataId: v.ataId || null,
           contratoId: v.contratoId || null,
           instrumento: v.instrumento,

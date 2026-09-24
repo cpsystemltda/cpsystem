@@ -26,6 +26,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/prospeccao",
+      "schedule": "5 12 * * 1-5"
+    },
+    {
       "path": "/api/cron/resumo-tarde",
       "schedule": "0 17 * * *"
     },

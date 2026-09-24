@@ -29,6 +29,8 @@ import {
 import { AnexosAdicionaisEditor } from "@/components/forms/AnexosAdicionaisEditor";
 
 type EmpresaOpt = { value: string; label: string };
+/** Colaborador da conta, para indicar quem acompanha o fornecimento. */
+type ColaboradorOpt = { value: string; label: string };
 // Igor (08/06): Ata agora carrega tambem pontos focais e enderecos pra
 // pre-preencher o form quando o usuario seleciona a Ata como origem
 // (igual ao Contrato ja fazia).
@@ -90,6 +92,7 @@ type ContratoOpt = { value: string; label: string; ataId: string | null; dados?:
 
 export type EmpenhoValoresIniciais = {
   empresaId: string;
+  responsavelId?: string | null;
   ataId: string | null;
   contratoId: string | null;
   instrumento?: InstrumentoContratual;
@@ -147,10 +150,13 @@ export default function NovoEmpenhoForm({
   empenhoId,
   valoresIniciais,
   instrumento: instrumentoProp,
+  colaboradores = [],
 }: {
   empresas: EmpresaOpt[];
   atas: AtaOpt[];
   contratos: ContratoOpt[];
+  /** Equipe da conta — vem do módulo Equipe (demanda de cliente 24/09). */
+  colaboradores?: ColaboradorOpt[];
   modo?: "criar" | "editar";
   empenhoId?: string;
   valoresIniciais?: EmpenhoValoresIniciais;
@@ -777,6 +783,38 @@ export default function NovoEmpenhoForm({
               vi?.pontosFocais
             }
           />
+        </Secao>
+
+        {/*
+          Responsável pelo acompanhamento (demanda de cliente 24/09/2026).
+          Fica entre os pontos focais do ÓRGÃO e os itens de propósito: é o
+          espelho do outro lado — lá quem responde pelo órgão, aqui quem
+          responde pela empresa.
+        */}
+        <Secao titulo="Responsável pelo acompanhamento — empresa">
+          <p className="mb-3 text-xs text-slate-600">
+            Quem, na sua equipe, acompanha e controla esta contratação. Opcional.
+          </p>
+          <div className="grid gap-2 sm:max-w-md">
+            <select
+              name="responsavelId"
+              defaultValue={valoresIniciais?.responsavelId ?? ""}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="">— Sem responsável definido —</option>
+              {colaboradores.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <a
+              href="/equipe"
+              className="text-xs font-medium text-blue-700 hover:text-blue-900 hover:underline"
+            >
+              Cadastrar colaborador no módulo Equipe →
+            </a>
+          </div>
         </Secao>
 
         <Secao titulo="Itens">

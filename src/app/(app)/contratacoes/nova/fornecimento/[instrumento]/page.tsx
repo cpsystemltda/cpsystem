@@ -116,8 +116,18 @@ export default async function Page({
     },
   });
 
+  // Equipe da conta, para indicar quem acompanha o fornecimento.
+  const colaboradores = (
+    await prisma.usuario.findMany({
+      where: { contaId: usuario.contaId },
+      orderBy: { criadoEm: "asc" },
+      select: { id: true, nome: true, email: true },
+    })
+  ).map((u) => ({ value: u.id, label: `${u.nome} · ${u.email}` }));
+
   return (
     <NovoEmpenhoForm
+      colaboradores={colaboradores}
       instrumento={instrumento}
       empresas={empresas.map((e) => ({ value: e.id, label: montarLabelEmpresa(e) }))}
       atas={atasComItens}

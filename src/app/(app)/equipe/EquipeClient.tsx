@@ -9,7 +9,8 @@ import {
   atualizarAcessoAction,
 } from "@/app/actions/equipe";
 import { MODULOS_PADRAO_COLABORADOR, rotuloDoModulo } from "@/lib/modulosAcesso";
-import { COLABORADORES_INCLUSOS, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precosConstants";
+import { COLABORADORES_INCLUSOS_POR_PLANO, PRECO_COLABORADOR_ADICIONAL } from "@/lib/precosConstants";
+import type { Plano } from "@/lib/gateway";
 import { brl } from "@/lib/validators";
 import { CaixaDeAcessos } from "./CaixaDeAcessos";
 
@@ -46,21 +47,25 @@ export function EquipeClient({
   meuId,
   ehAdmin,
   titularId,
+  plano,
 }: {
   membros: Membro[];
   meuId: string;
   ehAdmin: boolean;
   titularId: string | null;
+  /** Quantos colaboradores vêm inclusos depende do plano (Regina 24/09). */
+  plano: Plano;
 }) {
   const [state, formAction] = useActionState(convidarUsuarioAction, null);
   const [editando, setEditando] = useState<string | null>(null);
 
   const colaboradores = membros.filter((m) => m.id !== titularId).length;
-  const inclusosRestantes = Math.max(0, COLABORADORES_INCLUSOS - colaboradores);
+  const inclusos = COLABORADORES_INCLUSOS_POR_PLANO[plano];
+  const inclusosRestantes = Math.max(0, inclusos - colaboradores);
   // O proximo cadastro ja e cobrado? Serve pra avisar ANTES de submeter — a
   // pessoa nao pode descobrir a cobranca na fatura do mes seguinte.
-  const proximoEhCobrado = colaboradores >= COLABORADORES_INCLUSOS;
-  const excedentes = Math.max(0, colaboradores - COLABORADORES_INCLUSOS);
+  const proximoEhCobrado = colaboradores >= inclusos;
+  const excedentes = Math.max(0, colaboradores - inclusos);
 
   return (
     <div className="space-y-6">
@@ -72,7 +77,7 @@ export function EquipeClient({
           <Users className="h-4 w-4" /> Membros da equipe ({membros.length})
         </h2>
         <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-          Sua conta inclui <strong>{COLABORADORES_INCLUSOS} colaboradores</strong> além de você
+          Sua conta inclui <strong>{inclusos} colaboradores</strong> além de você
           {inclusosRestantes > 0
             ? ` — ${inclusosRestantes === 1 ? "resta 1 incluso" : `restam ${inclusosRestantes} inclusos`}.`
             : "."}{" "}
@@ -84,7 +89,7 @@ export function EquipeClient({
             </>
           ) : (
             <>
-              A partir do {COLABORADORES_INCLUSOS + 1}º, cada colaborador custa{" "}
+              A partir do {inclusos + 1}º, cada colaborador custa{" "}
               <strong>{brl(PRECO_COLABORADOR_ADICIONAL)}/mês</strong>.
             </>
           )}
@@ -160,7 +165,7 @@ export function EquipeClient({
                   color: "var(--text)",
                 }}
               >
-                Os {COLABORADORES_INCLUSOS} colaboradores inclusos já estão em uso. Cadastrar mais
+                Os {inclusos} colaboradores inclusos já estão em uso. Cadastrar mais
                 um acrescenta <strong>{brl(PRECO_COLABORADOR_ADICIONAL)}/mês</strong> à sua
                 mensalidade, cobrado junto da próxima renovação.
               </p>
