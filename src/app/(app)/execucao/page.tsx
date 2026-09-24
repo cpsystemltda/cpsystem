@@ -36,6 +36,7 @@ export default async function ExecucaoPage({
     q?: string;
     status?: string;
     orgao?: string;
+    responsavel?: string;
     de?: string; // data emissão >= (filtro por período)
     ate?: string; // data emissão <= (filtro por período)
     ataId?: string;
@@ -50,6 +51,9 @@ export default async function ExecucaoPage({
   const q = (sp.q || "").trim();
   const statusFiltro = sp.status || "";
   const orgao = sp.orgao || "";
+  // "SEM" = fornecimentos ainda sem dono definido. É o filtro que a empresa
+  // usa para distribuir o que ninguém pegou.
+  const responsavel = sp.responsavel || "";
   const de = sp.de || "";
   const ate = sp.ate || "";
   const ataId = sp.ataId || "";
@@ -91,6 +95,7 @@ export default async function ExecucaoPage({
           | "PAGO",
       }),
       ...(orgao && { orgaoNome: orgao }),
+      ...(responsavel && (responsavel === "SEM" ? { responsavelId: null } : { responsavelId: responsavel })),
       // Atraso de pagamento conta do ENCAMINHAMENTO da NF ao órgão, nunca da
       // emissão — Igor, 31/08: "o prazo de pagamento começa a correr a partir
       // do envio da NF ao órgão, e não da emissão".
@@ -125,7 +130,16 @@ export default async function ExecucaoPage({
       // que a pessoa vê a carteira inteira de uma vez (demanda de cliente
       // 23/09/2026). Só o tipo: a contagem por item fica no detalhe.
       entregas: { select: { tipo: true } },
+      // Etiqueta com quem acompanha (demanda de cliente 24/09): na lista é
+      // onde se enxerga a divisão do time sem abrir documento por documento.
+      responsavel: { select: { id: true, nome: true } },
     },
+  });
+
+  const equipe = await prisma.usuario.findMany({
+    where: { contaId: usuario.contaId },
+    orderBy: { criadoEm: "asc" },
+    select: { id: true, nome: true },
   });
 
   const [orgaosDistintos, atasOpcoes, contratosOpcoes] = await Promise.all([
@@ -200,6 +214,17 @@ export default async function ExecucaoPage({
               name: "orgao",
               label: "Todos os órgãos",
               opcoes: orgaosDistintos.map((o) => ({ value: o.orgaoNome, label: o.orgaoNome })),
+            },
+            {
+              // Seletor por colaborador, ao lado de status e órgão (demanda de
+              // cliente 24/09). "Sem responsável" vem junto: é como a empresa
+              // acha o que ainda não tem dono.
+              name: "responsavel",
+              label: "Todos os responsáveis",
+              opcoes: [
+                { value: "SEM", label: "— Sem responsável —" },
+                ...equipe.map((u) => ({ value: u.id, label: u.nome })),
+              ],
             },
             ...(atasOpcoes.length > 0
               ? [
@@ -285,6 +310,14 @@ export default async function ExecucaoPage({
                               Entrega parcial
                             </span>
                           )}
+                        {e.responsavel && (
+                          <span
+                            className="shrink-0 rounded bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-800"
+                            title={`Acompanhado por ${e.responsavel.nome}`}
+                          >
+                            👤 {e.responsavel.nome.split(" ")[0]}
+                          </span>
+                        )}
                         <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${COR_STATUS[e.status]}`}>
                           {ROTULO_STATUS[e.status]}
                         </span>

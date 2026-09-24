@@ -200,23 +200,36 @@ export function RegistrarEntrega({ empenhoId, ordem, itens, registrada, bloquead
             {tipo === "PARCIAL" ? "Quanto saiu nesta data" : "Quanto NÃO será entregue"}
           </p>
           <div className="space-y-1.5">
+            {/*
+              Igor, em vídeo (24/09): *"o texto vem a locação de painel de LED e
+              extrapola a margem direita da tela, eu tenho que rolar, rolar,
+              rolar para marcar o quantitativo."*
+
+              A causa era a linha única: descrição, saldo e campo disputavam a
+              mesma faixa, e descrição longa empurrava o campo para fora. Agora
+              a descrição ocupa a linha inteira e quebra em várias linhas — nada
+              de `truncate`, porque item de licitação se distingue justamente
+              pelo fim do texto ("...50W" x "...100W"). O campo fica embaixo, à
+              esquerda, sempre no mesmo lugar e sempre visível.
+            */}
             {itens.map((i) => (
-              <div key={i.id} className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-xs text-slate-700" title={i.descricao}>
-                  {i.descricao}
-                </span>
-                <span className="text-[10px] text-slate-500">
-                  falta {num(i.falta)} de {num(i.quantidade)} {i.unidade}
-                </span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  name={`item_${i.id}`}
-                  defaultValue={tipo === "PARCIAL" && i.falta > 0 ? num(i.falta) : ""}
-                  disabled={i.falta <= 0}
-                  placeholder="0"
-                  className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-xs outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
-                />
+              <div key={i.id} className="rounded-md border border-slate-100 bg-slate-50/60 p-2">
+                <p className="text-xs leading-snug break-words text-slate-700">{i.descricao}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    name={`item_${i.id}`}
+                    defaultValue={tipo === "PARCIAL" && i.falta > 0 ? num(i.falta) : ""}
+                    disabled={i.falta <= 0}
+                    placeholder="0"
+                    className="w-24 shrink-0 rounded-md border border-slate-300 px-2 py-1 text-right text-xs outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                  <span className="text-[11px] text-slate-500">
+                    {i.unidade} · falta <strong className="text-slate-700">{num(i.falta)}</strong> de{" "}
+                    {num(i.quantidade)}
+                  </span>
+                </div>
               </div>
             ))}
           </div>

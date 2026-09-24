@@ -48,11 +48,35 @@ function addItem(mapa: MapaUsuarios, usuarioId: string, item: Item): void {
   mapa.set(usuarioId, arr);
 }
 
-async function destinatariosDaConta(contaId: string) {
-  return prisma.usuario.findMany({
+/**
+ * Quem recebe o aviso deste documento.
+ *
+ * Demanda de cliente 24/09/2026: *"o responsável também ser notificado pelo
+ * WhatsApp (...) para que cada um receba suas notificações."*
+ *
+ * A regra tem que servir aos dois lados. Quem administra precisa da visão
+ * inteira — é ele que responde pela empresa. Quem acompanha um contrato
+ * específico precisa do dele, e só: colaborador de entregas recebendo os 40
+ * avisos da carteira inteira para de ler na segunda semana, e aí o aviso que
+ * importava passa junto com o resto.
+ *
+ * Então: admin e titular sempre; o responsável sempre; os demais colaboradores
+ * só quando o documento não tem dono — assim nada fica sem destinatário.
+ */
+async function destinatariosDaConta(contaId: string, responsavelId?: string | null) {
+  const todos = await prisma.usuario.findMany({
     where: { contaId, optInWhatsApp: true, telefoneWhatsApp: { not: null } },
-    select: { id: true, nome: true },
+    orderBy: { criadoEm: "asc" },
+    select: { id: true, nome: true, perfil: true },
   });
+  if (todos.length === 0) return [];
+
+  const titularId = todos[0].id;
+  if (!responsavelId) return todos.map(({ id, nome }) => ({ id, nome }));
+
+  return todos
+    .filter((u) => u.id === responsavelId || u.id === titularId || u.perfil === "ADMIN")
+    .map(({ id, nome }) => ({ id, nome }));
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -75,6 +99,7 @@ async function coletarCriticosDoDia(inicioHoje: Date, amanha: Date): Promise<Map
       dataEntregaCerta: true, dataEntregaInicio: true, dataEntregaFim: true,
       dataPedidoRecebido: true, prazoEntregaDias: true, prazoEntregaUnidade: true,
       empresa: { select: { contaId: true } },
+      responsavelId: true,
     },
   });
 
@@ -82,7 +107,7 @@ async function coletarCriticosDoDia(inicioHoje: Date, amanha: Date): Promise<Map
     const janela = janelaExecucao(e);
     const limite = janela.fim;
     const label = LABEL_INSTRUMENTO[e.instrumento];
-    const usuarios = await destinatariosDaConta(e.empresa.contaId);
+    const usuarios = await destinatariosDaConta(e.empresa.contaId, e.responsavelId);
     if (!usuarios.length) continue;
 
     if (limite < inicioHoje) {
@@ -144,10 +169,10 @@ async function coletarAcaoImediata(inicioHoje: Date): Promise<MapaUsuarios> {
 
     const atas = await prisma.ata.findMany({
       where: { vigenciaFim: { gte: inicio, lt: fim } },
-      select: { id: true, numero: true, orgaoNome: true, empresa: { select: { contaId: true } } },
+      select: { id: true, numero: true, orgaoNome: true, responsavelId: true, empresa: { select: { contaId: true } } },
     });
     for (const a of atas) {
-      const usuarios = await destinatariosDaConta(a.empresa.contaId);
+      const usuarios = await destinatariosDaConta(a.empresa.contaId, a.responsavelId);
       for (const u of usuarios) {
         addItem(mapa, u.id, {
           categoria: "vencendo",
@@ -159,10 +184,10 @@ async function coletarAcaoImediata(inicioHoje: Date): Promise<MapaUsuarios> {
 
     const contratos = await prisma.contrato.findMany({
       where: { vigenciaFim: { gte: inicio, lt: fim } },
-      select: { id: true, numero: true, orgaoNome: true, empresa: { select: { contaId: true } } },
+      select: { id: true, numero: true, orgaoNome: true, responsavelId: true, empresa: { select: { contaId: true } } },
     });
     for (const c of contratos) {
-      const usuarios = await destinatariosDaConta(c.empresa.contaId);
+      const usuarios = await destinatariosDaConta(c.empresa.contaId, c.responsavelId);
       for (const u of usuarios) {
         addItem(mapa, u.id, {
           categoria: "vencendo",
@@ -191,10 +216,11 @@ async function coletarAcaoImediata(inicioHoje: Date): Promise<MapaUsuarios> {
       dataNfEmitida: true, dataNfEncaminhada: true,
       itens: { select: { valorTotal: true } },
       empresa: { select: { contaId: true } },
+      responsavelId: true,
     },
   });
   for (const e of empenhosNfPendente) {
-    const usuarios = await destinatariosDaConta(e.empresa.contaId);
+    const usuarios = await destinatariosDaConta(e.empresa.contaId, e.responsavelId);
     const valor = e.itens.reduce((s, i) => s + i.valorTotal, 0);
     const dataNf = e.dataNfEncaminhada ?? e.dataNfEmitida;
     const dias = dataNf ? Math.floor((inicioHoje.getTime() - dataNf.getTime()) / 86400000) : 30;
@@ -239,10 +265,10 @@ async function coletarPlanejamento(inicioHoje: Date): Promise<MapaUsuarios> {
 
     const atas = await prisma.ata.findMany({
       where: { vigenciaFim: { gte: inicio, lt: fim } },
-      select: { id: true, numero: true, orgaoNome: true, empresa: { select: { contaId: true } } },
+      select: { id: true, numero: true, orgaoNome: true, responsavelId: true, empresa: { select: { contaId: true } } },
     });
     for (const a of atas) {
-      const usuarios = await destinatariosDaConta(a.empresa.contaId);
+      const usuarios = await destinatariosDaConta(a.empresa.contaId, a.responsavelId);
       for (const u of usuarios) {
         addItem(mapa, u.id, {
           categoria: "planejamento",
@@ -254,10 +280,10 @@ async function coletarPlanejamento(inicioHoje: Date): Promise<MapaUsuarios> {
 
     const contratos = await prisma.contrato.findMany({
       where: { vigenciaFim: { gte: inicio, lt: fim } },
-      select: { id: true, numero: true, orgaoNome: true, empresa: { select: { contaId: true } } },
+      select: { id: true, numero: true, orgaoNome: true, responsavelId: true, empresa: { select: { contaId: true } } },
     });
     for (const c of contratos) {
-      const usuarios = await destinatariosDaConta(c.empresa.contaId);
+      const usuarios = await destinatariosDaConta(c.empresa.contaId, c.responsavelId);
       for (const u of usuarios) {
         addItem(mapa, u.id, {
           categoria: "planejamento",

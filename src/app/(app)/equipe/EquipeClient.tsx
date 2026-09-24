@@ -21,6 +21,8 @@ type Membro = {
   perfil: string;
   criadoEm: Date;
   acessoRestrito: boolean;
+  funcaoNaEmpresa: string | null;
+  telefoneWhatsApp: string | null;
   modulosPermitidos: string[];
 };
 
@@ -48,6 +50,7 @@ export function EquipeClient({
   ehAdmin,
   titularId,
   plano,
+  carteira,
 }: {
   membros: Membro[];
   meuId: string;
@@ -55,6 +58,14 @@ export function EquipeClient({
   titularId: string | null;
   /** Quantos colaboradores vêm inclusos depende do plano (Regina 24/09). */
   plano: Plano;
+  /** Quem cuida de quê — o "painelzinho de colaborador" pedido pelo cliente. */
+  carteira: {
+    id: string;
+    nome: string;
+    funcao: string | null;
+    temWhats: boolean;
+    documentos: { tipo: "ata" | "contrato" | "empenho"; id: string; numero: string; orgao: string }[];
+  }[];
 }) {
   const [state, formAction] = useActionState(convidarUsuarioAction, null);
   const [editando, setEditando] = useState<string | null>(null);
@@ -100,6 +111,8 @@ export function EquipeClient({
             <thead className="text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-3 py-2 text-left">Nome</th>
+                <th className="px-3 py-2 text-left">Função</th>
+                <th className="px-3 py-2 text-left">WhatsApp</th>
                 <th className="px-3 py-2 text-left">E-mail</th>
                 <th className="px-3 py-2 text-left">Perfil</th>
                 <th className="px-3 py-2 text-left">Acessos</th>
@@ -127,6 +140,59 @@ export function EquipeClient({
         </div>
       </section>
 
+      {/*
+        Quem cuida de quê. Demanda de cliente 24/09: ver a divisão do time de
+        uma vez, em vez de abrir documento por documento para descobrir.
+      */}
+      <section className="glass rounded-[20px] px-6 py-5">
+        <h2
+          className="flex items-center gap-2 text-[12px] font-bold uppercase"
+          style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}
+        >
+          <Users className="h-4 w-4" /> Quem cuida de quê
+        </h2>
+        <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
+          Cada ata, contrato e fornecimento pode ter um responsável. Ele recebe no WhatsApp os
+          avisos de prazo do que está no nome dele.
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {carteira.map((c) => (
+            <div key={c.id} className="rounded-xl border border-slate-200 bg-white/70 p-3">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-sm font-bold text-slate-800">{c.nome}</span>
+                {c.funcao && <span className="text-[11px] text-slate-500">{c.funcao}</span>}
+                {!c.temWhats && (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                    sem WhatsApp
+                  </span>
+                )}
+              </div>
+              {c.documentos.length === 0 ? (
+                <p className="mt-1.5 text-[11px] text-slate-400">Nenhum documento sob responsabilidade.</p>
+              ) : (
+                <ul className="mt-1.5 space-y-0.5">
+                  {c.documentos.slice(0, 6).map((d) => (
+                    <li key={`${d.tipo}-${d.id}`} className="text-[11px] text-slate-600">
+                      <a
+                        href={d.tipo === "ata" ? `/atas/${d.id}` : d.tipo === "contrato" ? `/contratos/${d.id}` : `/execucao/${d.id}`}
+                        className="hover:underline"
+                      >
+                        <span className="font-semibold uppercase text-slate-400">{d.tipo}</span>{" "}
+                        {d.numero} · {d.orgao.slice(0, 28)}
+                      </a>
+                    </li>
+                  ))}
+                  {c.documentos.length > 6 && (
+                    <li className="text-[11px] text-slate-400">+{c.documentos.length - 6} outros</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
       {ehAdmin && (
         <section className="glass rounded-[20px] px-6 py-5">
           <h2
@@ -139,6 +205,14 @@ export function EquipeClient({
             <div className="grid gap-3 sm:grid-cols-2">
               <Campo label="Nome" name="nome" required />
               <Campo label="E-mail" name="email" type="email" required />
+              {/*
+                Função e WhatsApp entram no cadastro (demanda de cliente
+                24/09): a função é o que permite escolher o responsável certo
+                sem lembrar de cabeça, e o WhatsApp é o que faz o aviso chegar
+                em QUEM cuida do contrato, não só no titular da conta.
+              */}
+              <Campo label="Função na empresa" name="funcaoNaEmpresa" placeholder="Ex.: Licitações, Entregas, Financeiro" />
+              <Campo label="WhatsApp (com DDD)" name="telefoneWhatsApp" placeholder="(61) 99999-9999" />
               <Campo label="Senha provisória (mín. 8)" name="senha" type="password" required />
               <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-slate-600">Perfil</span>
@@ -232,6 +306,20 @@ function FragmentoMembro({
           {ehEu && <span className="ml-2 text-xs text-slate-400">(você)</span>}
           {ehTitular && <span className="ml-2 text-xs text-slate-400">· titular</span>}
         </td>
+        <td className="px-3 py-2 text-slate-600">
+          {membro.funcaoNaEmpresa || <span className="text-slate-400">—</span>}
+        </td>
+        <td className="px-3 py-2 text-slate-600">
+          {membro.telefoneWhatsApp ? (
+            formatarTelefoneBr(membro.telefoneWhatsApp)
+          ) : (
+            // Sem número, a pessoa pode ser responsável mas não recebe aviso —
+            // e isso precisa ficar visível, não descoberto quando o prazo vence.
+            <span className="text-amber-700" title="Sem WhatsApp: não recebe avisos dos documentos sob responsabilidade dela">
+              não recebe avisos
+            </span>
+          )}
+        </td>
         <td className="px-3 py-2 text-xs text-slate-600">{membro.email}</td>
         <td className="px-3 py-2">
           {ehAdmin && !ehEu ? (
@@ -308,6 +396,14 @@ function FragmentoMembro({
       )}
     </>
   );
+}
+
+/** (61) 99999-9999 — o formato que a pessoa reconhece. */
+function formatarTelefoneBr(bruto: string): string {
+  const d = bruto.replace(/\D/g, "").replace(/^55/, "");
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return bruto;
 }
 
 function Campo({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {

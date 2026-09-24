@@ -39,6 +39,11 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
   const email = String(formData.get("email") || "").toLowerCase().trim();
   const nome = String(formData.get("nome") || "").trim();
   const perfil = String(formData.get("perfil") || "OPERACIONAL") as "ADMIN" | "OPERACIONAL" | "VISUALIZADOR";
+  const funcaoNaEmpresa = String(formData.get("funcaoNaEmpresa") || "").trim() || null;
+  // Só dígitos: o WhatsApp é chave de envio, não texto livre. Sem número a
+  // pessoa pode ser responsável, mas não recebe aviso — e a tela mostra isso.
+  const telDigitos = String(formData.get("telefoneWhatsApp") || "").replace(/\D/g, "");
+  const telefoneWhatsApp = telDigitos.length >= 10 ? telDigitos : null;
   const senha = String(formData.get("senha") || "");
 
   if (!nome || nome.length < 2) return { erro: "Nome obrigatório." };
@@ -62,6 +67,11 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
     data: {
       nome,
       email,
+      funcaoNaEmpresa,
+      telefoneWhatsApp,
+      // Quem tem número entra recebendo: colaborador cadastrado para
+      // acompanhar contrato precisa ser avisado do prazo dele.
+      optInWhatsApp: !!telefoneWhatsApp,
       senhaHash,
       perfil,
       contaId: usuario.contaId,

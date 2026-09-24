@@ -34,6 +34,7 @@ import { ComissoesNoEmpenhoTab } from "@/components/abas/ComissoesNoEmpenhoTab";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import { situacaoEntrega, faltaPorItem } from "@/lib/entregas";
 import { RegistrarEntrega } from "@/components/RegistrarEntrega";
+import { ResponsavelTab } from "@/components/abas/ResponsavelTab";
 
 const PASSOS = [
   { marco: "PEDIDO_RECEBIDO", label: "Pedido recebido", campo: "dataPedidoRecebido" },
@@ -91,12 +92,20 @@ export default async function EmpenhoDetalhePage({
         orderBy: { ordem: "asc" },
         include: { itens: { select: { itemId: true, quantidade: true } } },
       },
+      responsavel: { select: { id: true, nome: true, email: true } },
     },
   });
 
   if (!e) notFound();
 
   const podeEditar = podeEditarDocumento(usuario, e);
+
+  // Equipe da conta, para indicar/trocar quem acompanha este fornecimento.
+  const colaboradoresDaConta = await prisma.usuario.findMany({
+    where: { contaId: usuario.contaId },
+    orderBy: { criadoEm: "asc" },
+    select: { id: true, nome: true, email: true },
+  });
 
   // Emissão de NFS-e (Fase 1). A configuração é por CNPJ, então quem manda é a
   // empresa dona deste empenho — não a conta.
@@ -385,6 +394,21 @@ export default async function EmpenhoDetalhePage({
                       ? e.dataNfEmitida.toLocaleDateString("pt-BR")
                       : null
                   }
+                />
+              ),
+            },
+            {
+              // Aba própria porque quem acompanha muda com frequência — férias,
+              // troca de área, saída — e abrir o cadastro inteiro só para
+              // trocar um nome é onde se erra outro campo sem querer.
+              key: "responsavel",
+              label: "Colaborador responsável",
+              content: (
+                <ResponsavelTab
+                  empenhoId={e.id}
+                  responsavelAtual={e.responsavel}
+                  colaboradores={colaboradoresDaConta}
+                  podeEditar={podeEditar}
                 />
               ),
             },
