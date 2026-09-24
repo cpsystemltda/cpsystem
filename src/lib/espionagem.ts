@@ -8,6 +8,20 @@ import { registrarAuditoria } from "@/lib/auditoria";
 import { getUsuarioAtual } from "@/lib/auth";
 
 const COOKIE_IMPERSONATE = "cp_impersonate";
+/**
+ * Rastro da última espionagem, que sobrevive à expiração do cookie principal.
+ *
+ * Regina, 24/09/2026, em pânico: *"por que o painel do meu cliente está
+ * completamente apagado se ele já cadastrou contratos e empenhos?"* Os dados
+ * do cliente estavam intactos — a espionagem tinha expirado (dura 1h) e ela
+ * estava vendo a PRÓPRIA conta, que é vazia, sem nada avisando da troca.
+ *
+ * O susto é o problema, não o prazo: por um momento pareceu que o cliente
+ * tinha perdido tudo. Este rastro dura 12h e existe só para o banner poder
+ * dizer "a espionagem expirou, você voltou para a sua conta" em vez de deixar
+ * a pessoa concluir sozinha o pior.
+ */
+const COOKIE_ULTIMA_ESPIONAGEM = "cp_impersonate_ultima";
 const COOKIE_EMPRESA = "cp_empresa";
 const COOKIE_VISAO = "cp_visao";
 
@@ -58,6 +72,13 @@ export async function entrarEspionagemAction(formData: FormData) {
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: MAX_AGE_S,
+  });
+  // Rastro que sobrevive à expiração — é o que permite avisar depois.
+  jar.set(COOKIE_ULTIMA_ESPIONAGEM, alvo.id, {
+    httpOnly: false,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 12 * 60 * 60,
   });
   // Reseta empresa em foco — a antiga pertence à conta da Regina/Igor e não
   // existe na conta alvo. Layout cai pra consolidado automaticamente.
@@ -117,6 +138,8 @@ export async function sairEspionagemAction() {
   }
 
   jar.delete(COOKIE_IMPERSONATE);
+  // Saída deliberada não precisa de aviso: ela sabe que saiu.
+  jar.delete(COOKIE_ULTIMA_ESPIONAGEM);
   // Restaura visão de plataforma e zera empresa em foco.
   jar.set(COOKIE_VISAO, "ADMIN_PLATAFORMA", {
     httpOnly: false,
@@ -138,6 +161,33 @@ export async function sairEspionagemAction() {
 // Helper pro layout/banner — lê o cookie e devolve o nome amigável da conta
 // espionada. Retorna null fora do modo. Não usa `getUsuarioAtual()` pra não
 // criar ciclo (auth → espionagem → auth).
+/**
+ * A espionagem acabou de expirar? Devolve o nome da conta que estava sendo
+ * vista, para o banner explicar o que aconteceu.
+ */
+export async function lerEspionagemExpirada(): Promise<{ contaNome: string } | null> {
+  const jar = await cookies();
+  if (jar.get(COOKIE_IMPERSONATE)?.value) return null; // ainda está dentro
+  const ultima = jar.get(COOKIE_ULTIMA_ESPIONAGEM)?.value;
+  if (!ultima) return null;
+
+  const conta = await prisma.conta.findUnique({
+    where: { id: ultima },
+    select: {
+      empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1 },
+      analista: { select: { nomeCompleto: true } },
+    },
+  });
+  if (!conta) return null;
+  return {
+    contaNome:
+      conta.empresas[0]?.nomeFantasia ||
+      conta.empresas[0]?.razaoSocial ||
+      conta.analista?.nomeCompleto ||
+      "a conta do cliente",
+  };
+}
+
 export async function lerEspionagemAtual(): Promise<{ contaId: string; contaNome: string } | null> {
   const contaId = await lerContaEspionada();
   if (!contaId) return null;

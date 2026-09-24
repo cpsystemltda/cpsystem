@@ -196,6 +196,15 @@ model Usuario {
   empenhosCriados             Empenho[]                 @relation("EmpenhosCriados")
   entregasRegistradas         EntregaEmpenho[]          @relation("EntregasRegistradas")
   empenhosAcompanhados        Empenho[]                 @relation("EmpenhosAcompanhados")
+  atasAcompanhadas            Ata[]                     @relation("AtasAcompanhadas")
+  contratosAcompanhados       Contrato[]                @relation("ContratosAcompanhados")
+
+  /// O que a pessoa faz na empresa — "Financeiro", "Licitações", "Entregas".
+  ///
+  /// Demanda de cliente 24/09/2026: *"na página de equipe a pessoa já colocar
+  /// quem são os membros da equipe e o que cada um faz."* Serve para escolher
+  /// o responsável certo na hora de indicar, sem ter que lembrar de cabeça.
+  funcaoNaEmpresa             String?
   pareceresCriados            ParecerJuridico[]         @relation("ParecresCriados")
   avulsosJuridicosCriados     DocumentoAvulsoJuridico[] @relation("AvulsosCriados")
   reajustesRetroativosCriados ReajusteRetroativo[]      @relation("ReajustesRetroativosCriados")
@@ -926,6 +935,11 @@ model Ata {
 
   @@index([empresaId])
   @@index([criadoPorId])
+  /// Colaborador da empresa que acompanha este documento (demanda de cliente
+  /// 24/09/2026). Mesma ideia do fornecimento: cada contratação tem um dono.
+  responsavelId String?
+  responsavel   Usuario? @relation("AtasAcompanhadas", fields: [responsavelId], references: [id], onDelete: SetNull)
+
 }
 
 model AtaItem {
@@ -1112,6 +1126,11 @@ model Contrato {
   @@index([empresaId])
   @@index([ataId])
   @@index([criadoPorId])
+  /// Colaborador da empresa que acompanha este documento (demanda de cliente
+  /// 24/09/2026). Mesma ideia do fornecimento: cada contratação tem um dono.
+  responsavelId String?
+  responsavel   Usuario? @relation("ContratosAcompanhados", fields: [responsavelId], references: [id], onDelete: SetNull)
+
 }
 
 // Cronograma de entrega quando modalidadeEntrega = PARCELADA.

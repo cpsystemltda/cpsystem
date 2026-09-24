@@ -12,7 +12,7 @@ import { SinoNotificacoes } from "@/components/SinoNotificacoes";
 import { ConviteInstalarApp } from "@/components/ConviteInstalarApp";
 import { lerVisao, type Visao } from "@/lib/visao";
 import { lerEmpresaSelecionada } from "@/lib/empresaContexto";
-import { lerEspionagemAtual } from "@/lib/espionagem";
+import { lerEspionagemAtual, lerEspionagemExpirada } from "@/lib/espionagem";
 import { BannerEspionagem } from "@/components/BannerEspionagem";
 import { PaginaPessoalNaEspionagem } from "@/components/PaginaPessoalNaEspionagem";
 import { FlutuanteIAsystem } from "@/components/FlutuanteIAsystem";
@@ -48,12 +48,13 @@ const ROTAS_PERMITIDAS_INADIMPLENTE = ["/conta/", "/termos"];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   // Todas as queries/cookies em paralelo — layout não pode bloquear a navegação
-  const [usuario, h, empresaSelecionadaCookie, visaoSalva, espionagem] = await Promise.all([
+  const [usuario, h, empresaSelecionadaCookie, visaoSalva, espionagem, espionagemExpirada] = await Promise.all([
     exigirUsuario(),
     headers(),
     lerEmpresaSelecionada(),
     lerVisao(),
     lerEspionagemAtual(),
+    lerEspionagemExpirada(),
   ]);
 
   // Onboarding pendente: usuario migrado ou com dados incompletos precisa
@@ -267,6 +268,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <NavigationProgress />
       {espionagem && <BannerEspionagem contaNome={espionagem.contaNome} />}
+      {/*
+        Espionagem expira em 1h e, sem aviso, a pessoa volta pra própria conta
+        achando que está vendo a do cliente. Em 24/09 isso fez a Regina pensar
+        que o cliente tinha perdido ata e empenhos — os dados estavam lá; ela
+        é que estava na conta errada.
+      */}
+      {!espionagem && espionagemExpirada && (
+        <div
+          className="flex flex-wrap items-center justify-center gap-2 px-4 py-2 text-center text-xs font-semibold"
+          style={{ background: "#FEF3C7", color: "#92400E" }}
+        >
+          <span>
+            O acompanhamento de <strong>{espionagemExpirada.contaNome}</strong> expirou (dura 1 hora).
+            Você está vendo a <strong>sua própria conta</strong> — os dados do cliente estão intactos.
+          </span>
+          <a href="/admin-plataforma/clientes" className="underline">
+            Entrar de novo
+          </a>
+        </div>
+      )}
       <FlutuanteIAsystem plano={usuario.conta.plano} superAdmin={usuario.superAdmin} />
       <ComandoRapido visao={visao} superAdmin={usuario.superAdmin} />
       <div className="app-content flex flex-1 w-full overflow-hidden">
