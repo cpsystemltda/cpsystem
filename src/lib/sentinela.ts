@@ -76,6 +76,21 @@ export async function conferirOperacao(): Promise<RelatorioSentinela> {
     });
   }
 
+  // Falha com "Z-API" no texto significa que algum caminho de envio escapou da
+  // ponte. É a assinatura exata do problema que custou uma semana.
+  const zapiVazando = await prisma.mensagemSaidaWhatsApp.count({
+    where: { erro: { contains: "Z-API" }, criadoEm: { gte: new Date(agora.getTime() - 7 * 86400_000) } },
+  });
+  const notifZapi = await prisma.notificacaoWhatsApp.count({
+    where: { erro: { contains: "Z-API" }, criadoEm: { gte: new Date(agora.getTime() - 2 * 86400_000) } },
+  });
+  if (zapiVazando + notifZapi > 0) {
+    achados.push({
+      grave: true,
+      texto: `${zapiVazando + notifZapi} envio(s) ainda tentaram sair pela Z-API. Algum caminho escapou da ponte.`,
+    });
+  }
+
   // ── 2. Clientes sem notícia ───────────────────────────────────────────────
   //
   // O sinal que faltava na semana passada: o César ficou dias sem receber

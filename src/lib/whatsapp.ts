@@ -105,6 +105,23 @@ let statusCache: { conectado: boolean; consultadoEm: number } | null = null;
 const STATUS_TTL_MS = 20 * 1000; // 20s
 
 async function checarConexaoZapi(): Promise<void> {
+  // Rede de segurança contra regressão silenciosa.
+  //
+  // Regina, 24/09/2026: *"eu fui muito clara para você investigar tudo que usa
+  // Z-API e retirar, e você não fez — até agora tem falha."* Estava certa:
+  // áudio e vídeo tinham escapado da primeira varredura e seguiam batendo numa
+  // assinatura vencida, falhando calados desde 18/09.
+  //
+  // Daqui pra frente, qualquer caminho novo que chegue aqui com a ponte ligada
+  // estoura com nome e sobrenome, em vez de virar mais um `FALHOU` no banco
+  // que ninguém lê. Erro barulhento é melhor que mensagem que não chega.
+  if (transportePonte()) {
+    throw new Error(
+      "Caminho de envio ainda usa Z-API com a ponte ligada. " +
+        "Todo envio tem que passar por enfileirarParaPonte — conserte a função que chamou isto.",
+    );
+  }
+
   if (statusCache && Date.now() - statusCache.consultadoEm < STATUS_TTL_MS) {
     if (!statusCache.conectado) {
       throw new Error("Z-API desconectada — reconecte a instancia antes de disparar msgs.");
@@ -549,6 +566,19 @@ export async function enviarAudio(
   telefone: string,
   audioUrl: string,
 ): Promise<{ messageId: string }> {
+  // Áudio também sai pela ponte. Ficou de fora da primeira varredura e por
+  // isso continuava dependendo da Z-API vencida — encaminhar o áudio de um
+  // cliente pro grupo de suporte falhava em silêncio.
+  if (transportePonte()) {
+    return enfileirarParaPonte({
+      destino: telefone,
+      texto: "",
+      documentoUrl: audioUrl,
+      // A ponte decide o tipo pela extensão: .ogg vira áudio de verdade.
+      nomeArquivo: "audio-cliente.ogg",
+    });
+  }
+
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
   await checarConexaoZapi();
   const phone = formatarDestino(telefone);
@@ -592,6 +622,17 @@ export async function enviarVideo(
   videoUrl: string,
   caption?: string,
 ): Promise<{ messageId: string }> {
+  // Vídeo também sai pela ponte. Era o último caminho de envio ainda preso na
+  // Z-API — e o mais visível, porque é o tour institucional que vai nos
+  // envios avulsos do admin. Falhava toda vez desde 18/09.
+  if (transportePonte()) {
+    return enfileirarParaPonte({
+      destino: telefone,
+      texto: caption ?? "",
+      documentoUrl: videoUrl,
+      nomeArquivo: "CP System - tour de 2 minutos.mp4",
+    });
+  }
   if (!CLIENT_TOKEN) throw new Error("ZAPI_CLIENT_TOKEN nao configurado");
   await checarConexaoZapi();
   const phone = formatarDestino(telefone);
