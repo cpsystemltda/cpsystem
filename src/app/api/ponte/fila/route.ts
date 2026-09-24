@@ -87,13 +87,27 @@ export async function GET(req: NextRequest) {
       // FALHOU entra junto: é exatamente o que a Z-API deixou para trás. Sem
       // isso, o cliente que ficou sem o aviso continuaria sem ele.
       status: { in: ["PENDENTE", "FALHOU"] },
-      criadoEm: { gte: new Date(Date.now() - VALIDADE_HORAS * 3600_000) },
-      // `NOT` sozinho descartaria toda linha com `erro` nulo — que são
-      // justamente as novas, nunca tentadas. Em SQL, NOT(NULL LIKE 'x%') é
-      // NULL, e NULL não é verdadeiro. Custou uma fila que parecia vazia com
-      // três mensagens dentro.
-      OR: [{ erro: null }, { NOT: { erro: { startsWith: MARCA_DESCARTE } } }],
       tentativas: { lt: 5 },
+      // Três condições independentes, cada uma no seu AND. Objeto literal só
+      // aceita uma chave `OR`: duas viram uma só, em silêncio, e o filtro passa
+      // a valer metade do que parece.
+      AND: [
+        // Validade conta da criação — mensagem agendada é exceção, porque
+        // nasce hoje pra sair amanhã e a janela de 24h a mataria antes da hora.
+        {
+          OR: [
+            { criadoEm: { gte: new Date(Date.now() - VALIDADE_HORAS * 3600_000) } },
+            { agendadoPara: { not: null } },
+          ],
+        },
+        // `NOT` sozinho descartaria toda linha com `erro` nulo — que são
+        // justamente as novas, nunca tentadas. Em SQL, NOT(NULL LIKE 'x%') é
+        // NULL, e NULL não é verdadeiro. Custou uma fila que parecia vazia com
+        // três mensagens dentro.
+        { OR: [{ erro: null }, { NOT: { erro: { startsWith: MARCA_DESCARTE } } }] },
+        // Hora marcada espera a hora chegar.
+        { OR: [{ agendadoPara: null }, { agendadoPara: { lte: new Date() } }] },
+      ],
     },
     orderBy: { criadoEm: "desc" }, // a mais nova de cada assunto é a que vale
     select: {

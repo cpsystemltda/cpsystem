@@ -40,6 +40,15 @@ export type EntregaRegistrada = {
 export type SituacaoEntrega = {
   /** Quanto já foi entregue de cada item, somando todas as entregas. */
   entreguePorItem: Map<string, number>;
+  /**
+   * Quanto de cada item a empresa declarou que NÃO será entregue.
+   *
+   * Vive na mesma tabela das quantidades entregues, e o que dá o sentido é o
+   * tipo do evento pai: em INEXECUCAO_PARCIAL a quantidade é o que faltou, não
+   * o que saiu. Somar os dois no mesmo balde faria a esteira achar que a
+   * entrega fechou justamente quando ela não fechou.
+   */
+  naoEntreguePorItem: Map<string, number>;
   /** Não falta quantidade em nenhum item. */
   completa: boolean;
   /** Há inexecução total declarada — esteira travada. */
@@ -64,6 +73,7 @@ export function situacaoEntrega(
   entregas: EntregaRegistrada[],
 ): SituacaoEntrega {
   const entreguePorItem = new Map<string, number>();
+  const naoEntreguePorItem = new Map<string, number>();
   let inexecucaoTotal = false;
   let inexecucaoParcial = false;
   let houveTotal = false;
@@ -72,8 +82,13 @@ export function situacaoEntrega(
     if (e.tipo === "INEXECUCAO_TOTAL") inexecucaoTotal = true;
     if (e.tipo === "INEXECUCAO_PARCIAL") inexecucaoParcial = true;
     if (e.tipo === "TOTAL") houveTotal = true;
+
+    // Em inexecução a quantidade tem o sentido inverso: é o que NÃO vai sair.
+    const balde = e.tipo === "INEXECUCAO_PARCIAL" || e.tipo === "INEXECUCAO_TOTAL"
+      ? naoEntreguePorItem
+      : entreguePorItem;
     for (const i of e.itens) {
-      entreguePorItem.set(i.itemId, (entreguePorItem.get(i.itemId) ?? 0) + i.quantidade);
+      balde.set(i.itemId, (balde.get(i.itemId) ?? 0) + i.quantidade);
     }
   }
 
@@ -89,16 +104,30 @@ export function situacaoEntrega(
     0,
   );
 
-  // Inexecução parcial encerra a etapa de entrega: o que faltou não vai vir, e
-  // manter "Entrega 3" pendente para sempre seria pedir uma entrega que a
-  // empresa já declarou que não acontece.
+  // A etapa fecha quando, item a item, o que saiu mais o que foi declarado
+  // como não entregue cobre o empenhado. Assim a inexecução parcial pode
+  // atingir só parte dos itens e o resto continuar pendente de entrega —
+  // manter "Entrega 3" aberta para um item que ainda vem é correto; mantê-la
+  // aberta para um item que a empresa já disse que não vem, não.
+  //
+  // Inexecução parcial declarada SEM quantitativo encerra a etapa do mesmo
+  // jeito: é a informação que a pessoa deu, e travar a esteira esperando um
+  // número que ela não tem seria transformar uma ressalva em bloqueio.
+  const inexParcialSemItens = entregas.some(
+    (e) => e.tipo === "INEXECUCAO_PARCIAL" && e.itens.length === 0,
+  );
   const completa =
     houveTotal ||
-    inexecucaoParcial ||
-    (itens.length > 0 && itens.every((i) => (entreguePorItem.get(i.id) ?? 0) >= i.quantidade));
+    inexParcialSemItens ||
+    (itens.length > 0 &&
+      itens.every(
+        (i) =>
+          (entreguePorItem.get(i.id) ?? 0) + (naoEntreguePorItem.get(i.id) ?? 0) >= i.quantidade,
+      ));
 
   return {
     entreguePorItem,
+    naoEntreguePorItem,
     completa,
     inexecucaoTotal,
     inexecucaoParcial,
@@ -111,10 +140,19 @@ export function situacaoEntrega(
 export function faltaPorItem(
   itens: ItemDoEmpenho[],
   situacao: SituacaoEntrega,
-): { item: ItemDoEmpenho; entregue: number; falta: number }[] {
+): { item: ItemDoEmpenho; entregue: number; naoEntregue: number; falta: number }[] {
   return itens.map((item) => {
     const entregue = situacao.entreguePorItem.get(item.id) ?? 0;
-    return { item, entregue, falta: Math.max(0, item.quantidade - entregue) };
+    // O que a empresa declarou que não vem sai da conta do que "falta": não é
+    // pendência, é perda registrada. Continuar cobrando entrega disso faria a
+    // esteira pedir para sempre uma parcela que ninguém vai lançar.
+    const naoEntregue = situacao.naoEntreguePorItem.get(item.id) ?? 0;
+    return {
+      item,
+      entregue,
+      naoEntregue,
+      falta: Math.max(0, item.quantidade - entregue - naoEntregue),
+    };
   });
 }
 

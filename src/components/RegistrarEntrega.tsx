@@ -194,10 +194,10 @@ export function RegistrarEntrega({ empenhoId, ordem, itens, registrada, bloquead
         ))}
       </fieldset>
 
-      {tipo === "PARCIAL" && (
+      {(tipo === "PARCIAL" || tipo === "INEXECUCAO_PARCIAL") && (
         <div className="rounded-md border border-slate-200 bg-white p-2.5">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Quanto saiu nesta data
+            {tipo === "PARCIAL" ? "Quanto saiu nesta data" : "Quanto NÃO será entregue"}
           </p>
           <div className="space-y-1.5">
             {itens.map((i) => (
@@ -212,7 +212,7 @@ export function RegistrarEntrega({ empenhoId, ordem, itens, registrada, bloquead
                   type="text"
                   inputMode="decimal"
                   name={`item_${i.id}`}
-                  defaultValue={i.falta > 0 ? num(i.falta) : ""}
+                  defaultValue={tipo === "PARCIAL" && i.falta > 0 ? num(i.falta) : ""}
                   disabled={i.falta <= 0}
                   placeholder="0"
                   className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-xs outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
@@ -221,7 +221,9 @@ export function RegistrarEntrega({ empenhoId, ordem, itens, registrada, bloquead
             ))}
           </div>
           <p className="mt-2 text-[10px] text-slate-500">
-            Deixe em branco o item que não saiu nesta data. O que faltar vira a próxima entrega.
+            {tipo === "PARCIAL"
+              ? "Deixe em branco o item que não saiu nesta data. O que faltar vira a próxima entrega."
+              : "Informe só os itens que não serão entregues. Pode deixar tudo em branco se ainda não souber o número — a inexecução fica registrada do mesmo jeito."}
           </p>
         </div>
       )}
@@ -229,7 +231,7 @@ export function RegistrarEntrega({ empenhoId, ordem, itens, registrada, bloquead
       {(tipo === "INEXECUCAO_TOTAL" || tipo === "INEXECUCAO_PARCIAL") && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5">
           <label className="mb-1 block text-[11px] font-semibold text-amber-900">
-            Motivo {tipo === "INEXECUCAO_TOTAL" ? "(recomendado)" : "(recomendado)"}
+            Motivo (recomendado)
           </label>
           <textarea
             name="observacao"

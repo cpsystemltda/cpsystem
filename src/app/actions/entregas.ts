@@ -74,8 +74,10 @@ export async function registrarEntregaAction(
   // Quantitativos da entrega parcial. Aceita só o que ainda falta: lançar mais
   // do que foi empenhado não é entrega, é erro de digitação — e passaria
   // despercebido na soma.
+  // Vale para PARCIAL (o que saiu) e para INEXECUCAO_PARCIAL (o que não vai
+  // sair). O campo é o mesmo; quem dá o sentido é o tipo do evento.
   const itensDaEntrega: { itemId: string; quantidade: number }[] = [];
-  if (tipo === "PARCIAL") {
+  if (tipo === "PARCIAL" || tipo === "INEXECUCAO_PARCIAL") {
     for (const item of empenho.itens) {
       const bruto = String(formData.get(`item_${item.id}`) || "").replace(",", ".").trim();
       if (!bruto) continue;
@@ -88,14 +90,19 @@ export async function registrarEntregaAction(
       const falta = item.quantidade - jaEntregue;
       if (qtd > falta + 1e-9) {
         return {
-          erro: `"${item.descricao}": você lançou ${qtd} ${item.unidade}, mas faltam só ${Number(falta.toFixed(4))} ${item.unidade}.`,
+          erro:
+            tipo === "PARCIAL"
+              ? `"${item.descricao}": você lançou ${qtd} ${item.unidade}, mas faltam só ${Number(falta.toFixed(4))} ${item.unidade}.`
+              : `"${item.descricao}": você declarou ${qtd} ${item.unidade} não entregues, mas restam só ${Number(falta.toFixed(4))} ${item.unidade} em aberto.`,
         };
       }
       itensDaEntrega.push({ itemId: item.id, quantidade: qtd });
     }
-    if (itensDaEntrega.length === 0) {
+    if (tipo === "PARCIAL" && itensDaEntrega.length === 0) {
       return { erro: "Informe a quantidade entregue de pelo menos um item." };
     }
+    // Inexecução parcial sem quantitativo é aceita: nem sempre a empresa sabe
+    // o número na hora, e travar o registro faria a informação se perder.
   }
 
   let arquivoUrl: string | null = null;
@@ -151,6 +158,21 @@ export async function registrarEntregaAction(
       } catch (e) {
         console.error("[entrega] aviso de solicitar nota falhou:", e);
       }
+    }
+  }
+
+  // Inexecução é evento de risco, não rotina: vira multa, vira procedimento
+  // apuratório e reaparece na habilitação da próxima licitação. Quem cuida da
+  // carteira precisa saber no dia, não no relatório do mês.
+  //
+  // Best-effort: falha no aviso não pode derrubar o registro, que é o que a
+  // pessoa veio fazer.
+  if (tipo === "INEXECUCAO_TOTAL" || tipo === "INEXECUCAO_PARCIAL") {
+    try {
+      const { avisarInexecucao } = await import("@/lib/avisoInexecucao");
+      await avisarInexecucao({ empenhoId, tipo, data, motivo: observacao || null });
+    } catch (e) {
+      console.error("[entrega] aviso de inexecução falhou:", e);
     }
   }
 

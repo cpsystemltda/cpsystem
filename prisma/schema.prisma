@@ -220,6 +220,10 @@ enum TipoNotificacaoWhatsApp {
   NF_EMITIDA_CLIENTE
   // Entrega registrada: hora de pedir a nota a contabilidade.
   SOLICITAR_NOTA
+  // Inexecucao declarada no fornecimento (demanda de cliente 23/09/2026).
+  // Vira multa, procedimento apuratorio e reaparece na proxima licitacao —
+  // por isso e aviso, nao linha de relatorio.
+  INEXECUCAO_REGISTRADA
   // Regina 14/07: resumos consolidados semanais (cap 1 msg/semana por
   // destinatario garantido pela chave (usuarioId, tipo, referenciaId=YYYY-Wxx)).
   RESUMO_SEMANAL_EMPRESA
@@ -374,6 +378,12 @@ model MensagemSaidaWhatsApp {
   tentativas Int                      @default(0)
   criadoEm  DateTime                  @default(now())
   enviadaEm DateTime?
+
+  /// Não entregar antes deste momento. Vazio = manda na próxima rodada.
+  ///
+  /// Mensagem com hora marcada não pode depender de alguém estar acordado pra
+  /// disparar: a fila guarda a hora e a ponte só leva quando chega.
+  agendadoPara DateTime?
 
   @@index([status, criadoEm])
   @@index([usuarioId])
