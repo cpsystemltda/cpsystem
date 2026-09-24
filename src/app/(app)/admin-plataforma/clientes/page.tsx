@@ -25,7 +25,7 @@ function brl(n: number): string {
 export default async function AdminClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; tipo?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; tipo?: string; arquivadas?: string }>;
 }) {
   const usuario = await exigirUsuario();
   if (!usuario.superAdmin) {
@@ -44,11 +44,20 @@ export default async function AdminClientesPage({
 
   const statusFiltro = (FILTROS_VALIDOS as readonly string[]).includes(status) ? status : null;
 
+  const verArquivadas = sp?.arquivadas === "1";
+
   const contas = await prisma.conta.findMany({
     where: {
       // Mostra todas as contas — inclusive as de super admin (Regina/Igor),
       // pra permitir entrar via modo espionagem se necessário. Linhas com
       // super admin recebem badge "Adm CP" pra distinguir.
+      //
+      // Arquivada NÃO aparece. Regina 24/09: *"eu não posso ficar com esse
+      // lixo ali dentro do sistema"*. A carteira tem que mostrar gente de
+      // verdade — quem parou de existir como cliente some da vista, mas
+      // continua no banco por 30 dias, caso volte. `?arquivadas=1` traz de
+      // volta quando for preciso conferir.
+      ...(verArquivadas ? {} : { arquivadaEm: null }),
       ...(statusFiltro && { statusAssinatura: statusFiltro as "TRIAL" | "ATIVA" | "INADIMPLENTE" | "CANCELADA" }),
       ...(tipo === "EMPRESA" && { tipo: "EMPRESA" }),
       ...(tipo === "ANALISTA" && { tipo: "ANALISTA" }),

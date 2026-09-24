@@ -34,6 +34,18 @@ enum StatusAssinatura {
 
 model Conta {
   id                      String           @id @default(cuid())
+
+  /// Conta fora da operação: some das listas, mas os dados continuam.
+  ///
+  /// Regina 24/09/2026: *"não posso ficar com o sistema sujo com perfis que
+  /// não são usuários de verdade"* — e, ao mesmo tempo, *"a gente tem que
+  /// tentar fazer que sejam usuários de verdade"*. Arquivar atende os dois: a
+  /// carteira volta a mostrar só gente real, e quem some por um mês ainda pode
+  /// ser reconquistado, porque nada foi apagado.
+  ///
+  /// Trial sem uso: arquiva em 30 dias, apaga em 60. A exclusão é a última
+  /// etapa, nunca a primeira.
+  arquivadaEm             DateTime?
   tipo                    TipoConta        @default(EMPRESA)
   plano                   Plano            @default(BASICO)
   statusAssinatura        StatusAssinatura @default(TRIAL)
