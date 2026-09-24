@@ -30,6 +30,14 @@
       "schedule": "5 12 * * 1-5"
     },
     {
+      "path": "/api/cron/sentinela",
+      "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/cron/sentinela",
+      "schedule": "0 21 * * *"
+    },
+    {
       "path": "/api/cron/resumo-tarde",
       "schedule": "0 17 * * *"
     },
