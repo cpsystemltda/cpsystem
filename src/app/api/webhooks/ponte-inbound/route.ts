@@ -198,6 +198,30 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Mensagem só com mídia: a ponte manda "[audio recebido]". Não dá pra
+  // responder o conteúdo — ninguém aqui ouviu —, mas dá pra não deixar a
+  // pessoa no vácuo e pra avisar quem precisa ouvir. Regina 25/09, com dois
+  // áudios parados: áudio é como muita gente fala; tratar como silêncio é
+  // perder a conversa.
+  const soMidia = /^\[(audio|image|video|document) recebido\]$/.exec(texto);
+  if (soMidia) {
+    const tipo = soMidia[1];
+    const nome = { audio: "áudio", image: "imagem", video: "vídeo", document: "documento" }[tipo] ?? tipo;
+    if (messageId) await marcarRespondida(messageId);
+    return NextResponse.json({
+      resposta:
+        `Recebemos seu ${nome}, ${(body.pushName || "").split(" ")[0] || "tudo bem"}! ` +
+        `Nossa equipe vai ouvir e retornar em seguida.\n\n` +
+        `Se preferir adiantar, pode escrever por aqui que já respondo.\n\n` +
+        `Contato CP System`,
+      avisos: avisoParaEquipe(
+        `🎧 *${nome.charAt(0).toUpperCase() + nome.slice(1)} recebido — precisa de gente*\n\n` +
+          `De: ${body.pushName || "—"} (${body.senderTelefone || body.sender})\n\n` +
+          `O sistema não transcreve ${nome}. Alguém precisa ouvir e responder.`,
+      ),
+    });
+  }
+
   // Conversa com gente da equipe dentro: o robô não fala por cima.
   //
   // Regina, 21/09/2026, negociando horário com a C2Vendas enquanto a resposta
