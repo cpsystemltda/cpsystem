@@ -129,13 +129,30 @@ export async function POST(req: NextRequest) {
     // Registra a decisão para virar tarefa, e confirma o recebimento. Sem o
     // registro, "o que ficar acordado por lá deve ser feito" depende de
     // alguém ter lido — que é exatamente o que falhou.
+    // `upsert`, não `update`: esta checagem roda ANTES do registro de
+    // idempotência ser criado, então aqui a linha ainda não existe. Com
+    // `update` a gravação falhava calada — e a decisão continuava sumindo,
+    // que era exatamente o defeito que eu vim consertar.
     if (ehSuporte && messageId) {
       await prisma.mensagemInboundWhatsApp
-        .update({
+        .upsert({
           where: { messageId },
-          data: { chatJid, texto: texto.slice(0, 2000), pushName: body.pushName || null, ehSuperAdmin: true },
+          create: {
+            messageId,
+            telefone: (body.sender ?? "").replace(/\D/g, ""),
+            chatJid,
+            texto: texto.slice(0, 2000),
+            pushName: body.pushName || null,
+            ehSuperAdmin: true,
+          },
+          update: {
+            chatJid,
+            texto: texto.slice(0, 2000),
+            pushName: body.pushName || null,
+            ehSuperAdmin: true,
+          },
         })
-        .catch(() => {});
+        .catch((e) => console.error("[ponte-inbound] não gravei a decisão do grupo:", e));
     }
     return NextResponse.json({ resposta: null, motivo: ehSuporte ? "decisao_registrada" : "grupo" });
   }
