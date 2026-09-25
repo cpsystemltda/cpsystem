@@ -154,7 +154,27 @@ export async function POST(req: NextRequest) {
         })
         .catch((e) => console.error("[ponte-inbound] não gravei a decisão do grupo:", e));
     }
-    return NextResponse.json({ resposta: null, motivo: ehSuporte ? "decisao_registrada" : "grupo" });
+    if (!ehSuporte) return NextResponse.json({ resposta: null, motivo: "grupo" });
+
+    // Responde NA HORA, no próprio grupo. Regina 25/09: *"eu quero respostas
+    // na hora, você antes fazia isso e eu não aceito regressão."* Em conversa
+    // individual a resposta sempre saiu em segundos; o grupo é que estava
+    // mudo. Laço não é risco: a ponte nunca reencaminha mensagem nossa.
+    const { responderInstrucaoInterna } = await import("@/lib/instrucaoInterna");
+    const resposta = await responderInstrucaoInterna({
+      texto,
+      autor: body.pushName || "equipe",
+      historico: (body.conversa ?? [])
+        .filter((m) => (m.texto ?? "").trim())
+        .slice(-6)
+        .map((m) => ({
+          autor: m.autor === "nos" ? "sistema" : "pessoa",
+          conteudo: String(m.texto).slice(0, 700),
+        })),
+    });
+
+    if (messageId) await marcarRespondida(messageId, true);
+    return NextResponse.json({ resposta, motivo: "decisao_registrada" });
   }
 
   // Idempotência pelo id da mensagem. A ponte pode reentregar (retry de rede),

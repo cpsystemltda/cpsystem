@@ -20,7 +20,9 @@ import { avisarEquipe } from "@/lib/alertaInterno";
  */
 export const dynamic = "force-dynamic";
 
-const MINUTOS_DE_TOLERANCIA = 20;
+// 5 minutos, não 20. Regina 25/09: *"eu quero respostas na hora."* Tolerância
+// longa transforma a cobrança em relatório do que já deu errado.
+const MINUTOS_DE_TOLERANCIA = 5;
 
 export async function GET(req: Request) {
   const auth = req.headers.get("authorization") || "";
