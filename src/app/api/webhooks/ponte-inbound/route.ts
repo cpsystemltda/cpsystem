@@ -111,9 +111,34 @@ export async function POST(req: NextRequest) {
   const messageId = body.messageId ?? "";
   if (!texto || !chatJid) return NextResponse.json({ resposta: null });
 
-  // Grupo não é atendimento individual — inclusive o próprio grupo de suporte,
-  // que entraria em laço respondendo a si mesmo.
-  if (chatJid.endsWith("@g.us")) return NextResponse.json({ resposta: null });
+  // ── Grupos ────────────────────────────────────────────────────────────────
+  //
+  // Grupo não é atendimento individual, e o robô não pode entrar em laço
+  // respondendo a si mesmo. Mas o GRUPO DE SUPORTE é outra coisa: é onde a
+  // Regina e o Igor decidem.
+  //
+  // Regina, 24/09/2026: *"o grupo de suporte é um grupo de super admin,
+  // portanto o que ficar acordado por lá deve ser feito."* Ela autorizou duas
+  // coisas ali e ficou sem retorno — porque esta linha descartava tudo que
+  // vinha de grupo, inclusive a decisão dela.
+  if (chatJid.endsWith("@g.us")) {
+    const grupoSuporte = (process.env.SUPORTE_GROUP_ID || "").replace(/\D/g, "");
+    const esteGrupo = chatJid.replace(/\D/g, "");
+    const ehSuporte = !!grupoSuporte && esteGrupo.startsWith(grupoSuporte);
+
+    // Registra a decisão para virar tarefa, e confirma o recebimento. Sem o
+    // registro, "o que ficar acordado por lá deve ser feito" depende de
+    // alguém ter lido — que é exatamente o que falhou.
+    if (ehSuporte && messageId) {
+      await prisma.mensagemInboundWhatsApp
+        .update({
+          where: { messageId },
+          data: { chatJid, texto: texto.slice(0, 2000), pushName: body.pushName || null, ehSuperAdmin: true },
+        })
+        .catch(() => {});
+    }
+    return NextResponse.json({ resposta: null, motivo: ehSuporte ? "decisao_registrada" : "grupo" });
+  }
 
   // Idempotência pelo id da mensagem. A ponte pode reentregar (retry de rede),
   // e sem esta trava o cliente recebe duas respostas com redação diferente —
