@@ -285,13 +285,32 @@ enum StatusNotificacaoWhatsApp {
 /// A unicidade e do banco de proposito. Duas entregas do mesmo webhook
 /// chegam com segundos de diferenca e rodam em paralelo — um SELECT antes
 /// do INSERT deixa as duas passarem. Aqui a segunda quebra na constraint.
+/// Mensagem recebida — e se alguém já respondeu.
+///
+/// Regina, 24/09/2026, pela quarta vez na semana: *"eu falei para você gravar
+/// que NINGUÉM fica sem resposta."* Até aqui a regra dependia de alguém
+/// perceber. Esta tabela existe para que o SISTEMA perceba: guarda o que
+/// chegou e cobra quando passa do tempo sem retorno.
+///
+/// `respondidaEm` é preenchido pela ponte assim que qualquer mensagem sai
+/// naquela conversa — resposta automática, envio manual meu ou da Regina pelo
+/// aparelho. Não importa quem respondeu; importa que respondeu.
 model MensagemInboundWhatsApp {
   id        String   @id @default(cuid())
   messageId String   @unique
   telefone  String
+  chatJid   String?
+  texto     String?  @db.Text
+  pushName  String?
+  /// Quem escreveu, quando dá pra identificar — muda o tom da cobrança.
+  ehSuperAdmin Boolean @default(false)
+  respondidaEm DateTime?
+  /// Já cobramos a equipe por esta? Evita repetir o alerta a cada rodada.
+  cobradaEm    DateTime?
   criadoEm  DateTime @default(now())
 
   @@index([criadoEm])
+  @@index([respondidaEm])
 }
 
 /// Lead de prospeccao ativa — a lista que a closer trabalha por telefone.

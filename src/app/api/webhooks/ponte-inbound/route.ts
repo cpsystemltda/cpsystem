@@ -84,6 +84,15 @@ function jaPrometemosRetorno(
   );
 }
 
+async function marcarRespondida(messageId: string, ehSuperAdmin = false): Promise<void> {
+  await prisma.mensagemInboundWhatsApp
+    .update({
+      where: { messageId },
+      data: { respondidaEm: new Date(), ...(ehSuperAdmin ? { ehSuperAdmin: true } : {}) },
+    })
+    .catch(() => {});
+}
+
 export async function POST(req: NextRequest) {
   const segredo = process.env.PONTE_INBOUND_SECRET;
   if (segredo && req.headers.get("x-ponte-secret") !== segredo) {
@@ -112,7 +121,15 @@ export async function POST(req: NextRequest) {
   if (messageId) {
     try {
       await prisma.mensagemInboundWhatsApp.create({
-        data: { messageId, telefone: (body.sender ?? "").replace(/\D/g, "") },
+        data: {
+          messageId,
+          telefone: (body.senderTelefone || body.sender || "").replace(/\D/g, ""),
+          chatJid,
+          // O texto fica guardado porque o alerta de "ninguém respondeu" só
+          // serve se disser O QUE a pessoa perguntou.
+          texto: texto.slice(0, 2000),
+          pushName: body.pushName || null,
+        },
       });
     } catch {
       return NextResponse.json({ resposta: null, motivo: "duplicada" });
@@ -183,6 +200,39 @@ export async function POST(req: NextRequest) {
 
   const quemEscreve = body.pushName || "—";
 
+  // ── Super admin não é cliente ────────────────────────────────────────────
+  //
+  // Regina, 24/09/2026: *"separe o que é pedido de super admin e de cliente —
+  // o Igor é super admin junto comigo."*
+  //
+  // O que motivou: o Igor mandou "alterações validadas" e, junto, um pedido de
+  // produto (avisar toda a base das novidades por WhatsApp e por pop-up no
+  // login). A IA de suporte tratou aquilo como chamado de cliente e respondeu
+  // com cortesia genérica. O pedido dele não chegou a ninguém.
+  //
+  // Sócio não abre chamado: ele dá instrução. Então nada de resposta de
+  // suporte — o texto vai inteiro para o grupo, para virar decisão, e ele
+  // recebe só a confirmação de que foi registrado.
+  if (usuario?.superAdmin) {
+    if (messageId) await marcarRespondida(messageId, true);
+    return NextResponse.json({
+      resposta:
+        `Recebido, ${usuario.nome.split(" ")[0]} — registrado e levado para a equipe.
+
+` +
+        `Contato CP System`,
+      avisos: avisoParaEquipe(
+        `🛠️ *Instrução interna — ${usuario.nome}*
+
+` +
+          `"${texto.slice(0, 900)}"
+
+` +
+          `Não é chamado de cliente: é pedido de quem administra a plataforma.`,
+      ),
+    });
+  }
+
   try {
     const decisao = await decidirRespostaIA(texto, {
       usuarioId: usuario?.id ?? "",
@@ -224,6 +274,10 @@ export async function POST(req: NextRequest) {
         ),
       );
     }
+
+    // Respondeu agora? Então esta mensagem não entra na cobrança de
+    // "ninguém sem resposta".
+    if (!calar && messageId) await marcarRespondida(messageId);
 
     return NextResponse.json({
       resposta: calar ? null : decisao.resposta,
