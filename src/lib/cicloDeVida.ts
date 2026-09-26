@@ -66,7 +66,7 @@ export async function rodarCicloDeVida(): Promise<ResumoCiclo> {
     },
     select: {
       id: true, tipo: true, plano: true, statusAssinatura: true, criadoEm: true,
-      arquivadaEm: true, gatewayCustomerId: true,
+      arquivadaEm: true, gatewayCustomerId: true, trialAteEm: true,
       empresas: { select: { id: true, razaoSocial: true } },
       analista: { select: { id: true, nomeCompleto: true } },
       usuarios: {
@@ -139,7 +139,17 @@ export async function rodarCicloDeVida(): Promise<ResumoCiclo> {
     }
 
     // ── Trial que nunca virou uso ───────────────────────────────────────────
-    const trialMorto = c.tipo === "EMPRESA" && !paga && documentos === 0;
+    //
+    // Trial EM CURSO nunca é arquivado, mesmo com a conta velha e sem
+    // documento. Regina, 26/09: *"o MSL já tinha saído do arquivado, porque
+    // ele já tinha voltado com o trial que a gente tinha pedido — por que
+    // você está falando que ele está arquivado?"*
+    //
+    // Estava arquivado de novo: a regra olhava só idade e documentos, então o
+    // cron das 11h desfazia todo dia a reativação da véspera. Prazo concedido
+    // à mão é decisão de gente; rotina automática não passa por cima.
+    const trialVigente = !!c.trialAteEm && c.trialAteEm > agora;
+    const trialMorto = c.tipo === "EMPRESA" && !paga && documentos === 0 && !trialVigente;
     if (!trialMorto) continue;
 
     if (idade >= TRIAL_APAGA_DIAS && c.arquivadaEm) {

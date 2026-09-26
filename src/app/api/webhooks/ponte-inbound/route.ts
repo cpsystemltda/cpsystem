@@ -111,6 +111,13 @@ export async function POST(req: NextRequest) {
   const messageId = body.messageId ?? "";
   if (!texto || !chatJid) return NextResponse.json({ resposta: null });
 
+  // Status e newsletter não são conversa: são feeds. Nada sai nem entra.
+  // Guarda no servidor além da que existe na ponte — em 26/09 cada status
+  // publicado por alguém virava "recebemos sua imagem" com aviso no grupo.
+  if (chatJid === "status@broadcast" || chatJid.endsWith("@newsletter") || chatJid.endsWith("@broadcast")) {
+    return NextResponse.json({ resposta: null, motivo: "feed" });
+  }
+
   // ── Grupos ────────────────────────────────────────────────────────────────
   //
   // Grupo não é atendimento individual, e o robô não pode entrar em laço
