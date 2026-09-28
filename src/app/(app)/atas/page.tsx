@@ -13,6 +13,7 @@ import { PainelFinanceiroExpansivel } from "@/components/PainelFinanceiroExpansi
 import { BannerAtestadosPendentes } from "@/components/BannerAtestadosPendentes";
 import { whereAtestadoPendente } from "@/lib/atestados";
 import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
+import { agruparOrgaos, variantesDoOrgao } from "@/lib/orgaos";
 
 export default async function AtasPage({
   searchParams,
@@ -46,13 +47,27 @@ export default async function AtasPage({
   const d120 = new Date(hoje.getTime() + 120 * 86400000);
 
   const whereBase = { empresa: filtroEmpresa };
+
+  // Antes da consulta: a URL traz a identidade do órgão, e é o agrupamento que
+  // sabe quais grafias gravadas ela representa (ver src/lib/orgaos.ts).
+  const orgaosDistintos = await prisma.ata.groupBy({
+    by: ["orgaoNome", "orgaoCnpj"],
+    where: whereBase,
+    _count: { _all: true },
+  });
+  const orgaosOpcoes = agruparOrgaos(
+    orgaosDistintos.map((o) => ({ nome: o.orgaoNome, cnpj: o.orgaoCnpj, quantidade: o._count._all })),
+  );
+  const grafiasDoOrgao = orgao ? variantesDoOrgao(orgao, orgaosOpcoes) : [];
+
   const whereQuery = {
     empresa: filtroEmpresa,
-    ...(q && { OR: [{ numero: { contains: q } }, { objeto: { contains: q } }, { processoAdministrativo: { contains: q } }, { orgaoNome: { contains: q } }, { idAtaPncp: { contains: q } }] }),
+    ...(q && { OR: [{ numero: { contains: q, mode: "insensitive" as const } }, { objeto: { contains: q, mode: "insensitive" as const } }, { processoAdministrativo: { contains: q, mode: "insensitive" as const } }, { orgaoNome: { contains: q, mode: "insensitive" as const } }, { idAtaPncp: { contains: q, mode: "insensitive" as const } }] }),
     ...(status === "vigentes" && { vigenciaFim: { gte: diaVigencia } }),
     ...(status === "vencidas" && { vigenciaFim: { lt: diaVigencia } }),
     ...(limiteAlerta && { vigenciaFim: { gte: hoje, lte: limiteAlerta } }),
-    ...(orgao && { orgaoNome: orgao }),
+    // Todas as grafias do mesmo órgão, não só a que a pessoa escolheu na lista.
+    ...(grafiasDoOrgao.length > 0 && { orgaoNome: { in: grafiasDoOrgao } }),
     // Por último de propósito: quando o cliente clica no banner de atestado,
     // esse recorte manda — sobrescreve qualquer vigenciaFim posto acima.
     ...(soAtestadoPendente ? whereAtestadoPendente(hoje) : {}),
@@ -61,7 +76,6 @@ export default async function AtasPage({
   // Tudo em paralelo — sem N+1
   const [
     atas,
-    orgaosDistintos,
     qtdVigentes,
     qtdFinalizadas,
     venc30,
@@ -86,7 +100,6 @@ export default async function AtasPage({
           },
         },
       }),
-      prisma.ata.groupBy({ by: ["orgaoNome"], where: whereBase, orderBy: { orgaoNome: "asc" } }),
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: diaVigencia } } }),
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { lt: diaVigencia } } }),
       prisma.ata.count({ where: { ...whereBase, vigenciaFim: { gte: hoje, lte: d30 } } }),
@@ -311,7 +324,7 @@ export default async function AtasPage({
             {
               name: "orgao",
               label: "Todos os órgãos",
-              opcoes: orgaosDistintos.map((o) => ({ value: o.orgaoNome, label: o.orgaoNome })),
+              opcoes: orgaosOpcoes.map((o) => ({ value: o.valor, label: o.label })),
             },
           ]}
         />

@@ -11,6 +11,7 @@ import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 import { PainelFinanceiroExpansivel } from "@/components/PainelFinanceiroExpansivel";
 import { BannerAtestadosPendentes } from "@/components/BannerAtestadosPendentes";
 import { whereAtestadoPendente } from "@/lib/atestados";
+import { agruparOrgaos, variantesDoOrgao } from "@/lib/orgaos";
 
 function classifica(vigenciaFim: Date): ContratoCard["status"] {
   const hoje = new Date();
@@ -49,10 +50,24 @@ export default async function ContratosPage({
     alertaDias > 0 ? new Date(hojeDate.getTime() + alertaDias * 86400000) : null;
 
   const whereBase = { empresa: filtroEmpresa };
+
+  // Antes da consulta: a URL traz a identidade do órgão, e é o agrupamento que
+  // sabe quais grafias gravadas ela representa (ver src/lib/orgaos.ts).
+  const orgaosDistintos = await prisma.contrato.groupBy({
+    by: ["orgaoNome", "orgaoCnpj"],
+    where: whereBase,
+    _count: { _all: true },
+  });
+  const orgaosOpcoes = agruparOrgaos(
+    orgaosDistintos.map((o) => ({ nome: o.orgaoNome, cnpj: o.orgaoCnpj, quantidade: o._count._all })),
+  );
+  const grafiasDoOrgao = orgaoFiltro ? variantesDoOrgao(orgaoFiltro, orgaosOpcoes) : [];
+
   const whereQuery = {
     empresa: filtroEmpresa,
-    ...(q && { OR: [{ numero: { contains: q } }, { objeto: { contains: q } }, { processoAdministrativo: { contains: q } }, { orgaoNome: { contains: q } }] }),
-    ...(orgaoFiltro && { orgaoNome: orgaoFiltro }),
+    ...(q && { OR: [{ numero: { contains: q, mode: "insensitive" as const } }, { objeto: { contains: q, mode: "insensitive" as const } }, { processoAdministrativo: { contains: q, mode: "insensitive" as const } }, { orgaoNome: { contains: q, mode: "insensitive" as const } }] }),
+    // Todas as grafias do mesmo órgão, não só a que a pessoa escolheu na lista.
+    ...(grafiasDoOrgao.length > 0 && { orgaoNome: { in: grafiasDoOrgao } }),
     ...(statusQs === "vencidas" && { vigenciaFim: { lt: hojeDate } }),
     ...(limiteAlertaContrato && { vigenciaFim: { gte: hojeDate, lte: limiteAlertaContrato } }),
     // Por último: o recorte do banner de atestado manda sobre os de vigência.
@@ -69,7 +84,6 @@ export default async function ContratosPage({
   // Vigentes deriva em memória.
   const [
     todos,
-    orgaosDistintos,
     qtdContratosVigentes,
     qtdContratosFinalizados,
     venc30c,
@@ -89,7 +103,6 @@ export default async function ContratosPage({
           empenhos: { select: { itens: { select: { valorTotal: true } } } },
         },
       }),
-      prisma.contrato.groupBy({ by: ["orgaoNome"], where: whereBase, orderBy: { orgaoNome: "asc" } }),
       prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate } } }),
       prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { lt: hojeDate } } }),
       prisma.contrato.count({ where: { ...whereBase, vigenciaFim: { gte: hojeDate, lte: d30 } } }),
@@ -308,7 +321,7 @@ export default async function ContratosPage({
         <ContratosBrowser
           contratos={filtrados}
           contadores={contadores}
-          orgaos={orgaosDistintos.map((o) => o.orgaoNome)}
+          orgaos={orgaosOpcoes.map((o) => ({ valor: o.valor, label: o.label }))}
         />
       </div>
     </div>

@@ -8,6 +8,7 @@ import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
+import { agruparOrgaos, variantesDoOrgao } from "@/lib/orgaos";
 
 const ROTULO_STATUS: Record<string, string> = {
   EMPENHADO: "Empenhado",
@@ -73,15 +74,28 @@ export default async function ExecucaoPage({
         }
       : undefined;
 
+  // A lista de órgãos é montada ANTES da consulta principal porque o filtro
+  // depende dela: o que chega na URL é a identidade do órgão, e quem traduz
+  // identidade nas grafias gravadas é o agrupamento (ver src/lib/orgaos.ts).
+  const orgaosDistintos = await prisma.empenho.groupBy({
+    by: ["orgaoNome", "orgaoCnpj"],
+    where: { empresa: filtroEmpresa },
+    _count: { _all: true },
+  });
+  const orgaosOpcoes = agruparOrgaos(
+    orgaosDistintos.map((o) => ({ nome: o.orgaoNome, cnpj: o.orgaoCnpj, quantidade: o._count._all })),
+  );
+  const grafiasDoOrgao = orgao ? variantesDoOrgao(orgao, orgaosOpcoes) : [];
+
   const empenhos = await prisma.empenho.findMany({
     where: {
       empresa: filtroEmpresa,
       ...(q && {
         OR: [
-          { numero: { contains: q } },
-          { objeto: { contains: q } },
-          { processoAdministrativo: { contains: q } },
-          { orgaoNome: { contains: q } },
+          { numero: { contains: q, mode: "insensitive" as const } },
+          { objeto: { contains: q, mode: "insensitive" as const } },
+          { processoAdministrativo: { contains: q, mode: "insensitive" as const } },
+          { orgaoNome: { contains: q, mode: "insensitive" as const } },
         ],
       }),
       ...(statusFiltro && {
@@ -94,7 +108,11 @@ export default async function ExecucaoPage({
           | "NF_ENCAMINHADA"
           | "PAGO",
       }),
-      ...(orgao && { orgaoNome: orgao }),
+      // Todas as grafias do mesmo órgão, não só a escolhida na lista — era o
+      // que fazia "Defensoria Pública da União" esconder os empenhos gravados
+      // como "Defensoria Publica Da Uniao". Lista vazia não filtra nada: se a
+      // chave não casar com órgão nenhum, esconder tudo seria pior.
+      ...(grafiasDoOrgao.length > 0 && { orgaoNome: { in: grafiasDoOrgao } }),
       ...(responsavel && (responsavel === "SEM" ? { responsavelId: null } : { responsavelId: responsavel })),
       // Atraso de pagamento conta do ENCAMINHAMENTO da NF ao órgão, nunca da
       // emissão — Igor, 31/08: "o prazo de pagamento começa a correr a partir
@@ -142,12 +160,7 @@ export default async function ExecucaoPage({
     select: { id: true, nome: true },
   });
 
-  const [orgaosDistintos, atasOpcoes, contratosOpcoes] = await Promise.all([
-    prisma.empenho.groupBy({
-      by: ["orgaoNome"],
-      where: { empresa: filtroEmpresa },
-      orderBy: { orgaoNome: "asc" },
-    }),
+  const [atasOpcoes, contratosOpcoes] = await Promise.all([
     prisma.ata.findMany({
       where: { empresa: filtroEmpresa, empenhos: { some: {} } },
       select: { id: true, numero: true },
@@ -213,7 +226,7 @@ export default async function ExecucaoPage({
             {
               name: "orgao",
               label: "Todos os órgãos",
-              opcoes: orgaosDistintos.map((o) => ({ value: o.orgaoNome, label: o.orgaoNome })),
+              opcoes: orgaosOpcoes.map((o) => ({ value: o.valor, label: o.label })),
             },
             {
               // Seletor por colaborador, ao lado de status e órgão (demanda de

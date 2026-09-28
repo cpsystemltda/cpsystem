@@ -62,7 +62,12 @@ export function ContratosBrowser({
 }: {
   contratos: ContratoCard[];
   contadores: Record<string, number>;
-  orgaos: string[];
+  /**
+   * O `valor` é a identidade do órgão (o que vai na URL) e o `label` é a grafia
+   * mostrada. Eram a mesma string até 27/09, e por isso a lista repetia o mesmo
+   * órgão uma vez por jeito de digitar — ver src/lib/orgaos.ts.
+   */
+  orgaos: { valor: string; label: string }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -171,7 +176,7 @@ export function ContratosBrowser({
             >
               <option value="">Todos</option>
               {orgaos.map((o) => (
-                <option key={o} value={o}>{o}</option>
+                <option key={o.valor} value={o.valor}>{o.label}</option>
               ))}
             </select>
           </label>

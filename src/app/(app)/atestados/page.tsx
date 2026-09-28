@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/SecaoGlass";
 import { FiltroLista } from "@/components/FiltroLista";
 import { podeAcessarModulo } from "@/lib/modulosAcesso";
 import { diasDecorridos, whereAguardandoOrgao, whereAtestadoPendente } from "@/lib/atestados";
+import { agruparOrgaos, variantesDoOrgao } from "@/lib/orgaos";
 
 /**
  * O registro de atestados da empresa (Regina 11/09).
@@ -63,7 +64,21 @@ export default async function AtestadosPage({
     ...(verContratos ? [{ contrato: { empresa: filtroEmpresa } }] : []),
   ];
 
-  const [atestados, orgaosDistintos, atasPendentes, contratosPendentes, atasEsperando, contratosEsperando] =
+  // Antes da consulta: a URL traz a identidade do órgão, e é o agrupamento que
+  // sabe quais grafias gravadas ela representa (ver src/lib/orgaos.ts). Aqui o
+  // atestado guarda só o nome do emissor, sem CNPJ — o agrupamento fica por
+  // nome, o que já resolve caixa, acento e pontuação.
+  const orgaosDistintos = await prisma.atestadoCapacidade.groupBy({
+    by: ["orgaoEmissor"],
+    where: { OR: origensPermitidas },
+    _count: { _all: true },
+  });
+  const orgaosOpcoes = agruparOrgaos(
+    orgaosDistintos.map((o) => ({ nome: o.orgaoEmissor, quantidade: o._count._all })),
+  );
+  const grafiasDoOrgao = orgao ? variantesDoOrgao(orgao, orgaosOpcoes) : [];
+
+  const [atestados, atasPendentes, contratosPendentes, atasEsperando, contratosEsperando] =
     await Promise.all([
       prisma.atestadoCapacidade.findMany({
         where: {
@@ -79,18 +94,14 @@ export default async function AtestadosPage({
               },
             ],
           }),
-          ...(orgao && { orgaoEmissor: orgao }),
+          // Todas as grafias do mesmo órgão, não só a escolhida na lista.
+          ...(grafiasDoOrgao.length > 0 && { orgaoEmissor: { in: grafiasDoOrgao } }),
         },
         orderBy: { dataEmissao: "desc" },
         include: {
           ata: { select: { id: true, numero: true, objeto: true } },
           contrato: { select: { id: true, numero: true, objeto: true } },
         },
-      }),
-      prisma.atestadoCapacidade.groupBy({
-        by: ["orgaoEmissor"],
-        where: { OR: origensPermitidas },
-        orderBy: { orgaoEmissor: "asc" },
       }),
       verAtas
         ? prisma.ata.findMany({
@@ -232,9 +243,9 @@ export default async function AtestadosPage({
               {
                 name: "orgao",
                 label: "Todos os órgãos",
-                opcoes: orgaosDistintos.map((o) => ({
-                  value: o.orgaoEmissor,
-                  label: o.orgaoEmissor,
+                opcoes: orgaosOpcoes.map((o) => ({
+                  value: o.valor,
+                  label: o.label,
                 })),
               },
             ]}
