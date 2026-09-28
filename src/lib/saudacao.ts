@@ -29,6 +29,27 @@ export function horaBrt(quando: Date = new Date()): number {
   return Number(s);
 }
 
+/**
+ * Meia-noite em Brasília, como instante.
+ *
+ * `setHours(0,0,0,0)` devolve a meia-noite do fuso de QUEM RODA o código, e na
+ * Vercel isso é UTC — o "hoje" virava às 21h de Brasília. Quem conta o que
+ * aconteceu no dia precisa do dia daqui.
+ */
+export function inicioDoDiaBrt(quando: Date = new Date()): Date {
+  const [dia, mes, ano] = quando
+    .toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
+    .split("/");
+  // -03:00 o ano todo: o horário de verão brasileiro acabou em 2019.
+  return new Date(`${ano}-${mes}-${dia}T00:00:00-03:00`);
+}
+
+/** Segunda a sexta pelo calendário de Brasília. */
+export function ehDiaUtilBrt(quando: Date = new Date()): boolean {
+  const d = new Date(quando.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).getDay();
+  return d >= 1 && d <= 5;
+}
+
 export function saudacaoBrt(quando: Date = new Date()): string {
   const h = horaBrt(quando);
   if (h < 12) return "Bom dia";
