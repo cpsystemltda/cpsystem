@@ -33,7 +33,7 @@ enum StatusAssinatura {
 }
 
 model Conta {
-  id                      String           @id @default(cuid())
+  id String @id @default(cuid())
 
   /// Conta fora da operação: some das listas, mas os dados continuam.
   ///
@@ -122,7 +122,7 @@ model Conta {
 
   // O indice do FK de cupom ja existe no banco desde sempre; faltava estar
   // declarado aqui, o que fazia schema e banco divergirem sem motivo.
-  arquivos                Arquivo[]
+  arquivos Arquivo[]
 
   @@index([cupomAplicadoId])
   @@index([indicadoPorContaId])
@@ -182,22 +182,22 @@ model Usuario {
   contaId String
   conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
 
-  sessoes                     Sessao[]
-  magicLinks                  MagicLink[]
-  dispositivosConhecidos      DispositivoConhecido[]
-  recoveryCodes2FA            RecoveryCode2FA[]
-  chamadosSuporte             ChamadoSuporte[]
-  logsAuditoria               LogAuditoria[]
-  notificacoesSistema         NotificacaoSistema[]
-  mensagensIAsystem           MensagemIAsystem[]
+  sessoes                Sessao[]
+  magicLinks             MagicLink[]
+  dispositivosConhecidos DispositivoConhecido[]
+  recoveryCodes2FA       RecoveryCode2FA[]
+  chamadosSuporte        ChamadoSuporte[]
+  logsAuditoria          LogAuditoria[]
+  notificacoesSistema    NotificacaoSistema[]
+  mensagensIAsystem      MensagemIAsystem[]
   // Quem criou cada documento — base da regra "só edita criador + admin"
-  atasCriadas                 Ata[]                     @relation("AtasCriadas")
-  contratosCriados            Contrato[]                @relation("ContratosCriados")
-  empenhosCriados             Empenho[]                 @relation("EmpenhosCriados")
-  entregasRegistradas         EntregaEmpenho[]          @relation("EntregasRegistradas")
-  empenhosAcompanhados        Empenho[]                 @relation("EmpenhosAcompanhados")
-  atasAcompanhadas            Ata[]                     @relation("AtasAcompanhadas")
-  contratosAcompanhados       Contrato[]                @relation("ContratosAcompanhados")
+  atasCriadas            Ata[]                  @relation("AtasCriadas")
+  contratosCriados       Contrato[]             @relation("ContratosCriados")
+  empenhosCriados        Empenho[]              @relation("EmpenhosCriados")
+  entregasRegistradas    EntregaEmpenho[]       @relation("EntregasRegistradas")
+  empenhosAcompanhados   Empenho[]              @relation("EmpenhosAcompanhados")
+  atasAcompanhadas       Ata[]                  @relation("AtasAcompanhadas")
+  contratosAcompanhados  Contrato[]             @relation("ContratosAcompanhados")
 
   /// O que a pessoa faz na empresa — "Financeiro", "Licitações", "Entregas".
   ///
@@ -211,6 +211,8 @@ model Usuario {
   contaGoogle                 GoogleAccount?
   notificacoesWhats           NotificacaoWhatsApp[]
   cuponsCriados               Cupom[]                   @relation("CuponsCriados")
+
+  conciliacoesConfirmadas ConciliacaoPortal[] @relation("ConciliacoesConfirmadas")
 
   @@index([contaId])
 }
@@ -296,18 +298,18 @@ enum StatusNotificacaoWhatsApp {
 /// naquela conversa — resposta automática, envio manual meu ou da Regina pelo
 /// aparelho. Não importa quem respondeu; importa que respondeu.
 model MensagemInboundWhatsApp {
-  id        String   @id @default(cuid())
-  messageId String   @unique
-  telefone  String
-  chatJid   String?
-  texto     String?  @db.Text
-  pushName  String?
+  id           String    @id @default(cuid())
+  messageId    String    @unique
+  telefone     String
+  chatJid      String?
+  texto        String?   @db.Text
+  pushName     String?
   /// Quem escreveu, quando dá pra identificar — muda o tom da cobrança.
-  ehSuperAdmin Boolean @default(false)
+  ehSuperAdmin Boolean   @default(false)
   respondidaEm DateTime?
   /// Já cobramos a equipe por esta? Evita repetir o alerta a cada rodada.
   cobradaEm    DateTime?
-  criadoEm  DateTime @default(now())
+  criadoEm     DateTime  @default(now())
 
   @@index([criadoEm])
   @@index([respondidaEm])
@@ -322,9 +324,9 @@ model MensagemInboundWhatsApp {
 /// Os dados do contrato vem do Portal Nacional de Contratacoes Publicas e do
 /// cadastro da Receita — nao sao dados de cliente nosso, sao dado publico.
 model LeadProspeccao {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   empresa   String
-  cnpj      String @unique
+  cnpj      String  @unique
   uf        String
   municipio String?
 
@@ -332,18 +334,18 @@ model LeadProspeccao {
   email    String?
 
   /// Contrato que vence primeiro — o gancho da ligacao.
-  venceEm            DateTime
-  valorDoContrato    Float
-  orgao              String?
-  objeto             String?
+  venceEm         DateTime
+  valorDoContrato Float
+  orgao           String?
+  objeto          String?
   /// Somado de todos os contratos publicos que a empresa tem.
-  valorTotal         Float
-  qtdContratos       Int    @default(1)
-  porte              String?
+  valorTotal      Float
+  qtdContratos    Int      @default(1)
+  porte           String?
   /// Perfil resumido pra closer decidir a abordagem.
-  perfil             String?
+  perfil          String?
   /// Marca as empresas de melhor encaixe (micro e pequeno porte, dono decide).
-  alvoIdeal          Boolean @default(false)
+  alvoIdeal       Boolean  @default(false)
 
   situacao  SituacaoLead @default(NAO_CONTATADO)
   anotacoes String?      @db.Text
@@ -396,10 +398,10 @@ enum SituacaoLead {
 /// opt-in, teto diário). Esta aqui é só transporte, e aponta pra lá em
 /// `notificacaoId` para o status dos dois andar junto.
 model MensagemSaidaWhatsApp {
-  id        String @id @default(cuid())
+  id      String @id @default(cuid())
   /// Telefone E.164 sem "+", ou JID de grupo (...@g.us).
-  destino   String
-  texto     String @db.Text
+  destino String
+  texto   String @db.Text
 
   /// Anexo. A ponte baixa a URL e manda como documento no WhatsApp — foi o que
   /// faltou pro Léo receber a nota fiscal em anexo em 22/09.
@@ -414,11 +416,11 @@ model MensagemSaidaWhatsApp {
   /// Espelha o status no registro de negócio quando existe.
   notificacaoId String?
 
-  status    StatusNotificacaoWhatsApp @default(PENDENTE)
-  erro      String?
-  tentativas Int                      @default(0)
-  criadoEm  DateTime                  @default(now())
-  enviadaEm DateTime?
+  status     StatusNotificacaoWhatsApp @default(PENDENTE)
+  erro       String?
+  tentativas Int                       @default(0)
+  criadoEm   DateTime                  @default(now())
+  enviadaEm  DateTime?
 
   /// Não entregar antes deste momento. Vazio = manda na próxima rodada.
   ///
@@ -489,15 +491,15 @@ model GoogleAccount {
 // documento — criador + N analistas vinculados a conta cliente. Regina 23/07.
 // Ao deletar GoogleAccount, cascade limpa tudo — evitando eventos orfaos.
 model EventoGoogleCalendar {
-  id              String   @id @default(cuid())
+  id              String        @id @default(cuid())
   googleAccountId String
   googleAccount   GoogleAccount @relation(fields: [googleAccountId], references: [id], onDelete: Cascade)
   // Qual entidade do CP System esse evento representa
-  entidadeTipo    String   // "EMPENHO" | "CONTRATO" | "ATA" | "GARANTIA" | "COBRANCA"
+  entidadeTipo    String // "EMPENHO" | "CONTRATO" | "ATA" | "GARANTIA" | "COBRANCA"
   entidadeId      String
   // ID retornado pelo Google Calendar API — usado pra atualizar/deletar
   eventId         String
-  criadoEm        DateTime @default(now())
+  criadoEm        DateTime      @default(now())
 
   @@unique([googleAccountId, entidadeTipo, entidadeId])
   @@index([entidadeTipo, entidadeId])
@@ -598,6 +600,8 @@ model Empresa {
   configuracaoFiscal         ConfiguracaoFiscal?
   notasFiscais               NotaFiscal[]
   documentosAvulsosJuridicos DocumentoAvulsoJuridico[]
+  documentosPortal           DocumentoPortal[]
+  notasFiscaisPortal         NotaFiscalPortal[]
 
   @@index([contaId])
 }
@@ -916,8 +920,8 @@ model Ata {
   //   dispensadoEm → o cliente decidiu que nao vai pedir (nada executado,
   //                  valor irrelevante, execucao problematica) e o aviso some.
   // Ambos null = encerrada e ninguem fez nada ainda: e o caso que alerta.
-  atestadoSolicitadoEm  DateTime?
-  atestadoDispensadoEm  DateTime?
+  atestadoSolicitadoEm   DateTime?
+  atestadoDispensadoEm   DateTime?
   atestadoDispensaMotivo String?
 
   // Google Calendar sync (Regina 23/07 — SEG P1 expandido).
@@ -951,14 +955,13 @@ model Ata {
   vigencias        Vigencia[]
   pareceres        ParecerJuridico[]
   atestados        AtestadoCapacidade[]
+  /// Colaborador da empresa que acompanha este documento (demanda de cliente
+  /// 24/09/2026). Mesma ideia do fornecimento: cada contratação tem um dono.
+  responsavelId    String?
+  responsavel      Usuario?                 @relation("AtasAcompanhadas", fields: [responsavelId], references: [id], onDelete: SetNull)
 
   @@index([empresaId])
   @@index([criadoPorId])
-  /// Colaborador da empresa que acompanha este documento (demanda de cliente
-  /// 24/09/2026). Mesma ideia do fornecimento: cada contratação tem um dono.
-  responsavelId String?
-  responsavel   Usuario? @relation("AtasAcompanhadas", fields: [responsavelId], references: [id], onDelete: SetNull)
-
 }
 
 model AtaItem {
@@ -1141,15 +1144,14 @@ model Contrato {
   vigencias        Vigencia[]
   pareceres        ParecerJuridico[]
   atestados        AtestadoCapacidade[]
+  /// Colaborador da empresa que acompanha este documento (demanda de cliente
+  /// 24/09/2026). Mesma ideia do fornecimento: cada contratação tem um dono.
+  responsavelId    String?
+  responsavel      Usuario?                 @relation("ContratosAcompanhados", fields: [responsavelId], references: [id], onDelete: SetNull)
 
   @@index([empresaId])
   @@index([ataId])
   @@index([criadoPorId])
-  /// Colaborador da empresa que acompanha este documento (demanda de cliente
-  /// 24/09/2026). Mesma ideia do fornecimento: cada contratação tem um dono.
-  responsavelId String?
-  responsavel   Usuario? @relation("ContratosAcompanhados", fields: [responsavelId], references: [id], onDelete: SetNull)
-
 }
 
 // Cronograma de entrega quando modalidadeEntrega = PARCELADA.
@@ -1414,6 +1416,7 @@ model Empenho {
   pareceres          ParecerJuridico[]
   reajusteRetroativo ReajusteRetroativo?
   entregas           EntregaEmpenho[]
+  documentosPortal   DocumentoPortal[]
 
   @@index([empresaId])
   @@index([ataId])
@@ -1436,14 +1439,14 @@ model Empenho {
 /// Inexecução parcial deixa seguir, mas fica marcada no documento — é
 /// informação que reaparece em fiscalização e em licitação futura.
 model EntregaEmpenho {
-  id        String             @id @default(cuid())
-  empenhoId String
-  empenho   Empenho            @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  id         String             @id @default(cuid())
+  empenhoId  String
+  empenho    Empenho            @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
   /// 1, 2, 3… — é o que vira "Entrega 2" na linha do tempo.
-  ordem     Int
-  tipo      TipoEntregaEmpenho
-  data      DateTime
-  observacao String?           @db.Text
+  ordem      Int
+  tipo       TipoEntregaEmpenho
+  data       DateTime
+  observacao String?            @db.Text
   arquivoUrl String?
 
   criadoPorId String?
@@ -2217,12 +2220,12 @@ model Cobranca {
   pixCopiaCola      String? // string PIX copia e cola
   boletoUrl         String? // URL do boleto
 
-  observacoes  String?
+  observacoes   String?
   // Google Calendar sync (Regina 23/07 — SEG P1 expandido). Cobranca vai
   // pro calendar do primeiro admin da conta que tenha Google conectado.
   googleEventId String?
-  criadaEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  criadaEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
 
   // Nota Fiscal de Servico (Regina 03/07): emitida automaticamente pelo
   // Asaas quando a cobranca vira PAGA (config no dashboard Asaas). Sistema
@@ -2454,9 +2457,9 @@ enum TipoTransacao {
 
 // Uma linha do extrato bancário.
 model TransacaoExtrato {
-  id                    String        @id @default(cuid())
+  id                    String              @id @default(cuid())
   extratoId             String
-  extrato               Extrato       @relation(fields: [extratoId], references: [id], onDelete: Cascade)
+  extrato               Extrato             @relation(fields: [extratoId], references: [id], onDelete: Cascade)
   tipo                  TipoTransacao
   data                  DateTime
   valor                 Float // sempre positivo; sinal vem do tipo
@@ -2468,7 +2471,7 @@ model TransacaoExtrato {
   // máximo 1 empenho (se casar com 2, cliente escolhe qual manualmente).
   conciliacoes          Conciliacao[]
   conciliacoesDebito    ConciliacaoDebito[]
-  criadoEm              DateTime      @default(now())
+  criadoEm              DateTime            @default(now())
 
   @@index([extratoId, tipo])
 }
@@ -2493,17 +2496,17 @@ enum TipoContrapartidaDebito {
 // a semântica atual do fluxo de crédito/empenho. Simetricamente segue o
 // mesmo padrão de score + status + campos de auditoria.
 model ConciliacaoDebito {
-  id                 String                  @id @default(cuid())
-  transacaoId        String
-  transacao          TransacaoExtrato        @relation(fields: [transacaoId], references: [id], onDelete: Cascade)
-  tipoContrapartida  TipoContrapartidaDebito
-  contrapartidaId    String // FK "virtual" pra Cobranca/PagamentoFixoMensal/ComissaoExecucao
-  score              Float
-  fatoresMatch       Json?
-  status             StatusConciliacao       @default(SUGERIDA)
-  confirmadaEm       DateTime?
-  confirmadaPorId    String?
-  criadoEm           DateTime                @default(now())
+  id                String                  @id @default(cuid())
+  transacaoId       String
+  transacao         TransacaoExtrato        @relation(fields: [transacaoId], references: [id], onDelete: Cascade)
+  tipoContrapartida TipoContrapartidaDebito
+  contrapartidaId   String // FK "virtual" pra Cobranca/PagamentoFixoMensal/ComissaoExecucao
+  score             Float
+  fatoresMatch      Json?
+  status            StatusConciliacao       @default(SUGERIDA)
+  confirmadaEm      DateTime?
+  confirmadaPorId   String?
+  criadoEm          DateTime                @default(now())
 
   @@index([transacaoId])
   @@index([contrapartidaId])
@@ -2549,14 +2552,14 @@ model RecoveryCode2FA {
 // do user-agent. Primeiro login (silencioso) marca o device como conhecido;
 // login subsequente de fingerprint NOVA dispara WA pro dono.
 model DispositivoConhecido {
-  id                 String   @id @default(cuid())
-  usuarioId          String
-  usuario            Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  fingerprint        String // sha256(user-agent). Substrings de IP nao — cliente troca de rede o tempo todo.
-  ipUltimoAcesso     String?
-  userAgentAmostra   String? // pra Regina/Igor auditarem em /admin
-  primeiroLoginEm    DateTime @default(now())
-  ultimoLoginEm      DateTime @default(now())
+  id               String   @id @default(cuid())
+  usuarioId        String
+  usuario          Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  fingerprint      String // sha256(user-agent). Substrings de IP nao — cliente troca de rede o tempo todo.
+  ipUltimoAcesso   String?
+  userAgentAmostra String? // pra Regina/Igor auditarem em /admin
+  primeiroLoginEm  DateTime @default(now())
+  ultimoLoginEm    DateTime @default(now())
 
   @@unique([usuarioId, fingerprint])
   @@index([usuarioId])
@@ -2639,19 +2642,19 @@ model ConfiguracaoFiscal {
   empresaId String  @unique
   empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
 
-  provedor ProvedorFiscal @default(DEMO)
-  ambiente AmbienteFiscal @default(HOMOLOGACAO)
+  provedor     ProvedorFiscal @default(DEMO)
+  ambiente     AmbienteFiscal @default(HOMOLOGACAO)
   // Token da API fiscal, cifrado em AES-256-GCM (lib/segredos).
   tokenCifrado String?
 
-  inscricaoMunicipal String?
-  inscricaoEstadual  String?
+  inscricaoMunicipal   String?
+  inscricaoEstadual    String?
   // Codigo IBGE do municipio do prestador — a prefeitura identifica a cidade
   // por ele, nao pelo nome. Preenchido sozinho a partir do CNPJ da empresa.
-  codigoMunicipio    String?
-  regime             RegimeTributarioFiscal @default(SIMPLES_NACIONAL)
-  optanteSimples     Boolean                @default(true)
-  incentivadorCultural Boolean              @default(false)
+  codigoMunicipio      String?
+  regime               RegimeTributarioFiscal @default(SIMPLES_NACIONAL)
+  optanteSimples       Boolean                @default(true)
+  incentivadorCultural Boolean                @default(false)
 
   // Parametros do servico prestado — o que a prefeitura exige na NFS-e.
   itemListaServico          String? // ex: "14.01"
@@ -2686,7 +2689,7 @@ model NotaFiscal {
   // Chave de idempotencia combinada com o provedor: se a rede cair depois do
   // envio, reenviar com a MESMA referencia consulta a nota em vez de emitir
   // outra. Nota fiscal duplicada da trabalho fiscal pra desfazer.
-  referencia String         @unique
+  referencia String           @unique
   provedor   ProvedorFiscal
   ambiente   AmbienteFiscal
   status     StatusNotaFiscal @default(PROCESSANDO)
@@ -2723,6 +2726,11 @@ model NotaFiscal {
   canceladaEm        DateTime?
   motivoCancelamento String?
 
+  /// Espelho da mesma nota no Portal da Transparência, quando encontrada.
+  espelhoPortal      NotaFiscalPortal[]
+  /// Pagamentos do portal casados com esta nota.
+  conciliacoesPortal ConciliacaoPortal[]
+
   @@index([empresaId, criadoEm])
   @@index([empenhoId])
   @@index([status])
@@ -2757,11 +2765,149 @@ model Arquivo {
   // navegador conhece, entao a conferencia de dono vale igual. Nulo = privado.
   urlPublica   String?
 
-  criadoPorId String?
-  criadoEm    DateTime @default(now())
+  criadoPorId    String?
+  criadoEm       DateTime  @default(now())
   // Ultimo acesso — ajuda a responder "quem baixou o quê" numa eventual
   // investigacao, sem guardar um log por download.
   ultimoAcessoEm DateTime?
 
   @@index([contaId, criadoEm])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Portal da Transparência — o que o órgão diz que pagou
+//
+// Igor descobriu em 27/09/2026 que o Portal da Transparência federal publica,
+// por CNPJ do favorecido, todo o caminho da despesa: empenho, liquidação e
+// pagamento. Ele parou por achar que faltava a nota fiscal; ela existe, em
+// base separada (`/api-de-dados/notas-fiscais`, por CNPJ do emitente).
+//
+// Regina autorizou a integração em 28/09. O que entra aqui é **cópia do que o
+// portal publica** — nunca substitui o que o cliente cadastrou. São duas
+// verdades diferentes e as duas importam: o portal diz o que o órgão afirma
+// ter pago, o extrato diz o que entrou na conta. Conciliar é cruzar as duas.
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum FaseDespesaPortal {
+  EMPENHO
+  LIQUIDACAO
+  PAGAMENTO
+}
+
+/// Confiança do casamento entre um pagamento do portal e uma nota nossa.
+enum ConfiancaConciliacao {
+  /// Não há outra leitura possível — valor único no empenho, ou a observação
+  /// do SIAFI cita o número da nota.
+  CONFIRMADO
+  /// A melhor hipótese, mas existe outra. Vai para a tela com um clique de
+  /// confirmação; o sistema não decide calado.
+  PROVAVEL
+}
+
+model DocumentoPortal {
+  id        String  @id @default(cuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  fase           FaseDespesaPortal
+  /// `documento` da API — unidade gestora + gestão + número. É a chave que o
+  /// próprio portal usa para relacionar um pagamento ao seu empenho.
+  codigo         String
+  /// `documentoResumido` — é o número curto que aparece para gente ler.
+  codigoResumido String?
+
+  data  DateTime
+  valor Float
+
+  /// Texto livre do SIAFI. Costuma trazer "ref. NF 1234", e quando traz vira
+  /// casamento exato em vez de palpite por valor.
+  observacao String? @db.Text
+
+  codigoUg       String?
+  ug             String?
+  codigoOrgao    String?
+  orgao          String?
+  numeroProcesso String?
+
+  /// Código do EMPENHO no portal a que este documento se liga, obtido em
+  /// `documentos-relacionados`. É por aqui que um pagamento encontra o
+  /// empenho, sem depender de casar texto.
+  codigoEmpenhoPortal String?
+
+  /// Empenho do CP System, quando reconhecido pelo número. Fica nulo quando o
+  /// portal traz contratação que o cliente ainda não cadastrou — e esse nulo é
+  /// justamente o que alimenta a importação por CNPJ.
+  empenhoId String?
+  empenho   Empenho? @relation(fields: [empenhoId], references: [id], onDelete: SetNull)
+
+  /// Quando o aviso de pagamento já foi mandado, para não repetir todo dia.
+  avisadoEm DateTime?
+
+  sincronizadoEm DateTime @default(now())
+  criadoEm       DateTime @default(now())
+
+  conciliacoes ConciliacaoPortal[]
+
+  @@unique([empresaId, fase, codigo])
+  @@index([empresaId, fase])
+  @@index([empenhoId])
+  @@index([codigoEmpenhoPortal])
+}
+
+/// Nota fiscal eletrônica como o portal a publica — a prova de que a nota
+/// chegou ao órgão, com número, série e chave.
+model NotaFiscalPortal {
+  id        String  @id @default(cuid())
+  empresaId String
+  empresa   Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  chave             String
+  numero            String
+  serie             String?
+  valor             Float
+  dataEmissao       DateTime
+  orgaoDestinatario String?
+  /// `tipoEventoMaisRecente` — diz se a nota foi autorizada, cancelada etc.
+  ultimoEvento      String?
+
+  /// Nossa nota, quando casada por número e série.
+  notaFiscalId String?
+  notaFiscal   NotaFiscal? @relation(fields: [notaFiscalId], references: [id], onDelete: SetNull)
+
+  sincronizadoEm DateTime @default(now())
+
+  @@unique([empresaId, chave])
+  @@index([empresaId])
+  @@index([notaFiscalId])
+}
+
+/// O casamento entre um pagamento do portal e uma nota nossa.
+///
+/// É tabela de ligação, e não um campo no pagamento, porque uma única ordem
+/// bancária quita várias notas — é o caso comum quando o órgão junta o mês.
+model ConciliacaoPortal {
+  id String @id @default(cuid())
+
+  pagamentoId String
+  pagamento   DocumentoPortal @relation(fields: [pagamentoId], references: [id], onDelete: Cascade)
+
+  notaFiscalId String
+  notaFiscal   NotaFiscal @relation(fields: [notaFiscalId], references: [id], onDelete: Cascade)
+
+  confianca ConfiancaConciliacao
+  /// Em uma frase, por que o sistema casou assim. Aparece na tela: quem
+  /// confirma precisa saber o que está confirmando.
+  motivo    String
+
+  confirmadoPorId String?
+  confirmadoPor   Usuario?  @relation("ConciliacoesConfirmadas", fields: [confirmadoPorId], references: [id], onDelete: SetNull)
+  confirmadoEm    DateTime?
+  /// Recusa explícita do cliente: "não foi essa nota". Guardada para o
+  /// casamento não ser refeito igual na próxima rodada.
+  recusadoEm      DateTime?
+
+  criadoEm DateTime @default(now())
+
+  @@unique([pagamentoId, notaFiscalId])
+  @@index([notaFiscalId])
 }
