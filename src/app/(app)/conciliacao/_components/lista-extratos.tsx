@@ -21,8 +21,16 @@ type ExtratoItem = {
 function brl(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+/**
+ * Data do extrato é DIA, não instante.
+ *
+ * O período vem do banco como `2026-09-01 00:00:00` sem fuso, o JavaScript lê
+ * isso como meia-noite em UTC e, ao imprimir no relógio de Brasília, volta um
+ * dia: o extrato de setembro aparecia começando em 31/08. É o mesmo erro que
+ * zerou o painel do C2Vendas na virada da vigência — ver `diaVigencia.ts`.
+ */
 function dt(d: Date | null) {
-  return d ? d.toLocaleDateString("pt-BR") : "-";
+  return d ? d.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "-";
 }
 function statusLabel(s: StatusProcessamentoExtrato): { texto: string; cor: string } {
   switch (s) {

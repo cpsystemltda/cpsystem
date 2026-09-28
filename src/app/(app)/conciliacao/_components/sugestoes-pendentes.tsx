@@ -47,8 +47,13 @@ export type SugestaoDebito = {
 function brl(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+/**
+ * Data do lançamento é DIA, não instante — gravada como meia-noite sem fuso.
+ * Sem `timeZone: "UTC"` o crédito de 03/09 aparecia como 02/09, e conferir
+ * extrato com data errada é pior do que não conferir.
+ */
 function dt(d: Date) {
-  return new Date(d).toLocaleDateString("pt-BR");
+  return new Date(d).toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }
 
 export function SugestoesPendentes({
