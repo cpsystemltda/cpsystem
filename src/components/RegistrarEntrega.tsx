@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Check, FileText, Undo2 } from "lucide-react";
 import { registrarEntregaAction, desfazerEntregaAction } from "@/app/actions/entregas";
+import { DropZoneArquivo } from "@/components/DropZoneArquivo";
 
 /**
  * A etapa de entrega, agora com natureza e quantitativo.
@@ -259,6 +260,18 @@ export function RegistrarEntrega({ empenhoId, ordem, itens, registrada, bloquead
           </p>
         </div>
       )}
+
+      {/*
+        Comprovante da entrega. Igor, em vídeo (27/09): *"o campo de carregar o
+        documento comprobatório sumiu (...) aí eu não tenho mais como colocar o
+        comprovante de entrega. Tem que voltar com esse campo."*
+
+        Sumiu porque esta etapa deixou de usar o componente antigo e eu não
+        trouxe o anexo junto. A action sempre aceitou o arquivo — faltava onde
+        soltar. Fica depois dos itens e do motivo, que é a ordem de quem
+        registra: o que aconteceu, quanto, e a prova.
+      */}
+      <DropZoneArquivo jaTem={false} onErro={setErro} rotulo="comprovante" />
 
       <div className="flex items-center gap-2">
         <button
