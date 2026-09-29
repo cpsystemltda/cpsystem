@@ -21,6 +21,9 @@
     },
     "src/app/api/cron/portal/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/portal-avisos/route.ts": {
+      "maxDuration": 120
     }
   },
   "crons": [
@@ -91,6 +94,10 @@
     {
       "path": "/api/cron/portal",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/portal-avisos",
+      "schedule": "0 13 * * *"
     }
   ]
 }

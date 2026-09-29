@@ -268,6 +268,11 @@ enum TipoNotificacaoWhatsApp {
   // O estágio do resgate vai no referenciaId ("cadastro-parado-<contaId>"),
   // o que limita cada estágio a uma única mensagem na vida da conta.
   ATIVACAO
+  // Regina 29/09 — o que o órgão publicou sobre o cliente no Portal da
+  // Transparência: pagamento registrado, nota liquidada e não paga, nota
+  // publicada que não está cadastrada aqui. Um aviso por empresa por rodada,
+  // e cada fato é anunciado uma única vez (marca `avisadoEm` na origem).
+  PORTAL_TRANSPARENCIA
 }
 
 enum StatusNotificacaoWhatsApp {
@@ -2869,6 +2874,9 @@ model NotaFiscalPortal {
   orgaoDestinatario String?
   /// `tipoEventoMaisRecente` — diz se a nota foi autorizada, cancelada etc.
   ultimoEvento      String?
+
+  /// Quando esta nota já entrou em algum aviso — para não repetir.
+  avisadoEm DateTime?
 
   /// Nossa nota, quando casada por número e série.
   notaFiscalId String?

@@ -305,12 +305,138 @@ async function gravarDocumento(opts: {
     sincronizadoEm: new Date(),
   };
 
-  await prisma.documentoPortal.upsert({
+  const doc = await prisma.documentoPortal.upsert({
     where: { empresaId_fase_codigo: { empresaId, fase, codigo } },
     create: { empresaId, fase, codigo, ...dados },
     update: dados,
   });
   if (empenhoId && fase === "PAGAMENTO") opts.r.pagamentosCasados++;
+
+  if (fase === "PAGAMENTO") {
+    await conciliarPagamento({
+      pagamentoId: doc.id,
+      empresaId,
+      empenhoId,
+      valor,
+      observacao: dados.observacao,
+    });
+  }
+}
+
+/**
+ * O número da nota fiscal escrito à mão na observação do SIAFI.
+ *
+ * Igor, no vídeo de 27/09: *"lá no portal ele não fala qual é a nota fiscal,
+ * ele não traz esse dado. Se trouxesse, tava amarrado."* Não traz em campo
+ * próprio — mas o operador do órgão escreve no texto livre, e escreve quase
+ * sempre. Nos pagamentos do próprio Léo, de julho a setembro:
+ *
+ *     NF:221 DE 25/05/2026 - PAG:0650/2024 - GABAER
+ *     NFS-E 238 EMITIDA EM 26/06/2026 // FORNECIMENTO DE INFRAESTRUTURA
+ *     NFE. 252, DE 08/07/2026 // REF A CONTRATACAO DE GRUPO MUSICAL
+ *
+ * Três grafias, todas com o número logo depois da sigla. Quando dá para ler,
+ * a conciliação deixa de ser palpite por valor e vira amarração exata.
+ *
+ * O cuidado que o texto exige: `PAG:10650/2024` também tem dois-pontos e
+ * número, e casaria numa expressão frouxa. Por isso a sigla é obrigatória e
+ * ancorada em início de palavra.
+ */
+export function numeroDaNotaNaObservacao(texto: string | null): string | null {
+  if (!texto) return null;
+  const padroes = [
+    /\bNFS?[\s.-]?E?\s*[:.\-]?\s*(\d{1,9})\b/i,
+    /\bNOTA\s+FISCAL\s*(?:N[º°.]?\s*)?(\d{1,9})\b/i,
+  ];
+  for (const p of padroes) {
+    const m = texto.match(p);
+    if (m?.[1]) {
+      const n = m[1].replace(/^0+/, "") || m[1];
+      // Número de quatro dígitos começando em 20 quase sempre é o ano de uma
+      // data vizinha, não a nota.
+      if (/^20\d{2}$/.test(n)) continue;
+      return n;
+    }
+  }
+  return null;
+}
+
+/**
+ * Liga o pagamento do portal às notas do cliente.
+ *
+ * Três caminhos, do mais forte para o mais fraco, e o primeiro que fecha
+ * manda:
+ *
+ * 1. **O órgão citou a nota** na observação — não há o que discutir.
+ * 2. **Uma nota só com aquele valor** dentro do empenho — também não há outra
+ *    leitura possível.
+ * 3. **Mais de uma nota compatível** — o sistema não escolhe calado: grava
+ *    como provável, e o cliente confirma com um clique.
+ */
+async function conciliarPagamento(opts: {
+  pagamentoId: string;
+  empresaId: string;
+  empenhoId: string | null;
+  valor: number;
+  observacao: string | null;
+}): Promise<"CONFIRMADO" | "PROVAVEL" | null> {
+  const ondeBuscar = opts.empenhoId
+    ? { empresaId: opts.empresaId, empenhoId: opts.empenhoId }
+    : { empresaId: opts.empresaId };
+
+  const citada = numeroDaNotaNaObservacao(opts.observacao);
+  if (citada) {
+    const porNumero = await prisma.notaFiscal.findMany({
+      where: { ...ondeBuscar, numero: citada },
+      select: { id: true },
+    });
+    if (porNumero.length === 1) {
+      await registrarConciliacao(opts.pagamentoId, porNumero[0].id, "CONFIRMADO",
+        `O órgão citou a NF ${citada} na observação do pagamento.`);
+      return "CONFIRMADO";
+    }
+  }
+
+  // Sem empenho reconhecido, casar por valor solto pela empresa inteira
+  // acertaria por acaso. Melhor não afirmar nada.
+  if (!opts.empenhoId) return null;
+
+  const doEmpenho = await prisma.notaFiscal.findMany({
+    where: ondeBuscar,
+    select: { id: true, numero: true, valorServicos: true },
+  });
+  const mesmoValor = doEmpenho.filter((n) => Math.abs(n.valorServicos - opts.valor) < 0.01);
+
+  if (mesmoValor.length === 1) {
+    await registrarConciliacao(opts.pagamentoId, mesmoValor[0].id, "CONFIRMADO",
+      `Valor idêntico ao da NF ${mesmoValor[0].numero ?? "sem número"} e nenhuma outra nota do empenho bate.`);
+    return "CONFIRMADO";
+  }
+  if (mesmoValor.length > 1) {
+    await registrarConciliacao(opts.pagamentoId, mesmoValor[0].id, "PROVAVEL",
+      `${mesmoValor.length} notas do empenho têm exatamente este valor — confirme qual foi paga.`);
+    return "PROVAVEL";
+  }
+  if (doEmpenho.length === 1) {
+    await registrarConciliacao(opts.pagamentoId, doEmpenho[0].id, "PROVAVEL",
+      `Única nota do empenho, mas o valor pago difere do valor da nota.`);
+    return "PROVAVEL";
+  }
+  return null;
+}
+
+async function registrarConciliacao(
+  pagamentoId: string,
+  notaFiscalId: string,
+  confianca: "CONFIRMADO" | "PROVAVEL",
+  motivo: string,
+) {
+  await prisma.conciliacaoPortal.upsert({
+    where: { pagamentoId_notaFiscalId: { pagamentoId, notaFiscalId } },
+    create: { pagamentoId, notaFiscalId, confianca, motivo },
+    // Recusa do cliente é decisão de gente: a rodada seguinte não a desfaz.
+    update: {},
+  });
 }
 
 /**
