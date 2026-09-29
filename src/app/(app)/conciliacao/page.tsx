@@ -10,6 +10,7 @@ import { UploadDropzone } from "./_components/upload-dropzone";
 import { ListaExtratos } from "./_components/lista-extratos";
 import { ConfigJanela } from "./_components/config-janela";
 import { SugestoesPendentes } from "./_components/sugestoes-pendentes";
+import { PainelPortal } from "./_components/painel-portal";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export default async function ConciliacaoPage() {
 
   if (!contaTemAcessoConciliacao(usuario.conta)) {
     // Não redireciona à força — mostra tela de upgrade
-    return (
+  return (
       <div className="mx-auto max-w-3xl p-6">
         <h1 className="text-2xl font-bold text-slate-900">Conciliação bancária</h1>
         <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-6">
@@ -215,6 +216,80 @@ export default async function ConciliacaoPage() {
     },
   });
 
+    // ── Portal da Transparência ────────────────────────────────────────────
+  // Mesma trava do extrato: quem chegou até aqui já passou por
+  // `contaTemAcessoConciliacao`. O recorte é pelas empresas da conta, para a
+  // visão consolidada somar os CNPJs e a visão por empresa mostrar só o dela.
+  const empresasDaConta = await prisma.empresa.findMany({
+    where: { contaId: usuario.contaId },
+    select: { id: true },
+  });
+  const idsEmpresa = empresasDaConta.map((e) => e.id);
+
+  const [notasPortal, pagamentosPortalRaw] = idsEmpresa.length
+    ? await Promise.all([
+        prisma.notaFiscalPortal.findMany({
+          where: { empresaId: { in: idsEmpresa } },
+          orderBy: { dataEmissao: "desc" },
+          take: 40,
+          select: {
+            id: true, numero: true, serie: true, valor: true, dataEmissao: true,
+            orgaoDestinatario: true, ultimoEvento: true, notaFiscalId: true,
+          },
+        }),
+        prisma.documentoPortal.findMany({
+          where: { empresaId: { in: idsEmpresa }, fase: "PAGAMENTO" },
+          orderBy: { data: "desc" },
+          take: 40,
+          select: {
+            id: true, codigoResumido: true, data: true, valor: true, orgao: true,
+            observacao: true, empenhoId: true,
+            empenho: { select: { numero: true } },
+          },
+        }),
+      ])
+    : [[], []];
+
+  const pagamentosPortal = pagamentosPortalRaw.map((p) => ({
+    id: p.id, codigoResumido: p.codigoResumido, data: p.data, valor: p.valor,
+    orgao: p.orgao, observacao: p.observacao, empenhoId: p.empenhoId,
+    empenhoNumero: p.empenho?.numero ?? null,
+  }));
+
+  // Os cartões de resumo contam o TOTAL, não a página exibida. Com `take: 40`
+  // a tela dizia "40 notas" para quem tinha 57 — número errado na cara do
+  // cliente é pior do que número nenhum.
+  const [totaisNotas, totaisNaoCadastradas, totaisPagamentos] = idsEmpresa.length
+    ? await Promise.all([
+        prisma.notaFiscalPortal.aggregate({
+          where: { empresaId: { in: idsEmpresa } },
+          _count: true,
+          _sum: { valor: true },
+        }),
+        prisma.notaFiscalPortal.aggregate({
+          where: { empresaId: { in: idsEmpresa }, notaFiscalId: null },
+          _count: true,
+          _sum: { valor: true },
+        }),
+        prisma.documentoPortal.aggregate({
+          where: { empresaId: { in: idsEmpresa }, fase: "PAGAMENTO" },
+          _count: true,
+          _sum: { valor: true },
+        }),
+      ])
+    : [null, null, null];
+
+  const ultimaLeituraPortal =
+    [...notasPortal, ...pagamentosPortalRaw].length > 0
+      ? await prisma.notaFiscalPortal
+          .findFirst({
+            where: { empresaId: { in: idsEmpresa } },
+            orderBy: { sincronizadoEm: "desc" },
+            select: { sincronizadoEm: true },
+          })
+          .then((x) => x?.sincronizadoEm ?? null)
+      : null;
+
   return (
     <div className="mx-auto max-w-6xl p-6">
       <header className="mb-6">
@@ -265,6 +340,20 @@ export default async function ConciliacaoPage() {
       </section>
 
       <SugestoesPendentes sugestoes={sugestoes} sugestoesDebito={sugestoesDebito} />
+
+      <PainelPortal
+        notas={notasPortal}
+        pagamentos={pagamentosPortal}
+        atualizadoEm={ultimaLeituraPortal}
+        totais={{
+          notas: totaisNotas?._count ?? 0,
+          notasValor: totaisNotas?._sum.valor ?? 0,
+          naoCadastradas: totaisNaoCadastradas?._count ?? 0,
+          naoCadastradasValor: totaisNaoCadastradas?._sum.valor ?? 0,
+          pagamentos: totaisPagamentos?._count ?? 0,
+          pagamentosValor: totaisPagamentos?._sum.valor ?? 0,
+        }}
+      />
 
       <section className="mt-10">
         <h2 className="text-lg font-semibold text-slate-900">Extratos importados</h2>
