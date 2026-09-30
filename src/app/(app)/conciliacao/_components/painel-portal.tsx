@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Landmark, CircleCheck, CircleAlert, FileWarning } from "lucide-react";
+import { Landmark, CircleCheck, CircleAlert, FileWarning, Plus } from "lucide-react";
 
 /**
  * O que o órgão publica sobre o cliente, dentro da conciliação.
@@ -28,6 +28,15 @@ type NotaPortal = {
   orgaoDestinatario: string | null;
   ultimoEvento: string | null;
   notaFiscalId: string | null;
+};
+
+type EmpenhoPortal = {
+  id: string;
+  codigoResumido: string | null;
+  data: Date;
+  valor: number;
+  orgao: string | null;
+  observacao: string | null;
 };
 
 type PagamentoPortal = {
@@ -69,17 +78,19 @@ type TotaisPortal = {
 export function PainelPortal({
   notas,
   pagamentos,
+  empenhosNaoCadastrados,
   atualizadoEm,
   totais,
 }: {
   notas: NotaPortal[];
   pagamentos: PagamentoPortal[];
+  empenhosNaoCadastrados: EmpenhoPortal[];
   atualizadoEm: Date | null;
   totais: TotaisPortal;
 }) {
   const semEmpenho = pagamentos.filter((p) => !p.empenhoId);
 
-  if (totais.notas === 0 && totais.pagamentos === 0) {
+  if (totais.notas === 0 && totais.pagamentos === 0 && empenhosNaoCadastrados.length === 0) {
     return (
       <section className="mt-10">
         <Cabecalho atualizadoEm={atualizadoEm} />
@@ -120,6 +131,52 @@ export function PainelPortal({
           icone={<CircleCheck className="h-4 w-4 text-emerald-600" />}
         />
       </div>
+
+      {empenhosNaoCadastrados.length > 0 && (
+        <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+          <h3 className="text-sm font-semibold text-slate-800">
+            Contratações federais que não estão no sistema
+          </h3>
+          <p className="mt-1 text-xs text-slate-600">
+            O órgão empenhou em nome do seu CNPJ e não encontramos o registro aqui. Clique em
+            cadastrar: o formulário abre com o que o portal já sabe preenchido — número, órgão,
+            data e objeto. Falta você conferir e completar a vigência.
+          </p>
+          <div className="mt-3 overflow-x-auto rounded-lg border border-amber-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="bg-amber-50 text-left text-xs uppercase tracking-wide text-amber-900">
+                <tr>
+                  <th className="px-3 py-2">Empenho</th>
+                  <th className="px-3 py-2">Emissão</th>
+                  <th className="px-3 py-2">Órgão</th>
+                  <th className="px-3 py-2 text-right">Valor</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-100">
+                {empenhosNaoCadastrados.map((e) => (
+                  <tr key={e.id} className="hover:bg-amber-50/60">
+                    <td className="px-3 py-2 font-medium text-slate-800">
+                      {e.codigoResumido ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-slate-600">{dia(e.data)}</td>
+                    <td className="px-3 py-2 text-slate-600">{e.orgao ?? "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-slate-800">{brl(e.valor)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <Link
+                        href={`/contratacoes/nova/fornecimento/nota-empenho?doPortal=${e.id}`}
+                        className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-700"
+                      >
+                        <Plus className="h-3 w-3" /> Cadastrar
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {notas.length > 0 && (
         <div className="mt-6">

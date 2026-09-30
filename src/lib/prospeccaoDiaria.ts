@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { inicioDoDiaBrt } from "@/lib/saudacao";
 
 /**
  * Prospecção diária — do servidor, não da minha mão.
@@ -130,8 +131,9 @@ export type ResumoProspeccao = {
 };
 
 export async function prospectarDoDia(): Promise<ResumoProspeccao> {
-  const inicioDoDia = new Date();
-  inicioDoDia.setHours(0, 0, 0, 0);
+  // Dia de Brasília: com `setHours` o "hoje" virava às 21h daqui, porque o
+  // processo roda em UTC na Vercel.
+  const inicioDoDia = inicioDoDiaBrt();
 
   // Quantas já saíram hoje — inclusive as que eu tiver disparado à mão. O teto
   // é do DIA, não da execução.
@@ -143,10 +145,23 @@ export async function prospectarDoDia(): Promise<ResumoProspeccao> {
     return { enfileiradas: 0, primeiraAs: null, ultimaAs: null, jaFeitasHoje, semCelular: 0, motivo: "teto diário já atingido" };
   }
 
+  // Sem `take` no banco, e o corte acontece depois de separar os celulares.
+  //
+  // Regina, 30/09: *"por que você não está fazendo a prospecção de dez
+  // pessoas e está reduzindo esse número?"* — foram 8, depois 4, depois 1.
+  //
+  // A causa era o `take: vagas * 4`: pegava os 40 primeiros por vencimento e
+  // só então descartava telefone fixo. Como cada rodada consome justamente os
+  // celulares, o começo da fila vai ficando cada vez mais cheio de fixo, e a
+  // janela de 40 passa a devolver quase nada — 8, 4, 1. A lista tinha 93
+  // elegíveis e 27 celulares no dia em que saiu uma única abordagem.
+  //
+  // Filtrar tudo em memória é seguro aqui: a lista inteira é de centenas de
+  // linhas, não de milhões, e o teto de mil evita surpresa se ela crescer.
   const candidatos = await prisma.leadProspeccao.findMany({
     where: { alvoIdeal: true, situacao: "NAO_CONTATADO", telefone: { not: null } },
     orderBy: [{ venceEm: "asc" }],
-    take: vagas * 4, // folga para descartar os sem celular
+    take: 1000,
     select: {
       id: true, empresa: true, telefone: true, orgao: true,
       valorTotal: true, venceEm: true, qtdContratos: true, anotacoes: true,
@@ -196,7 +211,18 @@ export async function prospectarDoDia(): Promise<ResumoProspeccao> {
     });
   }
 
-  const hora = (d: Date) => d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  // Hora de Brasília, sempre.
+  //
+  // Regina, 30/09: *"por que cargas d'água você está falando que a prospecção
+  // começa meio-dia, sendo que começa às nove?"* — o aviso no grupo dizia
+  // 12:05 porque a função roda na Vercel, em UTC, e o relógio saía sem fuso.
+  // O cron nunca mudou de hora; só a mensagem mentia.
+  const hora = (d: Date) =>
+    d.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    });
   return {
     enfileiradas: fila.length,
     primeiraAs: hora(horarios[0]),

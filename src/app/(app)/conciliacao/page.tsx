@@ -279,6 +279,18 @@ export default async function ConciliacaoPage() {
       ])
     : [null, null, null];
 
+  // Empenhos que o portal publicou e o sistema não conhece. É a fila de
+  // "cadastre o que já é seu" — e a razão de o trial não precisar começar
+  // com a tela vazia.
+  const empenhosNaoCadastrados = idsEmpresa.length
+    ? await prisma.documentoPortal.findMany({
+        where: { empresaId: { in: idsEmpresa }, fase: "EMPENHO", empenhoId: null },
+        orderBy: { data: "desc" },
+        take: 20,
+        select: { id: true, codigoResumido: true, data: true, valor: true, orgao: true, observacao: true },
+      })
+    : [];
+
   const ultimaLeituraPortal =
     [...notasPortal, ...pagamentosPortalRaw].length > 0
       ? await prisma.notaFiscalPortal
@@ -344,6 +356,7 @@ export default async function ConciliacaoPage() {
       <PainelPortal
         notas={notasPortal}
         pagamentos={pagamentosPortal}
+        empenhosNaoCadastrados={empenhosNaoCadastrados}
         atualizadoEm={ultimaLeituraPortal}
         totais={{
           notas: totaisNotas?._count ?? 0,

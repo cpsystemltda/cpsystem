@@ -8,10 +8,14 @@ import NovoEmpenhoForm from "../../empenho/NovoEmpenhoForm";
 
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ instrumento: string }>;
+  /** `doPortal` = id de um empenho encontrado no Portal da Transparência. */
+  searchParams?: Promise<{ doPortal?: string }>;
 }) {
   const { instrumento: slug } = await params;
+  const sp = (await searchParams) ?? {};
   const instrumento = instrumentoPorSlug(slug);
   if (!instrumento) notFound();
 
@@ -125,8 +129,64 @@ export default async function Page({
     })
   ).map((u) => ({ value: u.id, label: `${u.nome} · ${u.email}` }));
 
+  // Pré-preenchimento a partir do Portal da Transparência.
+  //
+  // O portal publica o empenho do órgão, mas não tudo o que o cadastro pede:
+  // não há CNPJ nem endereço do órgão, nem vigência. Por isso **nada é
+  // criado automaticamente** — o que o portal sabe entra no formulário já
+  // digitado, e a pessoa confere e completa o resto.
+  //
+  // Criar o registro sozinho seria pior que não importar: empenho com
+  // vigência inventada dispara alerta de vencimento falso no dia seguinte.
+  const doPortal = sp.doPortal
+    ? await prisma.documentoPortal.findFirst({
+        where: {
+          id: sp.doPortal,
+          fase: "EMPENHO",
+          empresa: { contaId: usuario.contaId },
+        },
+        select: {
+          codigoResumido: true, codigo: true, data: true, valor: true,
+          orgao: true, observacao: true, numeroProcesso: true,
+          empresaId: true,
+        },
+      })
+    : null;
+
+  const valoresDoPortal = doPortal
+    ? {
+        empresaId: doPortal.empresaId,
+        ataId: null,
+        contratoId: null,
+        instrumento,
+        tipo: "SERVICO",
+        // O número que a pessoa reconhece é o resumido ("2026NE000356"); o
+        // código longo carrega unidade gestora e gestão na frente.
+        numero: doPortal.codigoResumido || doPortal.codigo,
+        numeroOrdemFornecimento: null,
+        processoAdministrativo: doPortal.numeroProcesso ?? "",
+        procedimentoSelecao: null,
+        numeroLicitacao: null,
+        objeto: doPortal.observacao ?? "",
+        orgaoNome: doPortal.orgao ?? "",
+        orgaoCnpj: "",
+        orgaoEndereco: "",
+        orgaoEmail: null,
+        orgaoTelefone: null,
+        dataEmissao: doPortal.data.toISOString().slice(0, 10),
+        vigenciaInicio: doPortal.data.toISOString().slice(0, 10),
+        vigenciaFim: "",
+        prazoEntregaDias: null,
+        prazoPagamentoDias: null,
+        itens: [],
+        enderecosEntrega: [],
+        pontosFocais: [],
+      }
+    : undefined;
+
   return (
     <NovoEmpenhoForm
+      valoresIniciais={valoresDoPortal}
       colaboradores={colaboradores}
       instrumento={instrumento}
       empresas={empresas.map((e) => ({ value: e.id, label: montarLabelEmpresa(e) }))}
