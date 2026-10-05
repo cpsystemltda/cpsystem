@@ -12,6 +12,7 @@ import {
   similaridadeDesc,
 } from "@/lib/saldo";
 import { notificarAnalistasDaEmpresa } from "@/lib/notificacoes";
+import { resolverVigenciaDoEmpenho } from "@/lib/vigenciaDoEmpenho";
 import {
   criarComissoesParaEmpenho,
   sincronizarComissoesComEmpenhoPago,
@@ -1468,22 +1469,11 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
   // Resolve vigenciaId do empenho — aponta pra Vigência do contrato/ata
   // pai cujo intervalo de datas contém dataEmissao. Phase 3 do saldo por
   // vigência. Empenhos sem pai não recebem vigenciaId.
-  const vigenciaIdResolvida = await (async () => {
-    if (!v.contratoId && !v.ataId) return null;
-    const vigs = await prisma.vigencia.findMany({
-      where: v.contratoId ? { contratoId: v.contratoId } : { ataId: v.ataId },
-      orderBy: { ordem: "asc" },
-      select: { id: true, ordem: true, dataInicio: true, dataFim: true },
-    });
-    if (vigs.length === 0) return null;
-    const dentro = vigs.find(
-      (vig) => vig.dataInicio <= v.dataEmissao && vig.dataFim >= v.dataEmissao,
-    );
-    if (dentro) return dentro.id;
-    // Sem match exato: usa a última vigência (caso comum: contrato vencido
-    // recebendo empenho atrasado).
-    return vigs[vigs.length - 1].id;
-  })();
+  const vigenciaIdResolvida = await resolverVigenciaDoEmpenho({
+    contratoId: v.contratoId,
+    ataId: v.ataId,
+    dataEmissao: v.dataEmissao,
+  });
 
   try {
     const empenho = await prisma.empenho.create({
@@ -1821,6 +1811,17 @@ export async function editarEmpenhoAction(_prev: ActionResult | null, formData: 
           orgaoTelefone: v.orgaoTelefone || null,
           objeto: v.objeto,
           dataEmissao: v.dataEmissao,
+          // A vigência acompanha a data de emissão.
+          //
+          // Faltava aqui: editar o empenho trocava a data e deixava a
+          // vigência onde estava, então corrigir a data NÃO corrigia o saldo.
+          // Foi o que deixou o contrato 82/2024 com 140 executados contra 120
+          // contratados na primeira vigência (Igor, 05/10/2026).
+          vigenciaId: await resolverVigenciaDoEmpenho({
+            contratoId: v.contratoId || null,
+            ataId: v.ataId || null,
+            dataEmissao: v.dataEmissao,
+          }),
           vigenciaInicio: novaVigenciaInicio,
           vigenciaFim: novaVigenciaFim,
           prazoEntregaDias: v.prazoEntregaDias || null,

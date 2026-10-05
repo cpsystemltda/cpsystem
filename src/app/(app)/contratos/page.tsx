@@ -211,7 +211,11 @@ export default async function ContratosPage({
   });
 
   const contadores = {
-    vigentes: contratosCard.filter((c) => c.status === "vigentes").length,
+    // O contador acompanha a aba: se "Vigentes" mostra os que vencem em
+    // breve, o número tem de contá-los, senão a lista e o rótulo brigam.
+    vigentes: contratosCard.filter(
+      (c) => c.status === "vigentes" || c.status === "vencimento_proximo",
+    ).length,
     vencimento_proximo: contratosCard.filter((c) => c.status === "vencimento_proximo").length,
     vencidos: contratosCard.filter((c) => c.status === "vencidos").length,
     finalizados: contratosCard.filter((c) => c.status === "finalizados").length,
@@ -223,10 +227,22 @@ export default async function ContratosPage({
   // os "vencimento_proximo" quando a aba default é "vigentes".
   // O filtro de atestado entra na mesma exceção: o recorte já veio do banco e
   // é todo de contratos encerrados, que a aba padrão ("vigentes") descartaria.
+  // "Vigentes" mostra TUDO que está em vigor, inclusive o que vence em breve.
+  //
+  // Igor, 05/10/2026: *"esse contrato 82 no módulo de contrato não está nem
+  // aparecendo aqui... eu só estou achando ele pelo alerta de vencimento."*
+  // O 82/2024 vence em 11 dias, e `classifica` o tirava de "vigentes" para
+  // "vencimento_proximo" — a aba padrão deixava de mostrar um contrato que
+  // está valendo. Contrato a vencer continua vigente até o dia em que vence;
+  // "Vencimento próximo" é um recorte DENTRO de vigentes, não um lugar para
+  // onde o contrato se muda.
   const filtrados = alertaDias > 0 || soAtestadoPendente
     ? contratosCard
     : contratosCard.filter((c) => {
         if (abaSelecionada === "finalizados") return c.pctExecutado >= 100;
+        if (abaSelecionada === "vigentes") {
+          return c.status === "vigentes" || c.status === "vencimento_proximo";
+        }
         return c.status === abaSelecionada;
       });
 
