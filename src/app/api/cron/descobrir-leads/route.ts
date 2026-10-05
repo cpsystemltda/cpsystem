@@ -43,18 +43,37 @@ export async function GET(req: Request) {
   }
 
   const hoje = new Date();
+
+  // A janela GIRA a cada rodada.
+  //
+  // O PNCP devolve 429 por volta da oitava página, então cada rodada lê uns
+  // 3.500 contratos — sempre os primeiros da janela. Com janela fixa, a
+  // segunda noite releria exatamente os mesmos e devolveria quase só
+  // "já conhecíamos": foi o que aconteceu na primeira tentativa, 67 de 160.
+  //
+  // Girando por mês de publicação, cada noite entra numa fatia diferente dos
+  // últimos seis meses. Contrato publicado há meio ano ainda serve: o que
+  // importa para a abordagem é quando ele VENCE, não quando foi assinado.
+  const fatia = hoje.getDate() % 6; // 0 a 5 meses atrás
+  const publicadosAte = new Date(hoje.getTime() - fatia * 30 * 86400_000);
+  const publicadosDe = new Date(publicadosAte.getTime() - 30 * 86400_000);
+
   try {
     const r = await descobrirLeads({
-      // Contratos publicados nos últimos 90 dias: é onde está quem assinou
-      // recentemente e tem vigência terminando dentro da janela de abordagem.
-      publicadosDe: new Date(hoje.getTime() - 90 * 86400_000),
-      publicadosAte: hoje,
+      publicadosDe,
+      publicadosAte,
       venceEntreDias: [15, 150],
       valorMinimo: 20_000,
       limite: 120,
       maxPaginas: 60,
     });
-    return NextResponse.json({ ok: true, estoqueAntes: estoque, repos: true, ...r });
+    return NextResponse.json({
+      ok: true,
+      estoqueAntes: estoque,
+      repos: true,
+      janela: `${publicadosDe.toISOString().slice(0, 10)} a ${publicadosAte.toISOString().slice(0, 10)}`,
+      ...r,
+    });
   } catch (e) {
     console.error("[descobrir-leads] falhou:", e);
     return NextResponse.json({ ok: false, erro: (e as Error).message }, { status: 500 });
