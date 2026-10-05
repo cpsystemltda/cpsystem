@@ -24,6 +24,9 @@
     },
     "src/app/api/cron/portal-avisos/route.ts": {
       "maxDuration": 120
+    },
+    "src/app/api/cron/descobrir-leads/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -98,6 +101,10 @@
     {
       "path": "/api/cron/portal-avisos",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/descobrir-leads",
+      "schedule": "0 7 * * 1-5"
     }
   ]
 }
