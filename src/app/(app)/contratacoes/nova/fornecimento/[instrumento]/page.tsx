@@ -147,11 +147,54 @@ export default async function Page({
         },
         select: {
           codigoResumido: true, codigo: true, data: true, valor: true,
-          orgao: true, observacao: true, numeroProcesso: true,
+          orgao: true, observacao: true, numeroProcesso: true, itens: true,
           empresaId: true,
         },
       })
     : null;
+
+  // O que o portal publica sobre os itens serve para o OBJETO, não para a
+  // tabela de itens.
+  //
+  // Medido no dado real: o empenho quase nunca tem observação, e a descrição
+  // do item é que carrega a contratação — "OBJETO: PAINEL DE LED TIPO OUTDOOR.
+  // EVENTO: ENCERRAMENTO DO CURSO DE RADIOPATRULHAMENTO/2026...". Mas
+  // quantidade e valor unitário vêm zerados em todos eles. Preencher a tabela
+  // com linhas de quantidade 0 e R$ 0 não pouparia digitação: criaria um
+  // empenho de valor zero que a pessoa teria de desfazer.
+  //
+  // Então: descrição vira objeto; item só entra quando traz número de verdade.
+  const brutosDoPortal = Array.isArray(doPortal?.itens)
+    ? (doPortal.itens as { descricao?: string; quantidade?: number; valorUnitario?: number }[])
+        .filter((i) => i && typeof i.descricao === "string" && i.descricao.trim())
+    : [];
+
+  const itensDoPortal = brutosDoPortal
+    .filter((i) => Number(i.quantidade) > 0 || Number(i.valorUnitario) > 0)
+    .map((i) => ({
+      descricao: String(i.descricao).trim(),
+      unidade: "UN",
+      quantidade: Number(i.quantidade) || 0,
+      marca: null,
+      valorUnitario: Number(i.valorUnitario) || 0,
+    }));
+
+  /**
+   * O objeto, tirado de onde ele realmente está.
+   *
+   * Quando a descrição traz "OBJETO:", o que vem depois é a contratação em si
+   * — antes disso vêm plano interno, número de ata e validade, que são
+   * contabilidade do órgão e não dizem nada a quem vai conferir.
+   */
+  const descricoes = brutosDoPortal.map((i) => String(i.descricao).trim());
+  const comObjeto = descricoes.find((d) => /OBJETO\s*:/i.test(d));
+  const objetoDoPortal = (
+    doPortal?.observacao?.trim() ||
+    (comObjeto
+      ? comObjeto.split(/OBJETO\s*:/i)[1]?.trim()
+      : descricoes.join("; ")) ||
+    ""
+  ).slice(0, 500);
 
   const valoresDoPortal = doPortal
     ? {
@@ -167,7 +210,7 @@ export default async function Page({
         processoAdministrativo: doPortal.numeroProcesso ?? "",
         procedimentoSelecao: null,
         numeroLicitacao: null,
-        objeto: doPortal.observacao ?? "",
+        objeto: objetoDoPortal,
         orgaoNome: doPortal.orgao ?? "",
         orgaoCnpj: "",
         orgaoEndereco: "",
@@ -178,7 +221,7 @@ export default async function Page({
         vigenciaFim: "",
         prazoEntregaDias: null,
         prazoPagamentoDias: null,
-        itens: [],
+        itens: itensDoPortal,
         enderecosEntrega: [],
         pontosFocais: [],
       }

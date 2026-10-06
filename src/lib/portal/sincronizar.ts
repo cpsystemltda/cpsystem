@@ -198,6 +198,15 @@ export async function sincronizarDespesasDoDia(dia: Date): Promise<ResumoPortal>
   const liquidacoes: { empresaId: string; l: LinhaCsv }[] = [];
   /** Código do pagamento → empenhos que ele quitou, com o valor de cada um. */
   const impactados = new Map<string, { empenho: string; valor: number }[]>();
+  /**
+   * Código do empenho → seus itens.
+   *
+   * O empenho do portal quase nunca tem observação — nos três do Léo, nenhuma.
+   * Então o objeto da contratação não vem do cabeçalho: vem da descrição dos
+   * itens. Sem isso, o cadastro por CNPJ abria o formulário com o objeto
+   * vazio, que é justamente o campo mais trabalhoso de digitar.
+   */
+  const itensPorEmpenho = new Map<string, { descricao: string; quantidade: number; valorUnitario: number; valorTotal: number }[]>();
 
   const { lidas } = await lerZipDoPortal({
     url: urlDespesasDoDia(dia),
@@ -224,6 +233,28 @@ export async function sincronizarDespesasDoDia(dia: Date): Promise<ResumoPortal>
         },
       },
       {
+        sufixo: "_Despesas_ItemEmpenho.csv",
+        aoLer: (l) => {
+          const cod = (l["Código Empenho"] || "").trim();
+          if (!cod) return;
+          const lista = itensPorEmpenho.get(cod);
+          // Teto por empenho e no total: o arquivo é do Brasil inteiro, e
+          // guardar tudo trocaria um problema de digitação por um de memória.
+          if (lista && lista.length >= 20) return;
+          if (!lista && itensPorEmpenho.size >= 150_000) return;
+          const descricao = (l["Descrição"] || "").trim();
+          if (!descricao) return;
+          const item = {
+            descricao: descricao.slice(0, 300),
+            quantidade: valorDoPortal(l["Quantidade"]),
+            valorUnitario: valorDoPortal(l["Valor Unitário"]),
+            valorTotal: valorDoPortal(l["Valor Total"]),
+          };
+          if (lista) lista.push(item);
+          else itensPorEmpenho.set(cod, [item]);
+        },
+      },
+      {
         // A ligação que o Igor deu por perdida no vídeo: pagamento → empenho,
         // com o valor pago em cada um. Guardado inteiro porque a ordem das
         // entradas dentro do zip não é garantida — quando esta é lida, ainda
@@ -246,7 +277,12 @@ export async function sincronizarDespesasDoDia(dia: Date): Promise<ResumoPortal>
   r.linhasLidas = Object.values(lidas).reduce((s, n) => s + n, 0);
 
   for (const { empresaId, l } of empenhos) {
-    await gravarDocumento({ empresaId, l, fase: "EMPENHO", campoCodigo: "Código Empenho", campoResumido: "Código Empenho Resumido", r });
+    await gravarDocumento({
+      empresaId, l, fase: "EMPENHO",
+      campoCodigo: "Código Empenho", campoResumido: "Código Empenho Resumido",
+      itens: itensPorEmpenho.get((l["Código Empenho"] || "").trim()) ?? null,
+      r,
+    });
     r.empenhosGravados++;
   }
   for (const { empresaId, l } of liquidacoes) {
@@ -274,6 +310,7 @@ async function gravarDocumento(opts: {
   campoCodigo: string;
   campoResumido: string;
   codigoEmpenhoPortal?: string | null;
+  itens?: { descricao: string; quantidade: number; valorUnitario: number; valorTotal: number }[] | null;
   r: ResumoPortal;
 }) {
   const { empresaId, l, fase } = opts;
@@ -302,6 +339,7 @@ async function gravarDocumento(opts: {
     numeroProcesso: (l["Processo"] || "").trim() || null,
     codigoEmpenhoPortal: codigoEmpenho,
     empenhoId,
+    ...(opts.itens && opts.itens.length > 0 ? { itens: opts.itens } : {}),
     sincronizadoEm: new Date(),
   };
 

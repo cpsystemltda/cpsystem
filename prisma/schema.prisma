@@ -2845,6 +2845,14 @@ model DocumentoPortal {
   empenhoId String?
   empenho   Empenho? @relation(fields: [empenhoId], references: [id], onDelete: SetNull)
 
+  /// Itens do empenho, como o portal publica — descrição, quantidade e valor.
+  ///
+  /// Guardados como JSON porque são cópia de leitura: ninguém edita, ninguém
+  /// consulta por item, e criar tabela filha para isso só acrescentaria junção
+  /// a cada tela. Servem para o cadastro por CNPJ abrir o formulário já com o
+  /// objeto e os itens preenchidos, em vez de só o cabeçalho.
+  itens Json?
+
   /// Quando o aviso de pagamento já foi mandado, para não repetir todo dia.
   avisadoEm DateTime?
 
