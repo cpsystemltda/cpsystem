@@ -75,6 +75,10 @@ const SUBSTITUIVEIS = new Set([
   "VENCIMENTO_EMPENHO",
   "PLANO_ATRASADO",
   "ATIVACAO",
+  // O resumo do inadimplente: a contagem muda durante o dia, e o que vale e
+  // sempre o ultimo numero. Sem isso ele receberia um aviso por alerta retido,
+  // cada um dizendo um total diferente.
+  "ALERTAS_RETIDOS",
 ]);
 
 /** Teto diário por pessoa, o mesmo do disparo (Regina 08/07, depois do flood). */

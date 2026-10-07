@@ -268,6 +268,11 @@ enum TipoNotificacaoWhatsApp {
   // O estágio do resgate vai no referenciaId ("cadastro-parado-<contaId>"),
   // o que limita cada estágio a uma única mensagem na vida da conta.
   ATIVACAO
+  /// Regina 07/10 — o resumo que o inadimplente recebe no lugar dos avisos.
+  /// *"Ele não pode ter o benefício de ser notificado se está inadimplente.
+  /// Mas também não pode deixar de ser notificado, para que ele tenha motivo
+  /// para regularizar e não perder nenhum prazo."*
+  ALERTAS_RETIDOS
   // Regina 29/09 — o que o órgão publicou sobre o cliente no Portal da
   // Transparência: pagamento registrado, nota liquidada e não paga, nota
   // publicada que não está cadastrada aqui. Um aviso por empresa por rodada,

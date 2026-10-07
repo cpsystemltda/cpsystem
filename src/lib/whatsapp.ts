@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { reterSeInadimplente } from "@/lib/alertaRetido";
 import type { TipoNotificacaoWhatsApp } from "@/generated/prisma/client";
 
 // Integracao WhatsApp via Z-API (Regina 02/07).
@@ -396,6 +397,24 @@ export async function dispararNotificacao(opts: {
   // nao espera cortesia.
   if (opts.tipo !== "BOAS_VINDAS" && !opts.bypassCap) {
     await garantirBoasVindas(opts.usuarioId);
+  }
+
+  // Conta inadimplente nao recebe o aviso em si, recebe o aviso de que ha
+  // avisos. Regina 07/10: *"ele nao pode ter o beneficio de ser notificado se
+  // esta inadimplente, mas tambem nao pode deixar de ser notificado, para que
+  // tenha motivo para regularizar e nao perder nenhum prazo."* A regra e a de
+  // `alertaRetido.ts`, que ja deixa cobranca, seguranca e boas-vindas passar.
+  if (!opts.bypassCap) {
+    const retencao = await reterSeInadimplente({
+      usuarioId: opts.usuarioId,
+      tipo: opts.tipo,
+      referenciaId: opts.referenciaId,
+      telefone: formatarTelefone(usuario.telefoneWhatsApp),
+      mensagem: opts.mensagem,
+    });
+    if (retencao.reteve) {
+      return { enviado: false, motivo: "retido_inadimplencia" };
+    }
   }
 
   if (!opts.bypassCap) {
