@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { ehDiaUtilBrt, horaBrt, inicioDoDiaBrt } from "@/lib/saudacao";
+import { ondeNaoFoiDescartada } from "@/lib/marcasDaFila";
 
 /**
  * Sentinela — o sistema conferindo a si mesmo, todo dia.
@@ -55,16 +56,27 @@ export async function conferirOperacao(): Promise<RelatorioSentinela> {
   const [entregues, falhas, presas] = await Promise.all([
     prisma.mensagemSaidaWhatsApp.count({ where: { status: "ENVIADA", enviadaEm: { gte: inicioDoDia } } }),
     prisma.mensagemSaidaWhatsApp.findMany({
-      where: { status: "FALHOU", criadoEm: { gte: inicioDoDia }, NOT: { erro: { startsWith: "substituída" } } },
+      // Descarte e expiração não são falha de canal — ver `marcasDaFila.ts`.
+      // Antes só o descarte era ignorado, e a expiração nem existia: a
+      // mensagem vencida ficava PENDENTE para sempre e virava "presa há mais
+      // de 2h" em toda rodada, muito depois de a ponte ter voltado.
+      where: { status: "FALHOU", criadoEm: { gte: inicioDoDia }, ...ondeNaoFoiDescartada() },
       select: { destino: true, tipo: true, erro: true },
       take: 5,
     }),
-    // Presa = pendente há mais de 2h sem hora marcada. Mensagem sã não fica
+    // Presa = pendente entre 2h e 24h, sem hora marcada. Mensagem sã não fica
     // esperando: a ponte busca de minuto em minuto.
+    //
+    // O teto de 24h importa: passou disso, a fila expira e marca a mensagem,
+    // e o que já foi encerrado não é problema aberto. Sem esse teto o alarme
+    // nunca mais desligava.
     prisma.mensagemSaidaWhatsApp.count({
       where: {
         status: "PENDENTE",
-        criadoEm: { lt: new Date(agora.getTime() - 2 * 3600_000) },
+        criadoEm: {
+          lt: new Date(agora.getTime() - 2 * 3600_000),
+          gte: new Date(agora.getTime() - 24 * 3600_000),
+        },
         OR: [{ agendadoPara: null }, { agendadoPara: { lte: agora } }],
       },
     }),
@@ -85,6 +97,35 @@ export async function conferirOperacao(): Promise<RelatorioSentinela> {
     achados.push({
       grave: true,
       texto: `${presas} mensagem(ns) presas há mais de 2h na fila. A ponte pode estar fora do ar.`,
+    });
+  }
+
+  // ── A ponte está viva? ────────────────────────────────────────────────────
+  //
+  // Esta é a pergunta que "mensagens presas" não responde: fila vazia com
+  // ponte morta parece operação tranquila. Foi assim que o fim de semana de
+  // 03 e 04/10/2026 passou sem ninguém notar que nada saía.
+  const batimento = await prisma.batimentoPonte.findUnique({
+    where: { id: "unico" },
+    select: { ultimoEm: true },
+  });
+  const minutosSemBuscar = batimento
+    ? Math.round((agora.getTime() - batimento.ultimoEm.getTime()) / 60_000)
+    : null;
+
+  if (minutosSemBuscar === null) {
+    linhas.push(`🔌 Ponte: *sem batimento registrado ainda*`);
+  } else if (minutosSemBuscar <= 15) {
+    linhas.push(`🔌 Ponte: *ativa* — última busca há ${minutosSemBuscar} min`);
+  } else {
+    const horas = Math.floor(minutosSemBuscar / 60);
+    const quanto = horas >= 1 ? `${horas}h` : `${minutosSemBuscar} min`;
+    linhas.push(`🔌 Ponte: *parada há ${quanto}*`);
+    achados.push({
+      grave: true,
+      texto:
+        `A ponte não busca a fila há ${quanto}. Enquanto ela estiver parada nada sai — ` +
+        `e aviso que passar de 24h é descartado por vencimento.`,
     });
   }
 

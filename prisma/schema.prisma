@@ -2927,3 +2927,20 @@ model ConciliacaoPortal {
   @@unique([pagamentoId, notaFiscalId])
   @@index([notaFiscalId])
 }
+
+/// Último momento em que a ponte veio buscar a fila.
+///
+/// No fim de semana de 03 e 04/10/2026 a ponte ficou fora do ar e dezesseis
+/// avisos de cliente venceram sem sair. Ninguém soube: o sentinela contava
+/// "mensagens presas", que é consequência, e só acusa quando há mensagem na
+/// fila — sábado de madrugada, sem nada para mandar, o silêncio parecia
+/// normal.
+///
+/// Linha única, de id fixo. Não é log: é o relógio da última visita, e o que
+/// interessa dele é só o quanto já faz.
+model BatimentoPonte {
+  id         String   @id @default("unico")
+  ultimoEm   DateTime @default(now()) @updatedAt
+  /// Quantas mensagens a ponte levou na última visita — zero é normal.
+  levouAgora Int      @default(0)
+}

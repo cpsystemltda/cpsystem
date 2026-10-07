@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import {
+  MARCA_DESCARTE,
+  MARCA_EXPIRADA,
+  ondeNaoFoiDescartada,
+} from "@/lib/marcasDaFila";
 import { resolverSaudacao } from "@/lib/saudacao";
 
 /**
@@ -49,8 +54,11 @@ const POR_PESSOA_NA_RODADA = 2;
  * descarte gravava status FALHOU, e FALHOU é justamente o que a fila recolhe.
  * As descartadas voltavam na rodada seguinte, uma por vez. Sem status próprio
  * no enum, a marca fica no texto do erro — e é ela que exclui daqui pra frente.
+ *
+ * A marca mora em `marcasDaFila.ts`, junto com a de expiração, porque o
+ * sentinela também precisa lê-las para não contar descarte como falha de
+ * canal. Cópia local de regra compartilhada é cópia que diverge.
  */
-const MARCA_DESCARTE = "substituída por versão mais recente";
 
 /**
  * Avisos que se substituem, e só eles.
@@ -83,6 +91,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ erro: "unauthorized" }, { status: 401 });
   }
 
+  // Primeiro, encerra o que passou da validade.
+  //
+  // A fila já ignorava mensagem com mais de 24h — aviso de prazo de ontem é
+  // ruído hoje. O que faltava era DIZER isso: a linha ficava PENDENTE para
+  // sempre, invisível para a entrega e eterna para quem conta problema. O
+  // sentinela then passava a acusar "presas há mais de 2h, a ponte pode estar
+  // fora do ar" todo dia, muito depois de a ponte ter voltado.
+  //
+  // Marcar também transforma perda silenciosa em perda registrada: no fim de
+  // semana de 03 e 04/10/2026 a ponte ficou fora e dezesseis avisos de cliente
+  // morreram sem que nada dissesse quais.
+  const limiteValidade = new Date(Date.now() - VALIDADE_HORAS * 3600_000);
+  await prisma.mensagemSaidaWhatsApp.updateMany({
+    where: {
+      status: "PENDENTE",
+      criadoEm: { lt: limiteValidade },
+      // Agendada tem hora própria e não envelhece pela criação; só expira se
+      // a hora marcada também já passou da validade.
+      OR: [{ agendadoPara: null }, { agendadoPara: { lt: limiteValidade } }],
+    },
+    data: { status: "FALHOU", erro: `${MARCA_EXPIRADA} — a ponte não buscou dentro de ${VALIDADE_HORAS}h` },
+  });
+
   const brutas = await prisma.mensagemSaidaWhatsApp.findMany({
     where: {
       // FALHOU entra junto: é exatamente o que a Z-API deixou para trás. Sem
@@ -105,7 +136,7 @@ export async function GET(req: NextRequest) {
         // justamente as novas, nunca tentadas. Em SQL, NOT(NULL LIKE 'x%') é
         // NULL, e NULL não é verdadeiro. Custou uma fila que parecia vazia com
         // três mensagens dentro.
-        { OR: [{ erro: null }, { NOT: { erro: { startsWith: MARCA_DESCARTE } } }] },
+        ondeNaoFoiDescartada(),
         // Hora marcada espera a hora chegar.
         { OR: [{ agendadoPara: null }, { agendadoPara: { lte: new Date() } }] },
       ],
@@ -188,6 +219,21 @@ export async function GET(req: NextRequest) {
       data: { tentativas: { increment: 1 } },
     });
   }
+
+  // Marca a visita, mesmo quando não há nada para levar.
+  //
+  // É o que vai dizer que a ponte está viva. Contar "mensagens presas" só
+  // acusa quando existe mensagem na fila — sábado de madrugada, sem nada para
+  // mandar, o silêncio parecia normal, e assim o fim de semana inteiro de
+  // 03 e 04/10/2026 passou sem ninguém saber que nada saía.
+  await prisma.batimentoPonte
+    .upsert({
+      where: { id: "unico" },
+      create: { id: "unico", levouAgora: escolhidas.length },
+      update: { levouAgora: escolhidas.length },
+    })
+    // Falhar aqui não pode impedir a entrega: o batimento é diagnóstico.
+    .catch(() => {});
 
   return NextResponse.json({
     mensagens: escolhidas.map((m) => ({
