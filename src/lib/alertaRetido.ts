@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { TipoNotificacaoWhatsApp } from "@/generated/prisma/client";
 import { TOKEN_SAUDACAO } from "@/lib/saudacao";
+import { avaliarBloqueio } from "@/lib/bloqueio";
 
 /**
  * O que o cliente inadimplente recebe no lugar dos avisos.
@@ -64,9 +65,33 @@ export async function reterSeInadimplente(opts: {
 
   const usuario = await prisma.usuario.findUnique({
     where: { id: opts.usuarioId },
-    select: { nome: true, conta: { select: { id: true, statusAssinatura: true } } },
+    select: {
+      nome: true,
+      conta: { select: { id: true, tipo: true, statusAssinatura: true, trialAteEm: true } },
+    },
   });
-  if (usuario?.conta.statusAssinatura !== "INADIMPLENTE") return { reteve: false };
+  if (!usuario) return { reteve: false };
+
+  // Quem decide é a MESMA regra que barra o acesso — `avaliarBloqueio`.
+  //
+  // A primeira versão olhava só `statusAssinatura === "INADIMPLENTE"`, e isso
+  // deixava passar o caso mais comum: teste vencido sem forma de pagamento. A
+  // conta fica marcada TRIAL para sempre, porque toda a régua de cobrança
+  // trabalha em cima de `Cobranca` e quem nunca cadastrou pagamento não tem
+  // cobrança nenhuma. No dia em que isso foi visto havia três contas assim,
+  // uma com 27 dias de teste vencido — todas trancadas fora do sistema e
+  // recebendo os avisos completos, de graça.
+  //
+  // Usar a regra do bloqueio resolve na origem e garante coerência: ou o
+  // cliente entra no sistema e recebe aviso, ou não entra e recebe o resumo.
+  // Duas regras separadas para a mesma pergunta divergem — foi o que houve.
+  const bloqueio = await avaliarBloqueio({
+    id: usuario.conta.id,
+    tipo: usuario.conta.tipo,
+    statusAssinatura: usuario.conta.statusAssinatura,
+    trialAteEm: usuario.conta.trialAteEm,
+  });
+  if (!bloqueio.bloqueada) return { reteve: false };
 
   // Grava o que seria enviado, marcado como retido. O texto fica guardado de
   // propósito: quando a conta se regularizar, dá para saber o que o cliente
@@ -120,15 +145,15 @@ async function enfileirarResumo(o: {
   primeiroNome: string;
   quantidade: number;
 }) {
-  const plural = o.quantidade === 1;
+  const um = o.quantidade === 1;
   const texto =
     `${TOKEN_SAUDACAO}, ${o.primeiroNome}.\n\n` +
-    `Você tem *${o.quantidade} alerta${plural ? "" : "s"} do seu acompanhamento ` +
-    `aguardando${plural ? "" : ""}* — prazo de entrega, nota a emitir ou pagamento de órgão ` +
-    `que o CP System identificou e está segurando.\n\n` +
-    `Eles voltam a chegar assim que a assinatura for regularizada. ` +
-    `É em *Conta → Assinatura*, no sistema, e no PIX a liberação é na hora.\n\n` +
-    `Fazemos questão de avisar mesmo assim: prazo de contrato público não espera, ` +
+    `Você tem *${o.quantidade} aviso${um ? "" : "s"} aguardando* sobre ` +
+    `notas de empenho, contratos e execuções que o CP System está acompanhando ` +
+    `para você.\n\n` +
+    `Para voltar a receber e não perder nenhum prazo, regularize o seu cadastro ` +
+    `em *Conta → Assinatura*. No PIX a liberação é na hora.\n\n` +
+    `Fazemos questão de avisar mesmo assim: prazo de contratação pública não espera, ` +
     `e não queremos que você perca nenhum por falta de aviso.\n\n` +
     `Contato CP System`;
 
