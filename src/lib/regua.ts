@@ -36,6 +36,8 @@ export type ResumoRegua = {
   /** Comissões de analista repassadas por PIX nesta execução. */
   comissoesRepassadas: number;
   comissoesRepasseFalhou: number;
+  /** Trials que venceram sem forma de pagamento e deixaram de ser cortesia. */
+  trialsEncerrados: number;
 };
 
 export async function executarRegua(): Promise<ResumoRegua> {
@@ -126,6 +128,38 @@ export async function executarRegua(): Promise<ResumoRegua> {
     });
   }
 
+  // 4b. Teste que venceu sem pagamento deixa de ser conta em dia.
+  //
+  // Regina, 08/10/2026, sobre a C2Vendas: *"por que você está notificando o
+  // cliente como se ele estivesse em dia?"* Estava — e a razão é que toda esta
+  // régua trabalha em cima de `Cobranca`. Quem nunca cadastrou forma de
+  // pagamento não tem cobrança nenhuma, então nenhum passo daqui o alcançava:
+  // o teste vencia e a conta seguia marcada TRIAL, recebendo tudo de graça,
+  // para sempre. No dia em que isso foi visto havia três assim — uma com 27
+  // dias de teste vencido e outra com 20.
+  //
+  // Vira INADIMPLENTE, e não CANCELADA, de propósito: inadimplente é quem
+  // ainda pode voltar com um pagamento, e é esse estado que faz os avisos
+  // serem retidos em vez de sumirem (ver `alertaRetido.ts`). Cancelar seria
+  // fechar a porta de quem só não terminou o cadastro.
+  const trialsVencidos = await prisma.conta.findMany({
+    where: {
+      statusAssinatura: "TRIAL",
+      trialAteEm: { lt: hoje },
+      gatewayCustomerId: null,
+      arquivadaEm: null,
+      // Conta interna opera a plataforma e não é vendida.
+      usuarios: { none: { superAdmin: true } },
+    },
+    select: { id: true },
+  });
+  for (const c of trialsVencidos) {
+    await prisma.conta.update({
+      where: { id: c.id },
+      data: { statusAssinatura: "INADIMPLENTE" },
+    });
+  }
+
   // 5. Marca comissões variáveis A_RECEBER como ATRASADO após 30 dias da
   // liberação. Janela padrão; analista pode reverter manualmente.
   const { marcarComissoesAtrasadas } = await import("@/lib/comissaoExecucao");
@@ -187,6 +221,7 @@ export async function executarRegua(): Promise<ResumoRegua> {
     atrasoAnalistasAvisados: atrasos.analistasAvisados,
     comissoesRepassadas: repasses.sucessos,
     comissoesRepasseFalhou: repasses.falhas,
+    trialsEncerrados: trialsVencidos.length,
     trialAvisados: trial.avisados,
     renovacoesGeradas: renov.geradas,
     renovacoesIgnoradas: renov.ignoradas,

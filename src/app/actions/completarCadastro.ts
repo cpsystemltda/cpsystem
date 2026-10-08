@@ -119,12 +119,37 @@ export async function completarCadastroAction(
     Object.assign(empresa, empresaUpdates);
   }
 
-  // Calcula nextDueDate = próximo dia {10|15|20} APÓS trialAteEm (ou hoje se trial já expirou)
-  const base = conta.trialAteEm && conta.trialAteEm > new Date() ? conta.trialAteEm : new Date();
-  const nextDueDate = new Date(base);
-  nextDueDate.setDate(diaVenc);
-  if (nextDueDate <= base) {
-    nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+  // A PRIMEIRA cobrança não espera o dia escolhido.
+  //
+  // Regina, 08/10/2026, sobre a C2Vendas: *"a cobrança tem que ser feita hoje.
+  // Nos próximos vai ser para a data que ele escolheu. Não faz sentido ele ter
+  // o trial e ter mais não sei quantos dias até a data."*
+  //
+  // Era exatamente o que acontecia: o teste da C2 venceu em 05/10, ele
+  // completou o cadastro em 08/10 escolhendo o dia 15, e a primeira cobrança
+  // saiu para 15/10 — sete dias de uso sem teste e sem pagamento. Com o dia 20
+  // escolhido seriam doze.
+  //
+  // A regra passa a ter duas datas distintas:
+  //
+  // · **Primeira cobrança** — hoje, quando o teste já acabou; ou o último dia
+  //   do teste, quando ele ainda está correndo. Teste em curso é promessa
+  //   feita, e cobrar antes do fim seria encurtá-lo.
+  // · **Ciclo seguinte** — aí sim o dia escolhido, no mês seguinte ao da
+  //   primeira cobrança. É o que o cliente combinou para o resto da vida da
+  //   assinatura.
+  const hojeAgora = new Date();
+  const trialEmCurso = !!conta.trialAteEm && conta.trialAteEm > hojeAgora;
+  const nextDueDate = trialEmCurso ? new Date(conta.trialAteEm!) : hojeAgora;
+
+  // O dia escolhido vale do segundo ciclo em diante.
+  const vencimentoSeguinte = new Date(nextDueDate);
+  vencimentoSeguinte.setMonth(vencimentoSeguinte.getMonth() + 1);
+  vencimentoSeguinte.setDate(diaVenc);
+  // Se o dia escolhido já passou no mês seguinte, vai para o outro — evita
+  // gerar um vencimento anterior à própria cobrança que o originou.
+  if (vencimentoSeguinte <= nextDueDate) {
+    vencimentoSeguinte.setMonth(vencimentoSeguinte.getMonth() + 1);
   }
 
   // === Caminho PIX ===
@@ -194,7 +219,7 @@ export async function completarCadastroAction(
           // Escolher o dia de vencimento é o que marca "cadastro completo".
           // É esse campo que tira o cliente do funil obrigatório do cartão.
           diaVencimento: diaVenc,
-          proximoVencimento: nextDueDate,
+          proximoVencimento: vencimentoSeguinte,
         },
       });
 
@@ -254,7 +279,7 @@ export async function completarCadastroAction(
       customerId,
       cobrancaIdInterno: cobrancaInterna.id,
       valor: breakdown.valorTotal,
-      proximoVencimento: nextDueDate,
+      proximoVencimento: vencimentoSeguinte,
       descricao: `CP System — Plano ${conta.plano} (${competencia})`,
       cartao: {
         numero: cartaoInput.numero,
@@ -285,7 +310,7 @@ export async function completarCadastroAction(
         gatewayProvider: gateway.nome,
         diaVencimento: diaVenc,
         cpfTitularCartao: cpfTitularRaw,
-        proximoVencimento: nextDueDate,
+        proximoVencimento: vencimentoSeguinte,
       },
     });
 
