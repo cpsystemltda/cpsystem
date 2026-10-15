@@ -438,6 +438,24 @@ export async function processarEventoGateway(opts: {
   if (opts.status === "PAGA") {
     await ativarPlano(cobranca.contaId, cobranca.plano);
 
+    // Avisa QUEM PAGOU.
+    //
+    // Regina, 15/10/2026: *"o cliente fez o pagamento, deu certo. Ele tem que
+    // ser notificado sobre isso."* Até aqui este bloco ativava o plano, pagava
+    // a comissão do analista e avisava o embaixador — todo mundo menos a
+    // pessoa que pôs o dinheiro. Ela descobria que deu certo tentando entrar
+    // no sistema.
+    //
+    // Vai depois de `ativarPlano` de propósito: a conta já está ATIVA quando a
+    // mensagem é montada, então o próximo vencimento sai correto e a retenção
+    // de inadimplente não segura justamente o aviso de que ele deixou de ser.
+    try {
+      await avisarPagamentoConfirmado(cobranca.id);
+    } catch (e) {
+      // Nunca derruba o processamento do pagamento.
+      console.error("[pagamento] falha ao avisar o cliente:", e);
+    }
+
     // Regina 25/08: "tem que fazer esse pagamento automático quando for PIX".
     // O repasse ao analista sai AQUI, no instante em que o pagamento do cliente
     // é confirmado — não no cron do dia seguinte. Quem decide se sai é a mesma
@@ -614,4 +632,62 @@ function detectarBandeira(numero: string): string {
   if (/^3[47]/.test(n)) return "Amex";
   if (/^6/.test(n)) return "Elo/Discover";
   return "Outros";
+}
+
+
+/**
+ * "Recebemos o seu pagamento" — a mensagem que faltava.
+ *
+ * Uma por cobrança, para sempre: a chave de idempotência é o id da cobrança,
+ * então webhook repetido (o Asaas manda PAYMENT_CONFIRMED e depois
+ * PAYMENT_RECEIVED para o mesmo dinheiro) não vira duas mensagens.
+ */
+async function avisarPagamentoConfirmado(cobrancaId: string) {
+  const cobranca = await prisma.cobranca.findUnique({
+    where: { id: cobrancaId },
+    select: {
+      id: true, valor: true, plano: true,
+      conta: {
+        select: {
+          proximoVencimento: true,
+          usuarios: {
+            orderBy: { criadoEm: "asc" },
+            select: { id: true, nome: true, telefoneWhatsApp: true, optInWhatsApp: true },
+          },
+        },
+      },
+    },
+  });
+  if (!cobranca) return;
+
+  const titular = cobranca.conta.usuarios.find((u) => u.telefoneWhatsApp && u.optInWhatsApp);
+  if (!titular) return;
+
+  const brl = (v: number) =>
+    v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const rotuloPlano =
+    cobranca.plano === "INTERMEDIARIO" ? "Intermediário"
+    : cobranca.plano === "PREMIUM" ? "Premium" : "Básico";
+  const proximo = cobranca.conta.proximoVencimento
+    ? cobranca.conta.proximoVencimento.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
+    : null;
+
+  const { dispararNotificacao } = await import("@/lib/whatsapp");
+  const { TOKEN_SAUDACAO } = await import("@/lib/saudacao");
+
+  await dispararNotificacao({
+    usuarioId: titular.id,
+    tipo: "PAGAMENTO_CONFIRMADO",
+    referenciaId: cobranca.id,
+    mensagem:
+      `${TOKEN_SAUDACAO}, ${titular.nome.split(" ")[0] || titular.nome}!\n\n` +
+      `*Pagamento confirmado* ✅\n\n` +
+      `Recebemos ${brl(cobranca.valor)} referente ao plano *${rotuloPlano}*. ` +
+      `Sua assinatura está ativa e o acesso liberado normalmente.\n\n` +
+      (proximo ? `📅 Próxima cobrança: *${proximo}*.\n\n` : "") +
+      `A nota fiscal chega aqui mesmo, em PDF, assim que for emitida — ` +
+      `você não precisa fazer nada.\n\n` +
+      `Obrigado pela confiança.\n\n` +
+      `Contato CP System`,
+  });
 }

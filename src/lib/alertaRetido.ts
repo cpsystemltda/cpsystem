@@ -38,6 +38,9 @@ const SEMPRE_PASSAM: TipoNotificacaoWhatsApp[] = [
   "BOAS_VINDAS",
   "ALERTAS_RETIDOS",
   "ANIVERSARIO",
+  // Avisar que o pagamento entrou é o oposto de reter: é a conta saindo da
+  // inadimplência.
+  "PAGAMENTO_CONFIRMADO",
 ];
 
 /** Marca no campo `erro`: não foi falha, foi decisão. */

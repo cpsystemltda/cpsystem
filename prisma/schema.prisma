@@ -268,6 +268,10 @@ enum TipoNotificacaoWhatsApp {
   // O estágio do resgate vai no referenciaId ("cadastro-parado-<contaId>"),
   // o que limita cada estágio a uma única mensagem na vida da conta.
   ATIVACAO
+  /// Regina 15/10 — o cliente pagou e ninguém contava a ele. O webhook
+  /// ativava o plano, pagava a comissão do analista e avisava o embaixador;
+  /// quem pôs o dinheiro ficava sem retorno nenhum.
+  PAGAMENTO_CONFIRMADO
   /// Regina 07/10 — o resumo que o inadimplente recebe no lugar dos avisos.
   /// *"Ele não pode ter o benefício de ser notificado se está inadimplente.
   /// Mas também não pode deixar de ser notificado, para que ele tenha motivo
