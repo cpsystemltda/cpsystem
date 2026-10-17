@@ -170,6 +170,7 @@ export async function calcularSaldoAta(ataId: string): Promise<SaldoAta> {
     select: {
       quantidade: true,
       valorTotal: true,
+      valorUnitario: true,
       descricao: true,
       ataItemId: true,
       empenhoId: true,
@@ -429,11 +430,31 @@ export function normalizarDescricao(s: string): string {
 // que o usuario costuma omitir ao redigitar a descricao no empenho.
 const STOPWORDS = new Set(["de", "da", "do", "e", "a", "o", "para", "em", "com", "por"]);
 
+/**
+ * As palavras que importam, singularizadas DEPOIS de separadas.
+ *
+ * `normalizarDescricao` tira o "s" final de cada pedaco separado por espaco, e
+ * isso quebra quando ha pontuacao colada. No contrato 20/2025 do Leo:
+ *
+ *     execucao: "energia/tomadas"  → vira "energia/tomada"  → {energia, tomada}
+ *     contrato: "energia/tomadas." → termina em ".", mantem → {energia, tomadas}
+ *
+ * O mesmo item, escrito igual nos dois lados, produzia um token diferente de
+ * cada lado — e R$ 6.080 ficavam de fora do executado. Separar primeiro e
+ * singularizar depois deixa a regra indiferente a virgula, ponto e barra.
+ *
+ * `normalizarDescricao` continua como esta: ela tambem serve de chave para a
+ * comparacao exata, e mexer nela mudaria esse outro caminho sem necessidade.
+ */
 function tokensSignificativos(s: string): Set<string> {
   return new Set(
-    normalizarDescricao(s)
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
       .split(/[^\w]+/)
-      .filter((w) => w.length >= 2 && !STOPWORDS.has(w)),
+      .filter((w) => w.length >= 2 && !STOPWORDS.has(w))
+      .map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w)),
   );
 }
 
@@ -451,15 +472,59 @@ export function similaridadeDesc(a: string, b: string): number {
   return inter / (ta.size + tb.size - inter);
 }
 
+/**
+ * Quanto da descricao MAIS CURTA cabe dentro da mais longa.
+ *
+ * Igor, 16/10/2026, no contrato 20/2025 da Secretaria de Atendimento a
+ * Comunidade: *"tem 2 execucoes nele, porem o campo 'Ja executado' esta
+ * apontando um valor muito a menor. Ja foi executado 40k, ele esta apontando
+ * 3k."*
+ *
+ * A causa: o empenho e redigitado em versao ABREVIADA e em caixa alta do item
+ * do contrato. "LOCACAO E INSTALACAO DE MESA DE ILUMINACAO" contra "Locacao e
+ * instalacao de mesa de iluminacao. Controla ate 40 aparelhos com 36 canais,
+ * (...)". Todas as quatro palavras da execucao estao no contrato — mas o
+ * Jaccard divide pela UNIAO, entao 4 de 15 da 0,27 e o corte de 0,6 recusa.
+ *
+ * Jaccard pune diferenca de tamanho, e aqui a diferenca de tamanho E o caso:
+ * ninguem redigita quarenta palavras de especificacao tecnica ao lancar uma
+ * execucao. A medida certa e a de contencao — dividir pelo menor conjunto.
+ *
+ * O que impede falso positivo: exigir que a execucao traga pelo menos tres
+ * palavras significativas. Sem isso, "LOCACAO E INSTALACAO" sozinho casaria
+ * com qualquer item de locacao do contrato. As palavras que distinguem
+ * ("refletores", "ribalda", "mesa") estao justamente nessa sobra.
+ */
+export function contencaoDesc(
+  a: string,
+  b: string,
+): { score: number; comuns: number; menor: number } {
+  const ta = tokensSignificativos(a);
+  const tb = tokensSignificativos(b);
+  const menor = Math.min(ta.size, tb.size);
+  if (menor === 0) return { score: 0, comuns: 0, menor: 0 };
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  return { score: inter / menor, comuns: inter, menor };
+}
+
+/** Palavras significativas que a execucao precisa trazer para valer contencao. */
+const MINIMO_PALAVRAS_EM_COMUM = 3;
+/** Quase tudo da descricao curta tem de estar na longa. */
+const CONTENCAO_MINIMA = 0.9;
+
 // Acha o ContratoItem que melhor casa com um EmpenhoItem. Usa cascata:
 // 1) ataItemId (link explicito) → 2) descricao exata com saldo restante
 // → 3) descricao exata sem saldo (overflow) → 4) similaridade >= 0.6
 // preferindo maior score e com saldo restante → 5) similaridade >= 0.6
 // (mesmo estourado). Retorna o id ou null.
 function acharAlvoEmCascata<
-  T extends { id: string; descricao: string; ataItemId: string | null; quantidade: number },
+  T extends {
+    id: string; descricao: string; ataItemId: string | null;
+    quantidade: number; valorUnitario?: number;
+  },
 >(
-  ei: { descricao: string; ataItemId: string | null },
+  ei: { descricao: string; ataItemId: string | null; valorUnitario?: number },
   candidatos: T[],
   consumo: Map<string, { qty: number }>,
 ): T | undefined {
@@ -475,11 +540,41 @@ function acharAlvoEmCascata<
   if (exato) return exato;
   exato = candidatos.find((c) => normalizarDescricao(c.descricao) === descEi);
   if (exato) return exato;
-  // Fallback fuzzy
+  // Fallback fuzzy em tres sinais, do mais forte para o mais fraco.
+  //
+  // · **Jaccard** — descricoes parecidas e de tamanho parecido.
+  // · **Contencao** — descricao abreviada dentro da longa, o caso do
+  //   contrato 20/2025 da Secretaria.
+  // · **Preco unitario igual** — a prova mais forte que existe aqui, e a que
+  //   faltava. No contrato 20/2025 da Defensoria, "Transmissao WEB e Video
+  //   conferencia" a R$ 800,00 e "Transmissao Web" a R$ 800,00 sao o mesmo
+  //   item; o texto sozinho dava 0,50 e recusava. O contrato ainda tem DOIS
+  //   itens de mesma descricao e precos diferentes (R$ 800,00 e R$ 833,14,
+  //   de vigencias distintas) — e o preco e justamente o que os separa.
+  //
+  // Preco igual nao basta sozinho: dois itens sem relacao podem custar o
+  // mesmo. Ele so promove um casamento que o texto ja considerou plausivel.
+  const precoBate = (c: T) =>
+    typeof ei.valorUnitario === "number" &&
+    typeof c.valorUnitario === "number" &&
+    Math.abs(c.valorUnitario - ei.valorUnitario) < 0.005;
+
   const ranked = candidatos
-    .map((c) => ({ c, score: similaridadeDesc(c.descricao, ei.descricao) }))
+    .map((c) => {
+      const jac = similaridadeDesc(c.descricao, ei.descricao);
+      const cont = contencaoDesc(c.descricao, ei.descricao);
+      // Item curto do contrato nunca alcanca tres palavras em comum —
+      // "Transmissao Web" tem duas. Nesse caso exige-se que TODAS batam.
+      const minimo = Math.min(MINIMO_PALAVRAS_EM_COMUM, cont.menor);
+      const valeContencao = cont.score >= CONTENCAO_MINIMA && cont.comuns >= minimo;
+      const base = Math.max(jac, valeContencao ? cont.score : 0);
+      // Texto plausivel + preco identico fecha o caso.
+      const comPreco = precoBate(c) && Math.max(jac, cont.score) >= 0.45 ? 0.95 : 0;
+      return { c, score: Math.max(base, comPreco) };
+    })
     .filter((x) => x.score >= 0.6)
-    .sort((a, b) => b.score - a.score);
+    // Empate no texto: quem tem o preco igual ganha.
+    .sort((a, b) => b.score - a.score || Number(precoBate(b.c)) - Number(precoBate(a.c)));
   const fuzzyComSaldo = ranked.find((x) => comSaldo(x.c));
   if (fuzzyComSaldo) return fuzzyComSaldo.c;
   return ranked[0]?.c;
@@ -526,6 +621,7 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
     select: {
       quantidade: true,
       valorTotal: true,
+      valorUnitario: true,
       ataItemId: true,
       descricao: true,
       empenho: { select: { vigenciaId: true } },
@@ -623,7 +719,10 @@ async function calcularSaldoContratoLegacy(contratoId: string): Promise<SaldoCon
   });
   const empenhoItens = await prisma.empenhoItem.findMany({
     where: { empenho: { contratoId } },
-    select: { quantidade: true, valorTotal: true, ataItemId: true, descricao: true },
+    select: {
+      quantidade: true, valorTotal: true, valorUnitario: true,
+      ataItemId: true, descricao: true,
+    },
   });
 
   // Alocacao 1-para-1 com fallback fuzzy (Jaccard). Mesma logica da

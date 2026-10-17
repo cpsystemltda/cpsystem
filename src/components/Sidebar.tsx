@@ -136,6 +136,7 @@ const GRUPOS_ADMIN_PLATAFORMA: Grupo[] = [
     itens: [
       { href: "/admin", label: "Painel do PO", icon: Settings },
       { href: "/admin/gateway", label: "Gateway de pagamento", icon: CreditCard },
+      { href: "/admin/notas-fiscais", label: "Notas fiscais", icon: Receipt },
       { href: "/admin/suporte", label: "Suporte (chamados IA)", icon: MessageCircle },
       { href: "/admin/envios", label: "Envios WA (contrato / migração)", icon: Send },
       { href: "/notificacoes", label: "Notificações", icon: Bell },

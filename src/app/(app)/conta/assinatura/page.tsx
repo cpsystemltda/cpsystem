@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CreditCard, Check, AlertTriangle, Lock, Receipt } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ListaNotasFiscais } from "@/components/ListaNotasFiscais";
 import { brl } from "@/lib/validators";
 import { statusGateway } from "@/lib/gateway";
 import { PixPagamento } from "@/components/PixPagamento";
@@ -47,6 +48,25 @@ export default async function AssinaturaPage() {
     },
   });
   if (!conta) return null;
+
+  // Notas fiscais da assinatura — Regina 15/10: *"uma área que ele também
+  // dentro do sistema consiga ter acesso a todas as notas fiscais."* Antes a
+  // nota só existia no WhatsApp: ia uma vez, em PDF, e quem apagasse a
+  // conversa ou trocasse de aparelho ficava sem.
+  //
+  // Só entram cobranças pagas: antes de o dinheiro entrar não há nota a
+  // emitir, e listar pendência aqui misturaria fatura com documento fiscal.
+  const notasDaAssinatura = conta.cobrancas
+    .filter((c) => c.status === "PAGA")
+    .map((c) => ({
+      id: c.id,
+      competencia: c.competencia,
+      valor: c.valor,
+      pagaEm: c.pagaEm,
+      nfseNumero: c.nfseNumero,
+      nfseStatus: c.nfseStatus,
+      nfsePdfUrl: c.nfsePdfUrl,
+    }));
 
   const gw = await statusGateway();
   // Breakdown dinâmico: BASICO cobra adicional por CNPJ excedente (Regina 23/06).
@@ -343,6 +363,17 @@ export default async function AssinaturaPage() {
             </tbody>
           </table>
         )}
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-lg font-semibold text-slate-900">Notas fiscais</h2>
+        <p className="mt-1 text-sm text-slate-600">
+          Todas as notas da sua assinatura, com o PDF para baixar. A nota é emitida depois que o
+          pagamento é confirmado e aparece aqui automaticamente.
+        </p>
+        <div className="mt-4">
+          <ListaNotasFiscais linhas={notasDaAssinatura} />
+        </div>
       </section>
 
       {/* Cancelar */}
