@@ -150,7 +150,7 @@ export async function limparTentativasAntigas(): Promise<{ removidas: number }> 
 export function mensagemBloqueio(motivo: string, retryEmSegundos: number): string {
   const minutos = Math.ceil(retryEmSegundos / 60);
   if (motivo === "muitas_tentativas_email") {
-    return `Muitas tentativas de login pra esse e-mail. Aguarde ${minutos} minuto${minutos > 1 ? "s" : ""} e tente de novo.`;
+    return `Muitas tentativas de login para este e-mail. Aguarde ${minutos} minuto${minutos > 1 ? "s" : ""} e tente novamente.`;
   }
   if (motivo === "muitas_tentativas_ip") {
     return `Muitas tentativas de login desse dispositivo. Aguarde ${minutos} minuto${minutos > 1 ? "s" : ""} e tente de novo.`;

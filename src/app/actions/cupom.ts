@@ -56,7 +56,7 @@ export async function criarCupomAction(_p: Result | null, formData: FormData): P
   }
   const usosMaximos = usosMaximosRaw ? Number(usosMaximosRaw) : null;
   if (usosMaximos !== null && (!Number.isFinite(usosMaximos) || usosMaximos < 1)) {
-    return { erro: "Usos máximos inválidos (>= 1 ou vazio pra ilimitado)." };
+    return { erro: "Usos máximos inválidos (>= 1 ou vazio para ilimitado)." };
   }
 
   try {
@@ -130,7 +130,7 @@ export async function editarCupomAction(
   }
   const usosMaximos = usosMaximosRaw ? Number(usosMaximosRaw) : null;
   if (usosMaximos !== null && (!Number.isFinite(usosMaximos) || usosMaximos < 1)) {
-    return { erro: "Usos máximos inválidos (>= 1 ou vazio pra ilimitado)." };
+    return { erro: "Usos máximos inválidos (>= 1 ou vazio para ilimitado)." };
   }
 
   try {

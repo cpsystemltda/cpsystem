@@ -40,8 +40,8 @@ export async function enviarContratoAnalistaWaAction(
   // Aviso curto antes do PDF (contexto no WA)
   const aviso =
     `📄 *Contrato de Adesão ao Programa de Analista Parceiro — CP System*\n\n` +
-    `Versão ${VERSAO_CONTRATO_ANALISTA}. Segue em PDF pra revisão.\n\n` +
-    `Se quiser sugerir alteração, responde aqui neste chat.`;
+    `Versão ${VERSAO_CONTRATO_ANALISTA}. Segue em PDF para revisão.\n\n` +
+    `Se desejar sugerir alterações, responda neste chat.`;
 
   try {
     await enviarTexto(telefone, aviso);
@@ -105,10 +105,10 @@ export async function enviarMagicLinkMigracaoAction(
 
     const mensagem =
       `Olá ${primeiroNome}, aqui é do CP System.\n\n` +
-      `Preparamos tudo pra você concluir a migração da sua conta. É rapidinho:\n` +
+      `Preparamos tudo para você concluir a migração da sua conta. Leva poucos minutos:\n` +
       `1) Confirme os dados da sua empresa (razão social, CNPJ, endereço);\n` +
       `2) Aceite a versão atualizada do contrato;\n` +
-      `3) Cadastre o cartão pra que a cobrança comece automaticamente no dia que você escolher.\n\n` +
+      `3) Cadastre o cartão para que a cobrança comece automaticamente no dia que você escolher.\n\n` +
       `Este link entra logado direto na sua conta (uso único, válido até ${validade}):\n` +
       `${link}\n\n` +
       `Qualquer dúvida, é só responder por aqui.`;

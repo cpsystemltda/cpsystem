@@ -68,7 +68,7 @@ export async function signupAction(_prev: ActionResult | null, formData: FormDat
     return {
       erro:
         "Muitas contas criadas a partir desta conexão em pouco tempo. " +
-        "Se você precisa cadastrar várias empresas, fale com a gente pelo WhatsApp que a gente faz junto.",
+        "Se você precisa cadastrar várias empresas, fale conosco pelo WhatsApp e faremos o cadastro juntos.",
     };
   }
 

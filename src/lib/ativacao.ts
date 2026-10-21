@@ -189,7 +189,7 @@ export async function reengajarContas(): Promise<ResumoAtivacao> {
           `O período de teste de *${nomeEmpresa}* ${prazo}.\n\n` +
           (totalDocumentos === 0
             ? `Notamos que nenhum documento chegou a ser cadastrado. Vale usar o tempo que resta: ` +
-              `com uma ata ou contrato lançado, dá pra ver o acompanhamento de prazos funcionando na prática antes de decidir.\n\n`
+              `com uma ata ou contrato lançado, é possível ver o acompanhamento de prazos funcionando na prática antes de decidir.\n\n`
             : `Sua operação já tem ${porExtenso(totalDocumentos, "documento cadastrado", "documentos cadastrados")} ` +
               `sob acompanhamento. Ao fim do teste, esses prazos deixam de ser monitorados e voltam a depender de controle manual.\n\n`) +
           `Para manter o acesso ativo: cpsystem.app.br/assinatura\n\n` +

@@ -23,7 +23,7 @@ export async function salvarConfigGatewayAction(_p: Result | null, formData: For
   const webhookToken = String(formData.get("webhookToken") || "").trim();
 
   if (provider !== "DEMO" && !apiKey) {
-    return { erro: "API key obrigatória pra esse provider." };
+    return { erro: "Chave de API obrigatória para este provedor." };
   }
 
   await prisma.configuracaoGateway.upsert({

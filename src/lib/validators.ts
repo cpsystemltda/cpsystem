@@ -124,7 +124,7 @@ export const signupSchema = z
     responsavel: z.string().min(2, "Informe o responsável"),
     // Aceite obrigatorio do contrato (Regina 03/07). Checkbox HTML manda
     // "1" quando marcado, ausente quando desmarcado.
-    aceiteTermos: z.literal("1", { message: "Você precisa aceitar os termos pra continuar" }),
+    aceiteTermos: z.literal("1", { message: "Você precisa aceitar os termos para continuar" }),
     // Regina 13/07: CPF do titular do cartão + dia de vencimento fixo.
     // Ambos só fazem sentido com cartão — viraram opcionais junto com ele.
     cpfTitularCartao: z.string().optional(),
@@ -230,7 +230,7 @@ export const signupAnalistaSchema = z
     telefonePj: z.string().optional(),
 
     // Aceite obrigatorio do CONTRATO DE ANALISTA v1.0 (Regina 13/07).
-    aceiteTermos: z.literal("1", { message: "Você precisa aceitar o contrato do analista pra continuar" }),
+    aceiteTermos: z.literal("1", { message: "Você precisa aceitar o contrato do analista para continuar" }),
   })
   .superRefine((v, ctx) => {
     if (v.senha !== v.confirmacaoSenha) {

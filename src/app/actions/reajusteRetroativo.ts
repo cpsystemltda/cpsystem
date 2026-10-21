@@ -269,7 +269,7 @@ export async function desfazerReajusteRetroativoAction(
     return {
       ok: false,
       erro:
-        "Não dá pra desfazer — NF complementar já foi emitida. Edite as datas/arquivos manualmente.",
+        "Não é possível desfazer: a NF complementar já foi emitida. Edite as datas e os arquivos manualmente.",
     };
   }
 

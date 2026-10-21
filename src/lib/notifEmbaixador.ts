@@ -102,7 +102,7 @@ function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
         `📊 *Atualização de carteira — CP System*\n\n` +
         `Seu cliente *${nomeCliente}* teve a mensalidade de ${ev.competencia} liquidada (${brl(ev.valor)}). Assinatura ativa confirmada.\n\n` +
         `*Impacto na sua carteira:*\n` +
-        `• Cliente segue elegível pra comissão vitalícia enquanto permanecer ativo\n` +
+        `• Cliente segue elegível para comissão vitalícia enquanto permanecer ativo\n` +
         `• Sua comissão referente a este mês é apurada no fechamento e paga via PIX no dia 20 do mês seguinte\n\n` +
         `Detalhes do portfólio: cpsystem.app.br/painel-analista`
       );
@@ -110,10 +110,10 @@ function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
       return (
         `📊 *Fechamento fiscal do mês — cliente da sua carteira*\n\n` +
         `A NF ${ev.numero} do cliente *${nomeCliente}* foi autorizada pela prefeitura (competência ${ev.competencia}).\n\n` +
-        `*O que isso significa pra você como analista:*\n` +
+        `*O que isso significa para você como analista:*\n` +
         `• Ciclo mensal do cliente encerrado com sucesso\n` +
-        `• Comissão apurada e liberada pra pagamento no próximo dia 20\n` +
-        `• Cliente segue com pipeline financeiro em dia — sem risco imediato de churn\n\n` +
+        `• Comissão apurada e liberada para pagamento no próximo dia 20\n` +
+        `• Cliente segue com o fluxo financeiro em dia, sem risco imediato de cancelamento\n\n` +
         `Painel: cpsystem.app.br/painel-analista`
       );
     case "INADIMPLENTE":
@@ -121,10 +121,10 @@ function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
         `🚨 *Alerta de risco na carteira — CP System*\n\n` +
         `Seu cliente *${nomeCliente}* ficou inadimplente (mensalidade ${ev.competencia}, ${brl(ev.valor)}).\n\n` +
         `*Ação recomendada como analista:*\n` +
-        `• Entrar em contato com o cliente hoje pra entender a causa (esquecimento, restrição no cartão, disputa)\n` +
-        `• Reforçar o valor entregue pra evitar churn\n` +
-        `• A comissão referente a este cliente fica suspensa até regularização\n\n` +
-        `Se precisar de suporte da equipe CP System, chama aqui.`
+        `• Entrar em contato com o cliente hoje para entender a causa (esquecimento, restrição no cartão, disputa)\n` +
+        `• Reforçar o valor entregue para evitar o cancelamento\n` +
+        `• A comissão referente a este cliente fica suspensa até a regularização\n\n` +
+        `Se precisar de suporte da equipe CP System, responda a esta mensagem.`
       );
     case "CONTRATO_VENCENDO":
       return (
@@ -155,9 +155,9 @@ function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
         (ev.motivo ? `Motivo informado: ${ev.motivo}\n` : ``) +
         `\n*Impacto na sua carteira:*\n` +
         `• Comissão vitalícia deste cliente encerrada a partir do próximo ciclo\n` +
-        `• Momento crítico pra reengajar antes do bloqueio efetivo\n\n` +
+        `• Momento crítico para reengajar antes do bloqueio efetivo\n\n` +
         `*Ação recomendada como analista:*\n` +
-        `• Ligar em até 24h pra entender a causa real (preço, produto, atendimento, mudança de estratégia)\n` +
+        `• Ligar em até 24h para entender a causa real (preço, produto, atendimento, mudança de estratégia)\n` +
         `• Se for insatisfação pontual, ofereça suporte direto\n` +
         `• Se decidido, encerre com dignidade e mantenha porta aberta\n\n` +
         `Painel: cpsystem.app.br/painel-analista`
@@ -167,10 +167,10 @@ function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
         `🤝 *Novo cliente na sua carteira*\n\n` +
         `*${nomeCliente}* acabou de vincular você como analista responsável pela conta.\n\n` +
         `*O que isso significa:*\n` +
-        `• Você passa a ser referência técnica desse cliente pra questões de contratos públicos\n` +
+        `• Você passa a ser referência técnica desse cliente para questões de contratos públicos\n` +
         `• Comissão vitalícia começa a valer assim que a 1ª fatura for paga\n\n` +
         `*Ação recomendada como analista:*\n` +
-        `• Contato em até 48h pra apresentação e alinhamento inicial\n` +
+        `• Contato em até 48h para apresentação e alinhamento inicial\n` +
         `• Mapear os contratos ativos + prioridades imediatas do cliente\n` +
         `• Combinar cadência de reuniões e canal de suporte\n\n` +
         `Painel: cpsystem.app.br/painel-analista`

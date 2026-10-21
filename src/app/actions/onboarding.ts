@@ -35,7 +35,7 @@ export async function salvarDadosPessoaisAction(
   if (!cargo) campos.cargo = "Informe seu cargo";
   if (!dataNascimento) campos.dataNascimento = "Informe sua data de nascimento";
   if (senha !== confirmacao) campos.confirmacaoSenha = "Senhas não conferem";
-  if (!aceite) campos.aceiteTermos = "Você precisa aceitar os termos pra continuar";
+  if (!aceite) campos.aceiteTermos = "Você precisa aceitar os termos para continuar";
   let telefone: string;
   // 11 digitos (DDD + 9 + numero): `formatarTelefone` aceita 10 porque tambem
   // serve pra fixo, mas este campo e de WhatsApp. Numero de dez digitos passa

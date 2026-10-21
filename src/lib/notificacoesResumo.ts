@@ -381,7 +381,7 @@ async function coletarLembretesConciliacao(inicioHoje: Date): Promise<MapaUsuari
       linha = `🧾 Conciliação bancária amanhã (dia ${dia}). Sobe o PDF em https://cpsystem.app.br/conciliacao`;
       urgencia = 3;
     } else if (diff === 0) {
-      linha = `🧾 Hoje é dia da conciliação bancária. Sobe o PDF em https://cpsystem.app.br/conciliacao — a gente cruza com os empenhos automaticamente.`;
+      linha = `🧾 Hoje é dia da conciliação bancária. Envie o PDF em https://cpsystem.app.br/conciliacao — o sistema cruza com os empenhos automaticamente.`;
       urgencia = 4;
     }
     if (!linha) continue;
@@ -531,7 +531,7 @@ async function coletarAniversarios(hoje: Date): Promise<MapaUsuarios> {
 const JANELA_TITULO: Record<Janela, string> = {
   MANHA: `${TOKEN_SAUDACAO} — o que precisa da sua atenção HOJE`,
   TARDE: `${TOKEN_SAUDACAO} — alertas de ação nos próximos dias`,
-  NOITE: `${TOKEN_SAUDACAO} — resumo pra você planejar a semana`,
+  NOITE: `${TOKEN_SAUDACAO} — resumo para você planejar a semana`,
 };
 
 const JANELA_INTRO: Record<Janela, string> = {

@@ -110,7 +110,7 @@ export async function montarResumoEmpresa(contaId: string): Promise<ResumoEmpres
   if (conta.statusAssinatura === "ATIVA" && conta.proximoVencimento) {
     linhas.push(`💳 Próxima cobrança: ${dataBr(conta.proximoVencimento)} (${conta.plano} — débito automático)`);
   } else if (conta.statusAssinatura === "TRIAL") {
-    linhas.push(`💳 Assinatura em TRIAL. Complete o cadastro em cpsystem.app.br pra evitar bloqueio.`);
+    linhas.push(`💳 Assinatura em TRIAL. Complete o cadastro em cpsystem.app.br para evitar o bloqueio.`);
   } else if (conta.statusAssinatura === "INADIMPLENTE") {
     linhas.push(`💳 Assinatura em ATRASO. Regularize em cpsystem.app.br/conta/assinatura.`);
   }

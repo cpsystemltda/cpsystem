@@ -558,7 +558,7 @@ export async function processarNfseGateway(opts: {
         `📄 *Nota Fiscal emitida — CP System*\n\n` +
         `${primeiroNome}, sua NF referente à mensalidade *${cobranca.competencia}* (${valor}) foi emitida.\n\n` +
         (opts.numero ? `Nº da NF: *${opts.numero}*\n\n` : "") +
-        `Também enviamos por email. Guarde uma cópia pra sua contabilidade.`;
+        `Também enviamos por e-mail. Guarde uma cópia para sua contabilidade.`;
       await dispararNotificacaoComPdf({
         usuarioId: u.id,
         tipo: "NF_EMITIDA_CLIENTE",
@@ -605,7 +605,7 @@ export async function processarNfseGateway(opts: {
             <p>Olá <strong>${primeiroNome}</strong>,</p>
             <p>Segue em anexo a Nota Fiscal Eletrônica referente à mensalidade <strong>${cobranca.competencia}</strong> (${valor}).</p>
             ${opts.numero ? `<p>Nº da NF: <strong>${opts.numero}</strong></p>` : ""}
-            <p style="color:#64748B;font-size:13px;margin-top:24px">Você também recebeu essa NF por WhatsApp. Guarde uma cópia pra sua contabilidade.</p>
+            <p style="color:#64748B;font-size:13px;margin-top:24px">Você também recebeu esta NF por WhatsApp. Guarde uma cópia para sua contabilidade.</p>
             <hr style="border:none;border-top:0.5px solid #E2E8F0;margin:24px 0" />
             <p style="color:#94A3B8;font-size:11px">CP System · CNPJ 67.266.466/0001-04 · contato@cpsystem.app.br</p>
           </div>

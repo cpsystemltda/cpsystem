@@ -262,7 +262,7 @@ async function avisarRepasseAoAnalista(comissaoId: string): Promise<void> {
           `▸ Cliente: ${cliente}\n` +
           `▸ Competência: ${competenciaBr}\n\n` +
           `Costuma cair em segundos. Se não aparecer, confira a chave PIX em *Conta › Meus dados* ` +
-          `e fale com a gente.\n\n` +
+          `e fale conosco.\n\n` +
           `Contato CP System`,
       });
     }
@@ -335,7 +335,7 @@ export function traduzirErroGateway(bruto: string): string {
     return (
       "A chave de API do Asaas não tem permissão para transferências (saque via API). " +
       "No Asaas: Integrações → API Key → habilite a permissão de saque/transferência (ou gere uma " +
-      "chave nova com ela) e atualize a chave no CP System. Enquanto isso, dá pra pagar o analista " +
+      "chave nova com ela) e atualize a chave no CP System. Enquanto isso, é possível pagar o analista " +
       "manualmente pelo app do Asaas."
     );
   }

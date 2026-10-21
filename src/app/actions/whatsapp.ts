@@ -20,7 +20,7 @@ export async function salvarPreferenciaWhatsAppAction(
   const optIn = String(formData.get("optIn") || "") === "1";
 
   if (optIn && !telefoneRaw) {
-    return { erro: "Informe o telefone WhatsApp pra ativar as notificacoes." };
+    return { erro: "Informe o telefone WhatsApp para ativar as notificações." };
   }
 
   let telefone: string | null = null;

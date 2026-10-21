@@ -131,7 +131,7 @@ export async function rodarCicloDeVida(): Promise<ResumoCiclo> {
           `O caminho é curto: a empresa se cadastra em *cpsystem.app.br* e informa o seu nome no campo de analista. ` +
           `A partir da primeira fatura paga por ela, são *R$ 29,90 por mês, por cliente*, enquanto ela for cliente — ` +
           `cumulativo e vitalício.\n\n` +
-          `Se quiser, eu te ajudo a abordar o primeiro. Me chama aqui que a gente monta a conversa junto.\n\n` +
+          `Se desejar, podemos ajudar na abordagem do primeiro. Responda a esta mensagem e montamos a conversa juntos.\n\n` +
           `Contato CP System`);
         if (enviou) { r.analistasCobrados++; r.detalhes.push(`analista cobrado: ${nomeConta} (${idade}d)`); }
       }
@@ -170,8 +170,8 @@ export async function rodarCicloDeVida(): Promise<ResumoCiclo> {
         `Como o cadastro de *${nomeConta}* completou ${idade} dias sem nenhum lançamento, suspendemos o acesso por ora — ` +
         `é o procedimento padrão para manter a base organizada.\n\n` +
         `*Nada foi perdido.* Seus dados continuam guardados, e reativar leva um minuto: é só responder esta mensagem.\n\n` +
-        `E se o que travou foi a primeira contratação ser trabalhosa de lançar, essa parte a gente faz por você — ` +
-        `me mande o PDF da ata ou do contrato aqui mesmo que eu devolvo tudo cadastrado.\n\n` +
+        `E se o que travou foi a primeira contratação ser trabalhosa de lançar, essa parte nós fazemos por você: ` +
+        `envie o PDF da ata ou do contrato aqui mesmo e devolvemos tudo cadastrado.\n\n` +
         `Contato CP System`);
       continue;
     }
@@ -183,9 +183,9 @@ export async function rodarCicloDeVida(): Promise<ResumoCiclo> {
         `o que quer dizer que o sistema ainda não teve chance de trabalhar para vocês.\n\n` +
         `É justamente com a base alimentada que ele começa a avisar prazo de entrega antes de virar multa, ` +
         `apontar nota que o órgão não pagou e mostrar o saldo de cada ata.\n\n` +
-        `*Proposta:* me mande aqui o PDF de uma ata ou contrato de vocês. Eu cadastro e te devolvo pronto, ` +
+        `*Proposta:* envie aqui o PDF de uma ata ou contrato de vocês. Nós cadastramos e devolvemos pronto, ` +
         `para você ver funcionando com o seu próprio contrato — sem custo e sem compromisso.\n\n` +
-        `Se preferir que a gente encerre o cadastro, também é só dizer.\n\n` +
+        `Se preferir que o cadastro seja encerrado, basta nos informar.\n\n` +
         `Contato CP System`);
       if (enviou) { r.avisadas++; r.detalhes.push(`avisado: ${nomeConta} (${idade}d sem uso)`); }
     }

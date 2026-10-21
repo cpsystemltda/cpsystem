@@ -34,7 +34,7 @@ export const AJUDA = {
     "CPF do analista pessoa física. É usado pelas empresas como chave de vínculo — compartilhe-o com seus clientes para que possam te localizar.",
 
   bancoAnalista:
-    "Conta bancária para recebimento de honorários. As empresas que te vinculam usam esses dados pra fazer o repasse.",
+    "Conta bancária para recebimento de honorários. As empresas que vinculam você usam esses dados para fazer o repasse.",
 
   pixAnalista:
     "Chave PIX (CPF, e-mail, celular ou aleatória) — alternativa rápida à conta bancária. Pelo menos uma das duas formas é recomendada.",

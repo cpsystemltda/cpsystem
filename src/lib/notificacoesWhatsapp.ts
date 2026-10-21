@@ -78,7 +78,7 @@ export async function notificarNovoDocumento(opts: {
       `Olá, ${primeiroNome(u.nome)}!\n\n` +
       `${rotulo} *${opts.numero}* — ${opts.orgao}\n` +
       (opts.valor ? `Valor: ${brl(opts.valor)}\n` : "") +
-      `\nAcesse pra ver detalhes: https://cpsystem.app.br/execucao/${opts.documentoId}`;
+      `\nAcesse para ver os detalhes: https://cpsystem.app.br/execucao/${opts.documentoId}`;
 
     await dispararNotificacao({
       usuarioId: u.id,
@@ -160,7 +160,7 @@ function tomPorDias(dias: number): { emoji: string; urgencia: string; cta: strin
   if (dias >= 30) return { emoji: "📆", urgencia: "Ação intermediária", cta: "Programe renovação, aditivo ou uso do saldo." };
   if (dias >= 15) return { emoji: "⚠️", urgencia: "Ação prioritária", cta: "Formalize a próxima etapa esta semana." };
   if (dias >= 10) return { emoji: "🔔", urgencia: "Última chance de manobra", cta: "Se ainda não iniciou o processo, comece hoje." };
-  return { emoji: "🚨", urgencia: "Crítico — agora ou nunca", cta: "Regularize hoje pra evitar interrupção contratual." };
+  return { emoji: "🚨", urgencia: "Crítico — agora ou nunca", cta: "Regularize hoje para evitar interrupção contratual." };
 }
 
 // Cron consolidado (Regina 06/07): antes eram 3 funcoes separadas
@@ -247,7 +247,7 @@ export async function notificarPrazosConsolidado(hoje: Date = new Date()): Promi
         const msg =
           `🚨 *EMPENHO ATRASADO*\n\n` +
           `${primeiroNome(u.nome)}, o ${label} *${e.numero}* (${e.orgaoNome}) está atrasado *${diasAtraso} dia(s)*.\n\n` +
-          `Regularize urgente pra evitar multa contratual: ${url}`;
+          `Regularize com urgência para evitar multa contratual: ${url}`;
         const r = await dispararNotificacao({
           usuarioId: u.id,
           tipo: "VENCIMENTO_EMPENHO",
@@ -264,7 +264,7 @@ export async function notificarPrazosConsolidado(hoje: Date = new Date()): Promi
       for (const u of usuarios) {
         const msg =
           `⏰ *ENTREGA HOJE*\n\n` +
-          `${primeiroNome(u.nome)}, hoje é o último dia pra entregar o ${label} *${e.numero}* (${e.orgaoNome}).\n\n` +
+          `${primeiroNome(u.nome)}, hoje é o último dia para entregar o ${label} *${e.numero}* (${e.orgaoNome}).\n\n` +
           `Confirme a entrega no sistema: ${url}`;
         const r = await dispararNotificacao({
           usuarioId: u.id,
@@ -552,7 +552,7 @@ export async function notificarTrialVencendo(hoje: Date = new Date()): Promise<{
             `O plano *${conta.plano}* fica em *${brl(breakdown.valorTotal)}/mês*. ` +
             `Enquanto o pagamento não for cadastrado, o acesso ao sistema fica suspenso ` +
             `— seus dados continuam guardados e voltam assim que você regularizar.\n\n` +
-            `Qualquer dúvida, responda esta mensagem que a gente ajuda.`,
+            `Em caso de dúvida, responda a esta mensagem e nossa equipe ajudará.`,
         });
         if (r.enviado) avisados++;
       }
@@ -1075,7 +1075,7 @@ export async function notificarCartaoExpirando(hoje: Date = new Date()): Promise
       const msg =
         `💳 *Seu cartão do CP System vence em breve*\n\n` +
         `${primeiroNome(u.nome)}, o ${c.bandeira || "cartão"} final *${c.ultimosDigitos}* vence em ${String(c.validadeMes).padStart(2, "0")}/${c.validadeAno}.\n\n` +
-        `Atualize antes pra sua assinatura não ser interrompida:\n` +
+        `Atualize antes para que sua assinatura não seja interrompida:\n` +
         `https://cpsystem.app.br/conta/assinatura`;
       const r = await dispararNotificacao({
         usuarioId: u.id,
@@ -1111,7 +1111,7 @@ export async function notificarProcedimentoApuratorio(opts: {
       `${primeiroNome(u.nome)}, um procedimento apuratório foi registrado contra sua empresa:\n\n` +
       `Assunto: *${opts.assunto}*\n` +
       `Órgão: ${opts.orgao}${prazo}\n\n` +
-      `Acesse pra apresentar defesa: https://cpsystem.app.br/procedimentos/${opts.procedimentoId}`;
+      `Acesse para apresentar a defesa: https://cpsystem.app.br/procedimentos/${opts.procedimentoId}`;
     await dispararNotificacao({
       usuarioId: u.id,
       tipo: "PROCEDIMENTO_APURATORIO",
@@ -1228,9 +1228,9 @@ export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ 
   for (const u of usuarios) {
     const msg =
       `🎉 *Feliz aniversário, ${primeiroNome(u.nome)}!* 🎂\n\n` +
-      `Toda a equipe do CP System te deseja um dia incrível e um ano cheio de contratos fechados, prazos cumpridos e pagamentos em dia.\n\n` +
-      `Muito obrigado por confiar na gente pra cuidar da sua execução pública. Que venha muito sucesso!\n\n` +
-      `Com carinho,\nContato CP System 💚`;
+      `Toda a equipe do CP System deseja a você um dia incrível e um ano cheio de contratos fechados, prazos cumpridos e pagamentos em dia.\n\n` +
+      `Agradecemos a confiança no CP System para cuidar da sua execução pública. Desejamos muito sucesso!\n\n` +
+      `Com os melhores votos,\nContato CP System`;
 
     if (u.optInWhatsApp && u.telefoneWhatsApp) {
       const r = await dispararNotificacao({
@@ -1250,8 +1250,8 @@ export async function notificarAniversarios(hoje: Date = new Date()): Promise<{ 
           html:
             `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:520px;margin:0 auto;color:#0f172a">` +
             `<p style="font-size:18px;font-weight:700;margin:0 0 14px">🎉 Feliz aniversário, ${primeiroNome(u.nome)}! 🎂</p>` +
-            `<p style="margin:0 0 14px;line-height:1.6">Toda a equipe do CP System te deseja um dia incrível e um ano cheio de contratos fechados, prazos cumpridos e pagamentos em dia.</p>` +
-            `<p style="margin:0 0 14px;line-height:1.6">Obrigado por confiar na gente pra cuidar da sua execução pública.</p>` +
+            `<p style="margin:0 0 14px;line-height:1.6">Toda a equipe do CP System deseja a você um dia incrível e um ano cheio de contratos fechados, prazos cumpridos e pagamentos em dia.</p>` +
+            `<p style="margin:0 0 14px;line-height:1.6">Agradecemos a confiança no CP System para cuidar da sua execução pública.</p>` +
             `<p style="margin:22px 0 0;color:#64748b;font-size:13px">Contato CP System</p></div>`,
           texto: msg.replace(/\*/g, ""),
         });
@@ -1336,12 +1336,12 @@ export async function enviarLembreteExtratoSemanal(
         : "";
       const msg =
         `📄 *Lembrete: envie o extrato bancário da semana*\n\n` +
-        `${primeiroNome(u.nome)}, é sexta — dia de subir o extrato da semana pra o CP System conciliar tudo automaticamente com seus empenhos, mensalidade e comissões.\n\n` +
-        `*2 formas de enviar:*\n` +
-        `• Responde este WhatsApp com o PDF anexado — a gente processa direto por aqui\n` +
-        `• Ou entra em cpsystem.app.br/conciliacao e faz o upload\n` +
+        `${primeiroNome(u.nome)}, é sexta-feira, dia de enviar o extrato bancário da semana para que o CP System concilie automaticamente com seus empenhos, mensalidade e comissões.\n\n` +
+        `*Duas formas de enviar:*\n` +
+        `• Responda a este WhatsApp com o PDF anexado; o processamento é feito por aqui\n` +
+        `• Ou acesse cpsystem.app.br/conciliacao e faça o upload\n` +
         `${linhaCortesia}` +
-        `\nAssim que subir, você recebe as sugestões pra aprovar e o dashboard já reflete tudo. Bom fim de semana! 🚀`;
+        `\nAssim que o extrato for enviado, você recebe as sugestões para aprovação e o painel passa a refletir tudo. Bom fim de semana!`;
 
       const r = await dispararNotificacao({
         usuarioId: u.id,
@@ -1450,14 +1450,14 @@ export async function notificarAtrasoDePagamento(hoje: Date = new Date()): Promi
             ? `🔒 *Acesso suspenso por falta de pagamento*\n\n` +
               `${primeiroNome(u.nome)}, a fatura de *${brl(cb.valor)}* venceu em ${vencimentoBr} e ` +
               `o acesso ao CP System foi suspenso hoje.\n\n` +
-              `Pra liberar na hora: entre em *Conta › Assinatura* e pague por PIX — ` +
+              `Para liberar o acesso imediatamente: entre em *Conta › Assinatura* e pague por PIX — ` +
               `a confirmação é automática e o acesso volta em segundos.\n\n` +
               `https://cpsystem.app.br/conta/assinatura`
             : `⏰ *Fatura vencida ontem*\n\n` +
               `${primeiroNome(u.nome)}, a fatura de *${brl(cb.valor)}* venceu em ${vencimentoBr}.\n\n` +
               `Regularizando até amanhã, nada muda no seu acesso. A partir de *3 dias de atraso* ` +
               `o sistema bloqueia o uso automaticamente.\n\n` +
-              `Pague por PIX em segundos: https://cpsystem.app.br/conta/assinatura`,
+              `Pagamento por PIX disponível em: https://cpsystem.app.br/conta/assinatura`,
         });
         if (r.enviado) clientesAvisados++;
       }
@@ -1476,17 +1476,17 @@ export async function notificarAtrasoDePagamento(hoje: Date = new Date()): Promi
             ? `⚠️ *${nomeCliente} teve o acesso suspenso*\n\n` +
               `${primeiroNome(u.nome)}, a fatura de ${nomeCliente} (${brl(cb.valor)}, vencida em ` +
               `${vencimentoBr}) completou 3 dias de atraso e o acesso dele foi bloqueado.\n\n` +
-              `*O que isso significa pra você:* enquanto o cliente não regularizar, a comissão ` +
+              `*O que isso significa para você:* enquanto o cliente não regularizar, a comissão ` +
               `de *R$ 29,90/mês* referente a ele não é repassada — o repasse só sai depois que o ` +
               `pagamento dele entra em conta. Se ele cancelar, a comissão se encerra.\n\n` +
-              `Uma conversa sua com ele agora costuma resolver mais rápido que qualquer cobrança nossa.`
+              `Um contato seu com o cliente neste momento tende a resolver a situação mais rapidamente do que uma cobrança nossa.`
             : `📌 *${nomeCliente} está com fatura em atraso*\n\n` +
               `${primeiroNome(u.nome)}, a fatura de ${nomeCliente} (${brl(cb.valor)}) venceu em ` +
               `${vencimentoBr} e ainda não foi paga.\n\n` +
-              `*Por que te avisamos:* a sua comissão de *R$ 29,90/mês* por esse cliente depende do ` +
-              `pagamento dele. Se o atraso chegar a 3 dias, o acesso dele é bloqueado — e a ` +
-              `comissão fica parada até regularizar.\n\n` +
-              `Se puder dar um toque nele, ajuda os dois lados.`,
+              `*Por que estamos avisando:* a sua comissão de *R$ 29,90/mês* referente a esse cliente depende do ` +
+              `pagamento dele. Se o atraso chegar a 3 dias, o acesso dele será bloqueado e a ` +
+              `comissão ficará retida até a regularização.\n\n` +
+              `Um contato seu com o cliente pode agilizar a regularização.`,
         });
         if (r.enviado) analistasAvisados++;
       }

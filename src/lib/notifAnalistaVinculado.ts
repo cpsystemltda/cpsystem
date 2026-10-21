@@ -73,7 +73,7 @@ function montarMensagem(ev: EventoAnalistaVinculado): string {
         `A empresa *${ev.nomeEmpresa}* declarou pagamento da comissão do empenho *${ev.empenhoRef}* no valor de ${brl(ev.valor)}.\n\n` +
         (ev.observacao ? `Observação da empresa: ${ev.observacao}\n\n` : ``) +
         `*Ação necessária:*\n` +
-        `Confirme o recebimento no seu painel pra a comissão virar "Pago" definitivo. Enquanto não confirmar, ela fica registrada como "Aguardando confirmação".\n\n` +
+        `Confirme o recebimento no seu painel para que a comissão passe a "Pago" em definitivo. Enquanto não confirmar, ela fica registrada como "Aguardando confirmação".\n\n` +
         `Painel: ${ev.linkConfirmacao}`
       );
   }

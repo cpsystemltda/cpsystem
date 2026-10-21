@@ -29,7 +29,7 @@ export async function atualizarPerfilAction(
   await bloquearEspionagem();
 
   const senha = String(formData.get("senhaAtual") || "");
-  if (!senha) return { erro: "Confirme sua senha atual pra salvar.", campos: { senhaAtual: "Obrigatorio" } };
+  if (!senha) return { erro: "Confirme sua senha atual para salvar.", campos: { senhaAtual: "Obrigatorio" } };
 
   // Busca hash da senha e valida
   const usuarioFull = await prisma.usuario.findUnique({

@@ -142,7 +142,7 @@ ${linhasCtx.join("\n")}
 **Formato obrigatório da resposta** — JSON puro, sem markdown, sem texto ao redor:
 {
   "acao": "auto_responder" OU "escalar_admin",
-  "resposta": "texto que vai pro cliente via WhatsApp (curto, cordial)",
+  "resposta": "texto que vai para o cliente via WhatsApp (curto, cordial, em linguagem formal: sem gírias nem contrações coloquiais como 'pra', 'tá', 'a gente', 'dar um toque')",
   "categoria": "DUVIDA_USO" | "AJUSTE_DADOS" | "CORRECAO_OPERACIONAL" | "BUG_SISTEMA" | "FEATURE_PEDIDO" | "REUNIAO" | "COMERCIAL" | "OUTRO",
   "resumo": "1 linha do que o cliente quis (interna)",
   "motivo": "(SÓ SE escalar_admin) — por que precisa admin",
