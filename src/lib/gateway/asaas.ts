@@ -443,6 +443,43 @@ export class GatewayAsaas implements GatewayPagamento {
     return { invoiceId: r.id, status: r.status };
   }
 
+  async consultarNota(invoiceId: string) {
+    try {
+      const i = await this.req<Record<string, unknown>>(`/invoices/${encodeURIComponent(invoiceId)}`);
+      if (!i || typeof i !== "object" || !i["id"]) return null;
+      const s = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
+      return {
+        id: String(i["id"]),
+        status: String(i["status"] ?? ""),
+        numero: s(i["number"]),
+        pdfUrl: s(i["pdfUrl"]),
+        xmlUrl: s(i["xmlUrl"]),
+        emitidaEm: s(i["effectiveDate"]) ? new Date(String(i["effectiveDate"])) : null,
+        paymentId: s(i["payment"]),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async consultarAssinatura(subscriptionId: string) {
+    try {
+      const sub = await this.req<Record<string, unknown>>(`/subscriptions/${encodeURIComponent(subscriptionId)}`);
+      if (!sub || typeof sub !== "object" || !sub["id"]) return null;
+      const cartao = sub["creditCard"] as { creditCardNumber?: string | null } | null | undefined;
+      const final = cartao?.creditCardNumber ? String(cartao.creditCardNumber) : null;
+      return {
+        status: String(sub["status"] ?? ""),
+        billingType: String(sub["billingType"] ?? ""),
+        temCartao: !!final,
+        cartaoFinal: final,
+        proximoVencimento: sub["nextDueDate"] ? new Date(String(sub["nextDueDate"])) : null,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   async listarCobrancasDaAssinatura(subscriptionId: string) {
     type Resp = {
       data: Array<{
@@ -571,7 +608,9 @@ export class GatewayAsaas implements GatewayPagamento {
               ? "ESTORNADA"
               : data.payment.status === "DELETED"
                 ? "CANCELADA"
-                : undefined;
+                : data.payment.status === "PENDING"
+                  ? "PENDENTE"
+                  : undefined;
       const forma: FormaPagamento | undefined =
         data.payment.billingType === "PIX"
           ? "PIX"

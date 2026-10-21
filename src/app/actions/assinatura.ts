@@ -386,7 +386,7 @@ export async function executarReguaCobrancaAction(_p: Result | null, _formData: 
 // Webhook → confirmar pagamento
 export async function processarEventoGateway(opts: {
   chargeId: string;
-  status: "PAGA" | "ATRASADA" | "CANCELADA" | "ESTORNADA";
+  status: "PAGA" | "ATRASADA" | "CANCELADA" | "ESTORNADA" | "PENDENTE";
   pagaEm?: Date;
   /** Dados do gateway pra criar a cobrança quando ela não existir aqui. */
   cobrancaDoGateway?: {
@@ -407,6 +407,11 @@ export async function processarEventoGateway(opts: {
   // "ele não pagou esse mês e está como se estivesse adimplente" começou aqui.
   if (!cobranca && opts.cobrancaDoGateway) {
     const g = opts.cobrancaDoGateway;
+    // Cobrança recém-criada (Regina 21/10: "não tenho que lembrar nem as
+    // cobranças"): espelha no nascimento para o lembrete de 3 dias e o PIX
+    // saírem antes do vencimento. Só quando vem de assinatura — PIX avulso
+    // que chega na conta do Asaas não é mensalidade e não vira cobrança aqui.
+    if (opts.status === "PENDENTE" && !g.subscriptionId) return;
     const conta = await prisma.conta.findFirst({
       where: {
         OR: [
@@ -436,6 +441,8 @@ export async function processarEventoGateway(opts: {
   }
 
   if (!cobranca) return;
+  // PENDENTE só cria; nunca rebaixa uma linha que já andou (paga, atrasada).
+  if (opts.status === "PENDENTE") return;
 
   await prisma.cobranca.update({
     where: { id: cobranca.id },

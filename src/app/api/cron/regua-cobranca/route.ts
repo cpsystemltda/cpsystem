@@ -23,9 +23,14 @@ export async function GET(req: Request) {
     const { rotinaNotaFiscalDiaria } = await import("@/lib/notaFiscalAutomatica");
     const nf = await rotinaNotaFiscalDiaria();
     notaFiscal = nf;
-    const problemas = [...nf.assinaturas.falhas, ...nf.pendentes.falhas];
+    const problemas = [
+      ...nf.assinaturas.falhas,
+      ...nf.pendentes.falhas,
+      ...nf.sincronizacao.falhas,
+      ...nf.sincronizacao.comProblema.map((p) => `nota ${p.invoiceId} em ${p.status} — precisa de nova emissão ou de olhar no painel`),
+    ];
     const semMolde = nf.assinaturas.semMolde || nf.pendentes.semMolde;
-    if (problemas.length || semMolde || nf.pendentes.emitidas.length) {
+    if (problemas.length || semMolde || nf.pendentes.emitidas.length || nf.sincronizacao.enviadas.length) {
       const { avisarEquipe } = await import("@/lib/alertaInterno");
       const linhas = [
         `🧾 *Nota fiscal das mensalidades*`,
@@ -33,6 +38,7 @@ export async function GET(req: Request) {
         semMolde ? `⚠️ Sem molde fiscal: nenhuma assinatura configurada e nenhuma nota autorizada no Asaas.` : `Molde: ${nf.molde}`,
         `Assinaturas: ${nf.assinaturas.jaTinham} já tinham emissão, ${nf.assinaturas.configuradas} ligadas hoje.`,
         `Notas emitidas hoje: ${nf.pendentes.emitidas.length}.`,
+        `PDFs entregues pela sincronização (webhook não trouxe): ${nf.sincronizacao.enviadas.length}. Aguardando prefeitura: ${nf.sincronizacao.aguardando}.`,
         ...(problemas.length ? [``, `❌ Falhas:`, ...problemas.map((p) => `   ▫ ${p}`)] : []),
       ];
       await avisarEquipe(linhas.join("\n")).catch(() => {});
@@ -42,11 +48,37 @@ export async function GET(req: Request) {
     notaFiscal = { erro: (e as Error).message.slice(0, 200) };
   }
 
+  // Cartão das assinaturas (Regina 21/10: "nem as cobranças"): assinatura de
+  // cartão sem cartão preso não cobra ninguém e ninguém fica sabendo. Aqui
+  // o cliente é orientado e a equipe avisada, todo dia em que isso for verdade.
+  let cartoes: unknown = null;
+  try {
+    const { conferirCartoesDasAssinaturas } = await import("@/lib/cartaoAssinatura");
+    const c = await conferirCartoesDasAssinaturas();
+    cartoes = c;
+    if (c.semCartao.length || c.falhas.length) {
+      const { avisarEquipe } = await import("@/lib/alertaInterno");
+      await avisarEquipe(
+        [
+          `💳 *Assinaturas sem cartão vinculado: ${c.semCartao.length}*`,
+          ...c.semCartao.map((s) => `   ▫ ${s.empresa} — ${s.clienteAvisado ? "cliente orientado hoje" : "cliente já orientado nos últimos dias"}`),
+          ...(c.falhas.length ? [``, `❌ Falhas:`, ...c.falhas.map((f) => `   ▫ ${f}`)] : []),
+          ``,
+          `Sem cartão, a mensalidade não é debitada: o cliente precisa pagar por PIX ou recadastrar o cartão em Conta › Assinatura.`,
+        ].join("\n"),
+      ).catch(() => {});
+    }
+  } catch (e) {
+    console.error("[regua-cobranca] conferência de cartões falhou:", e);
+    cartoes = { erro: (e as Error).message.slice(0, 200) };
+  }
+
   return NextResponse.json({
     ok: true,
     duracaoMs: Date.now() - inicio,
     resumo,
     notaFiscal,
+    cartoes,
     executadoEm: new Date().toISOString(),
   });
 }

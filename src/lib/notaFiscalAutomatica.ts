@@ -247,17 +247,96 @@ export async function emitirNotasPendentes(opts: { aplicar: boolean; moldePronto
   return r;
 }
 
+export type ResumoSincronizacao = {
+  verificadas: number;
+  enviadas: Array<{ cobrancaId: string; invoiceId: string; numero: string | null }>;
+  aguardando: number;
+  comProblema: Array<{ cobrancaId: string; invoiceId: string; status: string }>;
+  falhas: string[];
+};
+
 /**
- * O que roda todo dia na régua: liga a emissão em quem não tem e emite o que
- * ficou para trás. Devolve um resumo para o cron registrar.
+ * Fecha o ciclo das notas emitidas cujo PDF nunca chegou ao cliente.
+ *
+ * O caminho normal é o webhook `INVOICE_AUTHORIZED` → `processarNfseGateway`
+ * → PDF por WhatsApp e e-mail. Mas o webhook já foi interrompido pelo Asaas
+ * uma vez (julho) e já ficou dois dias sem chegar (queda de outubro). Regina,
+ * 21/10: *"garanta que tem que ser automático o envio para os clientes e eu
+ * não tenho que lembrar isso toda vez."* Então, todo dia, cada nota nossa
+ * sem PDF é consultada no Asaas e, se já estiver autorizada, o envio é feito
+ * por aqui — pelo mesmo `processarNfseGateway`, que é idempotente no WhatsApp
+ * (chave por nota) e só roda uma vez porque grava o PDF na cobrança.
+ *
+ * Janela de 20 dias: nota mais velha que isso já foi tratada à mão, e mandar
+ * de novo uma nota antiga é confundir o cliente, não ajudar.
+ */
+export async function sincronizarNotasSemPdf(): Promise<ResumoSincronizacao> {
+  const r: ResumoSincronizacao = { verificadas: 0, enviadas: [], aguardando: 0, comProblema: [], falhas: [] };
+  const gw = await getGateway();
+  if (!gw.consultarNota) return r;
+
+  const desde = new Date(Date.now() - 20 * 86400_000);
+  const semPdf = await prisma.cobranca.findMany({
+    where: {
+      nfseId: { not: null },
+      nfsePdfUrl: null,
+      gatewayChargeId: { not: null },
+      pagaEm: { gte: desde },
+    },
+    select: { id: true, nfseId: true, gatewayChargeId: true },
+  });
+  r.verificadas = semPdf.length;
+  if (!semPdf.length) return r;
+
+  const { processarNfseGateway } = await import("@/app/actions/assinatura");
+  for (const cb of semPdf) {
+    try {
+      const nota = await gw.consultarNota(cb.nfseId!);
+      if (!nota) {
+        r.falhas.push(`${cb.id}: nota ${cb.nfseId} não encontrada no Asaas`);
+        continue;
+      }
+      if (nota.status === "AUTHORIZED" && nota.pdfUrl) {
+        await processarNfseGateway({
+          paymentId: cb.gatewayChargeId!,
+          nfseId: nota.id,
+          numero: nota.numero ?? undefined,
+          status: nota.status,
+          pdfUrl: nota.pdfUrl,
+          xmlUrl: nota.xmlUrl ?? undefined,
+          emitidaEm: nota.emitidaEm ?? undefined,
+        });
+        r.enviadas.push({ cobrancaId: cb.id, invoiceId: nota.id, numero: nota.numero });
+      } else if (["CANCELED", "ERROR", "CANCELLATION_DENIED"].includes(nota.status)) {
+        await prisma.cobranca.update({ where: { id: cb.id }, data: { nfseStatus: nota.status } });
+        r.comProblema.push({ cobrancaId: cb.id, invoiceId: nota.id, status: nota.status });
+      } else {
+        // SCHEDULED / SYNCHRONIZED: a prefeitura ainda não respondeu. Amanhã
+        // de novo.
+        if (nota.status) await prisma.cobranca.update({ where: { id: cb.id }, data: { nfseStatus: nota.status } });
+        r.aguardando++;
+      }
+    } catch (e) {
+      r.falhas.push(`${cb.id}: ${(e as Error).message.slice(0, 160)}`);
+    }
+  }
+  return r;
+}
+
+/**
+ * O que roda todo dia na régua: liga a emissão em quem não tem, emite o que
+ * ficou para trás e entrega o PDF do que já foi autorizado. Devolve um resumo
+ * para o cron registrar.
  */
 export async function rotinaNotaFiscalDiaria(): Promise<{
   molde: string | null;
   assinaturas: ResumoNotaAutomatica;
   pendentes: ResumoEmissaoPendentes;
+  sincronizacao: ResumoSincronizacao;
 }> {
   const molde = await moldeDeNotaFiscal();
   const assinaturas = await ligarNotaFiscalEmTodas(molde);
   const pendentes = await emitirNotasPendentes({ aplicar: true, moldePronto: molde });
-  return { molde: molde.origem, assinaturas, pendentes };
+  const sincronizacao = await sincronizarNotasSemPdf();
+  return { molde: molde.origem, assinaturas, pendentes, sincronizacao };
 }

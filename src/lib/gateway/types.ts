@@ -83,7 +83,13 @@ export type EventoWebhook = {
     forma?: FormaPagamento;
     invoiceUrl?: string;
   };
-  status?: "PAGA" | "ATRASADA" | "CANCELADA" | "ESTORNADA";
+  /**
+   * PENDENTE = cobrança recém-criada no gateway (assinatura gera sozinha).
+   * Serve para espelhar a linha aqui no nascimento, e não só quando vence:
+   * é o que faz o lembrete de 3 dias e o PIX chegarem ao cliente antes do
+   * vencimento, em vez de o primeiro contato ser "sua fatura venceu ontem".
+   */
+  status?: "PAGA" | "ATRASADA" | "CANCELADA" | "ESTORNADA" | "PENDENTE";
   // valor pago (pode diferir do esperado)
   valorPago?: number;
   pagaEm?: Date;
@@ -241,6 +247,24 @@ export interface GatewayPagamento {
     molde: ConfigNotaFiscal;
     dataEmissao?: string;
   }): Promise<{ invoiceId: string; status: string }>;
+  /** Situação atual de uma nota (para fechar o ciclo quando o webhook não vier). */
+  consultarNota?(invoiceId: string): Promise<{
+    id: string;
+    status: string;
+    numero: string | null;
+    pdfUrl: string | null;
+    xmlUrl: string | null;
+    emitidaEm: Date | null;
+    paymentId: string | null;
+  } | null>;
+  /** A assinatura como está no gateway — inclusive se ainda há cartão preso nela. */
+  consultarAssinatura?(subscriptionId: string): Promise<{
+    status: string;
+    billingType: string;
+    temCartao: boolean;
+    cartaoFinal: string | null;
+    proximoVencimento: Date | null;
+  } | null>;
   atualizarAssinatura?(input: AtualizarAssinaturaInput): Promise<void>;
   cancelarAssinatura?(subscriptionId: string): Promise<void>;
   // PIX out pra analista (Regina 13/07). Só Asaas por enquanto.

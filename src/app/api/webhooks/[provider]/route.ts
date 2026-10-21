@@ -89,6 +89,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ provide
     }
   }
 
+  // Cartão recusado pela operadora. Em agosto isto chegou quatro vezes para o
+  // mesmo cliente e ficou só na tabela de auditoria; ninguém soube até a
+  // fatura vencer. Agora o cliente recebe o caminho (PIX ou atualizar o
+  // cartão) e a equipe o aviso — uma vez por cobrança.
+  if (evento.evento === "PAYMENT_CREDIT_CARD_CAPTURE_REFUSED") {
+    try {
+      const { avisarCartaoRecusado } = await import("@/lib/cartaoAssinatura");
+      await avisarCartaoRecusado({
+        chargeId: evento.chargeId,
+        customerId: evento.cobranca?.customerId,
+        subscriptionId: evento.cobranca?.subscriptionId,
+        valor: evento.cobranca?.valor,
+        vencimento: evento.cobranca?.vencimento,
+      });
+    } catch (err) {
+      console.error(`[webhook/${provider}] erro avisando cartão recusado:`, err);
+    }
+  }
+
   // Evento de NF (INVOICE_CREATED / INVOICE_SYNCHRONIZED / INVOICE_AUTHORIZED)
   if (evento.nfse && evento.nfse.paymentIdRelacionado) {
     try {

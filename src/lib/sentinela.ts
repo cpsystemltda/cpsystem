@@ -248,6 +248,35 @@ export async function conferirOperacao(): Promise<RelatorioSentinela> {
   });
   linhas.push(`💬 Mensagens recebidas hoje: *${semResposta}*`);
 
+  // ── 5. Nota fiscal da mensalidade ─────────────────────────────────────────
+  // Regina, 21/10: *"eu não tenho que lembrar isso toda vez."* Mensalidade
+  // paga há mais de 2 dias sem nota autorizada e PDF enviado é falha da régua
+  // (que emite e sincroniza todo dia), e aparece aqui até ser resolvida.
+  const semNota = await prisma.cobranca.findMany({
+    where: {
+      status: "PAGA",
+      pagaEm: {
+        lt: new Date(agora.getTime() - 2 * 86400_000),
+        gte: new Date(agora.getTime() - 20 * 86400_000),
+      },
+      conta: { gatewaySubscriptionId: { not: null } },
+      OR: [{ nfseId: null }, { nfsePdfUrl: null }],
+    },
+    select: {
+      competencia: true,
+      conta: { select: { empresas: { select: { razaoSocial: true }, take: 1 } } },
+    },
+  });
+  linhas.push(`🧾 Mensalidades pagas sem nota enviada: *${semNota.length}*`);
+  if (semNota.length > 0) {
+    achados.push({
+      grave: true,
+      texto:
+        `${semNota.length} mensalidade(s) paga(s) há mais de 2 dias sem nota fiscal enviada:\n` +
+        semNota.map((c) => `   ▫ ${c.conta.empresas[0]?.razaoSocial ?? "?"} — ${c.competencia}`).join("\n"),
+    });
+  }
+
   return { linhas, achados, tudoCerto: achados.length === 0 };
 }
 
