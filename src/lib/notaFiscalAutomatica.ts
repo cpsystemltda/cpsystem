@@ -68,6 +68,18 @@ export async function moldeDeNotaFiscal(): Promise<Molde> {
   const gw = await getGateway();
   const vazio: Molde = { molde: null, vindoDe: null, origem: null };
 
+  // A nota autorizada vem primeiro: nela o nome do serviço é o texto curto
+  // que a prefeitura aceitou. A configuração da assinatura devolve o nome
+  // oficial completo, que passa dos 120 caracteres que o Asaas aceita (erro
+  // de 21/10). A configuração fica como segunda opção.
+  if (gw.ultimaNotaAutorizada) {
+    const nota = await gw.ultimaNotaAutorizada().catch(() => null);
+    if (nota) {
+      const { invoiceId, numero, ...molde } = nota;
+      return { molde, vindoDe: null, origem: `nota ${numero ?? "?"} (${invoiceId})` };
+    }
+  }
+
   if (gw.lerConfigNotaFiscal) {
     const contas = await prisma.conta.findMany({
       where: { gatewaySubscriptionId: { not: null } },
@@ -80,14 +92,6 @@ export async function moldeDeNotaFiscal(): Promise<Molde> {
       if (cfg && (cfg.municipalServiceId || cfg.municipalServiceCode)) {
         return { molde: cfg, vindoDe: c.gatewaySubscriptionId, origem: `assinatura ${c.gatewaySubscriptionId}` };
       }
-    }
-  }
-
-  if (gw.ultimaNotaAutorizada) {
-    const nota = await gw.ultimaNotaAutorizada().catch(() => null);
-    if (nota) {
-      const { invoiceId, numero, ...molde } = nota;
-      return { molde, vindoDe: null, origem: `nota ${numero ?? "?"} (${invoiceId})` };
     }
   }
 

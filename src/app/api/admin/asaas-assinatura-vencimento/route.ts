@@ -23,10 +23,15 @@ export async function POST(req: NextRequest) {
   if (!/^sub_\w+$/.test(id) || !/^\d{4}-\d{2}-\d{2}$/.test(data)) {
     return NextResponse.json({ erro: "informe id=sub_x e data=AAAA-MM-DD" }, { status: 400 });
   }
-  const gw = await getGateway();
-  if (!gw.atualizarProximoVencimento) return NextResponse.json({ erro: "gateway sem suporte" }, { status: 400 });
-  const antes = gw.consultarAssinatura ? await gw.consultarAssinatura(id) : null;
-  const r = await gw.atualizarProximoVencimento(id, new Date(`${data}T12:00:00Z`));
-  const depois = gw.consultarAssinatura ? await gw.consultarAssinatura(id) : null;
-  return NextResponse.json({ ok: true, id, antes, resultado: r, depois });
+  try {
+    const gw = await getGateway();
+    if (!gw.atualizarProximoVencimento) return NextResponse.json({ erro: "gateway sem suporte" }, { status: 400 });
+    const antes = gw.consultarAssinatura ? await gw.consultarAssinatura(id) : null;
+    const r = await gw.atualizarProximoVencimento(id, new Date(`${data}T12:00:00Z`));
+    const depois = gw.consultarAssinatura ? await gw.consultarAssinatura(id) : null;
+    return NextResponse.json({ ok: true, id, antes, resultado: r, depois });
+  } catch (e) {
+    // Erro do Asaas volta legível, em vez de 500 sem corpo.
+    return NextResponse.json({ ok: false, id, erro: (e as Error).message.slice(0, 400) }, { status: 502 });
+  }
 }

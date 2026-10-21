@@ -346,14 +346,13 @@ export class GatewayAsaas implements GatewayPagamento {
       observations: cfg.observations ?? undefined,
       taxes: cfg.taxes ?? { retainIss: false, iss: 0, cofins: 0, csll: 0, inss: 0, ir: 0, pis: 0 },
     };
-    // Com o id do serviço municipal, o nome é redundante — e o nome oficial
-    // pode passar de 120 caracteres, limite que o Asaas aplica à descrição
-    // (foi o erro "invalid_name" de 21/10). Sem id, vai código + nome curto.
+    // O Asaas exige municipalServiceName mesmo com o id, e limita a 120
+    // caracteres (os dois erros de 21/10: "deve ser informado" e "no máximo
+    // 120"). O nome oficial do serviço pode passar disso; cortado, continua
+    // identificando — quem vale para a prefeitura é o id.
     if (cfg.municipalServiceId) corpo.municipalServiceId = cfg.municipalServiceId;
-    else {
-      if (cfg.municipalServiceCode) corpo.municipalServiceCode = cfg.municipalServiceCode;
-      if (cfg.municipalServiceName) corpo.municipalServiceName = cfg.municipalServiceName.slice(0, 120);
-    }
+    if (cfg.municipalServiceCode) corpo.municipalServiceCode = cfg.municipalServiceCode;
+    if (cfg.municipalServiceName) corpo.municipalServiceName = cfg.municipalServiceName.slice(0, 120);
     if (cfg.daysBeforeDueDate) corpo.daysBeforeDueDate = cfg.daysBeforeDueDate;
 
     await this.req(`/subscriptions/${subscriptionId}/invoiceSettings`, {
@@ -439,10 +438,8 @@ export class GatewayAsaas implements GatewayPagamento {
       taxes: m.taxes ?? { retainIss: false, iss: 0, cofins: 0, csll: 0, inss: 0, ir: 0, pis: 0 },
     };
     if (m.municipalServiceId) corpo.municipalServiceId = m.municipalServiceId;
-    else {
-      if (m.municipalServiceCode) corpo.municipalServiceCode = m.municipalServiceCode;
-      if (m.municipalServiceName) corpo.municipalServiceName = m.municipalServiceName.slice(0, 120);
-    }
+    if (m.municipalServiceCode) corpo.municipalServiceCode = m.municipalServiceCode;
+    if (m.municipalServiceName) corpo.municipalServiceName = m.municipalServiceName.slice(0, 120);
     const r = await this.req<{ id: string; status: string }>(`/invoices`, {
       method: "POST",
       body: JSON.stringify(corpo),
