@@ -266,6 +266,14 @@ export interface GatewayPagamento {
     proximoVencimento: Date | null;
   } | null>;
   atualizarAssinatura?(input: AtualizarAssinaturaInput): Promise<void>;
+  /** Muda a data da próxima cobrança; o gateway gera a cobrança dessa data e segue o ciclo a partir dela. */
+  atualizarProximoVencimento?(subscriptionId: string, data: Date): Promise<{ proximoVencimento: string }>;
+  /** Paga uma cobrança em aberto com um cartão informado agora (fatura vencida na troca de cartão). */
+  pagarCobrancaComCartao?(input: {
+    chargeId: string;
+    cartao: { numero: string; nome: string; validadeMes: number; validadeAno: number; cvv: string };
+    titular: { nome: string; email: string; cpfCnpj: string; telefone?: string; cep?: string; numeroEndereco?: string };
+  }): Promise<{ status: CriarCobrancaResultado["status"]; pagaEm: Date | null }>;
   cancelarAssinatura?(subscriptionId: string): Promise<void>;
   // PIX out pra analista (Regina 13/07). Só Asaas por enquanto.
   transferirPix?(input: {

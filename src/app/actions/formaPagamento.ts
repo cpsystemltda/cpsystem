@@ -122,17 +122,101 @@ export async function trocarFormaPagamentoAction(
 
   if (!gateway.criarAssinatura) return { erro: "Gateway não suporta cobrança recorrente." };
 
+  // Duplo clique (21/10/2026: o mesmo cartão foi enviado duas vezes em 30
+  // segundos e nasceram duas assinaturas, uma cancelando a outra). O mesmo
+  // final de cartão cadastrado há instantes é a mesma intenção: nada a fazer.
+  const repetido = await prisma.metodoPagamento.findFirst({
+    where: {
+      contaId: conta.id,
+      ultimosDigitos: cartao.ultimos4,
+      ativo: true,
+      criadoEm: { gte: new Date(Date.now() - 5 * 60_000) },
+    },
+    select: { id: true },
+  });
+  if (repetido) {
+    revalidatePath("/conta/assinatura");
+    return { ok: true, mensagem: `Cartão ${cartao.bandeira} final ${cartao.ultimos4} já cadastrado há instantes. A cobrança mensal sai nele.` };
+  }
+
   try {
     const breakdown = await calcularValorMensal(conta.id, conta.plano);
-    // Próxima cobrança: mantém o vencimento já combinado; se não houver, joga
-    // pro mês que vem no dia escolhido (ou daqui a 30 dias).
-    const proximo =
-      conta.proximoVencimento && conta.proximoVencimento > new Date()
-        ? conta.proximoVencimento
-        : new Date(Date.now() + 30 * 86400000);
-
     const { garantirCustomer } = await import("@/app/actions/assinatura");
     const { customerId } = await garantirCustomer(conta.id);
+
+    const titular = {
+      nome: cartaoInput.nome,
+      email: conta.usuarios[0]?.email ?? usuario.email,
+      cpfCnpj: cpfTitular,
+      telefone: empresa.telefones || undefined,
+      cep: empresa.cep || undefined,
+      numeroEndereco: empresa.endereco.match(/,\s*(\d+[A-Za-z]?)\b/)?.[1] || "S/N",
+    };
+    const cartaoParaCobrar = {
+      numero: cartaoInput.numero,
+      nome: cartaoInput.nome,
+      validadeMes: cartao.validadeMes,
+      validadeAno: cartao.validadeAno,
+      cvv: cartaoInput.cvv,
+    };
+
+    // Fatura em aberto vem ANTES da troca (Regina, 21/10/2026). Trocar o
+    // cartão com fatura vencida criava assinatura nova e cancelava a antiga,
+    // e o Asaas apagava a fatura junto: a dívida sumia, o cliente pagava o
+    // mês seguinte achando que era o atual, e o analista recebia aviso do
+    // mês errado. Agora a fatura vencida (ou que vence hoje) é cobrada neste
+    // cartão primeiro. Se a operadora recusar, a troca não acontece e o
+    // cliente sabe na hora o que fazer.
+    const fimDeHoje = new Date();
+    fimDeHoje.setHours(23, 59, 59, 999);
+    const emAberto = await prisma.cobranca.findMany({
+      where: {
+        contaId: conta.id,
+        gatewayChargeId: { not: null },
+        OR: [{ status: "ATRASADA" }, { status: "PENDENTE", vencimento: { lte: fimDeHoje } }],
+      },
+      select: { id: true, gatewayChargeId: true, valor: true, competencia: true },
+      orderBy: { vencimento: "asc" },
+    });
+    if (emAberto.length > 0 && gateway.pagarCobrancaComCartao) {
+      for (const c of emAberto) {
+        try {
+          const pago = await gateway.pagarCobrancaComCartao({
+            chargeId: c.gatewayChargeId!,
+            cartao: cartaoParaCobrar,
+            titular,
+          });
+          if (pago.status !== "PAGA") throw new Error(`cobrança ficou ${pago.status}`);
+          await prisma.cobranca.update({
+            where: { id: c.id },
+            data: { forma: "CARTAO_CREDITO", observacoes: `Fatura em aberto quitada no cartão novo (final ${cartao.ultimos4}) na troca de cartão` },
+          });
+        } catch (e) {
+          console.error("[forma-pagamento] fatura em aberto recusada no cartão novo:", e);
+          const valorBr = Number(c.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+          return {
+            erro:
+              `A fatura em aberto de ${valorBr} (${c.competencia}) não foi aceita neste cartão pela operadora. ` +
+              `O cartão não foi trocado. Pague a fatura por PIX nesta tela ou confira os dados com a operadora e tente novamente.`,
+          };
+        }
+      }
+    }
+
+    // Próxima cobrança: o vencimento já combinado se ainda está à frente;
+    // senão, o dia escolhido no mês que vem (ou daqui a 30 dias, sem dia
+    // escolhido). A fatura em aberto já foi tratada acima, então a assinatura
+    // nova começa no mês seguinte, e não repete o mês que acabou de ser pago.
+    const agora = new Date();
+    let proximo: Date;
+    if (conta.proximoVencimento && conta.proximoVencimento > agora) {
+      proximo = conta.proximoVencimento;
+    } else if (conta.diaVencimento) {
+      const d = new Date(agora.getFullYear(), agora.getMonth() + 1, Math.min(conta.diaVencimento, 28), 12, 0, 0);
+      proximo = d;
+    } else {
+      proximo = new Date(Date.now() + 30 * 86400000);
+    }
 
     const cobranca = await prisma.cobranca.create({
       data: {
@@ -153,21 +237,8 @@ export async function trocarFormaPagamentoAction(
       valor: breakdown.valorTotal,
       proximoVencimento: proximo,
       descricao: `CP System — Plano ${conta.plano}`,
-      cartao: {
-        numero: cartaoInput.numero,
-        nome: cartaoInput.nome,
-        validadeMes: cartao.validadeMes,
-        validadeAno: cartao.validadeAno,
-        cvv: cartaoInput.cvv,
-      },
-      titular: {
-        nome: cartaoInput.nome,
-        email: conta.usuarios[0]?.email ?? usuario.email,
-        cpfCnpj: cpfTitular,
-        telefone: empresa.telefones || undefined,
-        cep: empresa.cep || undefined,
-        numeroEndereco: empresa.endereco.match(/,\s*(\d+[A-Za-z]?)\b/)?.[1] || "S/N",
-      },
+      cartao: cartaoParaCobrar,
+      titular,
     });
 
     // Cancela a recorrência antiga só depois que a nova existe — se a ordem

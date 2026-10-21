@@ -412,6 +412,8 @@ export async function processarEventoGateway(opts: {
     // saírem antes do vencimento. Só quando vem de assinatura — PIX avulso
     // que chega na conta do Asaas não é mensalidade e não vira cobrança aqui.
     if (opts.status === "PENDENTE" && !g.subscriptionId) return;
+    // Cobrança que já nasce cancelada ou estornada não precisa existir aqui.
+    if (opts.status === "CANCELADA" || opts.status === "ESTORNADA") return;
     const conta = await prisma.conta.findFirst({
       where: {
         OR: [
@@ -498,7 +500,7 @@ export async function processarEventoGateway(opts: {
       const { notificarEmbaixadorSobreCliente } = await import("@/lib/notifEmbaixador");
       await notificarEmbaixadorSobreCliente({
         contaClienteId: cobranca.contaId,
-        evento: { tipo: "PAGAMENTO_RECEBIDO", valor: cobranca.valor, competencia: cobranca.competencia },
+        evento: { tipo: "PAGAMENTO_RECEBIDO", valor: cobranca.valor, competencia: cobranca.competencia, forma: cobranca.forma },
       });
     } catch (e) {
       console.error("[processarEventoGateway] notif embaixador pgto falhou:", e);

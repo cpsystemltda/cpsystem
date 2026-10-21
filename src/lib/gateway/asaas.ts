@@ -515,6 +515,59 @@ export class GatewayAsaas implements GatewayPagamento {
     });
   }
 
+  /**
+   * Muda a data da próxima cobrança da assinatura. O Asaas gera a cobrança
+   * dessa data na hora e segue o ciclo mensal a partir dela.
+   */
+  async atualizarProximoVencimento(subscriptionId: string, data: Date): Promise<{ proximoVencimento: string }> {
+    const r = await this.req<{ nextDueDate: string }>(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ nextDueDate: data.toISOString().slice(0, 10), updatePendingPayments: false }),
+    });
+    return { proximoVencimento: r.nextDueDate };
+  }
+
+  /**
+   * Paga uma cobrança já existente com um cartão informado agora.
+   *
+   * É o que evita a dívida sumir na troca de cartão (21/10/2026): com fatura
+   * vencida, trocar o cartão criava assinatura nova e cancelava a antiga — e
+   * o Asaas apagava a fatura junto. Aqui a fatura em aberto é cobrada neste
+   * cartão antes de qualquer troca; se a operadora recusar, a troca não
+   * acontece e o cliente fica sabendo na hora.
+   */
+  async pagarCobrancaComCartao(input: {
+    chargeId: string;
+    cartao: { numero: string; nome: string; validadeMes: number; validadeAno: number; cvv: string };
+    titular: { nome: string; email: string; cpfCnpj: string; telefone?: string; cep?: string; numeroEndereco?: string };
+  }): Promise<{ status: CriarCobrancaResultado["status"]; pagaEm: Date | null }> {
+    const r = await this.req<{ status: string; confirmedDate?: string; paymentDate?: string }>(
+      `/payments/${encodeURIComponent(input.chargeId)}/payWithCreditCard`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          creditCard: {
+            holderName: input.cartao.nome,
+            number: input.cartao.numero.replace(/\D/g, ""),
+            expiryMonth: String(input.cartao.validadeMes).padStart(2, "0"),
+            expiryYear: String(input.cartao.validadeAno),
+            ccv: input.cartao.cvv,
+          },
+          creditCardHolderInfo: {
+            name: input.titular.nome,
+            email: input.titular.email,
+            cpfCnpj: input.titular.cpfCnpj.replace(/\D/g, ""),
+            phone: input.titular.telefone,
+            postalCode: input.titular.cep,
+            addressNumber: input.titular.numeroEndereco,
+          },
+        }),
+      },
+    );
+    const quando = r.confirmedDate ?? r.paymentDate ?? null;
+    return { status: mapearStatusAsaas(r.status), pagaEm: quando ? new Date(quando) : null };
+  }
+
   async cancelarAssinatura(subscriptionId: string): Promise<void> {
     await this.req(`/subscriptions/${subscriptionId}`, { method: "DELETE" });
   }
@@ -564,6 +617,7 @@ export class GatewayAsaas implements GatewayPagamento {
           dueDate?: string;
           billingType?: string;
           invoiceUrl?: string;
+          deleted?: boolean;
         };
         invoice?: {
           id?: string;
@@ -599,8 +653,14 @@ export class GatewayAsaas implements GatewayPagamento {
 
       // Eventos de PAYMENT (cobranca)
       if (!data.payment?.id) return null;
-      const status =
-        data.payment.status === "CONFIRMED" || data.payment.status === "RECEIVED"
+      // Cobrança apagada no Asaas (acontece quando a assinatura é cancelada:
+      // as pendentes vão junto). O `status` interno dela continua PENDING ou
+      // OVERDUE, e foi assim que uma cobrança já apagada virou linha PENDENTE
+      // aqui em 21/10. Apagada é CANCELADA, não importa o que o status diga.
+      const apagada = data.event === "PAYMENT_DELETED" || data.payment.deleted === true;
+      const status = apagada
+        ? "CANCELADA"
+        : data.payment.status === "CONFIRMED" || data.payment.status === "RECEIVED"
           ? "PAGA"
           : data.payment.status === "OVERDUE"
             ? "ATRASADA"

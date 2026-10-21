@@ -8,7 +8,7 @@ import { prisma } from "@/lib/prisma";
 // pagamento aprovado, NF emitida, contrato vencendo, empenho vencendo, etc.
 
 export type EventoEmbaixador =
-  | { tipo: "PAGAMENTO_RECEBIDO"; valor: number; competencia: string }
+  | { tipo: "PAGAMENTO_RECEBIDO"; valor: number; competencia: string; forma?: "PIX" | "BOLETO" | "CARTAO_CREDITO" | string }
   | { tipo: "NF_EMITIDA"; numero: string; competencia: string }
   | { tipo: "INADIMPLENTE"; competencia: string; valor: number }
   | { tipo: "CONTRATO_VENCENDO"; numero: string; venceEm: Date }
@@ -103,7 +103,14 @@ function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
         `Seu cliente *${nomeCliente}* teve a mensalidade de ${ev.competencia} liquidada (${brl(ev.valor)}). Assinatura ativa confirmada.\n\n` +
         `*Impacto na sua carteira:*\n` +
         `• Cliente segue elegível para comissão vitalícia enquanto permanecer ativo\n` +
-        `• Sua comissão referente a este mês é apurada no fechamento e paga via PIX no dia 20 do mês seguinte\n\n` +
+        // Regina, 24/08 e 21/10: a comissão sai quando o dinheiro entra em
+        // conta — PIX no mesmo dia, cartão quando a operadora libera. Nunca
+        // mais "dia 20 do mês seguinte".
+        (ev.forma === "PIX"
+          ? `• Pagamento por PIX: sua comissão referente a esta mensalidade é repassada por PIX hoje mesmo\n\n`
+          : ev.forma === "CARTAO_CREDITO"
+            ? `• Pagamento no cartão: sua comissão referente a esta mensalidade é repassada por PIX assim que a operadora liberar o valor (cerca de 30 dias)\n\n`
+            : `• Sua comissão referente a esta mensalidade é repassada por PIX assim que o valor entra em conta (PIX: no mesmo dia; cartão: na liberação pela operadora)\n\n`) +
         `Detalhes do portfólio: cpsystem.app.br/painel-analista`
       );
     case "NF_EMITIDA":
@@ -112,7 +119,7 @@ function montarMensagem(nomeCliente: string, ev: EventoEmbaixador): string {
         `A NF ${ev.numero} do cliente *${nomeCliente}* foi autorizada pela prefeitura (competência ${ev.competencia}).\n\n` +
         `*O que isso significa para você como analista:*\n` +
         `• Ciclo mensal do cliente encerrado com sucesso\n` +
-        `• Comissão apurada e liberada para pagamento no próximo dia 20\n` +
+        `• A comissão desta mensalidade é repassada assim que o valor entra em conta (PIX: no mesmo dia; cartão: na liberação pela operadora)\n` +
         `• Cliente segue com o fluxo financeiro em dia, sem risco imediato de cancelamento\n\n` +
         `Painel: cpsystem.app.br/painel-analista`
       );
