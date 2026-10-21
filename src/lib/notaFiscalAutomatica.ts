@@ -169,7 +169,10 @@ function descricaoDaNota(molde: ConfigNotaFiscal, plano: string, competencia: st
   const base = molde.serviceDescription || molde.municipalServiceName || "Licenciamento de uso de programa de computacao";
   // Sem acento e sem travessão de propósito: é o formato das notas já
   // autorizadas, e nem toda prefeitura aceita caractere fora do ASCII.
-  return `${base} - CP System, plano ${plano}, competencia ${competencia}`;
+  // Plano e competência vêm primeiro: o Asaas limita a descrição a 120
+  // caracteres, e o que não pode ser cortado é o que identifica a
+  // mensalidade na contabilidade do cliente.
+  return `CP System, plano ${plano}, competencia ${competencia} - ${base}`.slice(0, 120);
 }
 
 /**

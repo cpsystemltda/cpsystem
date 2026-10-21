@@ -346,9 +346,14 @@ export class GatewayAsaas implements GatewayPagamento {
       observations: cfg.observations ?? undefined,
       taxes: cfg.taxes ?? { retainIss: false, iss: 0, cofins: 0, csll: 0, inss: 0, ir: 0, pis: 0 },
     };
+    // Com o id do serviço municipal, o nome é redundante — e o nome oficial
+    // pode passar de 120 caracteres, limite que o Asaas aplica à descrição
+    // (foi o erro "invalid_name" de 21/10). Sem id, vai código + nome curto.
     if (cfg.municipalServiceId) corpo.municipalServiceId = cfg.municipalServiceId;
-    if (cfg.municipalServiceCode) corpo.municipalServiceCode = cfg.municipalServiceCode;
-    if (cfg.municipalServiceName) corpo.municipalServiceName = cfg.municipalServiceName;
+    else {
+      if (cfg.municipalServiceCode) corpo.municipalServiceCode = cfg.municipalServiceCode;
+      if (cfg.municipalServiceName) corpo.municipalServiceName = cfg.municipalServiceName.slice(0, 120);
+    }
     if (cfg.daysBeforeDueDate) corpo.daysBeforeDueDate = cfg.daysBeforeDueDate;
 
     await this.req(`/subscriptions/${subscriptionId}/invoiceSettings`, {
@@ -434,8 +439,10 @@ export class GatewayAsaas implements GatewayPagamento {
       taxes: m.taxes ?? { retainIss: false, iss: 0, cofins: 0, csll: 0, inss: 0, ir: 0, pis: 0 },
     };
     if (m.municipalServiceId) corpo.municipalServiceId = m.municipalServiceId;
-    if (m.municipalServiceCode) corpo.municipalServiceCode = m.municipalServiceCode;
-    if (m.municipalServiceName) corpo.municipalServiceName = m.municipalServiceName;
+    else {
+      if (m.municipalServiceCode) corpo.municipalServiceCode = m.municipalServiceCode;
+      if (m.municipalServiceName) corpo.municipalServiceName = m.municipalServiceName.slice(0, 120);
+    }
     const r = await this.req<{ id: string; status: string }>(`/invoices`, {
       method: "POST",
       body: JSON.stringify(corpo),
@@ -521,7 +528,7 @@ export class GatewayAsaas implements GatewayPagamento {
    */
   async atualizarProximoVencimento(subscriptionId: string, data: Date): Promise<{ proximoVencimento: string }> {
     const r = await this.req<{ nextDueDate: string }>(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
-      method: "PUT",
+      method: "POST", // Asaas atualiza assinatura por POST, não PUT (igual a atualizarAssinatura)
       body: JSON.stringify({ nextDueDate: data.toISOString().slice(0, 10), updatePendingPayments: false }),
     });
     return { proximoVencimento: r.nextDueDate };
