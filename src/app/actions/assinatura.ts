@@ -202,6 +202,16 @@ export async function iniciarCheckoutAction(_p: Result | null, formData: FormDat
         where: { id: usuario.contaId },
         data: { gatewaySubscriptionId: subscriptionId },
       });
+      // Liga a emissao automatica de NFS-e nesta assinatura, copiando as
+      // regras de uma que ja esteja configurada no painel. Best-effort: o
+      // cliente nao pode deixar de assinar porque a nota nao pode ser
+      // configurada; a regua diaria repoe depois.
+      try {
+        const { garantirNotaFiscalAutomatica } = await import("@/lib/notaFiscalAutomatica");
+        await garantirNotaFiscalAutomatica(subscriptionId);
+      } catch (e) {
+        console.error("[nfse] nao consegui ligar a emissao automatica:", e);
+      }
     }
 
     // Salva últimos dígitos do cartão (PCI-DSS: nunca o PAN inteiro)

@@ -147,6 +147,37 @@ export type AtualizarAssinaturaInput = {
   novoValor: number;
 };
 
+/**
+ * Regras de emissão automática de nota, como o provedor as guarda.
+ *
+ * Os campos fiscais — código do serviço municipal, alíquotas, retenção — não
+ * são inventados aqui: são LIDOS de uma assinatura que já esteja configurada
+ * e replicados nas demais. Fixar alíquota em código seria assinar um documento
+ * fiscal por conta própria.
+ */
+export type ConfigNotaFiscal = {
+  municipalServiceId?: string | null;
+  municipalServiceCode?: string | null;
+  municipalServiceName?: string | null;
+  /** Texto do serviço como saiu na última nota autorizada; base da descrição das próximas. */
+  serviceDescription?: string | null;
+  deductions?: number;
+  /** ON_PAYMENT_CONFIRMATION, ON_PAYMENT_DUE_DATE, BEFORE_PAYMENT_DUE_DATE, ON_NEXT_MONTH */
+  effectiveDatePeriod?: string;
+  receivedOnly?: boolean;
+  daysBeforeDueDate?: number | null;
+  observations?: string | null;
+  taxes?: {
+    retainIss?: boolean;
+    iss?: number;
+    cofins?: number;
+    csll?: number;
+    inss?: number;
+    ir?: number;
+    pis?: number;
+  };
+};
+
 export interface GatewayPagamento {
   readonly nome: "ASAAS" | "STRIPE" | "DEMO";
   criarCliente(input: ClienteInput): Promise<CriarClienteResultado>;
@@ -185,6 +216,31 @@ export interface GatewayPagamento {
   parsearWebhook(rawBody: string): Promise<EventoWebhook | null>;
   // Subscriptions (opcional — só Asaas implementa por enquanto)
   criarAssinatura?(input: CriarAssinaturaInput): Promise<CriarAssinaturaResultado>;
+  /**
+   * Emissão automática de NFS-e para uma assinatura.
+   *
+   * Regina, 17/10/2026: *"resolva para que as notas fiscais estejam no
+   * sistema e também sejam enviadas para o cliente de forma automática."*
+   *
+   * O provedor emite sozinho a cada cobrança paga; o webhook de nota avisa, e
+   * daí o PDF já segue para o cliente pelo caminho que existe. Isso é melhor
+   * do que emitir nota a nota do nosso lado: documento fiscal errado em série
+   * é pior do que documento fiscal nenhum.
+   */
+  lerConfigNotaFiscal?(subscriptionId: string): Promise<ConfigNotaFiscal | null>;
+  configurarNotaFiscal?(subscriptionId: string, cfg: ConfigNotaFiscal): Promise<void>;
+  /** A última nota que a prefeitura autorizou — molde quando nenhuma assinatura foi configurada. */
+  ultimaNotaAutorizada?(): Promise<(ConfigNotaFiscal & { invoiceId: string; numero: string | null }) | null>;
+  /** Notas já ligadas a uma cobrança, em qualquer situação. */
+  notasDoPagamento?(paymentId: string): Promise<Array<{ id: string; status: string; numero: string | null }>>;
+  /** Emite a nota de uma cobrança paga com os dados fiscais do molde. */
+  emitirNota?(input: {
+    paymentId: string;
+    valor: number;
+    descricao: string;
+    molde: ConfigNotaFiscal;
+    dataEmissao?: string;
+  }): Promise<{ invoiceId: string; status: string }>;
   atualizarAssinatura?(input: AtualizarAssinaturaInput): Promise<void>;
   cancelarAssinatura?(subscriptionId: string): Promise<void>;
   // PIX out pra analista (Regina 13/07). Só Asaas por enquanto.

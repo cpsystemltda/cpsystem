@@ -26,6 +26,7 @@ import type {
   AtualizarAssinaturaInput,
   FormaPagamento,
   PixParaPagar,
+  ConfigNotaFiscal,
 } from "./types";
 
 type AsaasConfig = {
@@ -290,6 +291,156 @@ export class GatewayAsaas implements GatewayPagamento {
         status: mapearStatusAsaas(first.status),
       },
     };
+  }
+
+  /**
+   * A configuração de emissão automática que a assinatura já tem, se tiver.
+   *
+   * Serve de molde: a primeira assinatura é configurada no painel do Asaas,
+   * por quem conhece os dados fiscais da empresa, e as próximas copiam dali.
+   * Assim nenhuma alíquota mora no nosso código.
+   */
+  async lerConfigNotaFiscal(subscriptionId: string): Promise<ConfigNotaFiscal | null> {
+    try {
+      const r = await this.req<Record<string, unknown>>(
+        `/subscriptions/${subscriptionId}/invoiceSettings`,
+      );
+      if (!r || typeof r !== "object") return null;
+      const t = (r["taxes"] ?? {}) as Record<string, unknown>;
+      return {
+        municipalServiceId: (r["municipalServiceId"] as string) ?? null,
+        municipalServiceCode: (r["municipalServiceCode"] as string) ?? null,
+        municipalServiceName: (r["municipalServiceName"] as string) ?? null,
+        deductions: Number(r["deductions"] ?? 0),
+        effectiveDatePeriod: (r["effectiveDatePeriod"] as string) ?? "ON_PAYMENT_CONFIRMATION",
+        receivedOnly: Boolean(r["receivedOnly"] ?? false),
+        daysBeforeDueDate: (r["daysBeforeDueDate"] as number) ?? null,
+        observations: (r["observations"] as string) ?? null,
+        taxes: {
+          retainIss: Boolean(t["retainIss"] ?? false),
+          iss: Number(t["iss"] ?? 0),
+          cofins: Number(t["cofins"] ?? 0),
+          csll: Number(t["csll"] ?? 0),
+          inss: Number(t["inss"] ?? 0),
+          ir: Number(t["ir"] ?? 0),
+          pis: Number(t["pis"] ?? 0),
+        },
+      };
+    } catch {
+      // 404 = assinatura sem configuração. Não é erro, é o estado inicial.
+      return null;
+    }
+  }
+
+  /** Liga a emissão automática de NFS-e numa assinatura. */
+  async configurarNotaFiscal(subscriptionId: string, cfg: ConfigNotaFiscal): Promise<void> {
+    const corpo: Record<string, unknown> = {
+      // Emitir na confirmação do pagamento, não na cobrança: nota de fatura
+      // que não foi paga vira trabalho de cancelamento e imposto recolhido à
+      // toa. `receivedOnly: false` porque no cartão a confirmação vem na hora
+      // e o "recebimento" só uns 30 dias depois — o cliente não pode esperar
+      // um mês pela nota de algo que já pagou.
+      effectiveDatePeriod: cfg.effectiveDatePeriod ?? "ON_PAYMENT_CONFIRMATION",
+      receivedOnly: cfg.receivedOnly ?? false,
+      deductions: cfg.deductions ?? 0,
+      observations: cfg.observations ?? undefined,
+      taxes: cfg.taxes ?? { retainIss: false, iss: 0, cofins: 0, csll: 0, inss: 0, ir: 0, pis: 0 },
+    };
+    if (cfg.municipalServiceId) corpo.municipalServiceId = cfg.municipalServiceId;
+    if (cfg.municipalServiceCode) corpo.municipalServiceCode = cfg.municipalServiceCode;
+    if (cfg.municipalServiceName) corpo.municipalServiceName = cfg.municipalServiceName;
+    if (cfg.daysBeforeDueDate) corpo.daysBeforeDueDate = cfg.daysBeforeDueDate;
+
+    await this.req(`/subscriptions/${subscriptionId}/invoiceSettings`, {
+      method: "POST",
+      body: JSON.stringify(corpo),
+    });
+  }
+
+  /**
+   * A última NFS-e AUTORIZADA pela prefeitura.
+   *
+   * É o molde mais seguro que existe: serviço municipal, alíquota e retenções
+   * que já passaram pelo crivo de quem recebe o imposto. As notas 3 e 4 do
+   * primeiro cliente saíram pelo painel, configuradas por quem conhece a
+   * situação fiscal da empresa — e é exatamente isso que se copia. Uma
+   * tentativa por API em julho, com código "1.05" e ISS 5%, nunca foi
+   * autorizada; por isso o molde é a nota que a prefeitura aceitou, não o
+   * que alguém achou que devia ser.
+   */
+  async ultimaNotaAutorizada(): Promise<(ConfigNotaFiscal & { invoiceId: string; numero: string | null }) | null> {
+    type Inv = Record<string, unknown> & { taxes?: Record<string, unknown> };
+    const r = await this.req<{ data?: Inv[] }>(`/invoices?status=AUTHORIZED&limit=50`);
+    const lista = (r.data ?? []).filter((i) => i["municipalServiceId"] || i["municipalServiceCode"]);
+    if (!lista.length) return null;
+    lista.sort((a, b) => Number(b["number"] ?? 0) - Number(a["number"] ?? 0));
+    const i = lista[0];
+    const t = i.taxes ?? {};
+    const n = (v: unknown) => (v === null || v === undefined || v === "" ? 0 : Number(v));
+    const s = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
+    return {
+      invoiceId: String(i["id"]),
+      numero: s(i["number"]),
+      municipalServiceId: s(i["municipalServiceId"]),
+      municipalServiceCode: s(i["municipalServiceCode"]),
+      municipalServiceName: s(i["municipalServiceName"]),
+      serviceDescription: s(i["serviceDescription"]),
+      deductions: n(i["deductions"]),
+      observations: s(i["observations"]),
+      effectiveDatePeriod: "ON_PAYMENT_CONFIRMATION",
+      receivedOnly: false,
+      daysBeforeDueDate: null,
+      taxes: {
+        retainIss: Boolean(t["retainIss"] ?? false),
+        iss: n(t["iss"]),
+        cofins: n(t["cofins"]),
+        csll: n(t["csll"]),
+        inss: n(t["inss"]),
+        ir: n(t["ir"]),
+        pis: n(t["pis"]),
+      },
+    };
+  }
+
+  /** As notas (em qualquer situação) já ligadas a uma cobrança. */
+  async notasDoPagamento(paymentId: string): Promise<Array<{ id: string; status: string; numero: string | null }>> {
+    const r = await this.req<{ data?: Array<Record<string, unknown>> }>(
+      `/invoices?payment=${encodeURIComponent(paymentId)}&limit=100`,
+    );
+    return (r.data ?? []).map((i) => ({
+      id: String(i["id"]),
+      status: String(i["status"] ?? ""),
+      numero: typeof i["number"] === "string" ? (i["number"] as string) : null,
+    }));
+  }
+
+  /** Emite uma NFS-e para uma cobrança já paga, com os dados fiscais do molde. */
+  async emitirNota(input: {
+    paymentId: string;
+    valor: number;
+    descricao: string;
+    molde: ConfigNotaFiscal;
+    dataEmissao?: string;
+  }): Promise<{ invoiceId: string; status: string }> {
+    const m = input.molde;
+    const corpo: Record<string, unknown> = {
+      payment: input.paymentId,
+      serviceDescription: input.descricao,
+      observations: m.observations ?? "",
+      value: input.valor,
+      deductions: m.deductions ?? 0,
+      // Data em Brasília, não em UTC: às 22h daqui o UTC já virou o dia.
+      effectiveDate: input.dataEmissao ?? new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10),
+      taxes: m.taxes ?? { retainIss: false, iss: 0, cofins: 0, csll: 0, inss: 0, ir: 0, pis: 0 },
+    };
+    if (m.municipalServiceId) corpo.municipalServiceId = m.municipalServiceId;
+    if (m.municipalServiceCode) corpo.municipalServiceCode = m.municipalServiceCode;
+    if (m.municipalServiceName) corpo.municipalServiceName = m.municipalServiceName;
+    const r = await this.req<{ id: string; status: string }>(`/invoices`, {
+      method: "POST",
+      body: JSON.stringify(corpo),
+    });
+    return { invoiceId: r.id, status: r.status };
   }
 
   async listarCobrancasDaAssinatura(subscriptionId: string) {
