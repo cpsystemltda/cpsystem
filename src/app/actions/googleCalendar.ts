@@ -22,23 +22,41 @@ export async function salvarPreferenciasGoogleAction(
 
   const conta = await prisma.googleAccount.findUnique({
     where: { usuarioId: usuario.id },
-    select: { id: true },
+    select: {
+      id: true,
+      syncEmpenhos: true, syncAtas: true, syncContratos: true, syncGarantias: true, syncCobrancas: true,
+    },
   });
   if (!conta) return { erro: "Nenhuma conta Google conectada." };
 
   // Checkbox ausente no FormData = desmarcado.
   const lig = (campo: string) => formData.get(campo) === "on";
 
-  await prisma.googleAccount.update({
-    where: { id: conta.id },
-    data: {
-      syncEmpenhos: lig("syncEmpenhos"),
-      syncAtas: lig("syncAtas"),
-      syncContratos: lig("syncContratos"),
-      syncGarantias: lig("syncGarantias"),
-      syncCobrancas: lig("syncCobrancas"),
-    },
-  });
+  const novo = {
+    syncEmpenhos: lig("syncEmpenhos"),
+    syncAtas: lig("syncAtas"),
+    syncContratos: lig("syncContratos"),
+    syncGarantias: lig("syncGarantias"),
+    syncCobrancas: lig("syncCobrancas"),
+  };
+  await prisma.googleAccount.update({ where: { id: conta.id }, data: novo });
+
+  // Regina, 22/10/2026: ligou a opção, o que já existe vai para a agenda de
+  // uma vez — não só o que for criado dali em diante.
+  const ligadosAgora: Array<"EMPENHO" | "ATA" | "CONTRATO" | "GARANTIA" | "COBRANCA"> = [];
+  if (novo.syncEmpenhos && !conta.syncEmpenhos) ligadosAgora.push("EMPENHO");
+  if (novo.syncAtas && !conta.syncAtas) ligadosAgora.push("ATA");
+  if (novo.syncContratos && !conta.syncContratos) ligadosAgora.push("CONTRATO");
+  if (novo.syncGarantias && !conta.syncGarantias) ligadosAgora.push("GARANTIA");
+  if (novo.syncCobrancas && !conta.syncCobrancas) ligadosAgora.push("COBRANCA");
+  if (ligadosAgora.length > 0) {
+    try {
+      const { sincronizarHistoricoDaConta } = await import("@/lib/googleCalendar");
+      await sincronizarHistoricoDaConta(usuario.contaId, ligadosAgora);
+    } catch (e) {
+      console.error("[google prefs] histórico não foi para a agenda:", e);
+    }
+  }
 
   revalidatePath("/conta/integracoes");
   return { ok: true };

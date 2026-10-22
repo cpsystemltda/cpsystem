@@ -607,6 +607,73 @@ function dataAllDayEvent(data: Date, summary: string, description: string, locat
   };
 }
 
+// -------- Histórico --------
+/**
+ * Manda para a agenda o que já existia antes de a opção ser ligada.
+ *
+ * Regina, 22/10/2026: *"preciso que apareça na agenda todas, inclusive as
+ * registradas antes."* Até aqui o sync só acontecia ao criar ou editar: quem
+ * ligava "Vigência de contratos" passava a ver só os contratos seguintes, e
+ * os já cadastrados nunca iam. Agora, ao ligar uma opção, ao conectar a
+ * agenda ou por pedido da administração, tudo o que ainda está em vigência
+ * (ou com entrega pendente) vai de uma vez. Idempotente: cada par (conta
+ * Google, entidade) tem um evento só, e o que já foi apenas é atualizado.
+ */
+export async function sincronizarHistoricoDaConta(
+  contaId: string,
+  tipos: TipoEntidade[] = ["EMPENHO", "ATA", "CONTRATO", "GARANTIA", "COBRANCA"],
+): Promise<Record<string, number>> {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const quer = new Set(tipos);
+  const feitos: Record<string, number> = {};
+
+  if (quer.has("ATA")) {
+    const atas = await prisma.ata.findMany({
+      where: { empresa: { contaId }, vigenciaFim: { gte: hoje } },
+      select: { id: true },
+    });
+    for (const a of atas) await sincronizarAta(a.id, "upsert");
+    feitos.ATA = atas.length;
+  }
+  if (quer.has("CONTRATO")) {
+    const contratos = await prisma.contrato.findMany({
+      where: { empresa: { contaId }, vigenciaFim: { gte: hoje } },
+      select: { id: true },
+    });
+    for (const c of contratos) await sincronizarContrato(c.id, "upsert");
+    feitos.CONTRATO = contratos.length;
+  }
+  if (quer.has("EMPENHO")) {
+    const empenhos = await prisma.empenho.findMany({
+      where: { empresa: { contaId }, status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] } },
+      select: { id: true },
+    });
+    for (const e of empenhos) await sincronizarEmpenho(e.id, "upsert");
+    feitos.EMPENHO = empenhos.length;
+  }
+  if (quer.has("GARANTIA")) {
+    const garantias = await prisma.garantia.findMany({
+      where: {
+        dataFim: { gte: hoje },
+        OR: [{ contrato: { empresa: { contaId } } }, { empenho: { empresa: { contaId } } }],
+      },
+      select: { id: true },
+    });
+    for (const g of garantias) await sincronizarGarantia(g.id, "upsert");
+    feitos.GARANTIA = garantias.length;
+  }
+  if (quer.has("COBRANCA")) {
+    const cobrancas = await prisma.cobranca.findMany({
+      where: { contaId, status: "PENDENTE" },
+      select: { id: true },
+    });
+    for (const c of cobrancas) await sincronizarCobranca(c.id, "upsert");
+    feitos.COBRANCA = cobrancas.length;
+  }
+  return feitos;
+}
+
 // -------- Ata --------
 export async function sincronizarAta(ataId: string, acao: "upsert" | "delete"): Promise<void> {
   try {

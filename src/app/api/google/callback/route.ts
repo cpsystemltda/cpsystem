@@ -76,6 +76,18 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // Regina, 22/10/2026: ao conectar, tudo o que já está cadastrado (em
+    // vigência ou com entrega pendente) vai para a agenda de uma vez.
+    try {
+      const u = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { contaId: true } });
+      if (u) {
+        const { sincronizarHistoricoDaConta } = await import("@/lib/googleCalendar");
+        await sincronizarHistoricoDaConta(u.contaId);
+      }
+    } catch (err) {
+      console.error("[google callback] histórico não foi para a agenda:", err);
+    }
+
     return NextResponse.redirect(new URL("/conta/integracoes?conectado=1", req.url));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "erro_desconhecido";

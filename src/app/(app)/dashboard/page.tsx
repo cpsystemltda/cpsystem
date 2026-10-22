@@ -504,6 +504,63 @@ export default async function DashboardPage({
     .filter((e) => e.janelaInicio < fimMesAgenda && e.janelaFim >= mesAgenda)
     .sort((a, b) => a.janelaInicio.getTime() - b.janelaInicio.getTime());
 
+  // Regina, 22/10/2026: *"preciso que apareça na agenda todas, inclusive as
+  // registradas antes"* — a agenda interna passa a mostrar também o fim da
+  // vigência de atas, contratos e garantias do mês visualizado. Até aqui era
+  // só execução (empenho); vigência ficava nos alertas de WhatsApp e no
+  // Google, e quem olhava o calendário do sistema não via o contrato acabar.
+  const zerarDia = (d: Date) => {
+    const c = new Date(d);
+    c.setHours(0, 0, 0, 0);
+    return c;
+  };
+  const [atasMes, contratosMes, garantiasMes] = await Promise.all([
+    prisma.ata.findMany({
+      where: { empresa: filtroEmpresa, vigenciaFim: { gte: mesAgenda, lt: fimMesAgenda } },
+      select: { id: true, numero: true, orgaoNome: true, objeto: true, vigenciaFim: true },
+    }),
+    prisma.contrato.findMany({
+      where: { empresa: filtroEmpresa, vigenciaFim: { gte: mesAgenda, lt: fimMesAgenda } },
+      select: { id: true, numero: true, orgaoNome: true, objeto: true, vigenciaFim: true },
+    }),
+    prisma.garantia.findMany({
+      where: {
+        dataFim: { gte: mesAgenda, lt: fimMesAgenda },
+        OR: [{ contrato: { empresa: filtroEmpresa } }, { empenho: { empresa: filtroEmpresa } }],
+      },
+      select: {
+        id: true, dataFim: true, descricao: true, seguradora: true, banco: true,
+        contrato: { select: { id: true, numero: true, orgaoNome: true } },
+        empenho: { select: { id: true, numero: true, orgaoNome: true } },
+      },
+    }),
+  ]);
+  const vigenciaComoEvento = (
+    kind: "ATA" | "CONTRATO" | "GARANTIA",
+    id: string, numero: string, orgaoNome: string, objeto: string, fim: Date, href: string,
+  ): EmpenhoAgenda => ({
+    id, numero, orgaoNome, objeto, status: "VIGENCIA", instrumento: null,
+    limite: zerarDia(fim), janelaInicio: zerarDia(fim), janelaFim: zerarDia(fim),
+    horaInicio: null, horaFim: null, kind, href,
+  });
+  const vigenciasMes: EmpenhoAgenda[] = [
+    ...atasMes.map((a) => vigenciaComoEvento("ATA", a.id, a.numero, a.orgaoNome, a.objeto, a.vigenciaFim, `/atas/${a.id}`)),
+    ...contratosMes.map((c) => vigenciaComoEvento("CONTRATO", c.id, c.numero, c.orgaoNome, c.objeto, c.vigenciaFim, `/contratos/${c.id}`)),
+    ...garantiasMes
+      .filter((g) => g.dataFim)
+      .map((g) => {
+        const pai = g.contrato ?? g.empenho;
+        const href = g.contrato ? `/contratos/${g.contrato.id}` : g.empenho ? `/execucao/${g.empenho.id}` : "/contratos";
+        return vigenciaComoEvento(
+          "GARANTIA", g.id, pai?.numero ?? "", pai?.orgaoNome ?? "",
+          g.descricao ?? g.seguradora ?? g.banco ?? "Garantia", g.dataFim!, href,
+        );
+      }),
+  ];
+  const agendaCompleta: EmpenhoAgenda[] = [...agendaMes, ...vigenciasMes].sort(
+    (a, b) => a.janelaInicio.getTime() - b.janelaInicio.getTime(),
+  );
+
   // Verifica se o usuario tem conta Google conectada — usado pra
   // mostrar botao "Conectar Google Agenda" no header da AgendaMes.
   const googleConectado = !!(await prisma.googleAccount.findFirst({
@@ -1076,7 +1133,7 @@ export default async function DashboardPage({
         </div>
 
         <div className="mt-3.5">
-          <AgendaMes entregas={agendaMes} mesReferencia={mesAgenda} hoje={hoje} googleConectado={googleConectado} />
+          <AgendaMes entregas={agendaCompleta} mesReferencia={mesAgenda} hoje={hoje} googleConectado={googleConectado} />
         </div>
 
         <div className="mt-3.5">

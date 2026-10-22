@@ -9,13 +9,35 @@ export type EmpenhoAgenda = {
   objeto: string;
   orgaoNome: string;
   status: string;
-  instrumento: InstrumentoContratual;
+  /** Nulo nos eventos de vigência (ata, contrato, garantia), que não têm instrumento de execução. */
+  instrumento: InstrumentoContratual | null;
   limite: Date;
   janelaInicio: Date;
   janelaFim: Date;
   horaInicio: string | null;
   horaFim: string | null;
+  /**
+   * Regina, 22/10/2026: *"preciso que apareça na agenda todas, inclusive as
+   * registradas antes"* — na agenda do sistema e na do Google. Até aqui a
+   * agenda interna mostrava só execução (empenho); o fim da vigência de ata,
+   * contrato e garantia ficava só nos alertas. Sem `kind`, é execução.
+   */
+  kind?: "EMPENHO" | "ATA" | "CONTRATO" | "GARANTIA";
+  /** Para onde o clique leva quando não é empenho. */
+  href?: string;
 };
+
+const COR_POR_KIND: Record<string, { bg: string; border: string; text: string }> = {
+  ATA:      { bg: "rgba(71,85,105,0.9)",   border: "rgba(51,65,85,1)",   text: "#FFFFFF" },
+  CONTRATO: { bg: "rgba(13,148,136,0.9)",  border: "rgba(15,118,110,1)", text: "#FFFFFF" },
+  GARANTIA: { bg: "rgba(234,88,12,0.9)",   border: "rgba(194,65,12,1)",  text: "#FFFFFF" },
+};
+
+const ROTULO_KIND: Record<string, string> = { ATA: "Ata", CONTRATO: "Contrato", GARANTIA: "Garantia" };
+
+function ehVigencia(e: EmpenhoAgenda): boolean {
+  return !!e.kind && e.kind !== "EMPENHO";
+}
 
 // Calendario mensal em grid 7 colunas x N linhas (5-6 semanas), eventos
 // como barras continuas atravessando dias (estilo Google Calendar). Igor
@@ -98,6 +120,9 @@ export function AgendaMes({
   const mesAnt = new Date(primeiroDoMes.getFullYear(), primeiroDoMes.getMonth() - 1, 1);
   const mesProx = new Date(primeiroDoMes.getFullYear(), primeiroDoMes.getMonth() + 1, 1);
 
+  const totalVigencias = entregas.filter(ehVigencia).length;
+  const totalExecucoes = entregas.length - totalVigencias;
+
   return (
     <section
       className="glass overflow-hidden rounded-[20px] px-5 py-5"
@@ -123,7 +148,8 @@ export function AgendaMes({
             </span>
           </h3>
           <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-            {entregas.length} execução(ões) com janela neste mês
+            {totalExecucoes} execução(ões) com janela neste mês
+            {totalVigencias > 0 ? ` · ${totalVigencias} vencimento(s) de vigência` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -218,7 +244,7 @@ export function AgendaMes({
           style={{ border: "0.5px dashed var(--hairline)" }}
         >
           <p className="text-xs" style={{ color: "var(--text-soft)" }}>
-            Nenhuma execução com janela em {NOMES_MES[primeiroDoMes.getMonth()]}.
+            Nenhuma execução nem vencimento de vigência em {NOMES_MES[primeiroDoMes.getMonth()]}.
           </p>
         </div>
       )}
@@ -353,18 +379,28 @@ function SemanaRow({
           const leftPct = (ev.colInicio / 7) * 100;
           const widthPct = (colSpan / 7) * 100;
           const topPx = HEADER_DIA + ev.trilha * (ALTURA_BARRA + GAP_BARRA);
-          const atrasado = ev.limite < hojeNorm;
+          const vigencia = ehVigencia(ev);
+          // Vigência que já acabou não é "atraso": é história, e aparece apagada.
+          const atrasado = !vigencia && ev.limite < hojeNorm;
           // Igor 30/07: empenhos ja concluidos (ENTREGUE em diante) aparecem
           // no historico da agenda com visual mais apagado — pra saber que
           // "aquele dia teve entrega e ja foi feita" sem sumir do calendario.
-          const concluido = ["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(ev.status);
-          const cor = COR_POR_STATUS[ev.status] ?? COR_POR_STATUS.EMPENHADO;
+          const concluido = !vigencia && ["ENTREGUE", "NF_EMITIDA", "NF_ENCAMINHADA", "PAGO"].includes(ev.status);
+          const cor = vigencia
+            ? (COR_POR_KIND[ev.kind!] ?? COR_POR_KIND.CONTRATO)
+            : (COR_POR_STATUS[ev.status] ?? COR_POR_STATUS.EMPENHADO);
           const corBg = atrasado ? "rgba(225,29,72,0.9)" : cor.bg;
           const corBorder = atrasado ? "rgba(190,18,60,1)" : cor.border;
-          const opacityConcluido = concluido && !atrasado ? 0.45 : 1;
+          const opacityConcluido = (concluido && !atrasado) || (vigencia && ev.limite < hojeNorm) ? 0.45 : 1;
           // Mostra hora SO no card do dia de inicio (evita poluir nos dias do meio)
           const ehDiaInicio = diffDias(ev.janelaInicio, inicioSemana) === ev.colInicio;
           const rotuloHora = ehDiaInicio && ev.horaInicio ? `${ev.horaInicio}${ev.horaFim ? `–${ev.horaFim}` : ""}` : null;
+          const rotulo = vigencia
+            ? `${ROTULO_KIND[ev.kind!] ?? "Vigência"} ${ev.numero} vence · ${ev.orgaoNome}`
+            : `${ev.instrumento ? labelCurtoInstrumento(ev.instrumento) : ""} ${ev.numero} · ${ev.orgaoNome}`;
+          const titulo = vigencia
+            ? `${ROTULO_KIND[ev.kind!] ?? "Vigência"} ${ev.numero} · fim da vigência em ${ev.limite.toLocaleDateString("pt-BR")} · ${ev.orgaoNome} · ${ev.objeto}`
+            : `${ev.instrumento ? labelInstrumento(ev.instrumento) : ""} ${ev.numero} · ${ev.orgaoNome} · ${ev.objeto}${ev.horaInicio ? ` · ${ev.horaInicio}${ev.horaFim ? `–${ev.horaFim}` : ""}` : ""}${concluido ? " · CONCLUÍDO" : ""}`;
           return (
             <div
               key={`${ev.id}-${ev.trilha}-${ev.colInicio}`}
@@ -377,7 +413,7 @@ function SemanaRow({
               }}
             >
               <Link
-                href={`/execucao/${ev.id}`}
+                href={ev.href ?? `/execucao/${ev.id}`}
                 className="flex h-full items-center gap-1.5 overflow-hidden rounded-md px-2 text-[10px] font-bold hover:opacity-90"
                 style={{
                   background: corBg,
@@ -386,7 +422,7 @@ function SemanaRow({
                   letterSpacing: "0.02em",
                   opacity: opacityConcluido,
                 }}
-                title={`${labelInstrumento(ev.instrumento)} ${ev.numero} · ${ev.orgaoNome} · ${ev.objeto}${ev.horaInicio ? ` · ${ev.horaInicio}${ev.horaFim ? `–${ev.horaFim}` : ""}` : ""}${concluido ? " · CONCLUÍDO" : ""}`}
+                title={titulo}
               >
                 {rotuloHora && (
                   <span
@@ -396,9 +432,7 @@ function SemanaRow({
                     {rotuloHora}
                   </span>
                 )}
-                <span className="truncate">
-                  {labelCurtoInstrumento(ev.instrumento)} {ev.numero} · {ev.orgaoNome}
-                </span>
+                <span className="truncate">{rotulo}</span>
               </Link>
             </div>
           );
