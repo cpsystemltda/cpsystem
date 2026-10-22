@@ -84,6 +84,23 @@ const SUBSTITUIVEIS = new Set([
 /** Teto diário por pessoa, o mesmo do disparo (Regina 08/07, depois do flood). */
 const LIMITE_DIARIO_POR_PESSOA = 4;
 
+/**
+ * Fora do teto: comprovante e segurança não são "mais um aviso".
+ *
+ * 21/10/2026: o cliente pagou, recebeu a confirmação, e a nota fiscal do
+ * pagamento ficou presa na fila porque ele já tinha recebido 4 mensagens no
+ * dia (fatura vencida, alerta de login, pagamento confirmado…). Nota fiscal
+ * do que acabou de ser pago, confirmação de pagamento, comissão paga e alerta
+ * de login são resposta a um ato da própria pessoa — sair "amanhã" é errado.
+ * O teto continua valendo para lembrete, resumo e alerta de prazo.
+ */
+const SEM_TETO_DIARIO = new Set([
+  "NF_EMITIDA_CLIENTE",
+  "PAGAMENTO_CONFIRMADO",
+  "COMISSAO_LIBERADA",
+  "SEGURANCA_LOGIN_NOVO_DEVICE",
+]);
+
 function autorizado(req: NextRequest): boolean {
   const segredo = process.env.PONTE_INBOUND_SECRET;
   if (!segredo) return true; // sem segredo configurado, não trava a entrega
@@ -200,7 +217,7 @@ export async function GET(req: NextRequest) {
 
     const hoje = jaRecebeuHoje.get(m.usuarioId) ?? 0;
     const quantas = porPessoa.get(m.usuarioId) ?? 0;
-    if (hoje + quantas >= LIMITE_DIARIO_POR_PESSOA) continue; // teto do dia
+    if (!SEM_TETO_DIARIO.has(m.tipo) && hoje + quantas >= LIMITE_DIARIO_POR_PESSOA) continue; // teto do dia
     if (quantas >= POR_PESSOA_NA_RODADA) continue; // fica pra próxima rodada
     porPessoa.set(m.usuarioId, quantas + 1);
 
