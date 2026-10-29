@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { asaasBaseUrl } from "@/lib/asaas-env";
 
 // Reativa webhook Asaas que ficou "INTERROMPIDO" apos falhas consecutivas.
 // Regina 17/07: nosso webhook parou de receber INVOICE_AUTHORIZED do Asaas.
@@ -28,10 +29,11 @@ const EVENTS_NECESSARIOS = [
   "INVOICE_ERROR",
 ];
 
+// A Vercel tem `ASAAS_AMBIENTE=production`; esta rota comparava com
+// "producao", caía no sandbox e o Asaas respondia `invalid_environment`.
+// O helper aceita as variações, como o resto do sistema.
 function ambienteBase(): string {
-  return (process.env.ASAAS_AMBIENTE || "sandbox") === "producao"
-    ? "https://api.asaas.com/v3"
-    : "https://sandbox.asaas.com/api/v3";
+  return asaasBaseUrl();
 }
 
 export async function GET(req: NextRequest) {
