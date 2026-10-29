@@ -26,6 +26,7 @@ import { prisma } from "@/lib/prisma";
 import { ondeDoUsuario } from "@/lib/escopoUsuario";
 import { dadosPorUf, extrairUf } from "@/lib/agregacaoUf";
 import { coletarPinsOrgaos } from "@/lib/pinsOrgaos";
+import { normalizarCnpj } from "@/lib/cnpj";
 import { coletarPinsEntregas } from "@/lib/pinsEntregas";
 import { coletarPinsEmpresas } from "@/lib/pinsEmpresas";
 import { MapaBrasil } from "@/components/MapaBrasil";
@@ -624,11 +625,11 @@ export default async function DashboardPage({
   // CNPJs vazios e CNPJs das próprias empresas da conta são excluídos
   // (defesa contra erro de digitação em que o usuário coloca o próprio CNPJ
   // no campo do órgão público).
-  const cnpjsDasEmpresas = new Set(empresasDaConta.map((e) => e.cnpj.replace(/\D/g, "")));
+  const cnpjsDasEmpresas = new Set(empresasDaConta.map((e) => normalizarCnpj(e.cnpj)));
   const orgaosUnicos = new Set<string>();
   function adicionarOrgao(cnpjBruto: string | null | undefined) {
     if (!cnpjBruto) return;
-    const cnpj = cnpjBruto.replace(/\D/g, "");
+    const cnpj = normalizarCnpj(cnpjBruto);
     if (!cnpj) return;
     if (cnpjsDasEmpresas.has(cnpj)) return; // não conta empresa fornecedora
     orgaosUnicos.add(cnpj);
@@ -673,7 +674,7 @@ export default async function DashboardPage({
   // (informativo) mas o valor monetário não.
   for (const a of atasVigentesDetalhe) {
     if (!a.orgaoCnpj) continue;
-    const cnpjLimpo = a.orgaoCnpj.replace(/\D/g, "");
+    const cnpjLimpo = normalizarCnpj(a.orgaoCnpj);
     if (!cnpjLimpo) continue;
     const cur = getOuCriar(cnpjLimpo, a.orgaoNome, a.orgaoEndereco ?? null);
     cur.valor += a.itens.reduce((s, it) => s + it.valorTotal, 0);
@@ -681,7 +682,7 @@ export default async function DashboardPage({
   }
   for (const c of contratosVigentesDetalhe) {
     if (!c.orgaoCnpj) continue;
-    const cnpjLimpo = c.orgaoCnpj.replace(/\D/g, "");
+    const cnpjLimpo = normalizarCnpj(c.orgaoCnpj);
     if (!cnpjLimpo) continue;
     const cur = getOuCriar(cnpjLimpo, c.orgaoNome, c.orgaoEndereco ?? null);
     // Valor inicial do contrato (snapshot da contratação); fallback pra soma
@@ -690,7 +691,7 @@ export default async function DashboardPage({
     cur.qtdContratos += 1;
   }
   for (const e of empenhosCompletos) {
-    const cnpjLimpo = (e.orgaoCnpj ?? "").replace(/\D/g, "");
+    const cnpjLimpo = normalizarCnpj(e.orgaoCnpj);
     if (!cnpjLimpo) continue;
     const cur = getOuCriar(cnpjLimpo, e.orgaoNome, e.orgaoEndereco ?? null);
     cur.qtdEmpenhos += 1;

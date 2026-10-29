@@ -67,7 +67,7 @@ export function PerfilForm({
           <p className="mt-1 text-xs text-slate-500">Empresa principal do cadastro. Se você tem múltiplos CNPJs, edite os demais em <a href="/empresas" className="underline">/empresas</a>.</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Campo label="Razão social" name="razaoSocial" defaultValue={empresa.razaoSocial} erro={e.razaoSocial} span={2} />
-            <Campo label="CNPJ" name="cnpj" defaultValue={empresa.cnpj} erro={e.cnpj} inputMode="numeric" maxLength={18} />
+            <Campo label="CNPJ" name="cnpj" defaultValue={empresa.cnpj} erro={e.cnpj} maxLength={18} />
             <Campo label="CEP" name="cep" defaultValue={empresa.cep} inputMode="numeric" maxLength={9} />
             <Campo label="Endereço completo" name="endereco" defaultValue={empresa.endereco} erro={e.endereco} span={2} />
             <Campo label="Telefones" name="telefones" defaultValue={empresa.telefones} />

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { exigirUsuario, verificarSenha } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
+import { normalizarCnpj, validarCnpj } from "@/lib/cnpj";
 
 // Edicao dos proprios dados pessoais (Regina 14/07).
 // - EMPRESA: atualiza Usuario (nome/telefoneWhatsApp/cpf/cargo/dataNascimento)
@@ -142,7 +143,7 @@ export async function atualizarPerfilAction(
     });
     if (empresa) {
       const razaoRaw = String(formData.get("razaoSocial") || "").trim();
-      const cnpjRaw = String(formData.get("cnpj") || "").replace(/\D/g, "");
+      const cnpjRaw = normalizarCnpj(String(formData.get("cnpj") || ""));
       const enderecoRaw = String(formData.get("endereco") || "").trim();
       const cepRaw = String(formData.get("cep") || "").replace(/\D/g, "");
       const telefonesRaw = String(formData.get("telefones") || "").trim();
@@ -161,7 +162,9 @@ export async function atualizarPerfilAction(
         dadosEmpresa.razaoSocial = razaoRaw;
       }
       if (cnpjRaw) {
-        if (cnpjRaw.length !== 14) return { erro: "CNPJ inválido.", campos: { cnpj: "14 dígitos" } };
+        if (cnpjRaw.length !== 14 || !validarCnpj(cnpjRaw)) {
+          return { erro: "CNPJ inválido.", campos: { cnpj: "Confira os 14 caracteres" } };
+        }
         dadosEmpresa.cnpj = cnpjRaw;
       }
       if (enderecoRaw) {

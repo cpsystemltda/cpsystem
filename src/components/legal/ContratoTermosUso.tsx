@@ -7,6 +7,8 @@
 // representante, CPF). Sem dados: mostra placeholder pra visitantes
 // anônimos.
 
+import { formatarCnpj as formatarCnpjBase } from "@/lib/cnpj";
+
 export const VERSAO_TERMOS = "2.2";
 export const VIGENCIA_TERMOS = "13/07/2026";
 
@@ -34,9 +36,7 @@ export type DadosContratante = {
 
 function formatarCnpj(cnpj: string | null | undefined): string {
   if (!cnpj) return PLACEHOLDER;
-  const n = cnpj.replace(/\D/g, "");
-  if (n.length !== 14) return cnpj;
-  return `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8, 12)}-${n.slice(12, 14)}`;
+  return formatarCnpjBase(cnpj);
 }
 
 function formatarCpf(cpf: string | null | undefined): string {

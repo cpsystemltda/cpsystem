@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { contaEhPagante, mensalidadeDaConta } from "@/lib/metricasReceita";
 import { entrarEspionagemAction } from "@/lib/espionagem";
 import { montarLabelEmpresa } from "@/lib/empresaLabel";
+import { normalizarCnpj } from "@/lib/cnpj";
 
 const PRECO_BASICO = 397;
 const PRECO_PREMIUM = 997;
@@ -66,7 +67,9 @@ export default async function AdminClientesPage({
           { empresas: { some: { OR: [
             { razaoSocial: { contains: q, mode: "insensitive" } },
             { nomeFantasia: { contains: q, mode: "insensitive" } },
-            { cnpj: { contains: q.replace(/\D/g, "") } },
+            // Só entra quando a busca tem cara de CNPJ: `contains: ""` casava
+            // com toda empresa e a busca por nome devolvia a lista inteira.
+            ...(normalizarCnpj(q) ? [{ cnpj: { contains: normalizarCnpj(q) } }] : []),
           ] } } },
           { analista: { OR: [
             { nomeCompleto: { contains: q, mode: "insensitive" } },

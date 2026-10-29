@@ -2,16 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-
-// Máscara CNPJ: 00.000.000/0000-00
-function mascararCnpj(raw: string): string {
-  const d = raw.replace(/\D/g, "").slice(0, 14);
-  if (d.length <= 2) return d;
-  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
-  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
-  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
-}
+// Máscara e limpeza vêm de `@/lib/cnpj`: desde 31/07/2026 o CNPJ pode ter
+// letras nas 12 primeiras posições, e a máscara antiga as apagava ao digitar.
+import { mascararCnpj, normalizarCnpj } from "@/lib/cnpj";
 
 // Mapeia porte da Receita pra enum interno (MEI/ME/EPP/GRANDE).
 function mapearPorte(porte: string | undefined): string | null {
@@ -48,7 +41,7 @@ type Props = {
 
 /**
  * Campo CNPJ com máscara automática + autopreenchimento via BrasilAPI.
- * Quando o usuário termina de digitar 14 dígitos, busca dados da Receita
+ * Quando o usuário termina de digitar 14 caracteres, busca dados da Receita
  * e preenche os outros campos do formulário (razão, porte, natureza, endereço…).
  */
 export function CampoCnpj({
@@ -129,7 +122,7 @@ export function CampoCnpj({
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const novo = mascararCnpj(e.target.value);
     setValor(novo);
-    const limpo = novo.replace(/\D/g, "");
+    const limpo = normalizarCnpj(novo);
     if (limpo.length === 14) buscarReceita(limpo);
     else if (estado !== "idle") {
       setEstado("idle");
@@ -148,7 +141,8 @@ export function CampoCnpj({
           onChange={handleChange}
           required={required}
           placeholder="00.000.000/0000-00"
-          inputMode="numeric"
+          inputMode="text"
+          autoCapitalize="characters"
           autoComplete="off"
           className={`w-full rounded-md border bg-white px-3 py-2 pr-9 text-sm text-slate-900 outline-none transition focus:ring-2 focus:ring-blue-200 ${
             erro ? "border-red-400 focus:border-red-400" : "border-slate-300 focus:border-blue-500"

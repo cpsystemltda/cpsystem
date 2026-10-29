@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { aplicarJitter, geocodificarOrgaosEmBatch } from "@/lib/geocode";
 import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
+import { normalizarCnpj } from "@/lib/cnpj";
 
 export type PinOrgao = {
   cnpj: string;
@@ -42,7 +43,7 @@ export async function coletarPinsOrgaos(
   if (empresaIds.length === 0) return [];
 
   const cnpjsEmpresas = new Set(
-    empresasDaConta.map((e) => e.cnpj.replace(/\D/g, "")).filter(Boolean),
+    empresasDaConta.map((e) => normalizarCnpj(e.cnpj)).filter(Boolean),
   );
 
   const hoje = new Date();
@@ -98,7 +99,7 @@ export async function coletarPinsOrgaos(
     kind: "ata" | "contrato" | "empenho",
     valor: number,
   ) {
-    const cnpj = (cnpjRaw ?? "").replace(/\D/g, "");
+    const cnpj = normalizarCnpj(cnpjRaw);
     if (!cnpj || cnpjsEmpresas.has(cnpj)) return;
     if (!endereco?.trim()) return; // sem endereço não há como geocodificar
     let cur = agg.get(cnpj);

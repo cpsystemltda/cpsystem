@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { validarCnpj } from "@/lib/cnpj";
+import { validarCnpj, cnpjRegex } from "@/lib/cnpj";
 import { validarCpf } from "@/lib/cpf";
 import { checarEmail } from "@/lib/emailValido";
 
-const cnpjRegex = /^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/;
+// `cnpjRegex` vem de `@/lib/cnpj`: desde 31/07/2026 o CNPJ pode ter letras.
 const cepRegex = /^\d{5}-?\d{3}$/;
 
 /**
@@ -604,9 +604,9 @@ export type NovaAtaInput = z.infer<typeof novaAtaSchema>;
 export type NovoContratoInput = z.infer<typeof novoContratoSchema>;
 export type NovoEmpenhoInput = z.infer<typeof novoEmpenhoSchema>;
 
-export function normalizarCnpj(cnpj: string): string {
-  return cnpj.replace(/\D/g, "");
-}
+// Normalização e formatação moram em `@/lib/cnpj` (CNPJ alfanumérico desde
+// 31/07/2026). Re-exportadas daqui porque meio sistema importa deste arquivo.
+export { normalizarCnpj, formatarCnpj } from "@/lib/cnpj";
 
 export const moedas = ["BRL", "USD", "EUR"] as const;
 export type Moeda = (typeof moedas)[number];
@@ -643,12 +643,6 @@ export function formatarCpf(cpf: string): string {
   const d = cpf.replace(/\D/g, "");
   if (d.length !== 11) return cpf;
   return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
-}
-
-export function formatarCnpj(cnpj: string): string {
-  const d = cnpj.replace(/\D/g, "");
-  if (d.length !== 14) return cnpj;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
 export const ROTULO_NATUREZA_JURIDICA: Record<(typeof naturezasJuridicas)[number], string> = {

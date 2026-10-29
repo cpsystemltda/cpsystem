@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { normalizarCnpj } from "@/lib/cnpj";
 
 /**
  * Descoberta de leads — empresas com contrato público vencendo.
@@ -202,7 +203,7 @@ export async function descobrirLeads(o: OpcoesDescoberta): Promise<ResumoDescobe
 
     for (const c of itens) {
       if (c.tipoPessoa !== "PJ") continue;
-      const cnpj = (c.niFornecedor || "").replace(/\D/g, "");
+      const cnpj = normalizarCnpj(c.niFornecedor);
       if (cnpj.length !== 14) continue;
 
       const valor = Number(c.valorGlobal ?? 0);
@@ -255,7 +256,7 @@ export async function descobrirLeads(o: OpcoesDescoberta): Promise<ResumoDescobe
     ).map((l) => l.cnpj),
   );
   const nossasEmpresas = new Set(
-    (await prisma.empresa.findMany({ select: { cnpj: true } })).map((e) => e.cnpj.replace(/\D/g, "")),
+    (await prisma.empresa.findMany({ select: { cnpj: true } })).map((e) => normalizarCnpj(e.cnpj)),
   );
 
   // Contrato maior primeiro: se a rodada bater no teto, que fique com o que

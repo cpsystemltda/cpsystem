@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { calcularSaldoContrato } from "@/lib/saldo";
 import { Logo } from "@/components/Logo";
 import { PrintButton } from "./PrintButton";
+import { formatarCnpj } from "@/lib/cnpj";
 
 const ROTULOS_TIPO: Record<string, string> = {
   COMPRAS: "Compras",
@@ -31,12 +32,6 @@ const ROTULOS_PROCEDIMENTO: Record<string, string> = {
 
 function brl(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
-}
-
-function formatarCnpj(cnpj: string): string {
-  const d = cnpj.replace(/\D/g, "");
-  if (d.length !== 14) return cnpj;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
 export default async function ImprimirContratoPage({ params }: { params: Promise<{ id: string }> }) {

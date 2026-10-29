@@ -44,20 +44,12 @@ export function detectarPrazoVigencia(
   return { qtd: Math.round((di2 - di1) / 86400000), unidade: "DIAS" };
 }
 
-export function formatarCnpjInput(valor: string): string {
-  const d = valor.replace(/\D/g, "").slice(0, 14);
-  if (d.length <= 2) return d;
-  if (d.length <= 5) return `${d.slice(0, 2)}.${d.slice(2)}`;
-  if (d.length <= 8) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
-  if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
-}
-
 export function formatarCepInput(valor: string): string {
   const d = valor.replace(/\D/g, "").slice(0, 8);
   if (d.length <= 5) return d;
   return `${d.slice(0, 5)}-${d.slice(5)}`;
 }
 
-// Re-export pra manter API estável em quem importava deste arquivo
-export { validarCnpj } from "@/lib/cnpj";
+// Re-export pra manter API estável em quem importava deste arquivo. A máscara
+// de CNPJ também vem de lá: desde 31/07/2026 o CNPJ pode ter letras.
+export { validarCnpj, mascararCnpj as formatarCnpjInput } from "@/lib/cnpj";

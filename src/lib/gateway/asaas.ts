@@ -1,4 +1,5 @@
 import { asaasBaseUrl } from "@/lib/asaas-env";
+import { normalizarCnpj } from "@/lib/cnpj";
 
 // Cliente real do gateway ASAAS.
 // Docs: https://docs.asaas.com/
@@ -96,7 +97,9 @@ export class GatewayAsaas implements GatewayPagamento {
       body: JSON.stringify({
         name: input.nome,
         email: input.email,
-        cpfCnpj: input.cpfCnpj.replace(/\D/g, ""),
+        // CPF continua só dígitos; CNPJ pode ter letras desde 31/07/2026 e o
+        // Asaas já aceita o formato novo em cobrança e nota fiscal.
+        cpfCnpj: normalizarCnpj(input.cpfCnpj),
         phone: input.telefone,
         address: addressCanonico,
         addressNumber: input.addressNumber ?? "S/N",
@@ -254,7 +257,7 @@ export class GatewayAsaas implements GatewayPagamento {
       creditCardHolderInfo: {
         name: input.titular.nome,
         email: input.titular.email,
-        cpfCnpj: input.titular.cpfCnpj.replace(/\D/g, ""),
+        cpfCnpj: normalizarCnpj(input.titular.cpfCnpj),
         phone: input.titular.telefone,
         postalCode: input.titular.cep,
         addressNumber: input.titular.numeroEndereco,
@@ -560,7 +563,7 @@ export class GatewayAsaas implements GatewayPagamento {
           creditCardHolderInfo: {
             name: input.titular.nome,
             email: input.titular.email,
-            cpfCnpj: input.titular.cpfCnpj.replace(/\D/g, ""),
+            cpfCnpj: normalizarCnpj(input.titular.cpfCnpj),
             phone: input.titular.telefone,
             postalCode: input.titular.cep,
             addressNumber: input.titular.numeroEndereco,

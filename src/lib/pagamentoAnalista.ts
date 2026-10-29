@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getGateway } from "@/lib/gateway";
+import { normalizarCnpj, validarCnpj } from "@/lib/cnpj";
 
 // Pagamento automático de comissão do analista via PIX (Regina 13/07).
 // Regra:
@@ -20,6 +21,9 @@ export function detectarTipoPix(chave: string): TipoChavePix | null {
   if (c.includes("@")) return "EMAIL";
   if (digitos.length === 11 && !digitos.startsWith("55")) return "CPF";
   if (digitos.length === 14) return "CNPJ";
+  // CNPJ alfanumérico (desde 31/07/2026): 14 caracteres com letra, DV confere.
+  const alfanumerico = normalizarCnpj(c);
+  if (alfanumerico.length === 14 && /[A-Z]/.test(alfanumerico) && validarCnpj(alfanumerico)) return "CNPJ";
   if (digitos.length >= 10 && digitos.length <= 13) return "PHONE";
   // Chave aleatória (EVP) = UUID
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(c)) return "EVP";
@@ -28,7 +32,8 @@ export function detectarTipoPix(chave: string): TipoChavePix | null {
 
 // Formata a chave conforme o tipo (Asaas exige formato específico).
 function normalizarChavePix(chave: string, tipo: TipoChavePix): string {
-  if (tipo === "CPF" || tipo === "CNPJ") return chave.replace(/\D/g, "");
+  if (tipo === "CPF") return chave.replace(/\D/g, "");
+  if (tipo === "CNPJ") return normalizarCnpj(chave);
   if (tipo === "PHONE") {
     const d = chave.replace(/\D/g, "");
     return d.startsWith("55") ? `+${d}` : `+55${d}`;

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { calcularSaldoAta } from "@/lib/saldo";
 import { Logo } from "@/components/Logo";
 import { PrintButton } from "./PrintButton";
+import { formatarCnpj } from "@/lib/cnpj";
 
 // Extrato impresso da Ata de Registro de Preços. Clone do extrato do
 // Contrato adaptado pro modelo Ata (sem 'Fornecedor', sem prazoPagamento
@@ -36,12 +37,6 @@ const ROTULOS_PROCEDIMENTO: Record<string, string> = {
 
 function brl(n: number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2 });
-}
-
-function formatarCnpj(cnpj: string): string {
-  const d = cnpj.replace(/\D/g, "");
-  if (d.length !== 14) return cnpj;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
 
 export default async function ImprimirAtaPage({ params }: { params: Promise<{ id: string }> }) {

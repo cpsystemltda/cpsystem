@@ -1,3 +1,5 @@
+import { normalizarCnpj } from "@/lib/cnpj";
+
 /**
  * Identidade de órgão a partir de texto digitado à mão.
  *
@@ -111,7 +113,7 @@ export function agruparOrgaos(linhas: Linha[]): OrgaoAgrupado[] {
       g = { chaves: new Set([chave]), cnpjs: new Set(), grafias: new Map() };
       porChave.set(chave, g);
     }
-    const cnpj = (l.cnpj || "").replace(/\D/g, "");
+    const cnpj = normalizarCnpj(l.cnpj);
     if (cnpj) g.cnpjs.add(cnpj);
     g.grafias.set(nome, (g.grafias.get(nome) ?? 0) + (l.quantidade ?? 1));
   }

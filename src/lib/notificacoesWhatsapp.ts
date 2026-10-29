@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { dispararNotificacao } from "@/lib/whatsapp";
 import { janelaExecucao, prazoLimiteOuVigencia } from "@/lib/prazoEntrega";
 import { TOKEN_SAUDACAO } from "@/lib/saudacao";
+import { formatarCnpj } from "@/lib/cnpj";
 import type {
   Empenho,
   StatusExecucao,
@@ -593,9 +594,7 @@ const STATUS_EM_ANDAMENTO: StatusExecucao[] = [
  */
 /** CNPJ formatado como no modelo do Igor: 10.200.000/0001-07. */
 function formatarCnpjBr(cnpj: string | null | undefined): string {
-  const d = (cnpj ?? "").replace(/\D/g, "");
-  if (d.length !== 14) return cnpj ?? "—";
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+  return cnpj ? formatarCnpj(cnpj) : "—";
 }
 
 async function blocoFinanceiroDoCliente(opts: {

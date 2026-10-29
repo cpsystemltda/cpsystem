@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { DadosUf } from "@/components/MapaBrasil";
 import { inicioDoDiaVigencia } from "@/lib/diaVigencia";
+import { normalizarCnpj } from "@/lib/cnpj";
 
 const UFS = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
@@ -123,7 +124,7 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
   // do órgão público).
   const cnpjsEmpresas = new Set(
     (await prisma.empresa.findMany({ where: { id: { in: empresaIds } }, select: { cnpj: true } }))
-      .map((e) => e.cnpj.replace(/\D/g, ""))
+      .map((e) => normalizarCnpj(e.cnpj))
       .filter(Boolean),
   );
 
@@ -175,7 +176,7 @@ export async function dadosPorUf(contaId: string, empresaIdFiltro?: string): Pro
   function marcarOrgao(uf: string, cnpj: string | null | undefined, nome: string) {
     const set = orgaosPorUf.get(uf);
     if (!set) return;
-    const cnpjLimpo = (cnpj ?? "").replace(/\D/g, "");
+    const cnpjLimpo = normalizarCnpj(cnpj);
     // Ignora CNPJ da própria fornecedora (erro de cadastro defensivo).
     if (cnpjLimpo && cnpjsEmpresas.has(cnpjLimpo)) return;
     set.add(cnpjLimpo || nome.trim().toLowerCase());

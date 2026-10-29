@@ -8,7 +8,7 @@ import { validarCartao } from "@/lib/cartao";
 import { getGateway } from "@/lib/gateway";
 import { calcularValorMensal } from "@/lib/precos";
 import { garantirCustomer } from "@/app/actions/assinatura";
-import { normalizarCnpj } from "@/lib/validators";
+import { normalizarCnpj, validarCnpj } from "@/lib/cnpj";
 
 // Ativa cobrança recorrente pra contas TRIAL que não passaram pelo signup
 // novo (Regina 13/07). Cliente vem do link "/conta/completar-cadastro"
@@ -94,7 +94,7 @@ export async function completarCadastroAction(
     telefones?: string;
   } = {};
   const razaoSocialRaw = String(formData.get("razaoSocial") || "").trim();
-  const cnpjRaw = String(formData.get("cnpj") || "").replace(/\D/g, "");
+  const cnpjRaw = normalizarCnpj(String(formData.get("cnpj") || ""));
   const enderecoRaw = String(formData.get("endereco") || "").trim();
   const cepRaw = String(formData.get("cep") || "").replace(/\D/g, "");
   const telefonesRaw = String(formData.get("telefones") || "").trim();
@@ -103,7 +103,9 @@ export async function completarCadastroAction(
     empresaUpdates.razaoSocial = razaoSocialRaw;
   }
   if (cnpjRaw) {
-    if (cnpjRaw.length !== 14) return { erro: "CNPJ inválido.", campos: { cnpj: "14 dígitos" } };
+    if (cnpjRaw.length !== 14 || !validarCnpj(cnpjRaw)) {
+      return { erro: "CNPJ inválido.", campos: { cnpj: "Confira os 14 caracteres" } };
+    }
     empresaUpdates.cnpj = cnpjRaw;
   }
   if (enderecoRaw) {

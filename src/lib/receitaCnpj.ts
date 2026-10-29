@@ -1,5 +1,5 @@
 import "server-only";
-import { validarCnpj } from "@/lib/cnpj";
+import { validarCnpj, normalizarCnpj } from "@/lib/cnpj";
 
 /**
  * Consulta de CNPJ na Receita (via BrasilAPI) do lado do servidor.
@@ -187,7 +187,10 @@ export type ResultadoCnpj =
  * como falha nossa, não como aval ao cadastro.
  */
 export async function verificarCnpjNaReceita(cnpjBruto: string): Promise<ResultadoCnpj> {
-  const cnpj = cnpjBruto.replace(/\D/g, "");
+  // Mantém as letras: BrasilAPI e ReceitaWS respondem ao CNPJ alfanumérico
+  // (conferido em 26/10/2026 com 00.000.000/E08G-12). Tirar o que não é
+  // dígito aqui era o que transformava uma empresa nova em "não existe".
+  const cnpj = normalizarCnpj(cnpjBruto);
   if (!validarCnpj(cnpj)) return { ok: false, motivo: "nao_encontrado" };
 
   let d: Record<string, unknown> | null = null;
@@ -263,7 +266,7 @@ export async function consultarCnpjsNaReceita(
   cnpjs: string[],
   concorrencia = 2,
 ): Promise<Record<string, EmpresaDaReceita | null>> {
-  const unicos = [...new Set(cnpjs.map((c) => c.replace(/\D/g, "")).filter((c) => c.length === 14))];
+  const unicos = [...new Set(cnpjs.map((c) => normalizarCnpj(c)).filter((c) => c.length === 14))];
   const saida: Record<string, EmpresaDaReceita | null> = {};
   let cursor = 0;
 
@@ -290,7 +293,7 @@ export async function consultarCnpjsNaReceita(
  * municipio do prestador quanto o do orgao tomador.
  */
 export async function consultarCodigoMunicipioPorCnpj(cnpjBruto: string): Promise<string | null> {
-  const d = await buscar(cnpjBruto.replace(/\D/g, ""));
+  const d = await buscar(normalizarCnpj(cnpjBruto));
   const codigo = d?.codigo_municipio_ibge;
   return codigo ? String(codigo) : null;
 }
@@ -308,7 +311,7 @@ export type EnderecoDaReceita = {
 };
 
 export async function consultarEnderecoPorCnpj(cnpjBruto: string): Promise<EnderecoDaReceita | null> {
-  const d = await buscar(cnpjBruto.replace(/\D/g, ""));
+  const d = await buscar(normalizarCnpj(cnpjBruto));
   if (!d) return null;
   const texto = (v: unknown) => {
     const t = String(v ?? "").trim();

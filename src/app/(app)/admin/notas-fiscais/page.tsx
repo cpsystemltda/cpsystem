@@ -4,6 +4,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { FiltroLista } from "@/components/FiltroLista";
 import { ListaNotasFiscais, type NotaFiscalLinha } from "@/components/ListaNotasFiscais";
+import { formatarCnpj } from "@/lib/cnpj";
 
 /**
  * Todas as notas fiscais emitidas pelo CP System.
@@ -236,11 +237,6 @@ export default async function NotasFiscaisPage({
   );
 }
 
-function formatarCnpj(c: string) {
-  const d = (c || "").replace(/\D/g, "");
-  if (d.length !== 14) return c;
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
-}
 
 function Aba({
   href,

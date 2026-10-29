@@ -89,7 +89,8 @@ export function CompletarCadastroForm({
                 type="text"
                 required
                 defaultValue={empresa.cnpj}
-                inputMode="numeric"
+                inputMode="text"
+                autoCapitalize="characters"
                 maxLength={18}
                 placeholder="00.000.000/0000-00"
                 className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-violet-400"

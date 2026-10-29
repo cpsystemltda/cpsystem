@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { normalizarCnpj } from "@/lib/cnpj";
 
 /**
  * Geocodificação de endereços de órgãos públicos via Nominatim (OpenStreetMap).
@@ -164,7 +165,7 @@ export async function geocodificarOrgao(
   endereco: string,
   nomeOrgao?: string,
 ): Promise<Geocode | null> {
-  const cnpjLimpo = cnpj.replace(/\D/g, "");
+  const cnpjLimpo = normalizarCnpj(cnpj);
   if (!cnpjLimpo || !endereco?.trim()) return null;
 
   const cache = await prisma.orgaoGeocode.findUnique({ where: { cnpj: cnpjLimpo } });
@@ -218,7 +219,7 @@ export async function geocodificarOrgaosEmBatch(
   // cidade" no Nominatim (Regina 03/06).
   const normalizado = new Map<string, { endereco: string; nome?: string }>();
   for (const o of orgaos) {
-    const cnpj = o.cnpj.replace(/\D/g, "");
+    const cnpj = normalizarCnpj(o.cnpj);
     if (cnpj && o.endereco && !normalizado.has(cnpj)) {
       normalizado.set(cnpj, { endereco: o.endereco, nome: o.nome });
     }

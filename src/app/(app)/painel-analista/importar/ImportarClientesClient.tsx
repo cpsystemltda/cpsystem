@@ -15,6 +15,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { OPCOES_NATUREZA_JURIDICA } from "@/lib/validators";
+import { normalizarCnpj } from "@/lib/cnpj";
 
 /**
  * Importacao da carteira em tres passos (opcao B, Regina 18/08):
@@ -131,7 +132,7 @@ function so(v: string) {
 }
 
 function formatarCnpj(v: string) {
-  const d = so(v);
+  const d = normalizarCnpj(v);
   if (d.length !== 14) return v || "—";
   return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
 }
@@ -140,7 +141,7 @@ function formatarCnpj(v: string) {
 function faltando(c: Campos): (keyof Campos)[] {
   const falta: (keyof Campos)[] = [];
   if (c.razaoSocial.trim().length < 2) falta.push("razaoSocial");
-  if (so(c.cnpj).length !== 14) falta.push("cnpj");
+  if (normalizarCnpj(c.cnpj).length !== 14) falta.push("cnpj");
   if (!c.porte) falta.push("porte");
   if (!c.naturezaJuridica) falta.push("naturezaJuridica");
   if (c.endereco.trim().length < 5) falta.push("endereco");
@@ -248,7 +249,7 @@ export function ImportarClientesClient() {
   }
 
   async function consultarReceita(base: Linha[]) {
-    const alvos = base.filter((l) => so(l.campos.cnpj).length === 14 && !l.jaCadastrada);
+    const alvos = base.filter((l) => normalizarCnpj(l.campos.cnpj).length === 14 && !l.jaCadastrada);
     if (alvos.length === 0) return;
 
     setProgresso({ feitos: 0, total: alvos.length });
@@ -263,13 +264,13 @@ export function ImportarClientesClient() {
         const r = await fetch("/api/analista/importar-clientes/receita", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ cnpjs: fatia.map((l) => so(l.campos.cnpj)) }),
+          body: JSON.stringify({ cnpjs: fatia.map((l) => normalizarCnpj(l.campos.cnpj)) }),
         });
         const dados = await r.json();
         const mapa: Record<string, DadosReceita | null> = r.ok ? dados.dados ?? {} : {};
         setLinhas((atual) =>
           atual.map((l) =>
-            ids.has(l.id) ? completarComReceita(l, mapa[so(l.campos.cnpj)] ?? null) : l,
+            ids.has(l.id) ? completarComReceita(l, mapa[normalizarCnpj(l.campos.cnpj)] ?? null) : l,
           ),
         );
       } catch {
@@ -314,7 +315,7 @@ export function ImportarClientesClient() {
         body: JSON.stringify({
           clientes: prontas.map((l) => ({
             ...l.campos,
-            cnpj: so(l.campos.cnpj),
+            cnpj: normalizarCnpj(l.campos.cnpj),
             cep: so(l.campos.cep),
             linha: l.linhaPlanilha,
           })),
@@ -328,7 +329,7 @@ export function ImportarClientesClient() {
       // repetir (duas abas, mesma numeracao), o CNPJ nao.
       setLinhas((atual) =>
         atual.map((l) => {
-          const achado = res.resultados.find((x) => x.cnpj === so(l.campos.cnpj));
+          const achado = res.resultados.find((x) => x.cnpj === normalizarCnpj(l.campos.cnpj));
           return achado
             ? { ...l, resultado: { situacao: achado.situacao, detalhe: achado.detalhe }, aberta: false }
             : l;

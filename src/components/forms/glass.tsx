@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { formatarCnpjInput, formatarCepInput, validarCnpj } from "./vigencia";
+import { normalizarCnpj } from "@/lib/cnpj";
 import { TooltipAjuda } from "@/components/TooltipAjuda";
 
 // Chip pequeno "AUTO" pra marcar campos preenchidos pela IA. Usuário pode
@@ -288,13 +289,13 @@ export function CnpjInput({
         if (erroDV) setErroDV(null);
       }}
       onBlur={(v) => {
-        const limpo = v.replace(/\D/g, "");
+        const limpo = normalizarCnpj(v);
         if (limpo.length === 0) {
           setErroDV(null);
           return;
         }
         if (limpo.length !== 14 || !validarCnpj(limpo)) {
-          setErroDV("CNPJ inválido — verifique os números.");
+          setErroDV("CNPJ inválido — confira os 14 caracteres.");
         } else {
           setErroDV(null);
         }

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatarCnpj } from "@/lib/cnpj";
+
 // Dropdown de filtro por CNPJ na tela de Empresas vinculadas. Server
 // component nao suporta onChange interativo — entao isolado aqui.
 export function CnpjFiltroSelect({
@@ -22,7 +24,7 @@ export function CnpjFiltroSelect({
     >
       <option value="">Todos os CNPJs</option>
       {cnpjs.map((c) => {
-        const cnpjFormat = c.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+        const cnpjFormat = formatarCnpj(c.cnpj);
         return (
           <option key={c.cnpj} value={c.cnpj}>
             {c.nome} ({cnpjFormat})
