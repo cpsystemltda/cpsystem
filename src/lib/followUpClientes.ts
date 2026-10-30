@@ -417,12 +417,22 @@ export type ClienteFollowUp = {
   historico: FollowUpRegistrado[];
 };
 
-/** Quem entra na cadência: quem PAGA. Trial é assunto da ativação. */
+/**
+ * Quem entra na cadência: quem PAGA. Trial é assunto da ativação.
+ *
+ * Inadimplente só entra se já pagou alguma vez: em 30/10 havia duas contas
+ * INADIMPLENTE em produção que nunca tiveram fatura paga — trial que acabou e
+ * ficou com documento dentro. Isso é lead perdido, não cliente, e apareceria
+ * como "atrasado" na primeira segunda-feira da rotina.
+ */
 function whereClientes() {
   return {
     tipo: "EMPRESA" as const,
-    statusAssinatura: { in: ["ATIVA", "INADIMPLENTE"] as ("ATIVA" | "INADIMPLENTE")[] },
     arquivadaEm: null,
+    OR: [
+      { statusAssinatura: "ATIVA" as const },
+      { statusAssinatura: "INADIMPLENTE" as const, cobrancas: { some: { status: "PAGA" as const } } },
+    ],
     usuarios: {
       none: { OR: [{ superAdmin: true }, { email: "demonstracao@cpsystem.app.br" }] },
     },
