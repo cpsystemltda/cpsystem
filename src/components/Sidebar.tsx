@@ -32,7 +32,7 @@ import { HelpButtonsInline } from "@/components/HelpButtonsInline";
 import { Logo } from "@/components/Logo";
 import type { Visao } from "@/lib/visao";
 import { podeAcessarRota } from "@/lib/modulosAcesso";
-import { Crown, Users2, Activity, Ticket, Send, UserCog, MessageCircle, FileSpreadsheet } from "lucide-react";
+import { Crown, Users2, Activity, Ticket, Send, UserCog, MessageCircle, FileSpreadsheet, Phone, HeartHandshake } from "lucide-react";
 
 type Item = { href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> };
 type Grupo = { titulo: string; itens: Item[] };
@@ -129,6 +129,15 @@ const GRUPOS_ADMIN_PLATAFORMA: Grupo[] = [
       { href: "/admin-plataforma/financeiro", label: "Financeiro · MRR", icon: Wallet },
       { href: "/admin-plataforma/atividade", label: "Atividade", icon: Activity },
       { href: "/admin/cupons", label: "Cupons promocionais", icon: Ticket },
+    ],
+  },
+  {
+    titulo: "Relacionamento",
+    itens: [
+      // Follow-up da carteira (Igor 30/10) e a lista da closer: as duas telas
+      // que a equipe abre para falar com gente, antes das telas de operação.
+      { href: "/follow-up", label: "Follow-up de clientes", icon: HeartHandshake },
+      { href: "/prospeccao", label: "Prospecção (closer)", icon: Phone },
     ],
   },
   {

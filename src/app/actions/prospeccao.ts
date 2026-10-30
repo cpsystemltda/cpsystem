@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
+import { temAcessoInterno } from "@/lib/acessoInterno";
 
 /**
  * Registro das ligações de prospecção.
@@ -29,18 +30,7 @@ type Situacao = (typeof SITUACOES)[number];
 /** Quem pode trabalhar a prospecção: a equipe do CP System, não os clientes. */
 async function exigirAcessoInterno() {
   const usuario = await exigirUsuario();
-  if (usuario.superAdmin) return usuario;
-  if (usuario.email === "demonstracao@cpsystem.app.br") return usuario;
-
-  // Colaborador da conta interna com o módulo de prospecção marcado.
-  const interna = await prisma.conta.findFirst({
-    where: { id: usuario.contaId, usuarios: { some: { superAdmin: true } } },
-    select: { id: true },
-  });
-  const liberado =
-    !!interna &&
-    (!usuario.acessoRestrito || usuario.modulosPermitidos.includes("PROSPECCAO"));
-  if (!liberado) throw new Error("Sem acesso à prospecção.");
+  if (!(await temAcessoInterno(usuario))) throw new Error("Sem acesso à prospecção.");
   return usuario;
 }
 

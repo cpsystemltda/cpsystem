@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { rodarCicloDeVida } from "@/lib/cicloDeVida";
 import { avisarEquipe } from "@/lib/alertaInterno";
+import { montarLembreteFollowUp } from "@/lib/followUpClientes";
+
+/** Segunda-feira no fuso de Brasília — o dia em que a equipe planeja a semana. */
+function ehSegundaBRT(d: Date): boolean {
+  return d.toLocaleDateString("en-US", { timeZone: "America/Sao_Paulo", weekday: "short" }) === "Mon";
+}
 
 /**
  * Ciclo de vida das contas — 14:00 UTC (11:00 BRT), todo dia.
@@ -35,10 +41,26 @@ export async function GET(req: Request) {
     ).catch(() => {});
   }
 
+  // Follow-up de clientes (Igor 30/10): toda segunda, quem está na vez de
+  // receber a conversa de relacionamento. Pega carona neste cron em vez de
+  // ganhar um próprio — cada cron novo é custo de infra
+  // ([[feedback-cadencia-de-cron-tem-custo-de-infra]]). `?followup=1` força
+  // fora de segunda, para testar.
+  const url = new URL(req.url);
+  let lembreteFollowUp: string | null = null;
+  if (ehSegundaBRT(new Date()) || url.searchParams.get("followup") === "1") {
+    lembreteFollowUp = await montarLembreteFollowUp().catch((e) => {
+      console.error("[ciclo-de-vida] lembrete de follow-up falhou:", e);
+      return null;
+    });
+    if (lembreteFollowUp) await avisarEquipe(lembreteFollowUp).catch(() => {});
+  }
+
   return NextResponse.json({
     ok: true,
     duracaoMs: Date.now() - inicio,
     resumo: r,
+    followUp: lembreteFollowUp ? "lembrete enviado" : "sem lembrete",
     executadoEm: new Date().toISOString(),
   });
 }

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
+import { temAcessoInterno } from "@/lib/acessoInterno";
 import { ListaProspeccao, type LeadNaTela } from "@/components/ListaProspeccao";
 import { Phone, Target, BookOpen, MessageSquare, ShieldQuestion } from "lucide-react";
 
@@ -21,19 +22,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function ProspeccaoPage() {
   const usuario = await exigirUsuario();
-
-  const contaInterna = await prisma.conta.findFirst({
-    where: { id: usuario.contaId, usuarios: { some: { superAdmin: true } } },
-    select: { id: true },
-  });
   // A closer trabalha com o mesmo login que usa pra demonstrar (Regina 08/09),
-  // então a conta de demonstração também entra aqui.
-  const liberado =
-    usuario.superAdmin ||
-    usuario.email === "demonstracao@cpsystem.app.br" ||
-    (!!contaInterna &&
-      (!usuario.acessoRestrito || usuario.modulosPermitidos.includes("PROSPECCAO")));
-  if (!liberado) redirect("/dashboard");
+  // então a conta de demonstração também entra — regra em `acessoInterno.ts`.
+  if (!(await temAcessoInterno(usuario))) redirect("/dashboard");
 
   const leads = await prisma.leadProspeccao.findMany({ orderBy: { venceEm: "asc" } });
 

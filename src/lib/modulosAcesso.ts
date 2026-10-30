@@ -87,10 +87,10 @@ export const MODULOS: Modulo[] = [
   },
   {
     chave: "PROSPECCAO",
-    label: "Prospecção (uso interno)",
+    label: "Prospecção e follow-up (uso interno)",
     descricao:
-      "Lista de empresas com contrato público vencendo, para ligação, com o registro de cada contato. Só faz sentido para quem trabalha a prospecção do CP System.",
-    rotas: ["/prospeccao"],
+      "Lista de empresas com contrato público vencendo, para ligação, e o follow-up da carteira de clientes, com o registro de cada contato. Só faz sentido para quem trabalha a prospecção e o relacionamento do CP System.",
+    rotas: ["/prospeccao", "/follow-up"],
   },
 ];
 
