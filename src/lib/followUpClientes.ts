@@ -1,10 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { whereAtestadoPendente } from "@/lib/atestados";
+import { dispararNotificacao } from "@/lib/whatsapp";
+import { TOKEN_SAUDACAO } from "@/lib/saudacao";
 import type { CanalFollowUp, ResultadoFollowUp } from "@/generated/prisma/client";
 
 /**
- * Follow-up proativo de clientes.
+ * Follow-up proativo de clientes e analistas.
  *
  * Igor, 30/10/2026: *"A ideia básica desse follow-up proativo dos clientes é:
  * mantermos um contato com base de clientes, para evitar churn; vermos onde o
@@ -17,10 +19,11 @@ import type { CanalFollowUp, ResultadoFollowUp } from "@/generated/prisma/client
  * Divisão de trabalho com o que já existia: `ativacao.ts` empurra quem está
  * no TESTE e parou; `cicloDeVida.ts` manda um WhatsApp automático para o
  * pagante parado há 15 dias. Este módulo é diferente dos dois: aqui a conversa
- * é de GENTE, não de robô. O sistema prepara o terreno — diz quem está na vez,
- * o que o cliente está deixando de usar e o que orientar — e a equipe liga.
+ * é de GENTE. O sistema prepara o terreno — diz quem está na vez, o que a
+ * pessoa está deixando de usar e o que orientar —, manda UM convite por marco
+ * propondo a conversa, e a equipe liga.
  *
- * Duas decisões não óbvias:
+ * Decisões não óbvias:
  *
  * 1. A cadência não vive no banco. "Cliente desde" + contatos já realizados
  *    bastam para saber o marco atual, e assim ninguém precisa gerar tarefa
@@ -30,6 +33,9 @@ import type { CanalFollowUp, ResultadoFollowUp } from "@/generated/prisma/client
  *    marco de 90 — cumprir 90 leva direto para 180. Se fosse pelo próximo da
  *    lista (30), o contato seguinte (60) nasceria vencido, e a tela cobraria
  *    três conversas seguidas com a mesma empresa.
+ * 3. Analista entra na carteira quando tem cliente vinculado (Regina 30/10:
+ *    "coloque o que ficou de fora dentro"). Analista sem carteira é assunto
+ *    do ciclo de vida, que cobra em 21 dias e encerra em 45.
  */
 
 export const MARCOS_INICIAIS: readonly number[] = [30, 60, 90, 180];
@@ -37,8 +43,10 @@ export const MARCOS_INICIAIS: readonly number[] = [30, 60, 90, 180];
 export const INTERVALO_TRIMESTRAL = 90;
 /** Dias depois do previsto em que o contato passa a contar como atrasado. */
 export const TOLERANCIA_DIAS = 7;
-/** Antecedência com que o contato aparece como "na janela". */
+/** Antecedência com que o contato aparece como "na janela" — e o convite sai. */
 export const ANTECEDENCIA_DIAS = 7;
+/** Tentativa humana recente: o convite automático não fala por cima. */
+const DIAS_TENTATIVA_RECENTE = 7;
 
 const DIA_MS = 86_400_000;
 
@@ -49,7 +57,7 @@ export function marcoSeguinte(marco: number): number {
 }
 
 /**
- * Marco que está na vez, dado quantos dias a empresa é cliente e o último
+ * Marco que está na vez, dado quantos dias a pessoa é cliente e o último
  * marco cumprido. Anda a sequência até o maior marco já alcançado pela idade;
  * se nenhum foi alcançado ainda, devolve o primeiro que vem.
  */
@@ -60,7 +68,7 @@ export function marcoAtual(diasComoCliente: number, ultimoMarcoCumprido: number 
 }
 
 export function rotuloDoMarco(marco: number): string {
-  return MARCOS_INICIAIS.includes(marco) ? `${marco} dias de cliente` : `trimestral · ${marco} dias`;
+  return MARCOS_INICIAIS.includes(marco) ? `${marco} dias` : `trimestral · ${marco} dias`;
 }
 
 export type SituacaoFollowUp = "ATRASADO" | "NA_JANELA" | "EM_DIA" | "RETORNO_PEDIDO";
@@ -130,19 +138,21 @@ export type Gravidade = "alta" | "media" | "baixa";
 export type PontoDeAtencao = {
   chave: string;
   gravidade: Gravidade;
-  /** "uso" = alimentando errado ou deixando de alimentar; "ocioso" = funcionalidade do plano que ele não usa. */
+  /** "uso" = alimentando errado ou deixando de alimentar; "ocioso" = recurso do plano que não usa. */
   tipo: "uso" | "ocioso";
   titulo: string;
   detalhe: string;
-  /** O passo a passo da tela — conduzir o cliente a fazer, não fazer por ele. */
+  /** O passo a passo da tela — conduzir a pessoa a fazer, não fazer por ela. */
   orientacao: string;
 };
 
+export type Indicador = { rotulo: string; valor: string };
+
 export type DiagnosticoDeUso = {
-  documentos: { atas: number; contratos: number; empenhos: number };
+  /** Os números do card: documentos e datas para empresa, carteira para analista. */
+  indicadores: Indicador[];
   ultimaMovimentacaoEm: Date | null;
   ultimoAcessoEm: Date | null;
-  usuarios: number;
   pontos: PontoDeAtencao[];
 };
 
@@ -152,73 +162,108 @@ function plural(n: number, um: string, varios: string): string {
   return `${n} ${n === 1 ? um : varios}`;
 }
 
-/**
- * O que o cliente está fazendo — e deixando de fazer — dentro do sistema.
- *
- * Cada ponto sai com a orientação pronta porque a pessoa que liga não é quem
- * conhece cada tela de cor. E a orientação é sempre "onde clicar", nunca "me
- * manda que eu cadastro" ([[feedback-conduzir-cliente-nao-fazer-por-ele]]).
- */
-export async function diagnosticarUso(contaId: string, hoje: Date = new Date()): Promise<DiagnosticoDeUso> {
-  const conta = await prisma.conta.findUnique({
-    where: { id: contaId },
-    select: {
-      plano: true,
-      conciliacaoCortesiaAte: true,
-      empresas: { select: { id: true } },
-      usuarios: {
-        orderBy: { criadoEm: "asc" },
-        select: { id: true, telefoneWhatsApp: true, optInWhatsApp: true },
-      },
-    },
-  });
-  if (!conta) throw new Error("Conta não encontrada.");
+function maisRecente(datas: (Date | null | undefined)[]): Date | null {
+  const validas = datas.filter((d): d is Date => !!d);
+  return validas.length ? new Date(Math.max(...validas.map((d) => d.getTime()))) : null;
+}
 
+function haDias(d: Date | null): string {
+  return d ? `há ${diasEntre(d, new Date())}d` : "sem registro";
+}
+
+/** Último acesso de alguém da conta: sessão aberta ou ação auditada. */
+async function ultimoAcessoDaConta(contaId: string, usuarioIds: string[]): Promise<Date | null> {
+  const [sessao, auditoria] = await Promise.all([
+    usuarioIds.length
+      ? prisma.sessao.findFirst({ where: { usuarioId: { in: usuarioIds } }, orderBy: { criadoEm: "desc" }, select: { criadoEm: true } })
+      : null,
+    prisma.logAuditoria.findFirst({ where: { contaId }, orderBy: { criadoEm: "desc" }, select: { criadoEm: true } }),
+  ]);
+  return maisRecente([sessao?.criadoEm, auditoria?.criadoEm]);
+}
+
+/** Última ata, contrato ou empenho criado ou alterado nas empresas dadas. */
+async function ultimaMovimentacaoDasEmpresas(empresaIds: string[]): Promise<Date | null> {
+  if (!empresaIds.length) return null;
+  const where = { empresaId: { in: empresaIds } };
+  const sel = { orderBy: { atualizadoEm: "desc" as const }, select: { atualizadoEm: true } };
+  const [a, c, e] = await Promise.all([
+    prisma.ata.findFirst({ where, ...sel }),
+    prisma.contrato.findFirst({ where, ...sel }),
+    prisma.empenho.findFirst({ where, ...sel }),
+  ]);
+  return maisRecente([a?.atualizadoEm, c?.atualizadoEm, e?.atualizadoEm]);
+}
+
+function pontoSemAcesso(ultimoAcessoEm: Date | null, temConteudo: boolean, hoje: Date, quem: string): PontoDeAtencao | null {
+  if (ultimoAcessoEm) {
+    const dias = diasEntre(ultimoAcessoEm, hoje);
+    if (dias < 21) return null;
+    return {
+      chave: "sem-acesso", gravidade: "media", tipo: "uso",
+      titulo: `Ninguém ${quem} entra há ${dias} dias`,
+      detalhe: "Os avisos de WhatsApp continuam saindo, mas sem alguém olhando a tela nada é atualizado — e aviso de coisa já resolvida vira ruído.",
+      orientacao: "Descubra quem deveria estar operando. Se for outra pessoa, o titular cadastra em Equipe › Adicionar colaborador e marca só os módulos de que ela precisa.",
+    };
+  }
+  if (!temConteudo) return null;
+  return {
+    chave: "sem-acesso", gravidade: "media", tipo: "uso",
+    titulo: "Sem registro de acesso recente",
+    detalhe: "Há conteúdo cadastrado, mas nenhum acesso ou alteração registrada nos últimos 30 dias.",
+    orientacao: "Pergunte quem opera o sistema hoje e se a pessoa ainda está na empresa. Se mudou, o titular ajusta em Equipe.",
+  };
+}
+
+/**
+ * O que a empresa está fazendo — e deixando de fazer — dentro do sistema.
+ *
+ * Cada ponto sai com a orientação pronta porque quem liga não é quem conhece
+ * cada tela de cor. E a orientação é sempre "onde clicar", nunca "me manda que
+ * eu cadastro" ([[feedback-conduzir-cliente-nao-fazer-por-ele]]).
+ */
+async function diagnosticarEmpresa(
+  conta: {
+    id: string; plano: string; conciliacaoCortesiaAte: Date | null;
+    empresas: { id: string }[];
+    usuarios: { id: string; telefoneWhatsApp: string | null; optInWhatsApp: boolean }[];
+  },
+  hoje: Date,
+): Promise<DiagnosticoDeUso> {
   const empresaIds = conta.empresas.map((e) => e.id);
   const usuarioIds = conta.usuarios.map((u) => u.id);
   const porEmpresa = { empresaId: { in: empresaIds } };
   const ha = (dias: number) => new Date(hoje.getTime() - dias * DIA_MS);
+  const sem = empresaIds.length === 0;
 
-  const semEmpresa = empresaIds.length === 0;
   const [
-    atas, contratos, empenhos,
-    ultimaAta, ultimoContrato, ultimoEmpenho,
-    ultimaSessao, ultimaAuditoria,
+    atas, contratos, empenhos, ultimaMovimentacaoEm, ultimoAcessoEm,
     entregueSemNota, nfSemEncaminhar, aguardandoPagamento, vencidoSemEntrega,
     atestadosAta, atestadosContrato,
     contratosSemItens, atasSemItens, contratosSemPdf, atasSemPdf, garantiaDeclaradaSemCadastro,
     contasGoogle, extratos, pareceres, mensagensIA,
   ] = await Promise.all([
-    semEmpresa ? 0 : prisma.ata.count({ where: porEmpresa }),
-    semEmpresa ? 0 : prisma.contrato.count({ where: porEmpresa }),
-    semEmpresa ? 0 : prisma.empenho.count({ where: porEmpresa }),
-    semEmpresa ? null : prisma.ata.findFirst({ where: porEmpresa, orderBy: { atualizadoEm: "desc" }, select: { atualizadoEm: true } }),
-    semEmpresa ? null : prisma.contrato.findFirst({ where: porEmpresa, orderBy: { atualizadoEm: "desc" }, select: { atualizadoEm: true } }),
-    semEmpresa ? null : prisma.empenho.findFirst({ where: porEmpresa, orderBy: { atualizadoEm: "desc" }, select: { atualizadoEm: true } }),
-    prisma.sessao.findFirst({ where: { usuarioId: { in: usuarioIds } }, orderBy: { criadoEm: "desc" }, select: { criadoEm: true } }),
-    prisma.logAuditoria.findFirst({ where: { contaId }, orderBy: { criadoEm: "desc" }, select: { criadoEm: true } }),
-    semEmpresa ? 0 : prisma.empenho.count({ where: { ...porEmpresa, status: "ENTREGUE", OR: [{ dataEntrega: { lt: ha(15) } }, { dataEntrega: null, atualizadoEm: { lt: ha(15) } }] } }),
-    semEmpresa ? 0 : prisma.empenho.count({ where: { ...porEmpresa, status: "NF_EMITIDA", OR: [{ dataNfEmitida: { lt: ha(7) } }, { dataNfEmitida: null, atualizadoEm: { lt: ha(7) } }] } }),
-    semEmpresa ? 0 : prisma.empenho.count({ where: { ...porEmpresa, status: "NF_ENCAMINHADA", OR: [{ dataNfEncaminhada: { lt: ha(30) } }, { dataNfEncaminhada: null, atualizadoEm: { lt: ha(30) } }] } }),
-    semEmpresa ? 0 : prisma.empenho.count({ where: { ...porEmpresa, status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] }, vigenciaFim: { lt: ha(7) } } }),
-    semEmpresa ? 0 : prisma.ata.count({ where: { ...porEmpresa, ...whereAtestadoPendente(hoje) } }),
-    semEmpresa ? 0 : prisma.contrato.count({ where: { ...porEmpresa, ...whereAtestadoPendente(hoje) } }),
-    semEmpresa ? 0 : prisma.contrato.count({ where: { ...porEmpresa, itens: { none: {} } } }),
-    semEmpresa ? 0 : prisma.ata.count({ where: { ...porEmpresa, itens: { none: {} } } }),
-    semEmpresa ? 0 : prisma.contrato.count({ where: { ...porEmpresa, arquivoPdfUrl: null, anexos: { none: {} } } }),
-    semEmpresa ? 0 : prisma.ata.count({ where: { ...porEmpresa, arquivoPdfUrl: null, anexos: { none: {} } } }),
-    semEmpresa ? 0 : prisma.contrato.count({ where: { ...porEmpresa, temGarantia: true, garantias: { none: {} } } }),
+    sem ? 0 : prisma.ata.count({ where: porEmpresa }),
+    sem ? 0 : prisma.contrato.count({ where: porEmpresa }),
+    sem ? 0 : prisma.empenho.count({ where: porEmpresa }),
+    ultimaMovimentacaoDasEmpresas(empresaIds),
+    ultimoAcessoDaConta(conta.id, usuarioIds),
+    sem ? 0 : prisma.empenho.count({ where: { ...porEmpresa, status: "ENTREGUE", OR: [{ dataEntrega: { lt: ha(15) } }, { dataEntrega: null, atualizadoEm: { lt: ha(15) } }] } }),
+    sem ? 0 : prisma.empenho.count({ where: { ...porEmpresa, status: "NF_EMITIDA", OR: [{ dataNfEmitida: { lt: ha(7) } }, { dataNfEmitida: null, atualizadoEm: { lt: ha(7) } }] } }),
+    sem ? 0 : prisma.empenho.count({ where: { ...porEmpresa, status: "NF_ENCAMINHADA", OR: [{ dataNfEncaminhada: { lt: ha(30) } }, { dataNfEncaminhada: null, atualizadoEm: { lt: ha(30) } }] } }),
+    sem ? 0 : prisma.empenho.count({ where: { ...porEmpresa, status: { in: ["EMPENHADO", "PEDIDO_RECEBIDO", "EM_TRANSITO"] }, vigenciaFim: { lt: ha(7) } } }),
+    sem ? 0 : prisma.ata.count({ where: { ...porEmpresa, ...whereAtestadoPendente(hoje) } }),
+    sem ? 0 : prisma.contrato.count({ where: { ...porEmpresa, ...whereAtestadoPendente(hoje) } }),
+    sem ? 0 : prisma.contrato.count({ where: { ...porEmpresa, itens: { none: {} } } }),
+    sem ? 0 : prisma.ata.count({ where: { ...porEmpresa, itens: { none: {} } } }),
+    sem ? 0 : prisma.contrato.count({ where: { ...porEmpresa, arquivoPdfUrl: null, anexos: { none: {} } } }),
+    sem ? 0 : prisma.ata.count({ where: { ...porEmpresa, arquivoPdfUrl: null, anexos: { none: {} } } }),
+    sem ? 0 : prisma.contrato.count({ where: { ...porEmpresa, temGarantia: true, garantias: { none: {} } } }),
     prisma.googleAccount.count({ where: { usuarioId: { in: usuarioIds } } }),
-    prisma.extrato.count({ where: { contaId } }),
+    prisma.extrato.count({ where: { contaId: conta.id } }),
     prisma.parecerJuridico.count({ where: { criadoPorId: { in: usuarioIds } } }),
     prisma.mensagemIAsystem.count({ where: { usuarioId: { in: usuarioIds }, role: "user" } }),
   ]);
-
-  const movimentos = [ultimaAta?.atualizadoEm, ultimoContrato?.atualizadoEm, ultimoEmpenho?.atualizadoEm]
-    .filter((d): d is Date => !!d);
-  const ultimaMovimentacaoEm = movimentos.length ? new Date(Math.max(...movimentos.map((d) => d.getTime()))) : null;
-  const acessos = [ultimaSessao?.criadoEm, ultimaAuditoria?.criadoEm].filter((d): d is Date => !!d);
-  const ultimoAcessoEm = acessos.length ? new Date(Math.max(...acessos.map((d) => d.getTime()))) : null;
 
   const totalDocs = atas + contratos + empenhos;
   const pontos: PontoDeAtencao[] = [];
@@ -242,24 +287,8 @@ export async function diagnosticarUso(contaId: string, hoje: Date = new Date()):
       });
     }
   }
-  if (ultimoAcessoEm) {
-    const dias = diasEntre(ultimoAcessoEm, hoje);
-    if (dias >= 21) {
-      pontos.push({
-        chave: "sem-acesso", gravidade: "media", tipo: "uso",
-        titulo: `Ninguém da empresa entra há ${dias} dias`,
-        detalhe: "Os avisos de WhatsApp continuam saindo, mas sem alguém olhando a tela nada é atualizado — e aviso de coisa já resolvida vira ruído.",
-        orientacao: "Descubra quem deveria estar operando. Se for outra pessoa, o titular cadastra em Equipe › Adicionar colaborador e marca só os módulos que ela precisa.",
-      });
-    }
-  } else if (totalDocs > 0) {
-    pontos.push({
-      chave: "sem-acesso", gravidade: "media", tipo: "uso",
-      titulo: "Sem registro de acesso recente",
-      detalhe: "Há documentos cadastrados, mas nenhum acesso ou alteração registrada nos últimos 30 dias.",
-      orientacao: "Pergunte quem opera o sistema hoje e se a pessoa ainda está na empresa. Se mudou, o titular ajusta em Equipe.",
-    });
-  }
+  const semAcesso = pontoSemAcesso(ultimoAcessoEm, totalDocs > 0, hoje, "da empresa");
+  if (semAcesso) pontos.push(semAcesso);
 
   // ── Alimentando errado / esteira parada ────────────────────────────────
   if (vencidoSemEntrega > 0) {
@@ -380,15 +409,155 @@ export async function diagnosticarUso(contaId: string, hoje: Date = new Date()):
   pontos.sort((a, b) => PESO[a.gravidade] - PESO[b.gravidade]);
 
   return {
-    documentos: { atas, contratos, empenhos },
+    indicadores: [
+      { rotulo: "Atas", valor: String(atas) },
+      { rotulo: "Contratos", valor: String(contratos) },
+      { rotulo: "Empenhos", valor: String(empenhos) },
+      { rotulo: "Última movimentação", valor: ultimaMovimentacaoEm ? haDias(ultimaMovimentacaoEm) : "nunca" },
+      { rotulo: "Último acesso", valor: haDias(ultimoAcessoEm) },
+    ],
     ultimaMovimentacaoEm,
     ultimoAcessoEm,
-    usuarios: conta.usuarios.length,
     pontos,
   };
 }
 
+/**
+ * O analista parceiro: o que importa é a carteira dele — quantos clientes,
+ * quantos pararam de alimentar, e se ele mesmo está acompanhando. A comissão
+ * de R$ 29,90 por cliente ativo só existe enquanto o cliente continua
+ * cliente, então cliente parado é risco direto para o bolso dele.
+ */
+async function diagnosticarAnalista(
+  conta: {
+    id: string; criadoEm: Date;
+    usuarios: { id: string; telefoneWhatsApp: string | null; optInWhatsApp: boolean }[];
+    analista: { vinculos: { contaId: string }[] } | null;
+  },
+  hoje: Date,
+): Promise<DiagnosticoDeUso> {
+  const usuarioIds = conta.usuarios.map((u) => u.id);
+  const contaIdsClientes = Array.from(new Set((conta.analista?.vinculos ?? []).map((v) => v.contaId)));
+
+  const [ultimoAcessoEm, contasGoogle, empresasDosClientes] = await Promise.all([
+    ultimoAcessoDaConta(conta.id, usuarioIds),
+    prisma.googleAccount.count({ where: { usuarioId: { in: usuarioIds } } }),
+    contaIdsClientes.length
+      ? prisma.empresa.findMany({
+          where: { contaId: { in: contaIdsClientes } },
+          select: {
+            contaId: true,
+            atas: { orderBy: { atualizadoEm: "desc" }, take: 1, select: { atualizadoEm: true } },
+            contratos: { orderBy: { atualizadoEm: "desc" }, take: 1, select: { atualizadoEm: true } },
+            empenhos: { orderBy: { atualizadoEm: "desc" }, take: 1, select: { atualizadoEm: true } },
+          },
+        })
+      : [],
+  ]);
+
+  // Por cliente: a movimentação mais recente entre todas as empresas dele.
+  const movimentacaoPorCliente = new Map<string, Date | null>();
+  for (const id of contaIdsClientes) movimentacaoPorCliente.set(id, null);
+  for (const e of empresasDosClientes) {
+    const m = maisRecente([e.atas[0]?.atualizadoEm, e.contratos[0]?.atualizadoEm, e.empenhos[0]?.atualizadoEm]);
+    const atual = movimentacaoPorCliente.get(e.contaId) ?? null;
+    movimentacaoPorCliente.set(e.contaId, maisRecente([atual, m]));
+  }
+  let semCadastro = 0;
+  let parados = 0;
+  for (const m of movimentacaoPorCliente.values()) {
+    if (!m) semCadastro++;
+    else if (diasEntre(m, hoje) >= 30) parados++;
+  }
+  const totalClientes = contaIdsClientes.length;
+  const ultimaMovimentacaoEm = maisRecente(Array.from(movimentacaoPorCliente.values()));
+
+  const pontos: PontoDeAtencao[] = [];
+
+  if (semCadastro > 0) {
+    pontos.push({
+      chave: "clientes-sem-cadastro", gravidade: "alta", tipo: "uso",
+      titulo: `${plural(semCadastro, "cliente vinculado", "clientes vinculados")} sem nenhuma contratação cadastrada`,
+      detalhe: "Cliente que não lança nada não vê valor, não renova — e a comissão do analista vai junto.",
+      orientacao: "No Painel do analista › Empresas vinculadas, ver quem está zerado e combinar com o cliente o primeiro cadastro: ele anexa o PDF da ata ou do contrato em Contratos › Nova contratação e confere o que a IA leu.",
+    });
+  }
+  if (parados > 0) {
+    pontos.push({
+      chave: "clientes-parados", gravidade: parados >= Math.max(1, Math.ceil(totalClientes / 2)) ? "alta" : "media", tipo: "uso",
+      titulo: `${parados} de ${plural(totalClientes, "cliente", "clientes")} da carteira sem movimentação há 30+ dias`,
+      detalhe: "Nada criado nem atualizado nessas contas. Ou a operação delas parou, ou está sendo controlada fora do sistema.",
+      orientacao: "Painel do analista › Empresas vinculadas mostra o último lançamento de cada um. Vale uma mensagem do analista ao cliente perguntando o que entrou de novo — ele é a pessoa que o cliente já conhece.",
+    });
+  }
+  const semAcesso = pontoSemAcesso(ultimoAcessoEm, totalClientes > 0, hoje, "do analista");
+  if (semAcesso) {
+    pontos.push({
+      ...semAcesso,
+      detalhe: "Comissão, eventos da carteira e vencimentos dos clientes passam pelo painel dele. Sem entrar, ele não acompanha o que os clientes estão fazendo.",
+      orientacao: "Pergunte se o painel do analista está servindo e o que ele esperava encontrar lá. cpsystem.app.br/painel-analista",
+    });
+  }
+
+  const alguemComWhatsApp = conta.usuarios.some((u) => u.telefoneWhatsApp && u.optInWhatsApp);
+  if (!alguemComWhatsApp) {
+    pontos.push({
+      chave: "whatsapp-desligado", gravidade: "alta", tipo: "ocioso",
+      titulo: "Não recebe os avisos por WhatsApp",
+      detalhe: "Comissão liberada, cliente inadimplente, contrato de cliente vencendo — tudo isso chega por WhatsApp, e está desligado.",
+      orientacao: "Conta › Notificações WhatsApp: informar o número e marcar Quero receber. Leva um minuto, com ele na linha.",
+    });
+  }
+  if (totalClientes <= 1 && diasEntre(conta.criadoEm, hoje) >= 30) {
+    pontos.push({
+      chave: "carteira-pequena", gravidade: "baixa", tipo: "ocioso",
+      titulo: totalClientes === 0 ? "Carteira vazia" : "Só um cliente na carteira",
+      detalhe: "Cada cliente vinculado vale R$ 29,90 por mês, recorrente, enquanto for cliente. A carteira é a renda dele.",
+      orientacao: "Painel do analista › Importar planilha traz a carteira que ele já atende de uma vez; e o link de indicação dele vincula automaticamente quem se cadastra por ele.",
+    });
+  }
+  if (contasGoogle === 0 && totalClientes > 0) {
+    pontos.push({
+      chave: "google-agenda", gravidade: "baixa", tipo: "ocioso",
+      titulo: "Google Agenda não conectado",
+      detalhe: "Os vencimentos dos clientes vinculados poderiam aparecer na agenda dele.",
+      orientacao: "Conta › Integrações › Conectar Google Agenda. O sistema cria uma agenda própria e não mexe na pessoal.",
+    });
+  }
+
+  pontos.sort((a, b) => PESO[a.gravidade] - PESO[b.gravidade]);
+
+  return {
+    indicadores: [
+      { rotulo: "Clientes vinculados", valor: String(totalClientes) },
+      { rotulo: "Parados 30d+", valor: String(parados) },
+      { rotulo: "Sem cadastro", valor: String(semCadastro) },
+      { rotulo: "Última movimentação", valor: ultimaMovimentacaoEm ? haDias(ultimaMovimentacaoEm) : "nunca" },
+      { rotulo: "Último acesso", valor: haDias(ultimoAcessoEm) },
+    ],
+    ultimaMovimentacaoEm,
+    ultimoAcessoEm,
+    pontos,
+  };
+}
+
+export async function diagnosticarUso(contaId: string, hoje: Date = new Date()): Promise<DiagnosticoDeUso> {
+  const conta = await prisma.conta.findUnique({
+    where: { id: contaId },
+    select: {
+      id: true, tipo: true, plano: true, criadoEm: true, conciliacaoCortesiaAte: true,
+      empresas: { select: { id: true } },
+      usuarios: { orderBy: { criadoEm: "asc" }, select: { id: true, telefoneWhatsApp: true, optInWhatsApp: true } },
+      analista: { select: { vinculos: { where: { status: "ATIVO" }, select: { contaId: true } } } },
+    },
+  });
+  if (!conta) throw new Error("Conta não encontrada.");
+  return conta.tipo === "ANALISTA" ? diagnosticarAnalista(conta, hoje) : diagnosticarEmpresa(conta, hoje);
+}
+
 // ─── A carteira ───────────────────────────────────────────────────────────────
+
+export type TipoCarteira = "EMPRESA" | "ANALISTA";
 
 export type FollowUpRegistrado = {
   id: string;
@@ -406,44 +575,62 @@ export type FollowUpRegistrado = {
 
 export type ClienteFollowUp = {
   contaId: string;
+  tipo: TipoCarteira;
   nome: string;
   plano: string;
   statusAssinatura: string;
-  titular: { nome: string; email: string; telefoneWhatsApp: string | null } | null;
+  titular: { id: string; nome: string; email: string; telefoneWhatsApp: string | null } | null;
   cadencia: Cadencia;
   diagnostico: DiagnosticoDeUso;
   /** Tentativas sem sucesso desde o último contato realizado. */
   tentativasDesdeUltimo: number;
+  /** Convite automático deste marco: quando saiu (ou entrou na fila). */
+  convite: { em: Date; status: "PENDENTE" | "ENVIADA" } | null;
   historico: FollowUpRegistrado[];
 };
 
+const EMAIL_DEMONSTRACAO = "demonstracao@cpsystem.app.br";
+
 /**
- * Quem entra na cadência: quem PAGA. Trial é assunto da ativação.
+ * Quem entra na cadência.
  *
- * Inadimplente só entra se já pagou alguma vez: em 30/10 havia duas contas
- * INADIMPLENTE em produção que nunca tiveram fatura paga — trial que acabou e
- * ficou com documento dentro. Isso é lead perdido, não cliente, e apareceria
- * como "atrasado" na primeira segunda-feira da rotina.
+ * Empresa: quem PAGA. Inadimplente só se já pagou alguma vez — em 30/10 havia
+ * duas contas INADIMPLENTE em produção que nunca tiveram fatura paga: trial
+ * que acabou e ficou com documento dentro. Isso é lead perdido, não cliente.
+ *
+ * Analista: quem tem cliente vinculado ativo. Sem carteira é assunto do ciclo
+ * de vida. Trial de empresa é assunto da ativação.
  */
-function whereClientes() {
+function whereCarteira() {
   return {
-    tipo: "EMPRESA" as const,
     arquivadaEm: null,
+    usuarios: { none: { OR: [{ superAdmin: true }, { email: EMAIL_DEMONSTRACAO }] } },
     OR: [
-      { statusAssinatura: "ATIVA" as const },
-      { statusAssinatura: "INADIMPLENTE" as const, cobrancas: { some: { status: "PAGA" as const } } },
+      { tipo: "EMPRESA" as const, statusAssinatura: "ATIVA" as const },
+      { tipo: "EMPRESA" as const, statusAssinatura: "INADIMPLENTE" as const, cobrancas: { some: { status: "PAGA" as const } } },
+      { tipo: "ANALISTA" as const, statusAssinatura: { not: "CANCELADA" as const }, analista: { vinculos: { some: { status: "ATIVO" as const } } } },
     ],
-    usuarios: {
-      none: { OR: [{ superAdmin: true }, { email: "demonstracao@cpsystem.app.br" }] },
-    },
   };
 }
 
+type ContaDaCarteira = {
+  id: string;
+  tipo: "EMPRESA" | "ANALISTA";
+  criadoEm: Date;
+  trialAteEm: Date | null;
+  analista: { vinculos: { dataInicio: Date }[] } | null;
+};
+
 /**
- * Desde quando a conta é cliente: a primeira fatura paga. Conta ativa sem
- * fatura (cortesia, migração) conta a partir do fim do teste, ou da criação.
+ * Desde quando é cliente. Empresa: a primeira fatura paga (conta ativa sem
+ * fatura — cortesia, migração — conta a partir do fim do teste, ou da
+ * criação). Analista: o primeiro vínculo ativo da carteira.
  */
-async function clienteDesde(conta: { id: string; criadoEm: Date; trialAteEm: Date | null }, hoje: Date): Promise<Date> {
+async function clienteDesde(conta: ContaDaCarteira, hoje: Date): Promise<Date> {
+  if (conta.tipo === "ANALISTA") {
+    const inicios = (conta.analista?.vinculos ?? []).map((v) => v.dataInicio.getTime());
+    return inicios.length ? new Date(Math.min(...inicios)) : conta.criadoEm;
+  }
   const primeiraPaga = await prisma.cobranca.findFirst({
     where: { contaId: conta.id, status: "PAGA" },
     orderBy: [{ pagaEm: "asc" }, { vencimento: "asc" }],
@@ -454,24 +641,24 @@ async function clienteDesde(conta: { id: string; criadoEm: Date; trialAteEm: Dat
   return conta.criadoEm;
 }
 
+type FollowUpMinimo = { marcoDias: number; resultado: ResultadoFollowUp; retornarEm: Date | null; realizadoEm: Date };
+
 async function cadenciaDaConta(
-  conta: { id: string; criadoEm: Date; trialAteEm: Date | null },
-  followUps: { marcoDias: number; resultado: ResultadoFollowUp; retornarEm: Date | null; realizadoEm: Date }[],
+  conta: ContaDaCarteira,
+  followUps: FollowUpMinimo[],
   hoje: Date,
 ): Promise<{ cadencia: Cadencia; tentativasDesdeUltimo: number }> {
   const desde = await clienteDesde(conta, hoje);
   const realizados = followUps.filter((f) => f.resultado === "REALIZADO");
   const ultimoMarco = realizados.length ? Math.max(...realizados.map((f) => f.marcoDias)) : null;
-  const ultimoRealizadoEm = realizados.length ? new Date(Math.max(...realizados.map((f) => f.realizadoEm.getTime()))) : null;
+  const ultimoRealizadoEm = maisRecente(realizados.map((f) => f.realizadoEm));
   const tentativasDesdeUltimo = followUps.filter(
     (f) => f.resultado === "TENTATIVA" && (!ultimoRealizadoEm || f.realizadoEm > ultimoRealizadoEm),
   ).length;
 
   // Pedido de retorno vale só o mais recente, e só até o próximo contato realizado.
-  const maisRecente = followUps.reduce<typeof followUps[number] | null>(
-    (a, b) => (!a || b.realizadoEm > a.realizadoEm ? b : a), null,
-  );
-  const retornarEm = maisRecente?.retornarEm ?? null;
+  const ultimo = followUps.reduce<FollowUpMinimo | null>((a, b) => (!a || b.realizadoEm > a.realizadoEm ? b : a), null);
+  const retornarEm = ultimo?.retornarEm ?? null;
 
   return {
     cadencia: calcularCadencia({ clienteDesde: desde, ultimoMarcoCumprido: ultimoMarco, retornarEm, hoje }),
@@ -479,17 +666,22 @@ async function cadenciaDaConta(
   };
 }
 
+function referenciaDoConvite(contaId: string, marco: number): string {
+  return `convite-${contaId}-${marco}`;
+}
+
 const ORDEM_SITUACAO: Record<SituacaoFollowUp, number> = { ATRASADO: 0, RETORNO_PEDIDO: 0, NA_JANELA: 1, EM_DIA: 2 };
 
 export async function listarClientesParaFollowUp(hoje: Date = new Date()): Promise<ClienteFollowUp[]> {
   const contas = await prisma.conta.findMany({
-    where: whereClientes(),
+    where: whereCarteira(),
     select: {
-      id: true, plano: true, statusAssinatura: true, criadoEm: true, trialAteEm: true,
+      id: true, tipo: true, plano: true, statusAssinatura: true, criadoEm: true, trialAteEm: true,
       empresas: { select: { razaoSocial: true, nomeFantasia: true }, orderBy: { criadoEm: "asc" }, take: 1 },
+      analista: { select: { nomeCompleto: true, telefone: true, vinculos: { where: { status: "ATIVO" }, select: { dataInicio: true } } } },
       usuarios: {
         orderBy: { criadoEm: "asc" }, take: 1,
-        select: { nome: true, email: true, telefoneWhatsApp: true },
+        select: { id: true, nome: true, email: true, telefoneWhatsApp: true },
       },
       followUps: {
         orderBy: { realizadoEm: "desc" },
@@ -507,16 +699,28 @@ export async function listarClientesParaFollowUp(hoje: Date = new Date()): Promi
       cadenciaDaConta(c, c.followUps, hoje),
       diagnosticarUso(c.id, hoje),
     ]);
+    const convite = await prisma.notificacaoWhatsApp.findFirst({
+      where: { tipo: "FOLLOW_UP_CONVITE", referenciaId: referenciaDoConvite(c.id, cadencia.marco), status: { in: ["PENDENTE", "ENVIADA"] } },
+      select: { status: true, enviadaEm: true, criadoEm: true },
+    });
     const empresa = c.empresas[0];
+    const titular = c.usuarios[0]
+      ? { ...c.usuarios[0], telefoneWhatsApp: c.usuarios[0].telefoneWhatsApp ?? c.analista?.telefone ?? null }
+      : null;
     clientes.push({
       contaId: c.id,
-      nome: empresa?.nomeFantasia || empresa?.razaoSocial || c.usuarios[0]?.nome || "Conta sem empresa",
+      tipo: c.tipo,
+      nome:
+        c.tipo === "ANALISTA"
+          ? c.analista?.nomeCompleto || titular?.nome || "Analista"
+          : empresa?.nomeFantasia || empresa?.razaoSocial || titular?.nome || "Conta sem empresa",
       plano: c.plano,
       statusAssinatura: c.statusAssinatura,
-      titular: c.usuarios[0] ?? null,
+      titular,
       cadencia,
       diagnostico,
       tentativasDesdeUltimo,
+      convite: convite ? { em: convite.enviadaEm ?? convite.criadoEm, status: convite.status as "PENDENTE" | "ENVIADA" } : null,
       historico: c.followUps,
     });
   }
@@ -545,14 +749,23 @@ export async function listarFeedbacks(limite = 50): Promise<FeedbackColhido[]> {
     take: limite,
     select: {
       id: true, feedback: true, realizadoEm: true, realizadoPorNome: true,
-      conta: { select: { empresas: { select: { razaoSocial: true, nomeFantasia: true }, take: 1 } } },
+      conta: {
+        select: {
+          tipo: true,
+          empresas: { select: { razaoSocial: true, nomeFantasia: true }, take: 1 },
+          analista: { select: { nomeCompleto: true } },
+        },
+      },
     },
   });
   return linhas
     .filter((l) => !!l.feedback?.trim())
     .map((l) => ({
       id: l.id,
-      cliente: l.conta.empresas[0]?.nomeFantasia || l.conta.empresas[0]?.razaoSocial || "—",
+      cliente:
+        l.conta.tipo === "ANALISTA"
+          ? `${l.conta.analista?.nomeCompleto ?? "Analista"} (analista)`
+          : l.conta.empresas[0]?.nomeFantasia || l.conta.empresas[0]?.razaoSocial || "—",
       feedback: l.feedback!.trim(),
       realizadoEm: l.realizadoEm,
       realizadoPorNome: l.realizadoPorNome,
@@ -564,8 +777,7 @@ export async function listarFeedbacks(limite = 50): Promise<FeedbackColhido[]> {
 export const CANAIS: readonly CanalFollowUp[] = ["WHATSAPP", "TELEFONE", "VIDEOCHAMADA", "EMAIL", "PRESENCIAL"];
 export const RESULTADOS: readonly ResultadoFollowUp[] = ["REALIZADO", "TENTATIVA"];
 
-export type NovoFollowUp = {
-  contaId: string;
+export type DadosFollowUp = {
   resultado: ResultadoFollowUp;
   canal: CanalFollowUp;
   contatoNome?: string | null;
@@ -575,10 +787,34 @@ export type NovoFollowUp = {
   retornarEm?: Date | null;
 };
 
+export type NovoFollowUp = DadosFollowUp & { contaId: string };
+
+function validarDados(dados: DadosFollowUp): { resumo: string } {
+  if (!RESULTADOS.includes(dados.resultado)) throw new Error("Resultado inválido.");
+  if (!CANAIS.includes(dados.canal)) throw new Error("Canal inválido.");
+  const resumo = dados.resumo.trim();
+  if (dados.resultado === "REALIZADO" && resumo.length < 10) {
+    throw new Error("Conte em uma frase o que a pessoa disse — é o que vale para o próximo contato.");
+  }
+  return { resumo: (resumo || (dados.resultado === "TENTATIVA" ? "Tentativa de contato sem sucesso." : "")).slice(0, 4000) };
+}
+
+function camposComuns(dados: DadosFollowUp, resumo: string) {
+  return {
+    resultado: dados.resultado,
+    canal: dados.canal,
+    contatoNome: dados.contatoNome?.trim().slice(0, 120) || null,
+    resumo,
+    orientacoes: dados.orientacoes?.trim().slice(0, 4000) || null,
+    feedback: dados.feedback?.trim().slice(0, 4000) || null,
+    retornarEm: dados.retornarEm ?? null,
+  };
+}
+
 /**
  * Grava um contato. O marco é decidido aqui, pela idade do cliente — quem
  * registra não escolhe, para a cadência não depender de ninguém lembrar em
- * que marco a empresa estava.
+ * que marco a pessoa estava.
  */
 export async function registrarFollowUp(
   dados: NovoFollowUp,
@@ -586,35 +822,24 @@ export async function registrarFollowUp(
   hoje: Date = new Date(),
 ): Promise<{ id: string; marcoDias: number }> {
   const conta = await prisma.conta.findFirst({
-    where: { id: dados.contaId, ...whereClientes() },
+    where: { id: dados.contaId, ...whereCarteira() },
     select: {
-      id: true, criadoEm: true, trialAteEm: true,
+      id: true, tipo: true, criadoEm: true, trialAteEm: true,
+      analista: { select: { vinculos: { where: { status: "ATIVO" }, select: { dataInicio: true } } } },
       followUps: { select: { marcoDias: true, resultado: true, retornarEm: true, realizadoEm: true } },
     },
   });
   if (!conta) throw new Error("Esta conta não está na carteira de follow-up.");
-  if (!RESULTADOS.includes(dados.resultado)) throw new Error("Resultado inválido.");
-  if (!CANAIS.includes(dados.canal)) throw new Error("Canal inválido.");
-
-  const resumo = dados.resumo.trim();
-  if (dados.resultado === "REALIZADO" && resumo.length < 10) {
-    throw new Error("Conte em uma frase o que o cliente disse — é o que vale para o próximo contato.");
-  }
+  const { resumo } = validarDados(dados);
 
   const { cadencia } = await cadenciaDaConta(conta, conta.followUps, hoje);
   const diagnostico = await diagnosticarUso(conta.id, hoje);
 
-  const criado = await prisma.followUpCliente.create({
+  return prisma.followUpCliente.create({
     data: {
       contaId: conta.id,
       marcoDias: cadencia.marco,
-      resultado: dados.resultado,
-      canal: dados.canal,
-      contatoNome: dados.contatoNome?.trim().slice(0, 120) || null,
-      resumo: (resumo || (dados.resultado === "TENTATIVA" ? "Tentativa de contato sem sucesso." : "")).slice(0, 4000),
-      orientacoes: dados.orientacoes?.trim().slice(0, 4000) || null,
-      feedback: dados.feedback?.trim().slice(0, 4000) || null,
-      retornarEm: dados.retornarEm ?? null,
+      ...camposComuns(dados, resumo),
       diagnostico: diagnostico.pontos.map((p) => ({ chave: p.chave, gravidade: p.gravidade, titulo: p.titulo })),
       realizadoEm: hoje,
       realizadoPorId: quem.id,
@@ -622,7 +847,126 @@ export async function registrarFollowUp(
     },
     select: { id: true, marcoDias: true },
   });
-  return criado;
+}
+
+/**
+ * Corrige um contato já registrado. O marco e a data ficam como estavam —
+ * mudar o resultado (tentativa ↔ realizado) já basta para a cadência se
+ * recalcular, porque ela é derivada, não armazenada.
+ */
+export async function atualizarFollowUp(
+  id: string,
+  dados: DadosFollowUp,
+  quem: { id: string; nome: string },
+): Promise<void> {
+  const existente = await prisma.followUpCliente.findUnique({ where: { id }, select: { id: true, realizadoPorNome: true } });
+  if (!existente) throw new Error("Registro não encontrado.");
+  const { resumo } = validarDados(dados);
+  await prisma.followUpCliente.update({
+    where: { id },
+    data: {
+      ...camposComuns(dados, resumo),
+      // Quem editou passa a assinar, para o histórico dizer com quem confirmar.
+      realizadoPorId: quem.id,
+      realizadoPorNome:
+        existente.realizadoPorNome && existente.realizadoPorNome !== quem.nome
+          ? `${existente.realizadoPorNome} (editado por ${quem.nome})`
+          : quem.nome,
+    },
+  });
+}
+
+/** Apaga um contato. Se era o que cumpria o marco, o marco volta a ficar na vez. */
+export async function excluirFollowUp(id: string): Promise<void> {
+  const existente = await prisma.followUpCliente.findUnique({ where: { id }, select: { id: true } });
+  if (!existente) throw new Error("Registro não encontrado.");
+  await prisma.followUpCliente.delete({ where: { id } });
+}
+
+// ─── Convite automático ───────────────────────────────────────────────────────
+
+function primeiroNome(nome: string): string {
+  return nome.split(" ")[0] || nome;
+}
+
+/**
+ * O texto que abre a porta. Não é cobrança nem venda — e diz isso, porque é
+ * exatamente o que o cliente pensa quando a empresa que ele paga manda
+ * mensagem. Tom corporativo cordial ([[feedback-tom-corporativo-bem-humorado]]).
+ */
+export function textoConvite(c: Pick<ClienteFollowUp, "tipo" | "nome" | "titular" | "cadencia" | "diagnostico">): string {
+  const nome = primeiroNome(c.titular?.nome ?? "");
+  const marco = c.cadencia.marco;
+  const trimestral = !MARCOS_INICIAIS.includes(marco);
+  const abertura = `${TOKEN_SAUDACAO}${nome ? `, ${nome}` : ""}!`;
+
+  if (c.tipo === "ANALISTA") {
+    const clientes = c.diagnostico.indicadores.find((i) => i.rotulo === "Clientes vinculados")?.valor ?? "";
+    return (
+      `${abertura}\n\n` +
+      (trimestral
+        ? `Chegou a nossa conversa trimestral de parceria. `
+        : `Você chegou aos ${marco} dias como analista parceiro da CP System${clientes ? `, com ${plural(Number(clientes), "cliente", "clientes")} na carteira` : ""}. `) +
+      `Nessa altura fazemos um acompanhamento com cada parceiro: como estão os seus clientes no sistema, ` +
+      `o que está travando e o que podemos melhorar para você.\n\n` +
+      `São 10 minutos, por chamada ou por aqui mesmo. Qual o melhor dia e horário?\n\n` +
+      `Contato CP System`
+    );
+  }
+
+  return (
+    `${abertura}\n\n` +
+    (trimestral
+      ? `Já são ${marco} dias de parceria entre *${c.nome}* e a CP System, e chegou a hora da nossa conversa trimestral de acompanhamento. `
+      : `*${c.nome}* chegou aos ${marco} dias com a CP System. Nessa altura fazemos uma conversa de acompanhamento com cada cliente. `) +
+    `Não é cobrança nem venda: queremos saber o que mudou na operação de vocês, o que está dando trabalho no sistema ` +
+    `e o que ele ainda não faz e deveria.\n\n` +
+    `São 10 minutos, por chamada ou por aqui mesmo. Qual o melhor dia e horário para você?\n\n` +
+    `Contato CP System`
+  );
+}
+
+export type ResumoConvites = { enviados: string[]; pulados: Record<string, number> };
+
+/**
+ * Manda o convite a quem entrou na janela do marco e ainda não recebeu.
+ *
+ * Roda todo dia junto com o ciclo de vida. Um convite por marco, pela chave
+ * de idempotência do `dispararNotificacao`; mas como a ponte entrega depois,
+ * o registro fica PENDENTE por um tempo — por isso conferimos o registro
+ * antes de disparar, senão cada dia enfileiraria outra cópia.
+ *
+ * Não convida: inadimplente (a conversa dele é a de cobrança), quem pediu
+ * retorno em data certa (já conversou), nem quem teve tentativa humana nos
+ * últimos 7 dias (o robô não fala por cima,
+ * [[resposta-automatica-nao-fala-por-cima]]).
+ */
+export async function enviarConvitesFollowUp(hoje: Date = new Date()): Promise<ResumoConvites> {
+  const r: ResumoConvites = { enviados: [], pulados: {} };
+  const pular = (motivo: string) => { r.pulados[motivo] = (r.pulados[motivo] ?? 0) + 1; };
+
+  const clientes = await listarClientesParaFollowUp(hoje);
+  for (const c of clientes) {
+    if (c.cadencia.situacao !== "NA_JANELA" && c.cadencia.situacao !== "ATRASADO") { pular("fora_da_janela"); continue; }
+    if (c.statusAssinatura === "INADIMPLENTE") { pular("inadimplente"); continue; }
+    if (c.convite) { pular("ja_convidado"); continue; }
+    if (!c.titular) { pular("sem_titular"); continue; }
+    const tentativaRecente = c.historico.some(
+      (h) => h.resultado === "TENTATIVA" && diasEntre(h.realizadoEm, hoje) <= DIAS_TENTATIVA_RECENTE,
+    );
+    if (tentativaRecente) { pular("tentativa_humana_recente"); continue; }
+
+    const res = await dispararNotificacao({
+      usuarioId: c.titular.id,
+      tipo: "FOLLOW_UP_CONVITE",
+      referenciaId: referenciaDoConvite(c.contaId, c.cadencia.marco),
+      mensagem: textoConvite(c),
+    }).catch((e) => ({ enviado: false as const, motivo: e instanceof Error ? e.message : "erro" }));
+
+    if (res.enviado) r.enviados.push(`${c.nome} (marco ${c.cadencia.marco})`);
+    else pular(res.motivo ?? "nao_enviado");
+  }
+  return r;
 }
 
 // ─── Lembrete à equipe ────────────────────────────────────────────────────────
@@ -649,13 +993,14 @@ export async function montarLembreteFollowUp(hoje: Date = new Date()): Promise<s
           ? `atrasado ${cad.diasDeDesvio} dias (marco de ${cad.marco})`
           : `marco de ${cad.marco} dias, previsto ${dataBr(cad.previstoPara)}`;
     const alta = c.diagnostico.pontos.filter((p) => p.gravidade === "alta").length;
-    return `▫ *${c.nome}* — ${quando}${alta ? ` · ${plural(alta, "ponto grave", "pontos graves")} no uso` : ""}`;
+    const convite = c.convite ? ` · convite enviado ${dataBr(c.convite.em)}` : "";
+    return `▫ *${c.nome}*${c.tipo === "ANALISTA" ? " (analista)" : ""} — ${quando}${alta ? ` · ${plural(alta, "ponto grave", "pontos graves")}` : ""}${convite}`;
   };
 
   const emDia = clientes.length - naVez.length;
   return (
     `🤝 *Follow-up de clientes — semana*\n\n` +
-    `${plural(naVez.length, "cliente na vez", "clientes na vez")} de conversar` +
+    `${plural(naVez.length, "pessoa na vez", "pessoas na vez")} de conversar` +
     (emDia ? `, ${emDia} em dia` : "") +
     `.\n\n` +
     naVez.map(linha).join("\n") +

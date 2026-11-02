@@ -2,9 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, MessageCircle, Check, Loader2, ChevronDown, AlertTriangle, Lightbulb } from "lucide-react";
-import { registrarFollowUpAction } from "@/app/actions/followUp";
-import type { PontoDeAtencao, SituacaoFollowUp } from "@/lib/followUpClientes";
+import {
+  Phone, MessageCircle, Check, Loader2, ChevronDown, AlertTriangle, Lightbulb, Pencil, Trash2, Send,
+} from "lucide-react";
+import { registrarFollowUpAction, atualizarFollowUpAction, excluirFollowUpAction } from "@/app/actions/followUp";
+import type { PontoDeAtencao, SituacaoFollowUp, Indicador, TipoCarteira } from "@/lib/followUpClientes";
 
 export type ContatoNaTela = {
   id: string;
@@ -22,6 +24,7 @@ export type ContatoNaTela = {
 
 export type ClienteNaTela = {
   contaId: string;
+  tipo: TipoCarteira;
   nome: string;
   plano: string;
   statusAssinatura: string;
@@ -36,13 +39,11 @@ export type ClienteNaTela = {
     retornarEm: string | null;
   };
   diagnostico: {
-    documentos: { atas: number; contratos: number; empenhos: number };
-    ultimaMovimentacaoEm: string | null;
-    ultimoAcessoEm: string | null;
-    usuarios: number;
+    indicadores: Indicador[];
     pontos: PontoDeAtencao[];
   };
   tentativasDesdeUltimo: number;
+  convite: { em: string; status: "PENDENTE" | "ENVIADA" } | null;
   historico: ContatoNaTela[];
 };
 
@@ -59,11 +60,6 @@ const PLANO: Record<string, string> = { BASICO: "Básico", INTERMEDIARIO: "Inter
 
 function data(iso: string | null | undefined): string {
   return iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
-}
-
-function diasDesde(iso: string | null): number | null {
-  if (!iso) return null;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
 function selo(c: ClienteNaTela["cadencia"]): { cor: string; texto: string } {
@@ -101,14 +97,31 @@ function Ponto({ p }: { p: PontoDeAtencao }) {
   );
 }
 
-function FormularioContato({ cliente, aoRegistrar }: { cliente: ClienteNaTela; aoRegistrar: (marco: number) => void }) {
-  const [resultado, setResultado] = useState<"REALIZADO" | "TENTATIVA">("REALIZADO");
-  const [canal, setCanal] = useState("WHATSAPP");
-  const [quem, setQuem] = useState("");
-  const [resumo, setResumo] = useState("");
-  const [orientacoes, setOrientacoes] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [retornarEm, setRetornarEm] = useState("");
+/**
+ * O mesmo formulário registra um contato novo e corrige um existente — o que
+ * muda é só para qual action os campos vão.
+ */
+function FormularioContato({
+  cliente,
+  inicial,
+  aoSalvar,
+  aoCancelar,
+}: {
+  cliente: ClienteNaTela;
+  inicial?: ContatoNaTela;
+  aoSalvar: (marco: number) => void;
+  aoCancelar: () => void;
+}) {
+  const editando = !!inicial;
+  const [resultado, setResultado] = useState<"REALIZADO" | "TENTATIVA">(
+    inicial?.resultado === "TENTATIVA" ? "TENTATIVA" : "REALIZADO",
+  );
+  const [canal, setCanal] = useState(inicial?.canal ?? "WHATSAPP");
+  const [quem, setQuem] = useState(inicial?.contatoNome ?? "");
+  const [resumo, setResumo] = useState(inicial?.resumo ?? "");
+  const [orientacoes, setOrientacoes] = useState(inicial?.orientacoes ?? "");
+  const [feedback, setFeedback] = useState(inicial?.feedback ?? "");
+  const [retornarEm, setRetornarEm] = useState(inicial?.retornarEm ? inicial.retornarEm.slice(0, 10) : "");
   const [erro, setErro] = useState("");
   const [pendente, iniciar] = useTransition();
 
@@ -116,7 +129,8 @@ function FormularioContato({ cliente, aoRegistrar }: { cliente: ClienteNaTela; a
     e.preventDefault();
     setErro("");
     const fd = new FormData();
-    fd.set("contaId", cliente.contaId);
+    if (editando) fd.set("id", inicial!.id);
+    else fd.set("contaId", cliente.contaId);
     fd.set("resultado", resultado);
     fd.set("canal", canal);
     fd.set("contatoNome", quem);
@@ -125,25 +139,28 @@ function FormularioContato({ cliente, aoRegistrar }: { cliente: ClienteNaTela; a
     fd.set("feedback", feedback);
     fd.set("retornarEm", retornarEm);
     iniciar(async () => {
-      const r = await registrarFollowUpAction(null, fd);
+      const r = editando ? await atualizarFollowUpAction(null, fd) : await registrarFollowUpAction(null, fd);
       if (r?.erro) setErro(r.erro);
-      else aoRegistrar(r.marco ?? cliente.cadencia.marco);
+      else aoSalvar(r.marco ?? (inicial?.marcoDias ?? cliente.cadencia.marco));
     });
   }
 
   const campo =
     "w-full rounded-lg border border-slate-300 px-3 py-2 text-[13.5px] leading-relaxed outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
+  const pessoa = cliente.tipo === "ANALISTA" ? "o analista" : "o cliente";
 
   return (
     <form onSubmit={enviar} className="mt-3 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
       <p className="text-[13px] font-bold text-slate-900">
-        Registrar contato · marco de {cliente.cadencia.marco} dias
+        {editando
+          ? `Corrigir contato de ${data(inicial!.realizadoEm)} · marco de ${inicial!.marcoDias} dias`
+          : `Registrar contato · marco de ${cliente.cadencia.marco} dias`}
       </p>
 
       <div className="mt-3 flex flex-wrap gap-2">
         {(
           [
-            ["REALIZADO", "Falei com o cliente"],
+            ["REALIZADO", `Falei com ${pessoa}`],
             ["TENTATIVA", "Tentei, não consegui falar"],
           ] as const
         ).map(([v, rot]) => (
@@ -180,7 +197,7 @@ function FormularioContato({ cliente, aoRegistrar }: { cliente: ClienteNaTela; a
       </div>
 
       <label className="mt-3 block text-[12px] font-semibold text-slate-600">
-        O que o cliente disse {resultado === "REALIZADO" && <span className="text-red-600">*</span>}
+        O que {pessoa} disse {resultado === "REALIZADO" && <span className="text-red-600">*</span>}
         <textarea
           value={resumo}
           onChange={(e) => setResumo(e.target.value)}
@@ -221,20 +238,87 @@ function FormularioContato({ cliente, aoRegistrar }: { cliente: ClienteNaTela; a
 
       {erro && <p className="mt-2 text-[12.5px] font-semibold text-red-600">{erro}</p>}
 
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
           type="submit"
           disabled={pendente}
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-bold text-white hover:bg-blue-700 disabled:opacity-60"
         >
           {pendente ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-          Salvar contato
+          {editando ? "Salvar correção" : "Salvar contato"}
         </button>
-        <span className="text-[12px] text-slate-500">
-          {resultado === "REALIZADO" ? "Cumpre o marco e agenda o próximo." : "Fica registrado; o marco continua na vez."}
-        </span>
+        <button type="button" onClick={aoCancelar} className="text-[13px] font-semibold text-slate-500 hover:text-slate-700">
+          Cancelar
+        </button>
+        {!editando && (
+          <span className="text-[12px] text-slate-500">
+            {resultado === "REALIZADO" ? "Cumpre o marco e agenda o próximo." : "Fica registrado; o marco continua na vez."}
+          </span>
+        )}
       </div>
     </form>
+  );
+}
+
+function ItemHistorico({
+  cliente,
+  contato,
+  aoMudar,
+}: {
+  cliente: ClienteNaTela;
+  contato: ContatoNaTela;
+  aoMudar: (msg: string) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [pendente, iniciar] = useTransition();
+
+  function apagar() {
+    if (!window.confirm(`Apagar o contato de ${data(contato.realizadoEm)}? Se ele cumpria o marco de ${contato.marcoDias} dias, o marco volta a ficar na vez.`)) return;
+    iniciar(async () => {
+      const r = await excluirFollowUpAction(contato.id);
+      if (r?.erro) setErro(r.erro);
+      else aoMudar("Contato apagado.");
+    });
+  }
+
+  if (editando) {
+    return (
+      <li>
+        <FormularioContato
+          cliente={cliente}
+          inicial={contato}
+          aoSalvar={() => { setEditando(false); aoMudar("Contato corrigido."); }}
+          aoCancelar={() => setEditando(false)}
+        />
+      </li>
+    );
+  }
+
+  return (
+    <li className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="text-[12px] text-slate-500">
+          {data(contato.realizadoEm)} · marco {contato.marcoDias} · {ROTULO_CANAL[contato.canal] ?? contato.canal}
+          {contato.resultado === "TENTATIVA" ? " · tentativa sem sucesso" : ""}
+          {contato.contatoNome ? ` · com ${contato.contatoNome}` : ""}
+          {contato.realizadoPorNome ? ` · por ${contato.realizadoPorNome}` : ""}
+          {contato.retornarEm ? ` · voltar em ${data(contato.retornarEm)}` : ""}
+        </p>
+        <span className="flex items-center gap-2">
+          <button type="button" onClick={() => setEditando(true)} className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-blue-700 hover:underline">
+            <Pencil className="h-3 w-3" /> Corrigir
+          </button>
+          <button type="button" onClick={apagar} disabled={pendente} className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-red-600 hover:underline disabled:opacity-60">
+            {pendente ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />} Apagar
+          </button>
+        </span>
+      </div>
+      <p className="mt-0.5 whitespace-pre-line">{contato.resumo}</p>
+      {contato.orientacoes && <p className="mt-1 whitespace-pre-line text-slate-600"><strong>Orientado:</strong> {contato.orientacoes}</p>}
+      {contato.feedback && <p className="mt-1 whitespace-pre-line text-violet-800"><strong>Feedback:</strong> {contato.feedback}</p>}
+      {erro && <p className="mt-1 text-[12px] font-semibold text-red-600">{erro}</p>}
+    </li>
   );
 }
 
@@ -250,15 +334,25 @@ function CardCliente({ cliente }: { cliente: ClienteNaTela }) {
   const fone = cliente.titular?.telefoneWhatsApp?.replace(/\D/g, "") ?? "";
   const ultimo = cliente.historico.find((h) => h.resultado === "REALIZADO");
   const naVez = cliente.cadencia.situacao !== "EM_DIA";
+  const analista = cliente.tipo === "ANALISTA";
+
+  function mudou(msg: string) {
+    setConfirmacao(msg);
+    router.refresh();
+  }
 
   return (
     <div className={`rounded-xl border bg-white p-4 ${naVez ? "border-l-4 border-l-amber-500 border-slate-200" : "border-slate-200"}`}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className={`rounded-md px-2 py-1 text-[11px] font-bold tabular-nums ${s.cor}`}>{s.texto}</span>
         <span className="text-[15px] font-bold text-slate-900">{cliente.nome}</span>
-        <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
-          {PLANO[cliente.plano] ?? cliente.plano}
-        </span>
+        {analista ? (
+          <span className="rounded bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800">analista parceiro</span>
+        ) : (
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-700">
+            {PLANO[cliente.plano] ?? cliente.plano}
+          </span>
+        )}
         {cliente.statusAssinatura === "INADIMPLENTE" && (
           <span className="rounded bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">inadimplente</span>
         )}
@@ -287,11 +381,11 @@ function CardCliente({ cliente }: { cliente: ClienteNaTela }) {
       </div>
 
       <p className="mt-2 text-[13px] text-slate-600">
-        Cliente desde <strong className="text-slate-800">{data(cliente.cadencia.clienteDesde)}</strong> ({cliente.cadencia.diasComoCliente} dias)
+        {analista ? "Parceiro desde" : "Cliente desde"} <strong className="text-slate-800">{data(cliente.cadencia.clienteDesde)}</strong> ({cliente.cadencia.diasComoCliente} dias)
         {" · "}marco atual: <strong className="text-slate-800">{cliente.cadencia.marco} dias</strong>, previsto {data(cliente.cadencia.previstoPara)}
         {cliente.titular && (
           <>
-            {" · "}titular <strong className="text-slate-800">{cliente.titular.nome}</strong>
+            {" · "}{analista ? "contato" : "titular"} <strong className="text-slate-800">{cliente.titular.nome}</strong>
             {" "}<span className="font-mono text-[11.5px] text-slate-500">{cliente.titular.email}</span>
           </>
         )}
@@ -302,19 +396,21 @@ function CardCliente({ cliente }: { cliente: ClienteNaTela }) {
           : <>Nenhum contato de follow-up registrado ainda.</>}
         {cliente.tentativasDesdeUltimo > 0 && <> · {cliente.tentativasDesdeUltimo} {cliente.tentativasDesdeUltimo === 1 ? "tentativa" : "tentativas"} sem sucesso desde então</>}
       </p>
+      {cliente.convite && (
+        <p className="mt-1 inline-flex items-center gap-1.5 text-[12.5px] text-blue-700">
+          <Send className="h-3 w-3" />
+          {cliente.convite.status === "ENVIADA"
+            ? `Convite automático para este marco enviado em ${data(cliente.convite.em)} — se responder, é por aqui que marca.`
+            : `Convite automático para este marco na fila de envio desde ${data(cliente.convite.em)}.`}
+        </p>
+      )}
 
       {/* Uso em números */}
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {[
-          ["Atas", String(d.documentos.atas)],
-          ["Contratos", String(d.documentos.contratos)],
-          ["Empenhos", String(d.documentos.empenhos)],
-          ["Última movimentação", d.ultimaMovimentacaoEm ? `há ${diasDesde(d.ultimaMovimentacaoEm)}d` : "nunca"],
-          ["Último acesso", d.ultimoAcessoEm ? `há ${diasDesde(d.ultimoAcessoEm)}d` : "sem registro"],
-        ].map(([rot, v]) => (
-          <div key={rot} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">{rot}</p>
-            <p className="text-[14px] font-bold tabular-nums text-slate-800">{v}</p>
+        {d.indicadores.map((i) => (
+          <div key={i.rotulo} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-slate-500">{i.rotulo}</p>
+            <p className="text-[14px] font-bold tabular-nums text-slate-800">{i.valor}</p>
           </div>
         ))}
       </div>
@@ -322,13 +418,13 @@ function CardCliente({ cliente }: { cliente: ClienteNaTela }) {
       {/* Pontos de atenção */}
       {d.pontos.length === 0 ? (
         <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-[13px] text-emerald-900">
-          Uso saudável: nada parado, nada incompleto e os recursos do plano em uso. A conversa é de relacionamento e feedback.
+          Uso saudável: nada parado, nada incompleto e os recursos em uso. A conversa é de relacionamento e feedback.
         </p>
       ) : (
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <div>
             <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-              <AlertTriangle className="h-3.5 w-3.5" /> Onde está falhando no uso ({uso.length})
+              <AlertTriangle className="h-3.5 w-3.5" /> {analista ? "Onde a carteira está falhando" : "Onde está falhando no uso"} ({uso.length})
             </p>
             {uso.length === 0 ? (
               <p className="text-[12.5px] text-slate-500">Nada parado nem incompleto.</p>
@@ -341,7 +437,7 @@ function CardCliente({ cliente }: { cliente: ClienteNaTela }) {
               <Lightbulb className="h-3.5 w-3.5" /> Funcionalidades ociosas ({ociosos.length})
             </p>
             {ociosos.length === 0 ? (
-              <p className="text-[12.5px] text-slate-500">Usa tudo que o plano oferece.</p>
+              <p className="text-[12.5px] text-slate-500">Usa tudo que está disponível.</p>
             ) : (
               <div className="space-y-1.5">{ociosos.map((p) => <Ponto key={p.chave} p={p} />)}</div>
             )}
@@ -358,18 +454,7 @@ function CardCliente({ cliente }: { cliente: ClienteNaTela }) {
           </summary>
           <ul className="mt-2 space-y-2">
             {cliente.historico.map((h) => (
-              <li key={h.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] text-slate-700">
-                <p className="text-[12px] text-slate-500">
-                  {data(h.realizadoEm)} · marco {h.marcoDias} · {ROTULO_CANAL[h.canal] ?? h.canal}
-                  {h.resultado === "TENTATIVA" ? " · tentativa sem sucesso" : ""}
-                  {h.contatoNome ? ` · com ${h.contatoNome}` : ""}
-                  {h.realizadoPorNome ? ` · por ${h.realizadoPorNome}` : ""}
-                  {h.retornarEm ? ` · voltar em ${data(h.retornarEm)}` : ""}
-                </p>
-                <p className="mt-0.5 whitespace-pre-line">{h.resumo}</p>
-                {h.orientacoes && <p className="mt-1 whitespace-pre-line text-slate-600"><strong>Orientado:</strong> {h.orientacoes}</p>}
-                {h.feedback && <p className="mt-1 whitespace-pre-line text-violet-800"><strong>Feedback:</strong> {h.feedback}</p>}
-              </li>
+              <ItemHistorico key={h.id} cliente={cliente} contato={h} aoMudar={mudou} />
             ))}
           </ul>
         </details>
@@ -383,11 +468,8 @@ function CardCliente({ cliente }: { cliente: ClienteNaTela }) {
       ) : aberto ? (
         <FormularioContato
           cliente={cliente}
-          aoRegistrar={(marco) => {
-            setAberto(false);
-            setConfirmacao(`Contato registrado no marco de ${marco} dias.`);
-            router.refresh();
-          }}
+          aoSalvar={(marco) => { setAberto(false); mudou(`Contato registrado no marco de ${marco} dias.`); }}
+          aoCancelar={() => setAberto(false)}
         />
       ) : (
         <button
@@ -404,11 +486,17 @@ function CardCliente({ cliente }: { cliente: ClienteNaTela }) {
 
 export function ListaFollowUp({ clientes }: { clientes: ClienteNaTela[] }) {
   const naVez = clientes.filter((c) => c.cadencia.situacao !== "EM_DIA");
-  const [filtro, setFiltro] = useState<"na-vez" | "em-dia" | "todos">(naVez.length ? "na-vez" : "todos");
+  const [filtro, setFiltro] = useState<"na-vez" | "em-dia" | "empresas" | "analistas" | "todos">(naVez.length ? "na-vez" : "todos");
   const [busca, setBusca] = useState("");
 
   const visiveis = clientes
-    .filter((c) => (filtro === "na-vez" ? c.cadencia.situacao !== "EM_DIA" : filtro === "em-dia" ? c.cadencia.situacao === "EM_DIA" : true))
+    .filter((c) => {
+      if (filtro === "na-vez") return c.cadencia.situacao !== "EM_DIA";
+      if (filtro === "em-dia") return c.cadencia.situacao === "EM_DIA";
+      if (filtro === "empresas") return c.tipo === "EMPRESA";
+      if (filtro === "analistas") return c.tipo === "ANALISTA";
+      return true;
+    })
     .filter((c) => (busca.trim() ? c.nome.toLowerCase().includes(busca.trim().toLowerCase()) : true));
 
   const botao = (v: typeof filtro, rotulo: string, n: number) => (
@@ -429,19 +517,21 @@ export function ListaFollowUp({ clientes }: { clientes: ClienteNaTela[] }) {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {botao("na-vez", "Na vez de conversar", naVez.length)}
         {botao("em-dia", "Em dia", clientes.length - naVez.length)}
+        {botao("empresas", "Empresas", clientes.filter((c) => c.tipo === "EMPRESA").length)}
+        {botao("analistas", "Analistas", clientes.filter((c) => c.tipo === "ANALISTA").length)}
         {botao("todos", "Todos", clientes.length)}
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar cliente…"
-          className="ml-auto w-56 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          placeholder="Buscar…"
+          className="ml-auto w-48 rounded-lg border border-slate-300 px-3 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
       </div>
 
       {visiveis.length === 0 ? (
         <p className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
           {clientes.length === 0
-            ? "Nenhum cliente pagante na carteira ainda. Quando a primeira fatura for paga, a empresa entra aqui sozinha."
+            ? "Ninguém na carteira ainda. Empresa entra quando paga a primeira fatura; analista, quando tem o primeiro cliente vinculado."
             : "Ninguém neste filtro. Troque o filtro para ver os outros."}
         </p>
       ) : (

@@ -283,6 +283,11 @@ enum TipoNotificacaoWhatsApp {
   // publicada que não está cadastrada aqui. Um aviso por empresa por rodada,
   // e cada fato é anunciado uma única vez (marca `avisadoEm` na origem).
   PORTAL_TRANSPARENCIA
+  /// Igor 30/10 — convite para a conversa de follow-up quando o cliente entra
+  /// na janela do marco (30/60/90/180 dias e trimestral). Um por marco, pela
+  /// chave (usuarioId, tipo, referenciaId="convite-<contaId>-<marco>"). A
+  /// conversa em si é de gente; o convite só abre a porta.
+  FOLLOW_UP_CONVITE
 }
 
 enum StatusNotificacaoWhatsApp {

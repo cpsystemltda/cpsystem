@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { rodarCicloDeVida } from "@/lib/cicloDeVida";
 import { avisarEquipe } from "@/lib/alertaInterno";
-import { montarLembreteFollowUp } from "@/lib/followUpClientes";
+import { montarLembreteFollowUp, enviarConvitesFollowUp } from "@/lib/followUpClientes";
 
 /** Segunda-feira no fuso de Brasília — o dia em que a equipe planeja a semana. */
 function ehSegundaBRT(d: Date): boolean {
@@ -56,11 +56,27 @@ export async function GET(req: Request) {
     if (lembreteFollowUp) await avisarEquipe(lembreteFollowUp).catch(() => {});
   }
 
+  // Convite de follow-up: todo dia, para quem entrou na janela do marco e
+  // ainda não recebeu. A equipe fica sabendo quando algum sai, para esperar
+  // a resposta no WhatsApp da empresa.
+  const convites = await enviarConvitesFollowUp().catch((e) => {
+    console.error("[ciclo-de-vida] convites de follow-up falharam:", e);
+    return { enviados: [] as string[], pulados: { erro: 1 } };
+  });
+  if (convites.enviados.length > 0) {
+    await avisarEquipe(
+      `📨 *Convite de follow-up enviado*\n\n` +
+        convites.enviados.map((n) => `▫ ${n}`).join("\n") +
+        `\n\nSe responder, a conversa é marcada pelo WhatsApp da CP System. Registro em cpsystem.app.br/follow-up`,
+    ).catch(() => {});
+  }
+
   return NextResponse.json({
     ok: true,
     duracaoMs: Date.now() - inicio,
     resumo: r,
     followUp: lembreteFollowUp ? "lembrete enviado" : "sem lembrete",
+    convites,
     executadoEm: new Date().toISOString(),
   });
 }

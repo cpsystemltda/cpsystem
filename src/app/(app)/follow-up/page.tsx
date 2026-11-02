@@ -31,10 +31,12 @@ export default async function FollowUpPage() {
 
   const naTela: ClienteNaTela[] = clientes.map((c) => ({
     contaId: c.contaId,
+    tipo: c.tipo,
     nome: c.nome,
     plano: c.plano,
     statusAssinatura: c.statusAssinatura,
-    titular: c.titular,
+    titular: c.titular ? { nome: c.titular.nome, email: c.titular.email, telefoneWhatsApp: c.titular.telefoneWhatsApp } : null,
+    convite: c.convite ? { em: c.convite.em.toISOString(), status: c.convite.status } : null,
     cadencia: {
       clienteDesde: c.cadencia.clienteDesde.toISOString(),
       diasComoCliente: c.cadencia.diasComoCliente,
@@ -45,10 +47,7 @@ export default async function FollowUpPage() {
       retornarEm: c.cadencia.retornarEm?.toISOString() ?? null,
     },
     diagnostico: {
-      documentos: c.diagnostico.documentos,
-      ultimaMovimentacaoEm: c.diagnostico.ultimaMovimentacaoEm?.toISOString() ?? null,
-      ultimoAcessoEm: c.diagnostico.ultimoAcessoEm?.toISOString() ?? null,
-      usuarios: c.diagnostico.usuarios,
+      indicadores: c.diagnostico.indicadores,
       pontos: c.diagnostico.pontos,
     },
     tentativasDesdeUltimo: c.tentativasDesdeUltimo,
@@ -71,28 +70,30 @@ export default async function FollowUpPage() {
   const naJanela = clientes.filter((c) => c.cadencia.situacao === "NA_JANELA").length;
   const emDia = clientes.filter((c) => c.cadencia.situacao === "EM_DIA").length;
   const comPontoGrave = clientes.filter((c) => c.diagnostico.pontos.some((p) => p.gravidade === "alta")).length;
+  const analistas = clientes.filter((c) => c.tipo === "ANALISTA").length;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Uso interno · Relacionamento</p>
       <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">Follow-up de clientes</h1>
       <p className="mt-2 max-w-3xl text-sm text-slate-600">
-        Quem paga recebe uma conversa nossa com cadência marcada — não para vender, para{" "}
-        <strong>evitar que vá embora</strong>. O sistema diz quem está na vez, o que a empresa está
-        deixando de usar e o que orientar. A ligação é sua; o registro fica aqui.
+        Quem paga, e o analista que tem carteira, recebe uma conversa nossa com cadência marcada —
+        não para vender, para <strong>evitar que vá embora</strong>. O sistema diz quem está na vez,
+        manda o convite, mostra o que a pessoa está deixando de usar e o que orientar. A conversa é
+        sua; o registro fica aqui.
       </p>
 
       {/* Placar */}
       <div className="mt-6 grid gap-3 sm:grid-cols-5">
         {[
-          ["Clientes", clientes.length, "text-blue-700"],
+          ["Na carteira", `${clientes.length}${analistas ? ` · ${analistas} analista${analistas > 1 ? "s" : ""}` : ""}`, "text-blue-700"],
           ["Atrasados", atrasados, atrasados ? "text-red-600" : "text-slate-400"],
           ["Esta semana", naJanela, naJanela ? "text-amber-600" : "text-slate-400"],
           ["Em dia", emDia, "text-emerald-700"],
           ["Com ponto grave", comPontoGrave, comPontoGrave ? "text-red-600" : "text-slate-400"],
         ].map(([rot, n, cor]) => (
           <div key={String(rot)} className="rounded-xl border border-slate-200 bg-white p-4 text-center">
-            <p className={`text-2xl font-extrabold tabular-nums ${cor}`}>{n as number}</p>
+            <p className={`text-2xl font-extrabold tabular-nums ${cor}`}>{String(n)}</p>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{rot as string}</p>
           </div>
         ))}
@@ -106,12 +107,19 @@ export default async function FollowUpPage() {
             <p className="mt-1">
               Aos <strong>{MARCOS_INICIAIS.join(", ")} dias</strong> de cliente e, depois, a cada{" "}
               <strong>{INTERVALO_TRIMESTRAL} dias</strong>. É o mínimo: a cada trimestre todo cliente
-              ouviu a nossa voz. “Cliente desde” é a data da primeira fatura paga.
+              ouviu a nossa voz. “Cliente desde” é a primeira fatura paga; para o analista, o primeiro
+              cliente vinculado.
             </p>
             <p className="mt-2 text-[12.5px] text-slate-500">
               A tela mostra o marco <em>da idade</em> do cliente. Quem virou cliente há 100 dias e nunca
               foi contatado está no marco de 90 — o contato registrado leva direto ao de 180, sem
               cobrar três conversas seguidas.
+            </p>
+            <p className="mt-2 text-[12.5px] text-slate-500">
+              <strong>Convite automático:</strong> quando a pessoa entra na janela do marco, recebe um
+              WhatsApp propondo a conversa e pedindo dia e horário — um por marco, nunca para
+              inadimplente, nunca por cima de uma tentativa sua dos últimos 7 dias. A resposta chega
+              no WhatsApp da CP System.
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4 text-[13.5px] text-slate-700">
@@ -173,7 +181,8 @@ export default async function FollowUpPage() {
       <Secao icone={<HeartHandshake className="h-4 w-4" />} titulo="3 · A carteira">
         <p className="mb-4 text-[13.5px] text-slate-600">
           Em ordem de urgência. Cada card mostra o uso em números, os pontos de atenção com a
-          orientação pronta, o histórico e o botão para registrar a conversa.
+          orientação pronta, o histórico (com correção e exclusão) e o botão para registrar a
+          conversa. Para o analista, os números são da carteira dele.
         </p>
         <ListaFollowUp clientes={naTela} />
       </Secao>
@@ -205,7 +214,7 @@ export default async function FollowUpPage() {
       </Secao>
 
       <p className="mt-10 flex items-center gap-2 text-[12px] text-slate-400">
-        <Target className="h-3.5 w-3.5" /> Trial não entra aqui: quem está no teste é acompanhado pela rotina de ativação.
+        <Target className="h-3.5 w-3.5" /> Trial e analista sem carteira não entram aqui: são acompanhados pela ativação e pelo ciclo de vida.
       </p>
     </div>
   );
