@@ -32,7 +32,7 @@ import { HelpButtonsInline } from "@/components/HelpButtonsInline";
 import { Logo } from "@/components/Logo";
 import type { Visao } from "@/lib/visao";
 import { podeAcessarRota } from "@/lib/modulosAcesso";
-import { Crown, Users2, Activity, Ticket, Send, UserCog, MessageCircle, FileSpreadsheet, Phone, HeartHandshake } from "lucide-react";
+import { Crown, Users2, Activity, Ticket, Send, UserCog, MessageCircle, FileSpreadsheet, Phone, HeartHandshake, Gift } from "lucide-react";
 
 type Item = { href: string; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>> };
 type Grupo = { titulo: string; itens: Item[] };
@@ -103,6 +103,7 @@ const GRUPOS_ANALISTA: Grupo[] = [
       { href: "/painel-analista", label: "Dashboard", icon: LayoutDashboard },
       { href: "/painel-analista/empresas-vinculadas", label: "Empresas vinculadas", icon: Wallet },
       { href: "/painel-analista/importar", label: "Importar planilha", icon: FileSpreadsheet },
+      { href: "/indicacao", label: "Minha indicação", icon: Gift },
       { href: "/honorarios", label: "Comissões SaaS", icon: Sparkles },
       { href: "/notificacoes", label: "Notificações", icon: Bell },
     ],
@@ -113,6 +114,28 @@ const GRUPOS_ANALISTA: Grupo[] = [
       { href: "/conta/perfil", label: "Meus dados", icon: UserCog },
       { href: "/conta/seguranca", label: "Segurança", icon: ShieldCheck },
       { href: "/equipe", label: "Equipe", icon: Users },
+      { href: "/termos", label: "Termos / LGPD", icon: ScrollText },
+    ],
+  },
+];
+
+// Indicador (Programa de Indicação, Regina 02/11): não tem carteira
+// operacional, então "Empresas vinculadas" e "Importar planilha" só
+// mostrariam vazio. O menu dele é o cupom, o dinheiro e a conta.
+const GRUPOS_INDICADOR: Grupo[] = [
+  {
+    titulo: "Indicação",
+    itens: [
+      { href: "/indicacao", label: "Minha indicação", icon: Gift },
+      { href: "/honorarios", label: "Comissões", icon: Sparkles },
+      { href: "/notificacoes", label: "Notificações", icon: Bell },
+    ],
+  },
+  {
+    titulo: "Conta",
+    itens: [
+      { href: "/conta/perfil", label: "Meus dados e PIX", icon: UserCog },
+      { href: "/conta/seguranca", label: "Segurança", icon: ShieldCheck },
       { href: "/termos", label: "Termos / LGPD", icon: ScrollText },
     ],
   },
@@ -164,6 +187,7 @@ export function Sidebar({
   empresaIdSelecionada = null,
   acessoRestrito = false,
   modulosPermitidos = [],
+  indicador = false,
 }: {
   nomeUsuario: string;
   nomeConta: string;
@@ -178,6 +202,8 @@ export function Sidebar({
   // de menu nao e controle de acesso, e so nao mostrar porta que nao abre.
   acessoRestrito?: boolean;
   modulosPermitidos?: string[];
+  /** Conta de analista que só indica (Programa de Indicação). */
+  indicador?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -189,7 +215,7 @@ export function Sidebar({
     visao === "ADMIN_PLATAFORMA"
       ? GRUPOS_ADMIN_PLATAFORMA
       : visao === "ANALISTA"
-        ? GRUPOS_ANALISTA
+        ? (indicador ? GRUPOS_INDICADOR : GRUPOS_ANALISTA)
         : !temEmpresaEmFoco
           ? [...GRUPOS_EMPRESA_CONSOLIDADO, ...GRUPOS_EMPRESA_CONTA]
           : [...GRUPOS_EMPRESA_OPERACAO, ...GRUPOS_EMPRESA_CONTA];

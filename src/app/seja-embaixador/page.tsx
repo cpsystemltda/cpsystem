@@ -87,6 +87,13 @@ export default function SejaEmbaixadorPage() {
               Já sou analista
             </Link>
           </div>
+          <p className="mt-4 text-[13px] text-[#5D6470]">
+            Não é analista, mas conhece empresas que vendem ao governo?{" "}
+            <Link href="/indicar" className="font-semibold text-[#9C7A2D] underline">
+              Entre no Programa de Indicação
+            </Link>{" "}
+            — mesmo R$ 29,90 por empresa, com um cupom só seu.
+          </p>
         </header>
 
         {/* Como funciona — 3 passos */}

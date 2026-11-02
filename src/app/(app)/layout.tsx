@@ -254,6 +254,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ? "ANALISTA"
     : "EMPRESA";
 
+  // Indicador (Programa de Indicação, Regina 02/11): conta ANALISTA que só
+  // indica, sem carteira operacional — o menu dele é outro.
+  const indicador =
+    tipoConta === "ANALISTA"
+      ? !!(await prisma.analista.findUnique({ where: { contaId: usuario.contaId }, select: { indicador: true } }))?.indicador
+      : false;
+
   return (
     <div className="app-shell flex h-screen flex-col">
       {/* Background atmosférico Liquid Glass — fixed atrás de tudo */}
@@ -320,6 +327,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           empresaIdSelecionada={empresaIdSelecionada}
           acessoRestrito={usuario.acessoRestrito}
           modulosPermitidos={usuario.modulosPermitidos}
+          indicador={indicador}
         />
         <main className="flex-1 overflow-y-auto">
           {exigirFormaDePagamento && <AvisoUltimoDiaTrial />}

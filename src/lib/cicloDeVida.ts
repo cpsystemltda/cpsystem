@@ -68,7 +68,7 @@ export async function rodarCicloDeVida(): Promise<ResumoCiclo> {
       id: true, tipo: true, plano: true, statusAssinatura: true, criadoEm: true,
       arquivadaEm: true, gatewayCustomerId: true, trialAteEm: true,
       empresas: { select: { id: true, razaoSocial: true } },
-      analista: { select: { id: true, nomeCompleto: true } },
+      analista: { select: { id: true, nomeCompleto: true, indicador: true } },
       usuarios: {
         orderBy: { criadoEm: "asc" },
         select: { id: true, nome: true, telefoneWhatsApp: true, optInWhatsApp: true },
@@ -118,7 +118,10 @@ export async function rodarCicloDeVida(): Promise<ResumoCiclo> {
     }
 
     // ── Analista sem carteira ───────────────────────────────────────────────
-    if (c.tipo === "ANALISTA" && vinculos === 0 && !c.arquivadaEm) {
+    // Indicador (Programa de Indicação) nunca tem vínculo: a carteira dele
+    // são as empresas indicadas, e cobrar "vínculo" dele seria cobrar a coisa
+    // errada. Fica de fora desta régua.
+    if (c.tipo === "ANALISTA" && vinculos === 0 && !c.arquivadaEm && !c.analista?.indicador) {
       if (idade >= ANALISTA_SAI_DIAS) {
         await prisma.conta.update({ where: { id: c.id }, data: { arquivadaEm: agora, statusAssinatura: "CANCELADA" } });
         r.arquivadas++;

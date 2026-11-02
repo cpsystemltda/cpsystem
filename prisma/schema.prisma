@@ -721,6 +721,15 @@ model Analista {
   telefonePj       String?
   divulgacaoUrl    String? // link da bio com o programa
   ativo            Boolean       @default(true)
+  /// Programa de Indicação (Regina 02/11/2026): quem NÃO é analista de
+  /// licitação, mas conhece empresas que vendem ao governo — contador,
+  /// consultor, representante, cliente satisfeito. Entra pela página pública
+  /// /indicar, ganha um cupom próprio e recebe os mesmos R$ 29,90/mês por
+  /// empresa indicada que paga (Conta.embaixadorId). Usa a mesma linha de
+  /// Analista porque toda a máquina de comissão e pagamento já mora aqui; a
+  /// flag existe para o sistema não tratá-lo como analista sem carteira
+  /// (ciclo de vida, ativação, painel).
+  indicador        Boolean       @default(false)
   criadoEm         DateTime      @default(now())
   atualizadoEm     DateTime      @updatedAt
 

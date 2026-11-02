@@ -46,7 +46,7 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
       tipo: true,
       plano: true,
       trialAteEm: true,
-      analista: { select: { nomeCompleto: true } },
+      analista: { select: { id: true, nomeCompleto: true, indicador: true } },
       empresas: { select: { razaoSocial: true, nomeFantasia: true, cnpj: true }, take: 1 },
       usuarios: {
         select: { id: true, nome: true, email: true, telefoneWhatsApp: true, optInWhatsApp: true },
@@ -71,6 +71,17 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
   // dele e outro (montar a carteira), e prometer "acompanho seus prazos" seria
   // falar do produto errado pra pessoa errada — analista != cliente.
   const ehAnalista = conta.tipo === "ANALISTA";
+  // Indicador (Programa de Indicação, Regina 02/11): a boas-vindas dele já
+  // traz o cupom, porque é o cupom que ele vai mandar para a primeira empresa.
+  const ehIndicador = ehAnalista && !!conta.analista?.indicador;
+  let cupomIndicador: { codigo: string } | null = null;
+  if (ehIndicador && conta.analista) {
+    const { garantirCupomDoAnalista } = await import("@/lib/indicacao");
+    cupomIndicador = await garantirCupomDoAnalista(
+      { id: conta.analista.id, nomeCompleto: conta.analista.nomeCompleto },
+      usuario.id,
+    ).catch(() => null);
+  }
 
   // O aviso pra equipe diz o que REALMENTE saiu. Antes afirmava "recebeu por
   // WhatsApp e e-mail" sempre — e quem le o alerta decide se precisa ligar pro
@@ -89,7 +100,18 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
     // excelente. Não uma coisa genérica (...) tem que ser mais curta e mais
     // direta". O que saía antes era um roteiro de configuração — dizia o que a
     // pessoa tinha que fazer, nunca o que ela ganhava com isso.
-    const texto = ehAnalista
+    const texto = ehIndicador && cupomIndicador
+      ? `👋 *Bem-vindo ao Programa de Indicação, ${primeiro}!*\n\n` +
+        `É um prazer ter você conosco. Seu cupom é *${cupomIndicador.codigo}* e já está valendo.\n\n` +
+        `*Como funciona:* cada empresa que se cadastrar com o seu cupom e pagar a primeira fatura ` +
+        `rende *R$ 29,90 por mês* para você, enquanto ela for cliente. Cumulativo e sem teto: ` +
+        `dez empresas são R$ 299,00 todo mês.\n\n` +
+        `*Quando o dinheiro entra:* por PIX, todo dia 20, na chave que você cadastrou.\n\n` +
+        `*Seu primeiro passo:* mandar o cupom para uma empresa que vende ao governo. Em ` +
+        `cpsystem.app.br/indicacao há mensagens prontas e o acompanhamento de quem entrou.\n\n` +
+        `Desejamos um excelente começo. Qualquer dúvida, é só responder esta mensagem.\n\n` +
+        `Contato CP System`
+      : ehAnalista
       ? // Regina 21/09/2026: o analista precisa entender COMO a comissão nasce
         // e QUANDO o dinheiro entra — senão ele se cadastra, não indica
         // ninguém e some. O ponto que ninguém adivinha sozinho é que a
@@ -175,7 +197,9 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
         <p style="font-size:18px;font-weight:700;margin:0 0 16px">Bem-vindo ao CP System, ${primeiro}!</p>
         <p style="margin:0 0 16px;line-height:1.6">
           ${
-            ehAnalista
+            ehIndicador
+              ? `É um prazer ter você no Programa de Indicação. Seu cupom é <strong>${cupomIndicador?.codigo ?? "—"}</strong> e já está valendo.`
+              : ehAnalista
               ? "É um prazer ter você conosco. Nossa intenção é direta: ampliar seus resultados e proteger sua carteira de prejuízos."
               : `É um prazer ter a <strong>${empresa?.nomeFantasia || empresa?.razaoSocial || "sua empresa"}</strong> conosco. Nossa intenção é direta: otimizar seus resultados e diminuir seus prejuízos no contrato público.`
           }
@@ -185,7 +209,11 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
         </p>
         <ul style="margin:0 0 16px;padding-left:20px;line-height:1.7">
           ${
-            ehAnalista
+            ehIndicador
+              ? `<li>R$ 29,90 por mês por cada empresa indicada que assinar, enquanto ela for cliente.</li>
+          <li>Pagamento por PIX todo dia 20, na chave cadastrada.</li>
+          <li>Painel com quem entrou pelo seu cupom, quanto rende e mensagens prontas para compartilhar.</li>`
+              : ehAnalista
               ? `<li>Os prazos de todos os seus clientes em um só painel.</li>
           <li>Avisos de risco da carteira por WhatsApp.</li>
           <li>R$ 29,90 por mês, vitalício, por cliente ativo vinculado a você.</li>`
@@ -200,7 +228,7 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
             : ""
         }
         <p style="margin:0 0 16px">
-          <a href="${ehAnalista ? "https://cpsystem.app.br/painel-analista" : "https://cpsystem.app.br/dashboard"}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600;display:inline-block">Acessar o sistema</a>
+          <a href="${ehIndicador ? "https://cpsystem.app.br/indicacao" : ehAnalista ? "https://cpsystem.app.br/painel-analista" : "https://cpsystem.app.br/dashboard"}" style="background:#1d4ed8;color:#fff;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:600;display:inline-block">Acessar o sistema</a>
         </p>
         ${
           linkConfirmacao

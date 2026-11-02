@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Wallet, TrendingUp, Briefcase, AlertCircle, Receipt, Coins } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -66,6 +67,19 @@ export default async function PainelAnalistaPage({
         </p>
       </div>
     );
+  }
+
+  // Indicador sem carteira (Programa de Indicação, Regina 02/11): este painel
+  // é de execução de clientes vinculados e ficaria todo vazio. A casa dele é
+  // a página do cupom. Se um dia ganhar vínculo, volta a entrar aqui.
+  if (!usuario.superAdmin) {
+    const perfil = await prisma.analista.findUnique({
+      where: { contaId: usuario.contaId },
+      select: { indicador: true, _count: { select: { vinculos: { where: { status: "ATIVO" } } } } },
+    });
+    if (perfil?.indicador && perfil._count.vinculos === 0) {
+      redirect(sp.novo ? "/indicacao?novo=1" : "/indicacao");
+    }
   }
 
   // Resolve qual analista exibir:

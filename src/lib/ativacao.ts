@@ -37,13 +37,15 @@ type Estagio =
   | "sem-primeiro-documento"
   | "cadastro-parado"
   | "teste-acabando"
-  | "analista-sem-carteira";
+  | "analista-sem-carteira"
+  | "indicador-sem-indicacao";
 
 const ESTAGIOS: Estagio[] = [
   "sem-primeiro-documento",
   "cadastro-parado",
   "teste-acabando",
   "analista-sem-carteira",
+  "indicador-sem-indicacao",
 ];
 
 export type ResumoAtivacao = {
@@ -108,7 +110,7 @@ export async function reengajarContas(): Promise<ResumoAtivacao> {
       statusAssinatura: true,
       trialAteEm: true,
       empresas: { select: { id: true, razaoSocial: true, nomeFantasia: true } },
-      analista: { select: { id: true } },
+      analista: { select: { id: true, nomeCompleto: true, indicador: true } },
       usuarios: {
         select: { id: true, nome: true, telefoneWhatsApp: true, optInWhatsApp: true },
         orderBy: { criadoEm: "asc" },
@@ -140,12 +142,24 @@ export async function reengajarContas(): Promise<ResumoAtivacao> {
       // errado com a pessoa errada. O que trava um analista é a carteira vazia
       // — sem cliente vinculado, não há comissão nem motivo pra voltar.
       if (conta.tipo === "ANALISTA") {
+        const diasDeConta = diasEntre(conta.criadoEm, agora);
+        if (conta.analista?.indicador) {
+          const enviou = await reengajarIndicador({
+            contaId: conta.id,
+            analista: conta.analista,
+            usuarioId: titular.id,
+            primeiroNome,
+            diasDeConta,
+          });
+          if (enviou) resumo.enviadas["indicador-sem-indicacao"] += 1;
+          continue;
+        }
         const enviou = await reengajarAnalista({
           contaId: conta.id,
           analistaId: conta.analista?.id ?? null,
           usuarioId: titular.id,
           primeiroNome,
-          diasDeConta: diasEntre(conta.criadoEm, agora),
+          diasDeConta,
         });
         if (enviou) resumo.enviadas["analista-sem-carteira"] += 1;
         continue;
@@ -254,6 +268,7 @@ export async function reengajarContas(): Promise<ResumoAtivacao> {
     "cadastro-parado": "Cadastro parado",
     "teste-acabando": "Teste acabando",
     "analista-sem-carteira": "Analista sem carteira",
+    "indicador-sem-indicacao": "Indicador sem indicação",
   };
   const totalEnviadas = ESTAGIOS.reduce((s, e) => s + resumo.enviadas[e], 0);
 
@@ -306,6 +321,42 @@ async function reengajarAnalista(dados: {
       `▸ *Quer começar do zero?* Use seu link de indicação — quem entra por ele já fica vinculado a você.\n\n` +
       `👉 cpsystem.app.br/painel-analista\n\n` +
       `Qualquer dúvida sobre o programa, é só responder esta mensagem.\n\n` +
+      `Contato CP System`,
+  });
+  return r.enviado;
+}
+
+/**
+ * Indicador (Programa de Indicação, Regina 02/11) que se cadastrou e ainda
+ * não trouxe ninguém. Uma mensagem na vida da conta, com o cupom dele e um
+ * texto pronto: o que trava não é vontade, é não saber o que escrever.
+ */
+async function reengajarIndicador(dados: {
+  contaId: string;
+  analista: { id: string; nomeCompleto: string };
+  usuarioId: string;
+  primeiroNome: string;
+  diasDeConta: number;
+}): Promise<boolean> {
+  if (dados.diasDeConta < DIAS_SEM_NENHUM_DOCUMENTO) return false;
+  const indicadas = await prisma.conta.count({ where: { embaixadorId: dados.analista.id } });
+  if (indicadas > 0) return false;
+
+  const { garantirCupomDoAnalista, linkDoCupom } = await import("@/lib/indicacao");
+  const cupom = await garantirCupomDoAnalista(dados.analista, dados.usuarioId);
+
+  const r = await dispararNotificacao({
+    usuarioId: dados.usuarioId,
+    tipo: "ATIVACAO",
+    referenciaId: `indicador-sem-indicacao-${dados.contaId}`,
+    mensagem:
+      `Olá, ${dados.primeiroNome}!\n\n` +
+      `Seu cupom *${cupom.codigo}* está pronto e ainda não chegou ninguém por ele. ` +
+      `A primeira indicação é a que destrava: a partir dela, cada empresa que assinar rende *R$ 29,90 por mês*, enquanto for cliente.\n\n` +
+      `Para não precisar inventar frase, segue um texto pronto para mandar a quem vende para o governo:\n\n` +
+      `_"Conheço um sistema que acompanha ata, contrato e empenho depois da licitação e avisa no WhatsApp antes de o prazo vencer. ` +
+      `Dá para testar 14 dias sem cartão. Cadastre com o meu código ${cupom.codigo} em ${linkDoCupom(cupom.codigo)}"_\n\n` +
+      `Seu painel, com quem entrou pelo cupom e quanto rende: cpsystem.app.br/indicacao\n\n` +
       `Contato CP System`,
   });
   return r.enviado;

@@ -394,6 +394,18 @@ export default function HomeLandingClient() {
               >
                 Saiba mais
               </Link>
+              <Link
+                href="/indicar"
+                className="inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-[13px] font-bold uppercase transition"
+                style={{
+                  background: "rgba(255,255,255,0.7)",
+                  border: "0.5px solid var(--hairline)",
+                  color: "var(--text)",
+                  letterSpacing: "0.2em",
+                }}
+              >
+                Não sou analista: quero indicar
+              </Link>
             </div>
           </div>
         </section>

@@ -177,6 +177,39 @@ const cpfRegex = /^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/;
 
 // Cadastro de Analista — campos obrigatórios + bloco PJ opcional.
 // Quando o flag "temPj" é "sim", todos os obrigatórios da PJ passam a valer.
+// Programa de Indicação (Regina 02/11/2026): cadastro curto de quem só vai
+// indicar — não é analista, não tem carteira, não emite como PJ. O que o
+// sistema precisa dele é identidade (CPF), canal (WhatsApp) e onde pagar (PIX).
+export const signupIndicadorSchema = z
+  .object({
+    nome: z.string().min(5, "Informe o nome completo"),
+    cpf: z
+      .string()
+      .regex(cpfRegex, "CPF inválido")
+      .refine((v) => validarCpf(v), "CPF inválido — verifique os dígitos"),
+    email: emailUtilizavel(),
+    telefone: z
+      .string()
+      .refine((v) => v.replace(/\D/g, "").length === 11, {
+        message: "Informe um WhatsApp com 11 dígitos: DDD + 9 + número (ex.: 61 98335-0607)",
+      }),
+    cidade: z.string().min(3, "Informe cidade e estado (ex.: Goiânia/GO)"),
+    pix: z.string().min(4, "Chave PIX obrigatória — é por ela que a comissão chega"),
+    pixTipo: z.string().optional(),
+    senha: z.string().min(10, "Mínimo 10 caracteres"),
+    confirmacaoSenha: z.string().min(1, "Confirme a senha"),
+    aceiteTermos: z.literal("1", { message: "Você precisa aceitar o contrato do programa para continuar" }),
+  })
+  .superRefine((v, ctx) => {
+    if (v.senha !== v.confirmacaoSenha) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmacaoSenha"],
+        message: "Confirmação não confere com a senha",
+      });
+    }
+  });
+
 export const signupAnalistaSchema = z
   .object({
     // Pessoais (obrigatórios)
