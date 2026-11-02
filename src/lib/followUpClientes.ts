@@ -672,7 +672,29 @@ function referenciaDoConvite(contaId: string, marco: number): string {
 
 const ORDEM_SITUACAO: Record<SituacaoFollowUp, number> = { ATRASADO: 0, RETORNO_PEDIDO: 0, NA_JANELA: 1, EM_DIA: 2 };
 
+function ultimos11(telefone: string | null | undefined): string {
+  return (telefone ?? "").replace(/\D/g, "").slice(-11);
+}
+
+/**
+ * A própria equipe não entra na carteira. Igor tem uma conta de analista com
+ * cliente vinculado (é como ele acompanha o Léo) — pela regra geral ela
+ * entraria, e a rotina mandaria convite de follow-up para o Igor conversar
+ * consigo mesmo. Quem tem o telefone ou o e-mail de um super admin é equipe.
+ */
+async function contatosDaEquipe(): Promise<{ telefones: Set<string>; emails: Set<string> }> {
+  const admins = await prisma.usuario.findMany({
+    where: { superAdmin: true },
+    select: { email: true, telefoneWhatsApp: true },
+  });
+  return {
+    telefones: new Set(admins.map((a) => ultimos11(a.telefoneWhatsApp)).filter((t) => t.length === 11)),
+    emails: new Set(admins.map((a) => a.email.toLowerCase())),
+  };
+}
+
 export async function listarClientesParaFollowUp(hoje: Date = new Date()): Promise<ClienteFollowUp[]> {
+  const equipe = await contatosDaEquipe();
   const contas = await prisma.conta.findMany({
     where: whereCarteira(),
     select: {
@@ -695,6 +717,14 @@ export async function listarClientesParaFollowUp(hoje: Date = new Date()): Promi
 
   const clientes: ClienteFollowUp[] = [];
   for (const c of contas) {
+    const primeiro = c.usuarios[0];
+    const telefones = [primeiro?.telefoneWhatsApp, c.analista?.telefone].map(ultimos11);
+    if (
+      (primeiro && equipe.emails.has(primeiro.email.toLowerCase())) ||
+      telefones.some((t) => t.length === 11 && equipe.telefones.has(t))
+    ) {
+      continue;
+    }
     const [{ cadencia, tentativasDesdeUltimo }, diagnostico] = await Promise.all([
       cadenciaDaConta(c, c.followUps, hoje),
       diagnosticarUso(c.id, hoje),
