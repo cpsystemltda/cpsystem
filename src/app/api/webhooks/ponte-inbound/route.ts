@@ -205,52 +205,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Mensagem só com mídia: a ponte manda "[audio recebido]". Não dá pra
-  // responder o conteúdo — ninguém aqui ouviu —, mas dá pra não deixar a
-  // pessoa no vácuo e pra avisar quem precisa ouvir. Regina 25/09, com dois
-  // áudios parados: áudio é como muita gente fala; tratar como silêncio é
-  // perder a conversa.
-  const soMidia = /^\[(audio|image|video|document) recebido\]$/.exec(texto);
-  if (soMidia) {
-    const tipo = soMidia[1];
-    const nome = { audio: "áudio", image: "imagem", video: "vídeo", document: "documento" }[tipo] ?? tipo;
-    if (messageId) await marcarRespondida(messageId);
-    return NextResponse.json({
-      resposta:
-        `Recebemos seu ${nome}, ${(body.pushName || "").split(" ")[0] || "tudo bem"}! ` +
-        `Nossa equipe vai ouvir e retornar em seguida.\n\n` +
-        `Se preferir adiantar, pode escrever por aqui que já respondo.\n\n` +
-        `Contato CP System`,
-      avisos: avisoParaEquipe(
-        `🎧 *${nome.charAt(0).toUpperCase() + nome.slice(1)} recebido — precisa de gente*\n\n` +
-          `De: ${body.pushName || "—"} (${body.senderTelefone || body.sender})\n\n` +
-          `O sistema não transcreve ${nome}. Alguém precisa ouvir e responder.`,
-      ),
-    });
-  }
-
-  // Conversa com gente da equipe dentro: o robô não fala por cima.
-  //
-  // Regina, 21/09/2026, negociando horário com a C2Vendas enquanto a resposta
-  // automática repetia "um de nós assume esta conversa em instantes" para a
-  // mesma cliente: *"você está prejudicando a sequência que já tinha dado
-  // certo."* A equipe continua sendo avisada — o que para é a fala do robô.
-  if (body.humanoNoComando) {
-    // Calar não é abandonar: a equipe vê a mensagem no grupo e segue a
-    // conversa. Silêncio sem registro seria a regra de "ninguém fica sem
-    // resposta" quebrando pela porta dos fundos.
-    return NextResponse.json({
-      resposta: null,
-      motivo: "humano_no_comando",
-      avisos: avisoParaEquipe(
-        `💬 *Mensagem numa conversa que vocês estão atendendo*\n\n` +
-          `De: ${body.pushName || "—"} (${body.senderTelefone || body.sender})\n\n` +
-          `"${texto.slice(0, 400)}"\n\n` +
-          `Não respondi automaticamente para não atravessar o atendimento.`,
-      ),
-    });
-  }
-
   // Quem está falando? O telefone vem em `senderTelefone`; `sender` pode ser um
   // LID (`280431333220532`), que não é telefone de ninguém e não casa com
   // cadastro nenhum. Foi assim que a Claudiamara, cliente em teste, caiu como
@@ -281,6 +235,71 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Como chamar quem escreve: pelo CADASTRO. O nome do status do WhatsApp só
+  // serve para quem não está no sistema. Em 04/11/2026 a resposta de mídia
+  // chamou a Isabela de "fé" (status dela: "fé em Deus sempre") e o aviso
+  // interno repetiu o apelido. Regina: *"chamar sempre pelo nome cadastrado,
+  // não pelo nome que ela coloca ali no status do WhatsApp."*
+  const quemEscreve = usuario?.nome || body.pushName || "—";
+  const primeiroNome = usuario
+    ? usuario.nome.trim().split(/\s+/)[0].toLowerCase().replace(/^\p{L}/u, (c) => c.toUpperCase())
+    : "";
+  const empresaDeQuemEscreve = usuario?.conta?.empresas[0]?.razaoSocial;
+  const quemEscreveParaEquipe = usuario
+    ? `${usuario.nome}${empresaDeQuemEscreve ? ` — ${empresaDeQuemEscreve}` : ""} (${cru})`
+    : `${body.pushName || "—"} (${body.senderTelefone || body.sender})`;
+
+  // Mensagem só com mídia: a ponte manda "[audio recebido]". Não dá pra
+  // responder o conteúdo — ninguém aqui ouviu —, mas dá pra não deixar a
+  // pessoa no vácuo e pra avisar quem precisa ouvir. Regina 25/09, com dois
+  // áudios parados: áudio é como muita gente fala; tratar como silêncio é
+  // perder a conversa.
+  //
+  // Sem "Olá, tudo bem?": isto é continuação de conversa, não primeiro
+  // contato ([[feedback-saudacao-uma-vez-por-conversa]]).
+  const soMidia = /^\[(audio|image|video|document) recebido\]$/.exec(texto);
+  if (soMidia) {
+    const tipo = soMidia[1];
+    const nome = { audio: "áudio", image: "imagem", video: "vídeo", document: "documento" }[tipo] ?? tipo;
+    const artigo = tipo === "image" ? "sua" : "seu";
+    const verbo = tipo === "audio" ? "ouvir" : tipo === "document" ? "ler" : "ver";
+    if (messageId) await marcarRespondida(messageId);
+    return NextResponse.json({
+      resposta:
+        `Recebemos ${artigo} ${nome}${primeiroNome ? `, ${primeiroNome}` : ""}. ` +
+        `Nossa equipe vai ${verbo} e retornar em seguida.\n\n` +
+        `Se preferir adiantar, pode escrever por aqui que já respondo.\n\n` +
+        `Contato CP System`,
+      avisos: avisoParaEquipe(
+        `🎧 *${nome.charAt(0).toUpperCase() + nome.slice(1)} recebido — precisa de gente*\n\n` +
+          `De: ${quemEscreveParaEquipe}\n\n` +
+          `O sistema não transcreve ${nome}. Alguém precisa ${verbo} e responder.`,
+      ),
+    });
+  }
+
+  // Conversa com gente da equipe dentro: o robô não fala por cima.
+  //
+  // Regina, 21/09/2026, negociando horário com a C2Vendas enquanto a resposta
+  // automática repetia "um de nós assume esta conversa em instantes" para a
+  // mesma cliente: *"você está prejudicando a sequência que já tinha dado
+  // certo."* A equipe continua sendo avisada — o que para é a fala do robô.
+  if (body.humanoNoComando) {
+    // Calar não é abandonar: a equipe vê a mensagem no grupo e segue a
+    // conversa. Silêncio sem registro seria a regra de "ninguém fica sem
+    // resposta" quebrando pela porta dos fundos.
+    return NextResponse.json({
+      resposta: null,
+      motivo: "humano_no_comando",
+      avisos: avisoParaEquipe(
+        `💬 *Mensagem numa conversa que vocês estão atendendo*\n\n` +
+          `De: ${quemEscreveParaEquipe}\n\n` +
+          `"${texto.slice(0, 400)}"\n\n` +
+          `Não respondi automaticamente para não atravessar o atendimento.`,
+      ),
+    });
+  }
+
   // O fio da conversa como está no WhatsApp. É o que impede a IA de tratar
   // "Ideal seria 17 na quarta" como se fosse a primeira frase de um estranho.
   const conversa = (body.conversa ?? [])
@@ -290,8 +309,6 @@ export async function POST(req: NextRequest) {
       autor: m.autor === "nos" ? ("sistema" as const) : ("cliente" as const),
       conteudo: String(m.texto).slice(0, 700),
     }));
-
-  const quemEscreve = body.pushName || "—";
 
   // ── Super admin não é cliente ────────────────────────────────────────────
   //

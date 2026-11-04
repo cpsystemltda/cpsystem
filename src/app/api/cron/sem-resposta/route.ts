@@ -50,13 +50,41 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, pendentes: 0 });
   }
 
+  // Quem é, pelo CADASTRO — não pelo nome que a pessoa pôs no WhatsApp.
+  //
+  // Regina, 04/11/2026, depois de o aviso chamar a Isabela de "fé em Deus
+  // sempre": *"você tem que chamar sempre pelo nome cadastrado e não pelo nome
+  // que ela coloca ali no status do WhatsApp."* O status é apelido, frase de
+  // fé, nome do filho; o cadastro é como a equipe conhece a cliente e como
+  // ela quer ser chamada. O WhatsApp fica só para quem não está no sistema.
+  const soDigitos = (t: string) => t.replace(/\D/g, "").slice(-11);
+  const telefones = Array.from(new Set(esquecidas.map((m) => soDigitos(m.telefone)).filter((t) => t.length >= 10)));
+  const cadastrados = telefones.length
+    ? await prisma.usuario.findMany({
+        where: { OR: telefones.map((t) => ({ telefoneWhatsApp: { endsWith: t } })) },
+        select: {
+          nome: true,
+          telefoneWhatsApp: true,
+          conta: { select: { tipo: true, empresas: { select: { razaoSocial: true }, take: 1 } } },
+        },
+      })
+    : [];
+  const nomePorTelefone = new Map<string, string>();
+  for (const u of cadastrados) {
+    const empresa = u.conta.empresas[0]?.razaoSocial;
+    const quem = u.conta.tipo === "ANALISTA" ? "analista" : empresa;
+    nomePorTelefone.set(soDigitos(u.telefoneWhatsApp ?? ""), quem ? `${u.nome} (${quem})` : u.nome);
+  }
+  const nomeDe = (m: { telefone: string; pushName: string | null }) =>
+    nomePorTelefone.get(soDigitos(m.telefone)) ?? m.pushName ?? m.telefone;
+
   const minutos = (d: Date) => Math.round((Date.now() - d.getTime()) / 60_000);
   const texto =
     `🔔 *${esquecidas.length === 1 ? "Uma mensagem" : `${esquecidas.length} mensagens`} sem resposta*\n\n` +
     esquecidas
       .map(
         (m) =>
-          `▫ *${m.pushName || m.telefone}*${m.ehSuperAdmin ? " (interno)" : ""} — há ${minutos(m.criadoEm)} min\n` +
+          `▫ *${nomeDe(m)}*${m.ehSuperAdmin ? " (interno)" : ""} — há ${minutos(m.criadoEm)} min\n` +
           `   "${(m.texto ?? "").slice(0, 220)}"`,
       )
       .join("\n\n") +
