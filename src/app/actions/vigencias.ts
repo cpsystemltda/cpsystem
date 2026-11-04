@@ -6,8 +6,44 @@ import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { isContratoNaoContinuado, ROTULO_TIPO } from "@/lib/validators";
+import { excluirVigenciaManual } from "@/lib/vigenciaExclusao";
 
 type Result = { ok: true } | { ok: false; erro: string };
+
+/**
+ * Exclui uma vigência iniciada manualmente (botão "Excluir" no bloco da
+ * vigência, aba Saldo). As regras — nunca a original, nunca a de aditivo,
+ * nunca com execução — e o porquê de cada uma estão em `vigenciaExclusao.ts`.
+ */
+export async function excluirVigenciaAction(formData: FormData): Promise<Result> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+
+  const vigenciaId = String(formData.get("vigenciaId") || "").trim();
+  if (!vigenciaId) return { ok: false, erro: "Vigência não informada." };
+
+  try {
+    const r = await excluirVigenciaManual({ vigenciaId, contaId: usuario.contaId });
+    if (!r.ok) return r;
+
+    await registrarAuditoria({
+      contaId: usuario.contaId,
+      usuarioId: usuario.id,
+      acao: "EXCLUIR",
+      recurso: "Vigencia",
+      recursoId: vigenciaId,
+      resumo:
+        `Vigência ${r.ordem}ª (iniciada manualmente) excluída` +
+        (r.renumeradas ? `; ${r.renumeradas} seguinte(s) renumerada(s)` : ""),
+    });
+
+    revalidatePath(r.contratoId ? `/contratos/${r.contratoId}` : `/atas/${r.ataId}`);
+    return { ok: true };
+  } catch (err) {
+    console.error("[excluirVigenciaAction]", err);
+    return { ok: false, erro: err instanceof Error ? err.message : "Falha ao excluir vigência." };
+  }
+}
 
 /**
  * Inicia manualmente uma nova vigência num contrato continuado ou ata —

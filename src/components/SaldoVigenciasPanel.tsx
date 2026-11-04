@@ -8,6 +8,7 @@ import type {
   SaldoVigenciaContrato,
 } from "@/lib/saldo";
 import { IniciarNovaVigenciaModal } from "@/components/IniciarNovaVigenciaModal";
+import { ExcluirVigenciaBotao } from "@/components/ExcluirVigenciaBotao";
 import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
 import { ItensContratoTab } from "@/components/abas/ItensContratoTab";
 
@@ -76,6 +77,11 @@ export function SaldoVigenciasPanel({
           vigencia={v}
           temMultiplas={temMultiplasVigencias}
           tipoItens={tipoItens}
+          // Excluir só a que foi iniciada à mão e não é a original. A de
+          // aditivo sai pelo "Excluir aditivo"; a 1ª é o próprio documento.
+          // Mesma permissão de quem pode iniciar — quem cria, desfaz.
+          podeExcluir={!!podeIniciarManual && !v.termoAditivoId && v.ordem > 1}
+          temSeguintes={saldo.vigencias.some((o) => o.ordem > v.ordem)}
         />
       ))}
 
@@ -163,10 +169,14 @@ function BlocoVigencia({
   vigencia,
   temMultiplas,
   tipoItens,
+  podeExcluir,
+  temSeguintes,
 }: {
   vigencia: SaldoVigencia | SaldoVigenciaContrato;
   temMultiplas: boolean;
   tipoItens: "ATA" | "CONTRATO";
+  podeExcluir: boolean;
+  temSeguintes: boolean;
 }) {
   return (
     <section
@@ -217,6 +227,14 @@ function BlocoVigencia({
               <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-700">
                 via Aditivo
               </span>
+            )}
+            {podeExcluir && (
+              <ExcluirVigenciaBotao
+                vigenciaId={vigencia.vigenciaId}
+                ordem={vigencia.ordem}
+                periodo={`${formatarData(vigencia.dataInicio)} → ${formatarData(vigencia.dataFim)}`}
+                temSeguintes={temSeguintes}
+              />
             )}
           </div>
         </header>
