@@ -99,6 +99,64 @@ function ehAlvoIdeal(porte: string | null | undefined): boolean {
   return p.includes("MICRO") || p.includes("PEQUEN") || p === "ME" || p === "EPP";
 }
 
+/**
+ * Quantos leads a prospecção ainda consegue abordar amanhã: perfil ideal,
+ * não contatado e com celular.
+ *
+ * É o único número que diz se a lista acabou. Contar a lista inteira
+ * esconde justamente isso — em 03/11/2026 havia 534 "não contatados" no banco
+ * e a prospecção saiu vazia dois dias seguidos, porque os 66 do perfil ideal
+ * eram todos telefone fixo e os 468 com celular eram empresa média ou grande.
+ * Usado pela reposição (decide se busca) e pela sentinela (conta no grupo).
+ */
+export async function estoqueDeProspeccao(): Promise<number> {
+  const naoContatados = await prisma.leadProspeccao.findMany({
+    where: { alvoIdeal: true, situacao: "NAO_CONTATADO", telefone: { not: null } },
+    select: { telefone: true },
+  });
+  return naoContatados.filter((l) => {
+    const d = (l.telefone || "").replace(/\D/g, "");
+    return d.length === 11 && d[2] === "9";
+  }).length;
+}
+
+/** Dias que a rotação de publicação cobre: de 15 dias a quase um ano atrás. */
+const ROTACAO_DIAS = 330;
+const ROTACAO_INICIO = 15;
+
+/**
+ * O dia de publicação que esta rodada varre no PNCP.
+ *
+ * Uma janela por dia, girando por todo o último ano — e não um mês fixo
+ * entre seis. O PNCP publica de 6 a 10 mil contratos por dia e devolve 429
+ * por volta da oitava página de 500, então cada rodada lê uns 4 mil
+ * contratos, sempre os primeiros da janela. Com seis fatias mensais, em seis
+ * rodadas a varredura passou a reler os mesmos 4 mil de cada mês e devolver
+ * só "já conhecíamos": o rendimento caiu de 81 leads (05/10/2026) para 22,
+ * 11 e zero, e a prospecção parou em 03/11 sem ninguém saber por quê.
+ *
+ * Com um dia por rodada, cada madrugada entra em contratos que nunca foram
+ * lidos, e rodadas vizinhas caem em meses diferentes — hoje um contrato de
+ * 11 meses atrás (anual, vencendo em semanas), amanhã um de 3 meses (curto).
+ * Começa 15 dias atrás porque o gancho é vencimento entre 15 e 150 dias, e
+ * vai até quase um ano porque o contrato anual publicado há 11 meses é
+ * exatamente o que está para vencer.
+ *
+ * O passo é 38, não um primo qualquer: como "hoje" também anda um dia por
+ * rodada, o dia lido anda `1 - passo` por rodada, e é ESSE número que precisa
+ * ser primo com 330 para nenhum dia repetir no ciclo (37 e 330 são primos
+ * entre si). Com passo 37 a conta parecia certa e repetia: 101 dias
+ * distintos em 330 rodadas, conferido antes de publicar.
+ *
+ * Fim de semana publica pouco, mas é leitura nova; empurrar para a sexta
+ * releria o que outra rodada já leu, e reler é o que esgotou a fonte.
+ */
+export function diaDePublicacaoDaRodada(hoje: Date = new Date()): Date {
+  const rodada = Math.floor(hoje.getTime() / 86400_000);
+  const atras = ROTACAO_INICIO + ((rodada * 38) % ROTACAO_DIAS);
+  return new Date(hoje.getTime() - atras * 86400_000);
+}
+
 type ContratoPncp = {
   niFornecedor?: string;
   nomeRazaoSocialFornecedor?: string;

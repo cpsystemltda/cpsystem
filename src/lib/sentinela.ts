@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { ehDiaUtilBrt, horaBrt, inicioDoDiaBrt } from "@/lib/saudacao";
 import { ondeNaoFoiDescartada } from "@/lib/marcasDaFila";
+import { estoqueDeProspeccao } from "@/lib/leads/descobrir";
 
 /**
  * Sentinela — o sistema conferindo a si mesmo, todo dia.
@@ -228,18 +229,58 @@ export async function conferirOperacao(): Promise<RelatorioSentinela> {
   const diaUtil = ehDiaUtilBrt(agora);
   const hora = horaBrt(agora);
 
+  // Em 03 e 04/11/2026 "0 de 10" não foi cron parado: o cron rodou e não
+  // achou lead elegível, porque a reposição noturna tinha esgotado a fonte
+  // doze dias antes — e nada aqui dizia isso. Agora o estoque aparece em todo
+  // relatório, e "zero prospecção" é lido junto com ele: cron que não rodou,
+  // cron que rodou sem estoque e cron que rodou com estoque e não enfileirou
+  // são três problemas diferentes, com três donos diferentes.
+  const [estoque, cronProspeccaoRodou] = await Promise.all([
+    estoqueDeProspeccao(),
+    prisma.mensagemSaidaWhatsApp.count({
+      where: { criadoEm: { gte: inicioDoDia }, texto: { startsWith: "📣 *Prospecção do dia*" } },
+    }),
+  ]);
+  linhas.push(`📦 Leads prontos para abordar: *${estoque}*`);
+  let estoqueJaCobrado = false;
+
   if (!diaUtil) {
     linhas.push(`📣 Prospecção: *não roda hoje* — só em dia útil`);
   } else if (hora < PROSPECCAO_COBRAR_A_PARTIR_DE) {
     linhas.push(`📣 Prospecção: sai às ${PROSPECCAO_HORA_BRT}h — *${prospeccaoHoje}* até agora`);
+    if (estoque === 0 && hora < PROSPECCAO_HORA_BRT) {
+      estoqueJaCobrado = true;
+      achados.push({
+        grave: true,
+        texto:
+          `Estoque de leads zerado e a descoberta das 4h não repôs: a prospecção das ${PROSPECCAO_HORA_BRT}h vai sair vazia. ` +
+          `O relatório da descoberta (📡) diz o que ela encontrou.`,
+      });
+    }
   } else {
     linhas.push(`📣 Prospecções hoje: *${prospeccaoHoje}* de 10`);
     if (prospeccaoHoje === 0) {
+      estoqueJaCobrado = true;
       achados.push({
         grave: true,
-        texto: `Nenhuma prospecção saiu até as ${hora}h, e é dia útil. O cron das ${PROSPECCAO_HORA_BRT}h falhou.`,
+        texto:
+          cronProspeccaoRodou === 0
+            ? `Nenhuma prospecção saiu até as ${hora}h, e é dia útil. O cron das ${PROSPECCAO_HORA_BRT}h falhou.`
+            : estoque === 0
+              ? `A prospecção das ${PROSPECCAO_HORA_BRT}h rodou, mas não havia lead elegível: estoque zerado. ` +
+                `A descoberta das 4h repõe; se amanhã continuar zerado, é a fonte (PNCP ou BrasilAPI) que precisa de atenção.`
+              : `A prospecção das ${PROSPECCAO_HORA_BRT}h rodou e não enfileirou nada, embora haja ${estoque} lead(s) prontos. Conferir o cron.`,
       });
     }
+  }
+
+  // Zerado agora é vazio amanhã. Observação, não alarme: quem alarma é o
+  // relatório das 8h, se a descoberta das 4h não tiver reposto.
+  if (estoque === 0 && !estoqueJaCobrado) {
+    achados.push({
+      grave: false,
+      texto: `Estoque de leads zerado. A descoberta das 4h repõe; o relatório das 8h confirma.`,
+    });
   }
 
   // ── 4. Mensagens que ninguém respondeu ────────────────────────────────────
