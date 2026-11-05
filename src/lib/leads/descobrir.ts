@@ -234,12 +234,14 @@ export async function descobrirLeads(o: OpcoesDescoberta): Promise<ResumoDescobe
     for (let tentativa = 1; tentativa <= 2 && !dados; tentativa++) {
       try {
         const resp = await fetch(url, { headers: CABECALHOS });
-        if (resp.status === 429) {
+        // 5xx entra na mesma segunda chance: em 05/11/2026 às 4h o PNCP
+        // devolveu 503 na página 1, a rodada encerrou e o dia ficou sem lead.
+        if (resp.status === 429 || resp.status >= 500) {
           if (tentativa === 1) {
             await dormir(8_000);
             continue;
           }
-          r.detalhes.push(`PNCP manteve o 429 na página ${pagina} — varredura encerrada aqui.`);
+          r.detalhes.push(`PNCP manteve o ${resp.status} na página ${pagina} — varredura encerrada aqui.`);
           break;
         }
         if (!resp.ok) {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { descobrirLeads, diaDePublicacaoDaRodada, estoqueDeProspeccao } from "@/lib/leads/descobrir";
 import { avisarEquipe } from "@/lib/alertaInterno";
+import { prisma } from "@/lib/prisma";
+import { inicioDoDiaBrt } from "@/lib/saudacao";
 
 /**
  * Repõe a lista de prospecção antes de ela acabar.
@@ -41,6 +43,21 @@ export async function GET(req: Request) {
 
   if (estoque >= ESTOQUE_MINIMO) {
     return NextResponse.json({ ok: true, estoque, repos: false, motivo: "estoque suficiente" });
+  }
+
+  // Duas chamadas por dia (4h e 6h BRT), uma rodada só. A das 6h existe para
+  // o dia em que a das 4h volta de mãos vazias — PNCP fora do ar às 4h de
+  // 05/11/2026 — e não deve reler o mesmo dia quando a primeira já gravou:
+  // seria tempo de função e um aviso "0 gravados" no grupo toda manhã.
+  // `?forcar=1` ignora a trava, para rodar à mão.
+  const url = new URL(req.url);
+  if (url.searchParams.get("forcar") !== "1") {
+    const jaGravouHoje = await prisma.leadProspeccao.count({
+      where: { criadoEm: { gte: inicioDoDiaBrt() }, anotacoes: { startsWith: "Descoberto automaticamente" } },
+    });
+    if (jaGravouHoje > 0) {
+      return NextResponse.json({ ok: true, estoque, repos: false, motivo: "já repôs hoje", gravadosHoje: jaGravouHoje });
+    }
   }
 
   // Um dia de publicação por rodada, girando pelo último ano — o porquê está

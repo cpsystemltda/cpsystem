@@ -105,6 +105,10 @@
     {
       "path": "/api/cron/descobrir-leads",
       "schedule": "0 7 * * 1-5"
+    },
+    {
+      "path": "/api/cron/descobrir-leads?tentativa=2",
+      "schedule": "0 9 * * 1-5"
     }
   ]
 }
