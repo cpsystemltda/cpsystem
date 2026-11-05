@@ -11,9 +11,9 @@ import { COMISSAO_FIXA_POR_VINCULO } from "@/lib/comissaoEmbaixador";
  * O que já existia e é reaproveitado inteiro: `Cupom` (código que a empresa
  * digita no cadastro; `analistaVinculadoId` vira `Conta.embaixadorId`),
  * `calcularComissoesDoMes` (R$ 29,90 por conta indicada ATIVA com fatura
- * paga, todo mês) e o cron do dia 20 que paga por PIX. O indicador é uma
- * linha de `Analista` com `indicador = true` — assim nada disso precisa de
- * segundo caminho.
+ * paga, todo mês) e o repasse por PIX da régua diária, que paga assim que o
+ * dinheiro do cliente entra em conta. O indicador é uma linha de `Analista`
+ * com `indicador = true` — assim nada disso precisa de segundo caminho.
  *
  * O que é novo: a porta de entrada pública (/indicar), o cupom pessoal
  * gerado sozinho no cadastro, e a página /indicacao com cupom, placar,
@@ -29,8 +29,20 @@ import { COMISSAO_FIXA_POR_VINCULO } from "@/lib/comissaoEmbaixador";
 
 export const DIAS_TRIAL_CUPOM_INDICACAO = 14;
 export const SITE = "https://cpsystem.app.br";
-/** Dia do mês em que o cron paga as comissões do mês anterior. */
-export const DIA_PAGAMENTO_COMISSAO = 20;
+
+/**
+ * Prazo em que a operadora de cartão libera o valor para o CP System. É o
+ * mesmo número de `pagamentoAnalista.ts`: a comissão só sai depois que o
+ * dinheiro do cliente existe em conta (Regina 10/08 e 24/08). PIX e boleto
+ * entram junto com a confirmação; cartão, cerca de 32 dias depois.
+ *
+ * Regina 05/11/2026: *"É sempre no PIX, cai na hora se a pessoa pagar no
+ * PIX. E se ela pagar no cartão, cai 32 dias depois, porque é o prazo que o
+ * banco tem."* Até esta data a página pública, o painel e as boas-vindas do
+ * indicador diziam "dia 20" — herança do cron antigo, regra que já não
+ * existia desde 24/08. Não há data fixa no mês.
+ */
+export const DIAS_COMPENSACAO_CARTAO = 32;
 
 export function linkDoCupom(codigo: string): string {
   return `${SITE}/signup?cupom=${encodeURIComponent(codigo)}`;
@@ -86,6 +98,43 @@ export async function garantirCupomDoAnalista(
   throw new Error("Não consegui gerar um código único para o cupom. Tente de novo.");
 }
 
+// ─── Quando o dinheiro entra ──────────────────────────────────────────────────
+
+/**
+ * Situação de uma comissão ainda não paga, do ponto de vista de quem espera:
+ * - LIBERADA: o dinheiro do cliente já está em conta; o PIX sai no próximo
+ *   repasse automático (a régua roda todo dia).
+ * - PREVISTA: o cliente pagou no cartão; a operadora libera em ~32 dias.
+ * - AGUARDANDO_CLIENTE: a empresa ainda não pagou a fatura dessa competência.
+ */
+export type LiberacaoComissao =
+  | { situacao: "LIBERADA"; em: Date }
+  | { situacao: "PREVISTA"; em: Date }
+  | { situacao: "AGUARDANDO_CLIENTE" };
+
+/**
+ * Espelha o critério de caixa de `pagarComissoesDoMesAnterior`: cada
+ * competência anda com a SUA mensalidade; bônus (competência com sufixo)
+ * vale com qualquer fatura paga da conta.
+ */
+export function liberacaoDaComissao(
+  comissao: { competencia: string },
+  cobrancasPagas: { competencia: string; forma: string; pagaEm: Date | null }[],
+  hoje: Date = new Date(),
+): LiberacaoComissao {
+  const ehBonus = !/^\d{4}-\d{2}$/.test(comissao.competencia);
+  const pagas = cobrancasPagas.filter((c) => c.pagaEm && (ehBonus || c.competencia === comissao.competencia));
+  if (pagas.length === 0) return { situacao: "AGUARDANDO_CLIENTE" };
+  let melhor: Date | null = null;
+  for (const p of pagas) {
+    const pagaEm = p.pagaEm as Date;
+    const em = p.forma === "CARTAO_CREDITO" ? new Date(pagaEm.getTime() + DIAS_COMPENSACAO_CARTAO * 86400000) : pagaEm;
+    if (!melhor || em < melhor) melhor = em;
+  }
+  const em = melhor as Date;
+  return em <= hoje ? { situacao: "LIBERADA", em } : { situacao: "PREVISTA", em };
+}
+
 // ─── O painel ─────────────────────────────────────────────────────────────────
 
 export type SituacaoIndicada = "TESTE" | "ASSINANTE" | "AGUARDANDO_PAGAMENTO" | "INADIMPLENTE" | "CANCELADA";
@@ -110,7 +159,16 @@ export type ComissaoLinha = {
   valor: number;
   paga: boolean;
   pagaEm: Date | null;
+  /** Só para comissão ainda não paga: quando o repasse pode sair. */
+  liberacao: LiberacaoComissao | null;
 };
+
+/** O que o painel mostra no cartão "Próximo repasse". */
+export type ProximoRepasse =
+  | { situacao: "LIBERADA"; valor: number }
+  | { situacao: "PREVISTA"; em: Date; valor: number }
+  | { situacao: "AGUARDANDO_CLIENTE"; valor: number }
+  | { situacao: "NADA" };
 
 export type ResumoIndicacao = {
   analista: { id: string; nomeCompleto: string; indicador: boolean; pix: string | null; telefone: string };
@@ -125,8 +183,7 @@ export type ResumoIndicacao = {
     comissaoMensal: number;
     aReceber: number;
     recebido: number;
-    proximoPagamentoEm: Date;
-    valorProximoPagamento: number;
+    proximoRepasse: ProximoRepasse;
   };
   comissoes: ComissaoLinha[];
 };
@@ -141,16 +198,6 @@ function situacaoDaConta(c: {
   if (c.statusAssinatura === "TRIAL") return "TESTE";
   // ATIVA
   return c.primeiraPaga ? "ASSINANTE" : "AGUARDANDO_PAGAMENTO";
-}
-
-/** Próximo dia 20 a partir de hoje (BRT). */
-export function proximoPagamento(hoje: Date = new Date()): Date {
-  const [ano, mes, dia] = hoje
-    .toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
-    .split("-")
-    .map(Number);
-  const proximoMes = dia >= DIA_PAGAMENTO_COMISSAO ? mes : mes - 1;
-  return new Date(Date.UTC(ano, proximoMes, DIA_PAGAMENTO_COMISSAO, 12));
 }
 
 export async function resumoDaIndicacao(contaId: string, usuarioId: string): Promise<ResumoIndicacao | null> {
@@ -178,7 +225,14 @@ export async function resumoDaIndicacao(contaId: string, usuarioId: string): Pro
       orderBy: [{ competencia: "desc" }, { criadoEm: "desc" }],
       select: {
         id: true, competencia: true, valor: true, paga: true, pagaEm: true,
-        conta: { select: { empresas: { select: { razaoSocial: true, nomeFantasia: true }, take: 1 } } },
+        conta: {
+          select: {
+            empresas: { select: { razaoSocial: true, nomeFantasia: true }, take: 1 },
+            // Para dizer QUANDO o repasse sai: depende de como e quando a
+            // empresa pagou a mensalidade desta competência.
+            cobrancas: { where: { status: "PAGA", pagaEm: { not: null } }, select: { competencia: true, forma: true, pagaEm: true } },
+          },
+        },
       },
     }),
   ]);
@@ -199,6 +253,7 @@ export async function resumoDaIndicacao(contaId: string, usuarioId: string): Pro
     };
   });
 
+  const hoje = new Date();
   const comissoes: ComissaoLinha[] = comissoesRaw.map((c) => ({
     id: c.id,
     competencia: c.competencia,
@@ -206,11 +261,30 @@ export async function resumoDaIndicacao(contaId: string, usuarioId: string): Pro
     valor: c.valor,
     paga: c.paga,
     pagaEm: c.pagaEm,
+    liberacao: c.paga ? null : liberacaoDaComissao(c, c.conta.cobrancas, hoje),
   }));
 
   const conta = (s: SituacaoIndicada) => empresas.filter((e) => e.situacao === s).length;
   const assinantes = conta("ASSINANTE");
-  const aReceber = comissoes.filter((c) => !c.paga).reduce((s, c) => s + c.valor, 0);
+  const soma = (xs: ComissaoLinha[]) => xs.reduce((s, c) => s + c.valor, 0);
+  const abertas = comissoes.filter((c) => !c.paga);
+  const liberadas = abertas.filter((c) => c.liberacao?.situacao === "LIBERADA");
+  const previstas = abertas.filter((c) => c.liberacao?.situacao === "PREVISTA");
+  const aguardando = abertas.filter((c) => c.liberacao?.situacao === "AGUARDANDO_CLIENTE");
+
+  let proximoRepasse: ProximoRepasse;
+  if (liberadas.length) {
+    proximoRepasse = { situacao: "LIBERADA", valor: soma(liberadas) };
+  } else if (previstas.length) {
+    const datas = previstas
+      .map((c) => (c.liberacao as { em: Date }).em.getTime())
+      .sort((a, b) => a - b);
+    proximoRepasse = { situacao: "PREVISTA", em: new Date(datas[0]), valor: soma(previstas) };
+  } else if (aguardando.length) {
+    proximoRepasse = { situacao: "AGUARDANDO_CLIENTE", valor: soma(aguardando) };
+  } else {
+    proximoRepasse = { situacao: "NADA" };
+  }
 
   return {
     analista,
@@ -223,10 +297,9 @@ export async function resumoDaIndicacao(contaId: string, usuarioId: string): Pro
       aguardandoPagamento: conta("AGUARDANDO_PAGAMENTO"),
       canceladas: conta("CANCELADA") + conta("INADIMPLENTE"),
       comissaoMensal: assinantes * COMISSAO_FIXA_POR_VINCULO,
-      aReceber,
-      recebido: comissoes.filter((c) => c.paga).reduce((s, c) => s + c.valor, 0),
-      proximoPagamentoEm: proximoPagamento(),
-      valorProximoPagamento: aReceber,
+      aReceber: soma(abertas),
+      recebido: soma(comissoes.filter((c) => c.paga)),
+      proximoRepasse,
     },
     comissoes,
   };

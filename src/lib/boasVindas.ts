@@ -106,7 +106,9 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
         `*Como funciona:* cada empresa que se cadastrar com o seu cupom e pagar a primeira fatura ` +
         `rende *R$ 29,90 por mês* para você, enquanto ela for cliente. Cumulativo e sem teto: ` +
         `dez empresas são R$ 299,00 todo mês.\n\n` +
-        `*Quando o dinheiro entra:* por PIX, todo dia 20, na chave que você cadastrou.\n\n` +
+        `*Quando o dinheiro entra:* por PIX, na chave que você cadastrou, assim que o pagamento da ` +
+        `empresa cai na nossa conta. Se ela pagar por PIX, no mesmo dia; se pagar no cartão, em cerca ` +
+        `de 32 dias, que é o prazo de liberação da operadora.\n\n` +
         `*Seu primeiro passo:* mandar o cupom para uma empresa que vende ao governo. Em ` +
         `cpsystem.app.br/indicacao há mensagens prontas e o acompanhamento de quem entrou.\n\n` +
         `Desejamos um excelente começo. Qualquer dúvida, é só responder esta mensagem.\n\n` +
@@ -211,7 +213,7 @@ export async function darBoasVindas(contaId: string): Promise<boolean> {
           ${
             ehIndicador
               ? `<li>R$ 29,90 por mês por cada empresa indicada que assinar, enquanto ela for cliente.</li>
-          <li>Pagamento por PIX todo dia 20, na chave cadastrada.</li>
+          <li>Repasse por PIX, na chave cadastrada, assim que o pagamento da empresa entra em conta: PIX no mesmo dia; cartão em cerca de 32 dias, prazo da operadora.</li>
           <li>Painel com quem entrou pelo seu cupom, quanto rende e mensagens prontas para compartilhar.</li>`
               : ehAnalista
               ? `<li>Os prazos de todos os seus clientes em um só painel.</li>

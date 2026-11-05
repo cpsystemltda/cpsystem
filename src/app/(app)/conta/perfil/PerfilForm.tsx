@@ -88,7 +88,7 @@ export function PerfilForm({
             <Campo label="Complemento" name="analistaComplemento" defaultValue={analista.complemento} />
 
             <div className="col-span-2 mt-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-900">
-              <strong>Chave PIX obrigatória</strong> para receber sua comissão mensal (dia 20). Aceita CPF, e-mail, celular ou aleatória.
+              <strong>Chave PIX obrigatória</strong> para receber sua comissão. O repasse sai por PIX assim que o pagamento do cliente entra em conta. Aceita CPF, e-mail, celular ou aleatória.
             </div>
             <Campo label="Chave PIX" name="analistaPix" defaultValue={analista.pix} erro={e.analistaPix} span={2} />
             <Campo label="Banco" name="analistaBanco" defaultValue={analista.banco} />

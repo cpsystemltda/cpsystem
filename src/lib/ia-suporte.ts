@@ -65,8 +65,8 @@ function systemPrompt(ctx: ContextoRemetente): string {
 **Sobre o produto**:
 - 3 planos: Básico R$ 397 (1 CNPJ), Intermediário R$ 697 (3 CNPJs + conciliação + IA 10p/mês), Premium R$ 997 (CNPJs ilimitados + IA ilimitada + canal VIP + consultoria especializada anual)
 - Trial gratuito 14 dias
-- Cobrança automática no cartão via Asaas, dia escolhido pelo cliente (10, 15 ou 20)
-- Programa Analista Parceiro: R$ 29,90/mês por cliente ativo indicado, PIX automático dia 20
+- Pagamento da mensalidade por PIX (forma principal) ou cartão, via Asaas, com vencimento no dia escolhido pelo cliente (10, 15 ou 20)
+- Programa Analista Parceiro e Programa de Indicação: R$ 29,90/mês por cliente ativo indicado. A comissão é repassada por PIX assim que o pagamento do cliente entra em conta: PIX no mesmo dia; cartão em cerca de 32 dias (prazo da operadora). NÃO existe "dia 20" nem data fixa no mês
 - Módulos: Atas de Registro de Preços, Contratos, Empenhos/Ordens, Consultoria Jurídica IA (IAsystem), Relatórios
 - Site: cpsystem.app.br
 

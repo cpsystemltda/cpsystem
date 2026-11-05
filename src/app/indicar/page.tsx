@@ -80,7 +80,7 @@ export default function IndicarPage() {
           <section id="como-funciona" className="mt-20 grid gap-5 md:grid-cols-3">
             <Passo n="1" icon={Ticket} titulo="Cadastre-se e receba o cupom" desc="Leva dois minutos. Você sai com um código pessoal, tipo MARIA-7K2P, e um link pronto para compartilhar." />
             <Passo n="2" icon={Share2} titulo="Compartilhe com quem precisa" desc="Mande o código ou o link para a empresa. Ela se cadastra no CP System informando o seu cupom e ganha 14 dias de teste, sem cartão." />
-            <Passo n="3" icon={Coins} titulo="Receba todo dia 20" desc="A partir da primeira fatura paga pela empresa, R$ 29,90 caem na sua chave PIX todo mês. Enquanto ela continuar cliente." />
+            <Passo n="3" icon={Coins} titulo="Receba por PIX, assim que a empresa pagar" desc="A partir da primeira fatura paga pela empresa, R$ 29,90 entram na sua chave PIX todo mês, enquanto ela continuar cliente. Se ela pagou por PIX, no mesmo dia; se pagou no cartão, em cerca de 32 dias, prazo de liberação da operadora." />
           </section>
 
           {/* Simulador */}
@@ -125,7 +125,7 @@ export default function IndicarPage() {
             <div className="mx-auto mt-8 grid max-w-4xl gap-3 md:grid-cols-2">
               <Faq p="Preciso ser analista de licitação?" r="Não. O programa é para quem conhece empresas que vendem ao governo. Quem é analista também pode indicar, pelo mesmo cupom." />
               <Faq p="Quanto eu ganho?" r="R$ 29,90 por mês por cada empresa indicada com assinatura ativa. Cinco empresas são R$ 149,50 por mês; vinte são R$ 598,00. Vitalício enquanto a empresa pagar." />
-              <Faq p="Quando o dinheiro entra?" r="A comissão nasce na primeira fatura paga pela empresa e é paga por PIX no dia 20 do mês seguinte, na chave que você cadastrar." />
+              <Faq p="Quando o dinheiro entra?" r="A comissão nasce na primeira fatura paga pela empresa e é repassada por PIX, na chave que você cadastrar, assim que o pagamento dela entra na nossa conta: se a empresa pagou por PIX, no mesmo dia; se pagou no cartão, em cerca de 32 dias, prazo de liberação da operadora. Não há data fixa no mês." />
               <Faq p="A empresa que uso meu cupom ganha o quê?" r="O teste gratuito de 14 dias, sem cartão, e a certeza de que a indicação é sua. O cupom identifica você no cadastro dela." />
               <Faq p="Tem custo ou meta?" r="Nenhum custo e nenhuma meta. Você se cadastra de graça e indica quantas empresas quiser." />
               <Faq p="E se a empresa cancelar?" r="A comissão daquela empresa para no mês em que ela deixa de pagar. As outras continuam." />

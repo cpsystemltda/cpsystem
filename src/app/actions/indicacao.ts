@@ -16,7 +16,8 @@ import { garantirCupomDoAnalista } from "@/lib/indicacao";
  *
  * O indicador nasce como conta ANALISTA + linha de Analista com
  * `indicador = true` — é a mesma máquina de comissão (R$ 29,90 por empresa
- * indicada que paga, PIX no dia 20), sem um segundo caminho para manter.
+ * indicada que paga, repassada por PIX assim que o dinheiro entra em conta),
+ * sem um segundo caminho para manter.
  */
 export type ResultadoIndicador = {
   erro?: string;
@@ -91,7 +92,7 @@ export async function signupIndicadorAction(
       statusAssinatura: "ATIVA", // indicador não paga assinatura — só recebe comissão
       // O indicador aceita o mesmo Contrato de Adesão ao Programa de Analista
       // Parceiro v1.0: é ele que rege o papel de embaixador (comissão por
-      // indicação, pagamento dia 20, condutas vedadas).
+      // indicação, repasse por PIX, condutas vedadas).
       termosAceitosEm: new Date(),
       termosAceitosVersao: "1.0",
       ...atribuicao(formData),

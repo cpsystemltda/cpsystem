@@ -30,6 +30,11 @@ function data(d: Date | null): string {
  * (Regina 02/11/2026): cupom, quantas empresas entraram por ele, em que
  * ponto cada uma está, quanto rende por mês, quando o dinheiro entra, o
  * histórico do que já foi pago e as mensagens prontas para compartilhar.
+ *
+ * "Quando o dinheiro entra" não é um dia do mês: a comissão sai por PIX
+ * assim que o pagamento da empresa cai em conta — PIX no mesmo dia, cartão
+ * quando a operadora libera (~32 dias). Regina 05/11/2026, ao ver "dia 20"
+ * aqui: *"Que coisa ridícula. É sempre no PIX, cai na hora."*
  */
 export default async function IndicacaoPage({ searchParams }: { searchParams: Promise<{ novo?: string }> }) {
   const usuario = await exigirUsuario();
@@ -66,6 +71,7 @@ export default async function IndicacaoPage({ searchParams }: { searchParams: Pr
   const mensagens = mensagensProntas(analista.nomeCompleto, cupom.codigo);
   const pctTeste = placar.cadastradas ? Math.round((placar.emTeste / placar.cadastradas) * 100) : 0;
   const pctAssinantes = placar.cadastradas ? Math.round((placar.assinantes / placar.cadastradas) * 100) : 0;
+  const pr = placar.proximoRepasse;
 
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
@@ -89,7 +95,7 @@ export default async function IndicacaoPage({ searchParams }: { searchParams: Pr
         <div className="mt-6 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            <strong>Sem chave PIX cadastrada.</strong> É por ela que a comissão entra no dia 20.{" "}
+            <strong>Sem chave PIX cadastrada.</strong> É por ela que a comissão entra.{" "}
             <Link href="/conta/perfil" className="font-bold underline">Cadastrar agora</Link>.
           </p>
         </div>
@@ -106,7 +112,21 @@ export default async function IndicacaoPage({ searchParams }: { searchParams: Pr
         <Card icon={BadgeCheck} titulo="Assinantes ativas" valor={String(placar.assinantes)} sub={placar.canceladas ? `${placar.canceladas} cancelada${placar.canceladas > 1 ? "s" : ""} ou em atraso` : "nenhuma cancelada"} cor="emerald" />
         <Card icon={Coins} titulo="Rende por mês" valor={brl(placar.comissaoMensal)} sub={`${brl(COMISSAO_FIXA_POR_VINCULO)} × ${placar.assinantes}`} cor="emerald" />
         <Card icon={Wallet} titulo="A receber" valor={brl(placar.aReceber)} sub={`${comissoes.filter((c) => !c.paga).length} comissão${comissoes.filter((c) => !c.paga).length === 1 ? "" : "ões"} em aberto`} cor="amber" />
-        <Card icon={CalendarCheck} titulo="Próximo pagamento" valor={data(placar.proximoPagamentoEm)} sub={placar.valorProximoPagamento ? `previsto ${brl(placar.valorProximoPagamento)} via PIX` : "nada a pagar ainda"} />
+        <Card
+          icon={CalendarCheck}
+          titulo="Próximo repasse"
+          valor={pr.situacao === "LIBERADA" ? "Liberado" : pr.situacao === "PREVISTA" ? data(pr.em) : pr.situacao === "AGUARDANDO_CLIENTE" ? "Aguardando" : "—"}
+          sub={
+            pr.situacao === "LIBERADA"
+              ? `${brl(pr.valor)} saem no repasse automático por PIX`
+              : pr.situacao === "PREVISTA"
+              ? `${brl(pr.valor)} quando a operadora do cartão liberar`
+              : pr.situacao === "AGUARDANDO_CLIENTE"
+              ? `${brl(pr.valor)} assim que a empresa pagar a fatura`
+              : "nada a pagar ainda"
+          }
+          cor={pr.situacao === "LIBERADA" ? "emerald" : undefined}
+        />
         <Card icon={Trophy} titulo="Já recebido" valor={brl(placar.recebido)} sub={`${comissoes.filter((c) => c.paga).length} pagamento${comissoes.filter((c) => c.paga).length === 1 ? "" : "s"}`} />
         <Card
           icon={Megaphone}
@@ -190,7 +210,7 @@ export default async function IndicacaoPage({ searchParams }: { searchParams: Pr
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Histórico de comissões ({comissoes.length})</h2>
         {comissoes.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">
-            A primeira comissão aparece aqui no mês em que uma empresa indicada paga a primeira fatura. O pagamento é por PIX, no dia 20 do mês seguinte.
+            A primeira comissão aparece aqui no mês em que uma empresa indicada paga a primeira fatura. O repasse é por PIX, assim que o pagamento dela entra em conta: PIX no mesmo dia; cartão em cerca de 32 dias, que é o prazo de liberação da operadora.
           </p>
         ) : (
           <table className="mt-3 w-full text-sm">
@@ -209,7 +229,15 @@ export default async function IndicacaoPage({ searchParams }: { searchParams: Pr
                   <td className="px-3 py-2">{c.cliente}</td>
                   <td className="px-3 py-2 text-right font-medium">{brl(c.valor)}</td>
                   <td className="px-3 py-2">
-                    {c.paga ? <span className="text-xs text-emerald-700">Pago em {data(c.pagaEm)}</span> : <span className="text-xs text-amber-700">A receber no dia 20</span>}
+                    {c.paga ? (
+                      <span className="text-xs text-emerald-700">Pago em {data(c.pagaEm)}</span>
+                    ) : c.liberacao?.situacao === "LIBERADA" ? (
+                      <span className="text-xs text-emerald-700">Liberada · sai no próximo repasse por PIX</span>
+                    ) : c.liberacao?.situacao === "PREVISTA" ? (
+                      <span className="text-xs text-amber-700">Prevista para {data(c.liberacao.em)} (pagamento no cartão)</span>
+                    ) : (
+                      <span className="text-xs text-amber-700">Aguardando o pagamento da empresa</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -219,7 +247,7 @@ export default async function IndicacaoPage({ searchParams }: { searchParams: Pr
       </section>
 
       <p className="mt-8 text-[12px] text-slate-400">
-        Regra do programa: R$ 29,90 por mês por empresa indicada com assinatura ativa, a partir da primeira fatura paga, enquanto ela for cliente. Contrato em{" "}
+        Regra do programa: R$ 29,90 por mês por empresa indicada com assinatura ativa, a partir da primeira fatura paga, enquanto ela for cliente. Repasse por PIX assim que o pagamento da empresa entra em conta. Contrato em{" "}
         <Link href="/termos?tipo=analista" className="underline">Termos</Link>. Dados de recebimento em{" "}
         <Link href="/conta/perfil" className="underline">Meus dados</Link>.
       </p>

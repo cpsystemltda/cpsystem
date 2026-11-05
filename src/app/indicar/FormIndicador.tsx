@@ -101,7 +101,7 @@ export function FormIndicador() {
             <a href="/termos?tipo=analista" target="_blank" rel="noreferrer" className="font-bold underline text-[#9C7A2D]">
               Contrato de Adesão ao Programa de Analista Parceiro
             </a>
-            , que rege também o papel de indicador: comissão de R$ 29,90 por empresa indicada com assinatura ativa, paga por PIX no dia 20 do mês seguinte, e as condutas vedadas.
+            , que rege também o papel de indicador: comissão de R$ 29,90 por empresa indicada com assinatura ativa, repassada por PIX, e as condutas vedadas.
           </span>
         </label>
         {e.aceiteTermos && <p className="mt-2 text-[11px] font-semibold text-[#BE123C]">{e.aceiteTermos}</p>}
