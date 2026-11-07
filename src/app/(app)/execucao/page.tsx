@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Receipt, Truck, AlertTriangle } from "lucide-react";
+import { Plus, Receipt, Truck, AlertTriangle, Paperclip, Download } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
@@ -151,6 +151,10 @@ export default async function ExecucaoPage({
       // Etiqueta com quem acompanha (demanda de cliente 24/09): na lista é
       // onde se enxerga a divisão do time sem abrir documento por documento.
       responsavel: { select: { id: true, nome: true } },
+      // C2VENDAS (follow-up 06/11/2026): quem está no telefone com o
+      // entregador precisa chegar aos anexos da execução em um clique, e
+      // mandar todos de uma vez. O número na etiqueta diz se há o que mandar.
+      _count: { select: { anexos: true } },
     },
   });
 
@@ -291,11 +295,11 @@ export default async function ExecucaoPage({
               return Math.max(0, Math.round((hoje - dia(prazo)) / 86400000));
             })();
             return (
-              <Link
+              <div
                 key={e.id}
-                href={`/execucao/${e.id}`}
-                className="glass-tile group block overflow-hidden rounded-[18px] px-5 py-5 transition hover:-translate-y-0.5"
+                className="glass-tile group overflow-hidden rounded-[18px] px-5 py-5 transition hover:-translate-y-0.5"
               >
+                <Link href={`/execucao/${e.id}`} className="block">
                 <div className="flex items-start justify-between gap-6">
                   <div className="flex min-w-0 flex-1 items-start gap-3">
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-amber-50">
@@ -352,7 +356,27 @@ export default async function ExecucaoPage({
                     {atrasoDias > 0 && <div className="mt-1 text-xs font-medium text-red-600">⚠ Atraso de {atrasoDias}d</div>}
                   </div>
                 </div>
-              </Link>
+                </Link>
+                {/* C2VENDAS (06/11/2026): atalho direto aos anexos desta
+                    execução e o pacote .zip para mandar à equipe de rua. */}
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                  <Link
+                    href={`/execucao/${e.id}?aba=anexos`}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-amber-300 hover:bg-amber-50"
+                  >
+                    <Paperclip className="h-3.5 w-3.5" /> Anexos ({e._count.anexos})
+                  </Link>
+                  {e._count.anexos > 0 && (
+                    <a
+                      href={`/api/anexos/zip?empenho=${e.id}`}
+                      title="Baixa todos os anexos desta execução em um único arquivo .zip"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-amber-300 hover:bg-amber-50"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Baixar tudo (.zip)
+                    </a>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>

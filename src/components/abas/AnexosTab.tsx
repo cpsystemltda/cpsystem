@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { adicionarAnexoAction, adicionarAnotacaoAction } from "@/app/actions/contratuais";
-import { Paperclip, FileText, StickyNote } from "lucide-react";
+import { Paperclip, FileText, StickyNote, Download } from "lucide-react";
 
 type Anexo = {
   id: string;
@@ -47,8 +47,29 @@ export function AnexosTab({
 }) {
   const [state, formAction] = useActionState(adicionarAnexoAction, null);
 
+  // C2VENDAS (follow-up 06/11/2026): quem está na rua recebe o pacote inteiro
+  // da execução pelo WhatsApp — empenho, ordem de fornecimento, edital, TR.
+  // Um clique, um .zip, em vez de abrir e salvar anexo por anexo.
+  const zipHref = empenhoId
+    ? `/api/anexos/zip?empenho=${empenhoId}`
+    : ataId
+    ? `/api/anexos/zip?ata=${ataId}`
+    : contratoId
+    ? `/api/anexos/zip?contrato=${contratoId}`
+    : null;
+
   return (
     <div className="space-y-6">
+      {anexos.length > 0 && zipHref && (
+        <div className="flex justify-end">
+          <a
+            href={zipHref}
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Download className="h-3.5 w-3.5" /> Baixar todos ({anexos.length}) em .zip
+          </a>
+        </div>
+      )}
       {anexos.length > 0 ? (
         <ul className="grid gap-2 md:grid-cols-2">
           {anexos.map((a) => (

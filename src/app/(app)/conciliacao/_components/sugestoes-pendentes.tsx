@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { Loader2, Check, X, ArrowRight } from "lucide-react";
+import { Loader2, Check, X, ArrowRight, ExternalLink } from "lucide-react";
 import {
   confirmarConciliacaoAction,
   rejeitarConciliacaoAction,
@@ -13,6 +14,8 @@ import {
 type Sugestao = {
   id: string;
   score: number;
+  /** Frases de `fatoresLegiveis` — o "por quê" do percentual. */
+  fatores?: string[];
   transacao: {
     data: Date;
     valor: number;
@@ -100,10 +103,17 @@ function ItemSugestao({ sugestao }: { sugestao: Sugestao }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex items-start gap-4">
         <div className="flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${scoreCor}`}>
               {Math.round(sugestao.score)}% de match
             </span>
+            {/* C2VENDAS (06/11/2026): o percentual sozinho não explicava nada.
+                Estas são as razões que o motor usou para casar os dois. */}
+            {sugestao.fatores?.map((f) => (
+              <span key={f} className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-700">
+                {f}
+              </span>
+            ))}
           </div>
           <div className="mt-2 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
             <div>
@@ -121,6 +131,15 @@ function ItemSugestao({ sugestao }: { sugestao: Sugestao }) {
                 Empenho {sugestao.empenho.numero} — {brl(sugestao.empenho.valorEmpenho)}
               </p>
               <p className="text-xs text-slate-600 line-clamp-2">{sugestao.empenho.orgaoNome}</p>
+              {/* Abre ao lado: a pessoa confere entrega, nota e saldo sem
+                  perder a lista de sugestões (pedido da C2VENDAS, 06/11). */}
+              <Link
+                href={`/execucao/${sugestao.empenho.id}?from=conciliacao`}
+                target="_blank"
+                className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:underline"
+              >
+                Abrir empenho <ExternalLink className="h-3 w-3" />
+              </Link>
             </div>
           </div>
         </div>

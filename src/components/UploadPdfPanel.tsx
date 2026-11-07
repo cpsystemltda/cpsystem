@@ -1,15 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Upload, Check, AlertCircle, Loader2, Beaker, UploadCloud } from "lucide-react";
+import { Sparkles, Upload, Check, AlertCircle, Loader2, Beaker, UploadCloud, FileText, X } from "lucide-react";
+
+export type ArquivoSalvoInfo = { url: string; nome: string; tamanhoBytes?: number };
 
 type Resultado<T> =
-  | { ok: true; dados: T; demo?: boolean; arquivoUrl?: string; nomeArquivo?: string; tamanhoBytes?: number }
+  | {
+      ok: true;
+      dados: T;
+      demo?: boolean;
+      arquivoUrl?: string;
+      nomeArquivo?: string;
+      tamanhoBytes?: number;
+      /** Todos os arquivos persistidos nesta leitura (modo `multiplos`). */
+      arquivos?: ArquivoSalvoInfo[];
+    }
   | { ok: false; erro: string };
 
-// Limite de upload — bate com o limite em chamarClaudeComPdf (32MB) e
-// salvarArquivo (25MB). Usamos 25MB pra rejeitar antes de bater no server.
+// Limite por arquivo — bate com salvarArquivo (25MB). Rejeitamos antes de
+// bater no servidor.
 const MAX_BYTES_PDF = 25 * 1024 * 1024;
+// Limite do LOTE: a server action aceita 25MB de corpo (next.config) e a API
+// da IA aceita 32MB por requisição já em base64 (+33%). 20MB de PDFs cabem
+// nos dois com folga.
+const MAX_BYTES_LOTE = 20 * 1024 * 1024;
+const MAX_ARQUIVOS = 8;
 
 function ehPdf(file: File): boolean {
   return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -20,28 +36,47 @@ function formatarTamanho(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/**
+ * Painel "preencher com IA".
+ *
+ * Em modo `multiplos` (Regina 07/11/2026: cadastro de ata, contrato e
+ * execução) a pessoa junta vários PDFs — o instrumento e o que ajuda a
+ * preencher (edital, termo de referência, ETP, proposta) — e manda tudo numa
+ * leitura só. A lista fica visível antes de enviar, com o tamanho de cada
+ * um, e todos os arquivos voltam persistidos para virar Anexo no save.
+ *
+ * Sem `multiplos` o comportamento é o de sempre: escolheu o PDF, a leitura
+ * começa na hora (garantia, aditivo, apostilamento, procedimento).
+ */
 export function UploadPdfPanel<T>({
   titulo,
   descricao,
   action,
   onSuccess,
   onArquivoSalvo,
+  onArquivosSalvos,
   badgeAposExtracao,
+  multiplos = false,
 }: {
   titulo: string;
   descricao: string;
   action: (formData: FormData) => Promise<Resultado<T>>;
   onSuccess: (dados: T) => void;
-  /** Callback opcional acionado quando o PDF foi persistido no storage.
-   * Recebe a URL pública pra ser usada como hidden input no form principal. */
+  /** Primeiro arquivo persistido (compatibilidade com os formulários de um PDF só). */
   onArquivoSalvo?: (info: { url: string; nome: string }) => void;
+  /** Todos os arquivos persistidos na leitura — use com `multiplos`. */
+  onArquivosSalvos?: (arquivos: ArquivoSalvoInfo[]) => void;
   /** ex: (dados) => `${dados.itens.length} item(ns) preenchido(s)` */
   badgeAposExtracao?: (dados: T) => string;
+  multiplos?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [extraindo, setExtraindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [pdfNome, setPdfNome] = useState<string | null>(null);
+  /** Arquivos escolhidos e ainda não enviados (só em `multiplos`). */
+  const [fila, setFila] = useState<File[]>([]);
+  /** Nomes dos arquivos já lidos pela IA. */
+  const [lidos, setLidos] = useState<string[]>([]);
   const [badge, setBadge] = useState<string | null>(null);
   const [modoDemo, setModoDemo] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -76,38 +111,74 @@ export function UploadPdfPanel<T>({
     ev.stopPropagation();
     setDragOver(false);
     if (extraindo) return;
-    const file = ev.dataTransfer.files?.[0];
-    if (!file) return;
-    handleArquivo(file);
+    receber(ev.dataTransfer.files);
   }
 
-  async function handleArquivo(file: File) {
-    // Validacao client-side — rejeita ANTES de bater no servidor pra
-    // dar feedback imediato e nao consumir token de IA por nada.
-    if (!ehPdf(file)) {
-      setErro(`Esperado um PDF — recebido "${file.name}" (${file.type || "tipo desconhecido"}).`);
-      return;
-    }
-    if (file.size === 0) {
-      setErro(`Arquivo "${file.name}" está vazio (0 bytes).`);
-      return;
-    }
+  /** Validação no navegador: rejeita ANTES de bater no servidor, pra não gastar IA à toa. */
+  function validar(file: File): string | null {
+    if (!ehPdf(file)) return `"${file.name}" não é PDF (${file.type || "tipo desconhecido"}).`;
+    if (file.size === 0) return `"${file.name}" está vazio (0 bytes).`;
     if (file.size > MAX_BYTES_PDF) {
-      setErro(
-        `PDF "${file.name}" tem ${formatarTamanho(file.size)} — excede o limite de ${formatarTamanho(MAX_BYTES_PDF)}.`,
-      );
+      return `"${file.name}" tem ${formatarTamanho(file.size)} — o limite por arquivo é ${formatarTamanho(MAX_BYTES_PDF)}.`;
+    }
+    return null;
+  }
+
+  function receber(lista: FileList | null) {
+    const files = Array.from(lista ?? []);
+    if (files.length === 0) return;
+    if (!multiplos) {
+      const file = files[0];
+      const problema = validar(file);
+      if (problema) {
+        setErro(problema);
+        return;
+      }
+      void enviar([file]);
       return;
     }
 
+    const problemas: string[] = [];
+    const novos: File[] = [];
+    for (const f of files) {
+      const problema = validar(f);
+      if (problema) {
+        problemas.push(problema);
+        continue;
+      }
+      const repetido = [...fila, ...novos].some((x) => x.name === f.name && x.size === f.size);
+      if (!repetido) novos.push(f);
+    }
+    const total = [...fila, ...novos];
+    const bytes = total.reduce((s, f) => s + f.size, 0);
+    if (total.length > MAX_ARQUIVOS) {
+      problemas.push(`São no máximo ${MAX_ARQUIVOS} arquivos por leitura. Leia os principais agora e anexe os demais depois, na aba Anexos.`);
+    } else if (bytes > MAX_BYTES_LOTE) {
+      problemas.push(
+        `Juntos, os arquivos somam ${formatarTamanho(bytes)} — a leitura conjunta aceita até ${formatarTamanho(MAX_BYTES_LOTE)}. ` +
+          `Leia o documento principal agora e anexe os demais depois, na aba Anexos.`,
+      );
+    } else {
+      setFila(total);
+    }
+    setErro(problemas.length ? problemas.join(" ") : null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function remover(idx: number) {
+    setFila((f) => f.filter((_, i) => i !== idx));
+  }
+
+  async function enviar(files: File[]) {
+    if (files.length === 0 || extraindo) return;
     setExtraindo(true);
     setErro(null);
-    setPdfNome(file.name);
     setBadge(null);
     setModoDemo(false);
 
     try {
       const fd = new FormData();
-      fd.append("pdf", file);
+      for (const f of files) fd.append("pdf", f);
       const res = await action(fd);
 
       if (!res.ok) {
@@ -115,15 +186,23 @@ export function UploadPdfPanel<T>({
         return;
       }
       onSuccess(res.dados);
-      if (res.arquivoUrl && onArquivoSalvo) {
-        onArquivoSalvo({ url: res.arquivoUrl, nome: res.nomeArquivo ?? file.name });
+      const salvos: ArquivoSalvoInfo[] =
+        res.arquivos ??
+        (res.arquivoUrl
+          ? [{ url: res.arquivoUrl, nome: res.nomeArquivo ?? files[0].name, tamanhoBytes: res.tamanhoBytes }]
+          : []);
+      if (salvos.length > 0) {
+        onArquivosSalvos?.(salvos);
+        onArquivoSalvo?.({ url: salvos[0].url, nome: salvos[0].nome });
       }
+      setLidos((prev) => [...prev, ...files.map((f) => f.name)]);
+      setFila([]);
       if (res.demo) setModoDemo(true);
       if (badgeAposExtracao) setBadge(badgeAposExtracao(res.dados));
       else setBadge("Dados preenchidos");
     } catch (e) {
       // Erros de rede / runtime que escapam do try-catch da server action
-      // (Vercel timeout 60s, JSON corrompido, etc.). Antes silenciava.
+      // (timeout, JSON corrompido, etc.). Antes silenciava.
       setErro(
         e instanceof Error
           ? `Falha de comunicação: ${e.message}`
@@ -136,6 +215,9 @@ export function UploadPdfPanel<T>({
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
+
+  const bytesFila = fila.reduce((s, f) => s + f.size, 0);
+  const textoSoltar = multiplos ? "Solte os PDFs aqui" : "Solte o PDF aqui";
 
   return (
     <section
@@ -153,8 +235,8 @@ export function UploadPdfPanel<T>({
         minHeight: dragOver ? "180px" : undefined,
       }}
     >
-      {/* Overlay grande mostrando 'Solte o PDF aqui' enquanto arrastando.
-          Cobre o card inteiro pra eliminar duvida sobre onde soltar. */}
+      {/* Overlay grande enquanto arrasta. Cobre o card inteiro pra
+          eliminar duvida sobre onde soltar. */}
       {dragOver && !extraindo && (
         <div
           className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center"
@@ -169,7 +251,7 @@ export function UploadPdfPanel<T>({
               className="text-[18px] font-extrabold"
               style={{ color: "#0A0A0A", letterSpacing: "-0.02em" }}
             >
-              Solte o PDF aqui
+              {textoSoltar}
             </p>
           </div>
         </div>
@@ -195,45 +277,118 @@ export function UploadPdfPanel<T>({
             {descricao}
           </p>
           <p className="mt-1 text-[12px]" style={{ color: "var(--text-mute)" }}>
-            {dragOver ? "Solte o PDF aqui…" : "Arraste o PDF aqui ou clique no botão abaixo."}
+            {dragOver
+              ? `${textoSoltar}…`
+              : multiplos
+              ? "Arraste um ou mais PDFs aqui, ou clique em Escolher arquivos. Todos vão para a aba Anexos."
+              : "Arraste o PDF aqui ou clique no botão abaixo."}
           </p>
 
           <input
             ref={fileInputRef}
             type="file"
             accept="application/pdf"
+            multiple={multiplos}
             className="hidden"
-            onChange={(ev) => {
-              const f = ev.target.files?.[0];
-              if (f) handleArquivo(f);
-            }}
+            onChange={(ev) => receber(ev.target.files)}
           />
 
+          {multiplos && fila.length > 0 && (
+            <ul className="mt-4 space-y-1.5">
+              {fila.map((f, i) => (
+                <li
+                  key={`${f.name}-${f.size}`}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-[13px]"
+                  style={{ background: "rgba(255,255,255,0.55)", border: "0.5px solid rgba(15,14,12,0.08)" }}
+                >
+                  <FileText className="h-4 w-4 shrink-0" style={{ color: "var(--lavender-deep, #6B4FC9)" }} />
+                  <span className="min-w-0 flex-1 truncate" style={{ color: "var(--text)" }}>
+                    {f.name}
+                    {i === 0 && (
+                      <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(197,180,255,0.35)", color: "#4B3A9E" }}>
+                        principal
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-xs" style={{ color: "var(--text-mute)" }}>{formatarTamanho(f.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => remover(i)}
+                    disabled={extraindo}
+                    className="shrink-0 rounded p-0.5 hover:bg-black/5 disabled:opacity-50"
+                    aria-label={`Remover ${f.name}`}
+                  >
+                    <X className="h-3.5 w-3.5" style={{ color: "var(--text-mute)" }} />
+                  </button>
+                </li>
+              ))}
+              <li className="px-1 text-[11px]" style={{ color: "var(--text-mute)" }}>
+                {fila.length} arquivo{fila.length === 1 ? "" : "s"} · {formatarTamanho(bytesFila)} de {formatarTamanho(MAX_BYTES_LOTE)}.
+                {" "}O primeiro da lista é tratado como o documento principal; os outros completam itens, prazos e dados do órgão.
+                {lidos.length > 0 && " Uma nova leitura substitui os campos já preenchidos."}
+              </li>
+            </ul>
+          )}
+
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={extraindo}
-              className="btn-primary inline-flex disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {extraindo ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Extraindo dados…
-                </>
-              ) : (
-                <>
+            {multiplos ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={extraindo}
+                  className="btn-secondary inline-flex disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   <Upload className="h-4 w-4" />
-                  {pdfNome ? "Outro PDF" : "Anexar PDF"}
-                </>
-              )}
-            </button>
-            {pdfNome && !extraindo && (
+                  {fila.length > 0 || lidos.length > 0 ? "Adicionar arquivos" : "Escolher arquivos"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void enviar(fila)}
+                  disabled={extraindo || fila.length === 0}
+                  className="btn-primary inline-flex disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {extraindo ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Lendo {fila.length} arquivo{fila.length === 1 ? "" : "s"}…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Ler com IA e preencher{fila.length > 0 ? ` (${fila.length})` : ""}
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={extraindo}
+                className="btn-primary inline-flex disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {extraindo ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Extraindo dados…
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    {lidos.length > 0 ? "Outro PDF" : "Anexar PDF"}
+                  </>
+                )}
+              </button>
+            )}
+            {lidos.length > 0 && !extraindo && (
               <span
                 className="max-w-md truncate text-xs"
                 style={{ color: "var(--text-mute)" }}
+                title={lidos.join(", ")}
               >
-                {pdfNome}
+                {multiplos && lidos.length > 1 ? `${lidos.length} arquivos lidos: ` : ""}
+                {lidos.join(", ")}
               </span>
             )}
             {badge && (

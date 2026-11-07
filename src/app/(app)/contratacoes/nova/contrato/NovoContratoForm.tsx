@@ -146,6 +146,9 @@ export default function NovoContratoForm({
   // Ajuste 6 — PDF persistido + badge AUTO
   const [arquivoPdfUrl, setArquivoPdfUrl] = useState<string | null>(null);
   const [arquivoPdfNome, setArquivoPdfNome] = useState<string | null>(null);
+  // Regina 07/11/2026: a leitura aceita vários PDFs (contrato + edital + TR +
+  // ETP + proposta...). Todos viram Anexo no save.
+  const [arquivosPdf, setArquivosPdf] = useState<{ url: string; nome: string }[]>([]);
   const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set());
 
   // M9 IA — sugestões de matching de itens contra a Ata vinculada
@@ -251,14 +254,18 @@ export default function NovoContratoForm({
       {modo !== "editar" && (
         <div className="mt-6">
           <UploadPdfPanel
-            titulo="Preencher automaticamente a partir do PDF do Contrato"
-            descricao="Anexe o PDF do contrato administrativo. A IA extrai número, processo, órgão, vigência, prazos e a lista completa de itens. Você confere e edita antes de salvar."
+            multiplos
+            titulo="Preencher automaticamente a partir dos PDFs da contratação"
+            descricao="Anexe o contrato administrativo e, se tiver, o edital, o termo de referência, o estudo técnico preliminar e a proposta. A IA lê o conjunto e extrai número, processo, órgão, vigência, prazos e a lista completa de itens. Todos os arquivos vão para a aba Anexos. Você confere e edita antes de salvar."
             action={extrairContratoPdfAction}
             onSuccess={setDados}
             onArquivoSalvo={(info) => {
               setArquivoPdfUrl(info.url);
               setArquivoPdfNome(info.nome);
             }}
+            onArquivosSalvos={(lista) =>
+              setArquivosPdf((prev) => [...prev, ...lista.map((a) => ({ url: a.url, nome: a.nome }))])
+            }
             badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchido(s)`}
           />
         </div>
@@ -283,8 +290,15 @@ export default function NovoContratoForm({
         {modo === "editar" && contratoId && (
           <input type="hidden" name="contratoId" value={contratoId} />
         )}
-        {/* PDF persistido pela IA — vira Anexo do Contrato após save */}
-        {arquivoPdfUrl && (
+        {/* PDFs lidos pela IA — cada um vira Anexo do Contrato após save. O par
+            arquivoPdfUrl/Nome só vai quando a lista está vazia (prefill do painel). */}
+        {arquivosPdf.map((a, i) => (
+          <span key={`${a.url}-${i}`} hidden>
+            <input type="hidden" name={`arquivosPdf[${i}][url]`} value={a.url} />
+            <input type="hidden" name={`arquivosPdf[${i}][nome]`} value={a.nome} />
+          </span>
+        ))}
+        {arquivosPdf.length === 0 && arquivoPdfUrl && (
           <>
             <input type="hidden" name="arquivoPdfUrl" value={arquivoPdfUrl} />
             <input type="hidden" name="arquivoPdfNome" value={arquivoPdfNome ?? ""} />

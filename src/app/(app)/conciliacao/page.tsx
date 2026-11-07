@@ -11,6 +11,8 @@ import { ListaExtratos } from "./_components/lista-extratos";
 import { ConfigJanela } from "./_components/config-janela";
 import { SugestoesPendentes } from "./_components/sugestoes-pendentes";
 import { PainelPortal } from "./_components/painel-portal";
+import { ConciliacoesRealizadas } from "./_components/conciliacoes-realizadas";
+import { fatoresLegiveis } from "@/lib/conciliacao/fatoresLegiveis";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +68,7 @@ export default async function ConciliacaoPage() {
     select: {
       id: true,
       score: true,
+      fatoresMatch: true,
       empenhoId: true,
       transacao: {
         select: { data: true, valor: true, descricao: true, nomeContraparte: true },
@@ -99,7 +102,7 @@ export default async function ConciliacaoPage() {
     .map((s) => {
       const emp = empenhoMap.get(s.empenhoId);
       if (!emp) return null;
-      return { id: s.id, score: s.score, transacao: s.transacao, empenho: emp };
+      return { id: s.id, score: s.score, fatores: fatoresLegiveis(s.fatoresMatch), transacao: s.transacao, empenho: emp };
     })
     .filter((s): s is NonNullable<typeof s> => s !== null);
 
@@ -352,6 +355,8 @@ export default async function ConciliacaoPage() {
       </section>
 
       <SugestoesPendentes sugestoes={sugestoes} sugestoesDebito={sugestoesDebito} />
+
+      <ConciliacoesRealizadas contaId={usuario.contaId} />
 
       <PainelPortal
         notas={notasPortal}

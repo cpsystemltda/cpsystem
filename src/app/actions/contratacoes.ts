@@ -24,6 +24,7 @@ import {
   normalizarCnpj,
 } from "@/lib/validators";
 import { salvarArquivo } from "@/lib/uploads";
+import { anexarArquivosDaIa, lerArquivosDaIa } from "@/lib/anexosDaIa";
 import { registrarAuditoria } from "@/lib/auditoria";
 import {
   calcularDiff,
@@ -434,26 +435,9 @@ export async function criarAtaAction(_prev: ActionResult | null, formData: FormD
       console.warn("[criarAtaAction] falha ao criar Vigência 1:", errVig);
     }
 
-    // PDF da IA: se o form tinha hidden inputs `arquivoPdfUrl`/`arquivoPdfNome`,
-    // cria registro Anexo vinculado à Ata recém-criada.
-    const arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
-    const arquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
-    if (arquivoPdfUrl) {
-      try {
-        await prisma.anexo.create({
-          data: {
-            ataId: ata.id,
-            categoria: "CONTRATUAL",
-            nome: arquivoPdfNome || "ata.pdf",
-            url: arquivoPdfUrl,
-            mimeType: "application/pdf",
-          },
-        });
-      } catch (errAnexo) {
-        // Não bloqueia o save da Ata — usuário pode re-anexar manualmente.
-        console.warn("[criarAtaAction] falha ao criar Anexo do PDF:", errAnexo);
-      }
-    }
+    // PDFs lidos pela IA (um ou vários — Regina 07/11/2026): cada um vira um
+    // Anexo da Ata recém-criada. Falha aqui não bloqueia o save.
+    await anexarArquivosDaIa({ ataId: ata.id }, lerArquivosDaIa(formData), "ata.pdf", "criarAtaAction");
 
     // Notifica WhatsApp — nova Ata cadastrada (best-effort).
     const empresaAta = await prisma.empresa.findUnique({
@@ -922,24 +906,9 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
       console.warn("[criarContratoAction] falha ao criar Vigência 1:", errVig);
     }
 
-    // PDF da IA — cria registro Anexo vinculado ao Contrato (Ajuste 6)
-    const arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
-    const arquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
-    if (arquivoPdfUrl) {
-      try {
-        await prisma.anexo.create({
-          data: {
-            contratoId: contrato.id,
-            categoria: "CONTRATUAL",
-            nome: arquivoPdfNome || "contrato.pdf",
-            url: arquivoPdfUrl,
-            mimeType: "application/pdf",
-          },
-        });
-      } catch (errAnexo) {
-        console.warn("[criarContratoAction] falha ao criar Anexo do PDF:", errAnexo);
-      }
-    }
+    // PDFs lidos pela IA (um ou vários — Regina 07/11/2026): cada um vira um
+    // Anexo do Contrato. Falha aqui não bloqueia o save.
+    await anexarArquivosDaIa({ contratoId: contrato.id }, lerArquivosDaIa(formData), "contrato.pdf", "criarContratoAction");
 
     // Notifica WhatsApp — novo Contrato cadastrado (best-effort).
     const empresaContrato = await prisma.empresa.findUnique({
@@ -1570,24 +1539,9 @@ export async function criarEmpenhoAction(_prev: ActionResult | null, formData: F
       recursoId: empenho.id,
     });
 
-    // PDF principal da IA — vira Anexo (CONTRATUAL)
-    const arquivoPdfUrl = String(formData.get("arquivoPdfUrl") || "").trim();
-    const arquivoPdfNome = String(formData.get("arquivoPdfNome") || "").trim();
-    if (arquivoPdfUrl) {
-      try {
-        await prisma.anexo.create({
-          data: {
-            empenhoId: empenho.id,
-            categoria: "CONTRATUAL",
-            nome: arquivoPdfNome || "documento.pdf",
-            url: arquivoPdfUrl,
-            mimeType: "application/pdf",
-          },
-        });
-      } catch (errAnexo) {
-        console.warn("[criarEmpenhoAction] falha ao criar Anexo do PDF:", errAnexo);
-      }
-    }
+    // PDFs lidos pela IA (um ou vários — Regina 07/11/2026): cada um vira um
+    // Anexo (CONTRATUAL). Falha aqui não bloqueia o save.
+    await anexarArquivosDaIa({ empenhoId: empenho.id }, lerArquivosDaIa(formData), "documento.pdf", "criarEmpenhoAction");
 
     // Anexos adicionais (Ordem de Fornecimento, aditivos, apostilamentos)
     let idx = 0;

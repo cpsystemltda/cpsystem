@@ -50,10 +50,13 @@ export default async function EmpenhoDetalhePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string }>;
+  // `?aba=anexos` abre direto na aba certa — é o atalho da lista de execuções
+  // (C2VENDAS, 06/11/2026). `?from=conciliacao` faz o "Voltar" devolver à
+  // conciliação, de onde se abre o empenho casado.
+  searchParams: Promise<{ from?: string; aba?: string }>;
 }) {
   const { id } = await params;
-  const { from } = await searchParams;
+  const { from, aba } = await searchParams;
   const usuario = await exigirUsuario();
 
   const e = await prisma.empenho.findFirst({
@@ -189,6 +192,9 @@ export default async function EmpenhoDetalhePage({
     if (from?.startsWith("contrato-")) {
       const contratoId = from.slice("contrato-".length);
       return { href: `/contratos/${contratoId}`, label: "Voltar para Contrato" };
+    }
+    if (from === "conciliacao") {
+      return { href: "/conciliacao", label: "Voltar para Conciliação" };
     }
     return { href: "/execucao", label: "Voltar" };
   })();
@@ -351,6 +357,7 @@ export default async function EmpenhoDetalhePage({
 
       <div className="mt-8">
         <Tabs
+          defaultKey={aba}
           abas={[
             {
               key: "execucao",

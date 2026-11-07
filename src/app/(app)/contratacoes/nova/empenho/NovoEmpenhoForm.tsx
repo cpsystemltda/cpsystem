@@ -207,6 +207,9 @@ export default function NovoEmpenhoForm({
   // adicionais ficam em outra seção mais abaixo)
   const [arquivoPdfUrl, setArquivoPdfUrl] = useState<string | null>(null);
   const [arquivoPdfNome, setArquivoPdfNome] = useState<string | null>(null);
+  // Regina 07/11/2026: a leitura aceita vários PDFs (empenho + ordem de
+  // fornecimento + edital + TR...). Todos viram Anexo no save.
+  const [arquivosPdf, setArquivosPdf] = useState<{ url: string; nome: string }[]>([]);
   const [camposAuto, setCamposAuto] = useState<Set<string>>(new Set());
   // Anexos adicionais cadastrados na criação (PDFs de Ordem de Fornecimento,
   // aditivos etc). Cada um tem URL persistida (Vercel Blob) + nome + categoria.
@@ -367,7 +370,7 @@ export default function NovoEmpenhoForm({
         <div className="mt-6">
           <UploadPdfPanel
             titulo={`Preencher automaticamente a partir do PDF da ${nomeInstr}`}
-            descricao={`Anexe o PDF do documento. A IA extrai número, identificador, processo, órgão, vigência, prazos e itens. Você confere e edita antes de salvar.${
+            descricao={`Anexe o PDF do documento e, se tiver, a ordem de fornecimento, o edital e o termo de referência. A IA lê o conjunto e extrai número, identificador, processo, órgão, vigência, prazos e itens. Todos os arquivos vão para a aba Anexos. Você confere e edita antes de salvar.${
               instrumento !== "NOTA_EMPENHO"
                 ? " (Treinada principalmente em Notas de Empenho — para outros instrumentos pode ser necessário ajuste manual.)"
                 : ""
@@ -378,7 +381,11 @@ export default function NovoEmpenhoForm({
               setArquivoPdfUrl(info.url);
               setArquivoPdfNome(info.nome);
             }}
+            onArquivosSalvos={(lista) =>
+              setArquivosPdf((prev) => [...prev, ...lista.map((a) => ({ url: a.url, nome: a.nome }))])
+            }
             badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchido(s)`}
+            multiplos
           />
         </div>
       )}
@@ -413,8 +420,15 @@ export default function NovoEmpenhoForm({
         {modo === "editar" && empenhoId && (
           <input type="hidden" name="empenhoId" value={empenhoId} />
         )}
-        {/* PDF da IA — cria Anexo (CONTRATUAL) após save */}
-        {arquivoPdfUrl && (
+        {/* PDFs lidos pela IA — cada um vira Anexo (CONTRATUAL) após save. O par
+            arquivoPdfUrl/Nome só vai quando a lista está vazia (prefill do painel). */}
+        {arquivosPdf.map((a, i) => (
+          <span key={`${a.url}-${i}`} hidden>
+            <input type="hidden" name={`arquivosPdf[${i}][url]`} value={a.url} />
+            <input type="hidden" name={`arquivosPdf[${i}][nome]`} value={a.nome} />
+          </span>
+        ))}
+        {arquivosPdf.length === 0 && arquivoPdfUrl && (
           <>
             <input type="hidden" name="arquivoPdfUrl" value={arquivoPdfUrl} />
             <input type="hidden" name="arquivoPdfNome" value={arquivoPdfNome ?? ""} />

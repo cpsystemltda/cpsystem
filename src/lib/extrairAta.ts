@@ -240,22 +240,22 @@ REGRAS DE EXTRAÇÃO:
 
 Retorne APENAS o JSON estruturado solicitado, sem comentários ou explicações.`;
 
-export async function extrairAtaDoPdf(file: File): Promise<AtaExtraida> {
-  if (file.type !== "application/pdf") {
-    throw new Error(`Esperado PDF, recebido ${file.type || "tipo desconhecido"}.`);
-  }
-  if (file.size > 32 * 1024 * 1024) {
-    throw new Error("PDF maior que 32 MB. Reduza o tamanho do arquivo.");
-  }
+export async function extrairAtaDoPdf(entrada: File | File[]): Promise<AtaExtraida> {
+  // Um ou vários PDFs (Regina 07/11/2026): a ata mais edital, TR, ETP,
+  // proposta. Validação e montagem dos blocos são as mesmas do extrator
+  // genérico (`montarConteudo`).
+  const files = listaDeArquivos(entrada);
+  const conteudo = await montarConteudo(
+    files,
+    "Extraia os dados desta Ata de Registro de Preços conforme o schema JSON.",
+  );
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
-    return mockAta(file.name);
+    return mockAta(files[0]?.name ?? "ata.pdf");
   }
 
   const client = new Anthropic({ apiKey });
-  const buffer = await file.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString("base64");
 
   // Igor (05/06): Ata com 132 itens em lotes nao extraia. Causa: o
   // max_tokens de 8192 era curto pro JSON com 132 itens (~130 tokens por
@@ -356,25 +356,7 @@ export async function extrairAtaDoPdf(file: File): Promise<AtaExtraida> {
         },
       },
     },
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: base64,
-            },
-          },
-          {
-            type: "text",
-            text: "Extraia os dados desta Ata de Registro de Preços conforme o schema JSON.",
-          },
-        ],
-      },
-    ],
+    messages: [{ role: "user", content: conteudo }],
   })
     .finalMessage();
 
@@ -438,10 +420,61 @@ REGRAS DE EXTRAÇÃO:
 - Para itens, extraia TODOS os itens do documento. Para cada um: descrição completa, unidade de medida, quantidade, marca (se especificada) e valor unitário em reais.
 - Retorne APENAS o JSON estruturado solicitado, sem comentários.`;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function chamarClaudeComPdf(file: File, schema: any, prompt: string) {
-  if (file.type !== "application/pdf") throw new Error(`Esperado PDF, recebido ${file.type || "tipo desconhecido"}.`);
-  if (file.size > 32 * 1024 * 1024) throw new Error("PDF maior que 32 MB. Reduza o tamanho do arquivo.");
+/**
+ * Vários PDFs numa leitura só (Regina, 07/11/2026): o instrumento que está
+ * sendo cadastrado mais o que ajuda a preencher — edital, termo de
+ * referência, ETP, proposta, ordem de fornecimento. O modelo recebe um bloco
+ * de documento por arquivo, cada um precedido do nome, e esta orientação
+ * explica a hierarquia: o primeiro manda; os outros completam e conferem.
+ */
+const ORIENTACAO_VARIOS_DOCUMENTOS = `Há mais de um documento anexado. O PRIMEIRO é o instrumento principal — o documento que está sendo cadastrado — e manda nos campos de identificação: número, processo, órgão, datas de assinatura e publicação, vigência. Os demais (edital, termo de referência, estudo técnico preliminar, proposta da empresa, ordem de fornecimento etc.) servem para COMPLETAR e CONFERIR o que o principal não traz ou traz resumido: descrição completa dos itens, unidades, quantidades, marcas, valores unitários, prazos de entrega e de pagamento, endereço, e-mail e telefone do órgão. Quando dois documentos divergirem, prevalece o instrumento principal. Não misture contratações diferentes: use apenas o que se refere ao mesmo processo ou licitação do documento principal.`;
+
+// A API aceita 32 MB por requisição já em base64, que infla ~33%: 24 MB de
+// PDF é o teto real para a leitura conjunta.
+const MAX_BYTES_REQUISICAO = 24 * 1024 * 1024;
+
+function listaDeArquivos(entrada: File | File[]): File[] {
+  return Array.isArray(entrada) ? entrada : [entrada];
+}
+
+/** Valida cada PDF e monta os blocos de conteúdo da mensagem (documentos + instrução). */
+async function montarConteudo(files: File[], prompt: string): Promise<Anthropic.Messages.ContentBlockParam[]> {
+  if (files.length === 0) throw new Error("Nenhum PDF recebido.");
+  for (const f of files) {
+    if (f.type !== "application/pdf") throw new Error(`Esperado PDF, recebido ${f.type || "tipo desconhecido"} ("${f.name}").`);
+    if (f.size > 32 * 1024 * 1024) throw new Error(`PDF "${f.name}" maior que 32 MB. Reduza o tamanho do arquivo.`);
+  }
+  const total = files.reduce((s, f) => s + f.size, 0);
+  if (total > MAX_BYTES_REQUISICAO) {
+    throw new Error(
+      `Os ${files.length} PDFs somam ${(total / 1024 / 1024).toFixed(1)} MB; a leitura conjunta aceita até 24 MB. ` +
+        `Leia o documento principal agora e anexe os demais depois, na aba Anexos.`,
+    );
+  }
+  const conteudo: Anthropic.Messages.ContentBlockParam[] = [];
+  for (const [i, f] of files.entries()) {
+    const base64 = Buffer.from(await f.arrayBuffer()).toString("base64");
+    if (files.length > 1) {
+      conteudo.push({
+        type: "text",
+        text: `Documento ${i + 1} de ${files.length}: "${f.name}"${i === 0 ? " — instrumento principal" : ""}`,
+      });
+    }
+    conteudo.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } });
+  }
+  conteudo.push({ type: "text", text: files.length > 1 ? `${ORIENTACAO_VARIOS_DOCUMENTOS}\n\n${prompt}` : prompt });
+  return conteudo;
+}
+
+async function chamarClaudeComPdf(
+  entrada: File | File[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  schema: any,
+  prompt: string,
+  systemPrompt: string = SYSTEM_PROMPT_BASE,
+) {
+  const files = listaDeArquivos(entrada);
+  const conteudo = await montarConteudo(files, prompt);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
@@ -449,12 +482,11 @@ async function chamarClaudeComPdf(file: File, schema: any, prompt: string) {
   }
 
   const inicio = Date.now();
-  const tag = `[chamarClaudeComPdf ${file.name} ${(file.size / 1024).toFixed(0)}KB]`;
+  const totalKB = (files.reduce((s, f) => s + f.size, 0) / 1024).toFixed(0);
+  const tag = `[chamarClaudeComPdf ${files.map((f) => f.name).join(" + ")} ${totalKB}KB]`;
   console.log(`${tag} iniciando extracao`);
 
   const client = new Anthropic({ apiKey });
-  const buffer = await file.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString("base64");
 
   try {
     // Regina (05/06): usar .stream().finalMessage() em vez de .create()
@@ -466,17 +498,9 @@ async function chamarClaudeComPdf(file: File, schema: any, prompt: string) {
         // Subido de 8192 -> 32000 (limite Haiku 4.5) pra suportar PDFs
         // com muitos itens (ex: Contrato 132 itens em lotes). Igor (05/06).
         max_tokens: 32000,
-        system: [{ type: "text", text: SYSTEM_PROMPT_BASE, cache_control: { type: "ephemeral" } }],
+        system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         output_config: { format: { type: "json_schema", schema } },
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-              { type: "text", text: prompt },
-            ],
-          },
-        ],
+        messages: [{ role: "user", content: conteudo }],
       })
       .finalMessage();
 
@@ -500,7 +524,8 @@ async function chamarClaudeComPdf(file: File, schema: any, prompt: string) {
     // Loga stack + status code do SDK pra diagnosticar nos Vercel logs.
     const erroInfo: Record<string, unknown> = {
       duracaoMs: Date.now() - inicio,
-      pdfSizeKB: (file.size / 1024).toFixed(0),
+      pdfSizeKB: totalKB,
+      arquivos: files.length,
     };
     if (err instanceof Error) {
       erroInfo.message = err.message;
@@ -528,7 +553,7 @@ async function tentarOuMock<T>(fn: () => Promise<T>, mock: () => T): Promise<T> 
   }
 }
 
-export async function extrairContratoDoPdf(file: File): Promise<ContratoExtraido> {
+export async function extrairContratoDoPdf(entrada: File | File[]): Promise<ContratoExtraido> {
   const schema = {
     type: "object",
     properties: {
@@ -562,15 +587,15 @@ export async function extrairContratoDoPdf(file: File): Promise<ContratoExtraido
   return tentarOuMock<ContratoExtraido>(
     () =>
       chamarClaudeComPdf(
-        file,
+        entrada,
         schema,
         "Extraia os dados deste Contrato administrativo conforme o schema JSON.",
       ) as Promise<ContratoExtraido>,
-    () => mockContrato(file.name),
+    () => mockContrato(listaDeArquivos(entrada)[0]?.name ?? "contrato.pdf"),
   );
 }
 
-export async function extrairEmpenhoDoPdf(file: File): Promise<EmpenhoExtraido> {
+export async function extrairEmpenhoDoPdf(entrada: File | File[]): Promise<EmpenhoExtraido> {
   const schema = {
     type: "object",
     properties: {
@@ -603,11 +628,11 @@ export async function extrairEmpenhoDoPdf(file: File): Promise<EmpenhoExtraido> 
   return tentarOuMock<EmpenhoExtraido>(
     () =>
       chamarClaudeComPdf(
-        file,
+        entrada,
         schema,
         "Extraia os dados desta Nota de Empenho conforme o schema JSON.",
       ) as Promise<EmpenhoExtraido>,
-    () => mockEmpenho(file.name),
+    () => mockEmpenho(listaDeArquivos(entrada)[0]?.name ?? "empenho.pdf"),
   );
 }
 

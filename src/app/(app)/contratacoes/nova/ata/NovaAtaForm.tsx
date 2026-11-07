@@ -217,6 +217,9 @@ export default function NovaAtaForm({
   // o usuário sobe o PDF pra IA. Vão como hidden inputs e criam o Anexo no save.
   const [arquivoPdfUrl, setArquivoPdfUrl] = useState<string | null>(null);
   const [arquivoPdfNome, setArquivoPdfNome] = useState<string | null>(null);
+  // Regina 07/11/2026: a leitura aceita vários PDFs (ata + edital + TR + ETP +
+  // proposta...). Todos viram Anexo no save — é o repositório da contratação.
+  const [arquivosPdf, setArquivosPdf] = useState<{ url: string; nome: string }[]>([]);
 
   // M9 IA — prefill via UploadInteligenteCard (dashboard)
   const prefill = usePrefillIa<AtaExtraida>("ATA");
@@ -373,14 +376,18 @@ export default function NovaAtaForm({
       {modo !== "editar" && (
         <div className="mt-5">
           <UploadPdfPanel
-            titulo="Preencher automaticamente a partir do PDF da Ata"
-            descricao="Anexe o PDF original. A IA extrai número, processo, órgão, vigência, prazos e itens. Você confere e edita antes de salvar."
+            multiplos
+            titulo="Preencher automaticamente a partir dos PDFs da contratação"
+            descricao="Anexe a Ata e, se tiver, o edital, o termo de referência, o estudo técnico preliminar e a proposta. A IA lê o conjunto e extrai número, processo, órgão, vigência, prazos e itens com mais precisão. Todos os arquivos vão para a aba Anexos. Você confere e edita antes de salvar."
             action={extrairAtaPdfAction}
             onSuccess={setDados}
             onArquivoSalvo={(info) => {
               setArquivoPdfUrl(info.url);
               setArquivoPdfNome(info.nome);
             }}
+            onArquivosSalvos={(lista) =>
+              setArquivosPdf((prev) => [...prev, ...lista.map((a) => ({ url: a.url, nome: a.nome }))])
+            }
             badgeAposExtracao={(d) => `${d.itens.length} item(ns) preenchidos`}
           />
         </div>
@@ -405,8 +412,15 @@ export default function NovaAtaForm({
         {modo === "editar" && ataId && (
           <input type="hidden" name="ataId" value={ataId} />
         )}
-        {/* PDF persistido pela IA — vira Anexo da Ata após save */}
-        {arquivoPdfUrl && (
+        {/* PDFs lidos pela IA — cada um vira Anexo da Ata após save. O par
+            arquivoPdfUrl/Nome só vai quando a lista está vazia (prefill do painel). */}
+        {arquivosPdf.map((a, i) => (
+          <span key={`${a.url}-${i}`} hidden>
+            <input type="hidden" name={`arquivosPdf[${i}][url]`} value={a.url} />
+            <input type="hidden" name={`arquivosPdf[${i}][nome]`} value={a.nome} />
+          </span>
+        ))}
+        {arquivosPdf.length === 0 && arquivoPdfUrl && (
           <>
             <input type="hidden" name="arquivoPdfUrl" value={arquivoPdfUrl} />
             <input type="hidden" name="arquivoPdfNome" value={arquivoPdfNome ?? ""} />

@@ -29,9 +29,12 @@ function modoDemo(): boolean {
   return !k || k.trim() === "";
 }
 
-// Após a extração da IA, o PDF é persistido no Vercel Blob. O form usa
-// `arquivoUrl`/`nomeArquivo` como hidden inputs pra criar o registro Anexo
-// vinculado ao recurso (Ata/Contrato/Empenho) quando o save acontece.
+// Após a extração da IA, cada PDF é persistido no Vercel Blob. O form guarda
+// `arquivos[]` em hidden inputs e cria um registro Anexo por arquivo quando
+// o save acontece. `arquivoUrl`/`nomeArquivo` (o primeiro da lista) continuam
+// por compatibilidade com quem só lê um arquivo (prefill do painel).
+export type ArquivoExtraido = { url: string; nome: string; tamanhoBytes?: number };
+
 export type ExtracaoAtaResult =
   | {
       ok: true;
@@ -40,6 +43,7 @@ export type ExtracaoAtaResult =
       arquivoUrl?: string;
       nomeArquivo?: string;
       tamanhoBytes?: number;
+      arquivos?: ArquivoExtraido[];
     }
   | { ok: false; erro: string };
 export type ExtracaoContratoResult =
@@ -50,6 +54,7 @@ export type ExtracaoContratoResult =
       arquivoUrl?: string;
       nomeArquivo?: string;
       tamanhoBytes?: number;
+      arquivos?: ArquivoExtraido[];
     }
   | { ok: false; erro: string };
 export type ExtracaoEmpenhoResult =
@@ -60,6 +65,7 @@ export type ExtracaoEmpenhoResult =
       arquivoUrl?: string;
       nomeArquivo?: string;
       tamanhoBytes?: number;
+      arquivos?: ArquivoExtraido[];
     }
   | { ok: false; erro: string };
 
@@ -110,29 +116,55 @@ export type ExtracaoProcedimentoResult =
 // retro-compat
 export type ExtracaoResult = ExtracaoAtaResult;
 
+/**
+ * Todos os PDFs do campo `pdf` — um ou vários.
+ *
+ * Regina, 07/11/2026: a leitura de ata, contrato e execução aceita mais de
+ * um arquivo (o instrumento + edital + termo de referência + ETP + proposta).
+ * A IA lê o conjunto e preenche com mais precisão; cada arquivo é persistido
+ * e vira Anexo quando o registro é salvo.
+ */
+function pdfsDoFormulario(formData: FormData): File[] {
+  return formData.getAll("pdf").filter((f): f is File => f instanceof File && f.size > 0);
+}
+
+/**
+ * Persiste todos — em modo demo a IA não roda, mas os PDFs mesmo assim são
+ * salvos, pra que os anexos apareçam quando o usuário gravar. Falha no upload
+ * de um arquivo não bloqueia a extração nem os outros: a pessoa ainda pode
+ * revisar os dados e anexar depois pela aba.
+ */
+async function persistirTodos(files: File[], rotulo: string): Promise<ArquivoExtraido[]> {
+  const salvos: ArquivoExtraido[] = [];
+  for (const f of files) {
+    try {
+      const salvo = await salvarArquivo(f);
+      salvos.push({ url: salvo.url, nome: salvo.nome, tamanhoBytes: salvo.tamanhoBytes });
+    } catch (errSave) {
+      console.warn(`[${rotulo}] falha ao persistir "${f.name}":`, errSave);
+    }
+  }
+  return salvos;
+}
+
 export async function extrairAtaPdfAction(formData: FormData): Promise<ExtracaoAtaResult> {
   await exigirUsuario();
   await bloquearEspionagem();
-  const file = formData.get("pdf") as File | null;
-  if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
+  const files = pdfsDoFormulario(formData);
+  if (files.length === 0) return { ok: false, erro: "Selecione ao menos um arquivo PDF." };
   try {
-    const dados = await extrairAtaDoPdf(file);
-    // Persiste o PDF — em modo demo a IA não roda mas o PDF mesmo assim é
-    // salvo, pra que o anexo apareça quando o usuário gravar a Ata.
-    let arquivoUrl: string | undefined;
-    let nomeArquivo: string | undefined;
-    let tamanhoBytes: number | undefined;
-    try {
-      const salvo = await salvarArquivo(file);
-      arquivoUrl = salvo.url;
-      nomeArquivo = salvo.nome;
-      tamanhoBytes = salvo.tamanhoBytes;
-    } catch (errSave) {
-      // Falha no upload não bloqueia extração — usuário ainda pode revisar
-      // os dados e salvar a Ata sem anexo automático.
-      console.warn("[extrairAtaPdfAction] falha ao persistir PDF:", errSave);
-    }
-    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
+    const dados = await extrairAtaDoPdf(files);
+    const arquivos = await persistirTodos(files, "extrairAtaPdfAction");
+    const primeiro = arquivos[0];
+    return {
+      ok: true,
+      dados,
+      demo: modoDemo(),
+      arquivoUrl: primeiro?.url,
+      nomeArquivo: primeiro?.nome,
+      tamanhoBytes: primeiro?.tamanhoBytes,
+      arquivos,
+    };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
@@ -142,22 +174,21 @@ export async function extrairAtaPdfAction(formData: FormData): Promise<ExtracaoA
 export async function extrairContratoPdfAction(formData: FormData): Promise<ExtracaoContratoResult> {
   await exigirUsuario();
   await bloquearEspionagem();
-  const file = formData.get("pdf") as File | null;
-  if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
+  const files = pdfsDoFormulario(formData);
+  if (files.length === 0) return { ok: false, erro: "Selecione ao menos um arquivo PDF." };
   try {
-    const dados = await extrairContratoDoPdf(file);
-    let arquivoUrl: string | undefined;
-    let nomeArquivo: string | undefined;
-    let tamanhoBytes: number | undefined;
-    try {
-      const salvo = await salvarArquivo(file);
-      arquivoUrl = salvo.url;
-      nomeArquivo = salvo.nome;
-      tamanhoBytes = salvo.tamanhoBytes;
-    } catch (errSave) {
-      console.warn("[extrairContratoPdfAction] falha ao persistir PDF:", errSave);
-    }
-    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
+    const dados = await extrairContratoDoPdf(files);
+    const arquivos = await persistirTodos(files, "extrairContratoPdfAction");
+    const primeiro = arquivos[0];
+    return {
+      ok: true,
+      dados,
+      demo: modoDemo(),
+      arquivoUrl: primeiro?.url,
+      nomeArquivo: primeiro?.nome,
+      tamanhoBytes: primeiro?.tamanhoBytes,
+      arquivos,
+    };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
@@ -167,22 +198,21 @@ export async function extrairContratoPdfAction(formData: FormData): Promise<Extr
 export async function extrairEmpenhoPdfAction(formData: FormData): Promise<ExtracaoEmpenhoResult> {
   await exigirUsuario();
   await bloquearEspionagem();
-  const file = formData.get("pdf") as File | null;
-  if (!file || file.size === 0) return { ok: false, erro: "Selecione um arquivo PDF." };
+  const files = pdfsDoFormulario(formData);
+  if (files.length === 0) return { ok: false, erro: "Selecione ao menos um arquivo PDF." };
   try {
-    const dados = await extrairEmpenhoDoPdf(file);
-    let arquivoUrl: string | undefined;
-    let nomeArquivo: string | undefined;
-    let tamanhoBytes: number | undefined;
-    try {
-      const salvo = await salvarArquivo(file);
-      arquivoUrl = salvo.url;
-      nomeArquivo = salvo.nome;
-      tamanhoBytes = salvo.tamanhoBytes;
-    } catch (errSave) {
-      console.warn("[extrairEmpenhoPdfAction] falha ao persistir PDF:", errSave);
-    }
-    return { ok: true, dados, demo: modoDemo(), arquivoUrl, nomeArquivo, tamanhoBytes };
+    const dados = await extrairEmpenhoDoPdf(files);
+    const arquivos = await persistirTodos(files, "extrairEmpenhoPdfAction");
+    const primeiro = arquivos[0];
+    return {
+      ok: true,
+      dados,
+      demo: modoDemo(),
+      arquivoUrl: primeiro?.url,
+      nomeArquivo: primeiro?.nome,
+      tamanhoBytes: primeiro?.tamanhoBytes,
+      arquivos,
+    };
   } catch (err) {
     console.error("[extracao IA] falhou:", err);
     return { ok: false, erro: await mensagemDeFalhaDaIa(err) };
