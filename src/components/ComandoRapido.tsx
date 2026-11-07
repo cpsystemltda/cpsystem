@@ -67,7 +67,7 @@ const ROTAS: Rota[] = [
 
   // Super admin
   { label: "Adm CP System — Visão geral", href: "/admin-plataforma", icon: Crown, categoria: "Plataforma", keywords: ["admin", "plataforma", "po", "visao geral"], apenasSuperAdmin: true },
-  { label: "Adm CP System — Clientes", href: "/admin-plataforma/clientes", icon: Users2, categoria: "Plataforma", keywords: ["clientes", "contas", "espionagem", "ver como"], apenasSuperAdmin: true },
+  { label: "Adm CP System — Clientes", href: "/admin-plataforma/clientes", icon: Users2, categoria: "Plataforma", keywords: ["clientes", "contas", "acesso de suporte", "ver como"], apenasSuperAdmin: true },
   { label: "Adm CP System — Analistas", href: "/admin-plataforma/analistas", icon: UserCheck, categoria: "Plataforma", keywords: ["analistas", "rede", "comissoes"], apenasSuperAdmin: true },
   { label: "Adm CP System — Financeiro / MRR", href: "/admin-plataforma/financeiro", icon: Wallet, categoria: "Plataforma", keywords: ["mrr", "arr", "financeiro", "receita", "assinaturas"], apenasSuperAdmin: true },
   { label: "Adm CP System — Atividade", href: "/admin-plataforma/atividade", icon: Activity, categoria: "Plataforma", keywords: ["atividade", "auditoria", "logs", "historico"], apenasSuperAdmin: true },

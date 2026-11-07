@@ -273,15 +273,23 @@ function FormNovaGarantia({
           />
         )}
 
-        {/* Banco */}
+        {/* Instituição emissora da fiança (AJ-03, Igor 07/11/2026). O campo
+            continua `banco` no banco de dados; muda o rótulo e entra o aviso
+            legal, sem validação automática. */}
         {isFianca && (
-          <CampoInput
-            label="Banco *"
-            name="banco"
-            required
-            placeholder="Nome do banco"
-            defaultValue={iaDados?.banco ?? undefined}
-          />
+          <div className="space-y-1.5">
+            <CampoInput
+              label="Instituição emissora *"
+              name="banco"
+              required
+              placeholder="Banco ou instituição financeira que emitiu a fiança"
+              defaultValue={iaDados?.banco ?? undefined}
+            />
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+              A fiança deve ser emitida por banco ou instituição financeira autorizada pelo Banco Central
+              (Lei 14.133, art. 96, §1º, III; Lei 8.666, art. 56, §1º, III). Confira a autorização no site do BCB.
+            </p>
+          </div>
         )}
 
         {/* Valor + Datas */}
@@ -450,7 +458,7 @@ function CardGarantia({ g }: { g: Garantia }) {
           <span><span className="font-medium text-slate-700">Seguradora:</span> {g.seguradora}</span>
         )}
         {g.banco && (
-          <span><span className="font-medium text-slate-700">Banco:</span> {g.banco}</span>
+          <span><span className="font-medium text-slate-700">Instituição emissora:</span> {g.banco}</span>
         )}
         {g.valor > 0 && (
           <span><span className="font-medium text-slate-700">Valor base:</span> {brl(g.valor)}</span>

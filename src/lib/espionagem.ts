@@ -41,8 +41,10 @@ export async function lerContaEspionada(): Promise<string | null> {
 export async function bloquearEspionagem(): Promise<void> {
   const espionando = await lerContaEspionada();
   if (espionando) {
+    // AJ-02 (Igor, 07/11/2026): nome visível é "acesso de suporte (somente
+    // leitura)". "Espionagem" fica só no código.
     throw new Error(
-      "Modo espionagem é somente leitura. Saia do modo espionagem para alterar dados.",
+      "O acesso de suporte é somente leitura. Encerre o acesso de suporte para alterar dados.",
     );
   }
 }
@@ -50,7 +52,7 @@ export async function bloquearEspionagem(): Promise<void> {
 export async function entrarEspionagemAction(formData: FormData) {
   const usuario = await getUsuarioAtual();
   if (!usuario || !usuario.superAdmin) {
-    throw new Error("Apenas gestores da plataforma podem entrar no modo espionagem.");
+    throw new Error("Apenas gestores da plataforma podem usar o acesso de suporte.");
   }
 
   const contaId = String(formData.get("contaId") || "").trim();
@@ -96,15 +98,16 @@ export async function entrarEspionagemAction(formData: FormData) {
     maxAge: 60 * 60 * 24 * 30,
   });
 
-  // Auditoria: usa `LOGIN` + recurso="espionagem" porque o enum AcaoAuditoria
-  // não tem ESPIONAGEM (evita migration). Filtro por `recurso` distingue
-  // de logins reais.
+  // Auditoria: usa `LOGIN` + recurso="acesso-de-suporte" porque o enum
+  // AcaoAuditoria não tem valor próprio (evita migration). Filtro por
+  // `recurso` distingue de logins reais. O texto é o que o cliente lê no
+  // histórico dele (AJ-02): nunca "espionagem".
   await registrarAuditoria({
     contaId: alvo.id,
     usuarioId: usuario.id,
     acao: "LOGIN",
-    recurso: "espionagem",
-    resumo: `Início da espionagem por ${usuario.nome} (${usuario.email})`,
+    recurso: "acesso-de-suporte",
+    resumo: `Início do acesso de suporte (somente leitura) por ${usuario.nome} (${usuario.email})`,
   });
 
   revalidatePath("/", "layout");
@@ -132,8 +135,8 @@ export async function sairEspionagemAction() {
       contaId: contaIdEspionada,
       usuarioId: usuarioRealId,
       acao: "LOGOUT",
-      recurso: "espionagem",
-      resumo: "Fim da espionagem",
+      recurso: "acesso-de-suporte",
+      resumo: "Fim do acesso de suporte (somente leitura)",
     });
   }
 

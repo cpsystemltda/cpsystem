@@ -35,16 +35,18 @@ export type ContratoCard = {
   status: "vigentes" | "vencimento_proximo" | "vencidos" | "finalizados";
 };
 
+// AJ-01 (Igor, 07/11/2026): a lista mostrava "SERVICOS_DEDICACAO_EXCLUSIVA"
+// porque este mapa era de um enum antigo (COMPRAS, OBRA...) que não existe
+// mais. Mesmos rótulos de ROTULO_TIPO em `src/lib/validators.ts`.
 const ROTULOS_TIPO: Record<string, string> = {
-  COMPRAS: "Compras",
+  FORNECIMENTO: "Fornecimento de bens",
+  FORNECIMENTO_CONTINUO: "Fornecimento contínuo de bens",
   SERVICOS: "Serviços",
-  OBRA: "Obra",
-  FORNECIMENTO: "Fornecimento",
-  SERVICO_CONTINUADO: "Serviço Continuado",
-  AQUISICAO: "Aquisição",
-  ALUGUEL: "Aluguel",
-  CONVENIO: "Convênio",
-  OUTRO: "Outro",
+  SERVICOS_CONTINUOS: "Serviços contínuos",
+  SERVICOS_DEDICACAO_EXCLUSIVA: "Serviços contínuos com dedicação exclusiva de mão de obra",
+  SERVICOS_PREDOMINANCIA_MAO_DE_OBRA: "Serviços com predominância de mão de obra",
+  LOCACAO: "Locação",
+  OBRAS_ENGENHARIA: "Obras e serviços de engenharia",
 };
 
 function brl(n: number): string {

@@ -9,7 +9,10 @@ export function BannerEspionagem({ contaNome }: { contaNome: string }) {
           <Eye className="h-4 w-4" />
         </div>
         <div className="flex-1 min-w-0 text-sm">
-          <span className="font-semibold">Modo espionagem · </span>
+          {/* AJ-02 (Igor, 07/11/2026): "modo espionagem" saiu de todo texto
+              visível — o cliente pode ver o registro, e a palavra é
+              inadequada sob a LGPD. Internamente o nome continua. */}
+          <span className="font-semibold">Acesso de suporte (somente leitura) · </span>
           <span className="opacity-90">
             Você está vendo o espaço de{" "}
             <strong className="font-bold">{contaNome}</strong> em somente leitura.
@@ -22,7 +25,7 @@ export function BannerEspionagem({ contaNome }: { contaNome: string }) {
             className="inline-flex items-center gap-2 rounded-md bg-white/15 px-3 py-1.5 text-xs font-semibold hover:bg-white/25 transition"
           >
             <LogOut className="h-3.5 w-3.5" />
-            Sair do modo espionagem
+            Encerrar acesso de suporte
           </button>
         </form>
       </div>
