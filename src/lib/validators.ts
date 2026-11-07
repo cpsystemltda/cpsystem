@@ -337,6 +337,7 @@ export const tiposObjeto = [
   "SERVICOS",
   "SERVICOS_CONTINUOS",
   "SERVICOS_DEDICACAO_EXCLUSIVA",
+  "SERVICOS_PREDOMINANCIA_MAO_DE_OBRA",
   "LOCACAO",
   "OBRAS_ENGENHARIA",
 ] as const;
@@ -346,6 +347,23 @@ export const tiposNaoContinuados = ["FORNECIMENTO", "SERVICOS"] as const;
 export function isContratoNaoContinuado(tipo: (typeof tiposObjeto)[number]): boolean {
   return (tiposNaoContinuados as readonly string[]).includes(tipo);
 }
+
+// Contratos de mão de obra — CMO (ESP-001, Igor 07/11/2026): dedicação
+// exclusiva (DEMO) ou predominância de mão de obra (PMO). É o recorte do
+// Módulo Terceirização: competência mensal em vez de entrega, postos em vez
+// de quantidade consumida, limite de prorrogação pelo regime legal.
+export const tiposMaoDeObra = ["SERVICOS_DEDICACAO_EXCLUSIVA", "SERVICOS_PREDOMINANCIA_MAO_DE_OBRA"] as const;
+export function isContratoMaoDeObra(tipo: string | null | undefined): boolean {
+  return !!tipo && (tiposMaoDeObra as readonly string[]).includes(tipo);
+}
+
+export const regimesLegais = ["LEI_8666", "LEI_14133", "LEI_13303", "OUTRO"] as const;
+export const termosIniciaisPagamento = ["ATESTE_NF", "RECEBIMENTO_NF", "OUTRO"] as const;
+export const ROTULO_TERMO_INICIAL_PAGAMENTO: Record<(typeof termosIniciaisPagamento)[number], string> = {
+  ATESTE_NF: "Ateste da nota fiscal",
+  RECEBIMENTO_NF: "Recebimento da nota fiscal",
+  OUTRO: "Outro",
+};
 
 export const modalidadesEntrega = ["INTEGRAL", "PARCELADA", "SOB_DEMANDA"] as const;
 export const marcosIniciaisPrazo = ["ASSINATURA_CONTRATO", "ORDEM_FORNECIMENTO", "OUTRO"] as const;
@@ -526,9 +544,76 @@ export const novoContratoSchema = contratacaoBase
       (v) => (v === "" || v == null ? undefined : v),
       z.enum(marcosReajusteOrigem).optional(),
     ),
+    // ── Módulo Terceirização, ESP-001 (Igor 07/11/2026) ──
+    // Regime legal obrigatório em todo contrato (RN01); a sugestão da IA só
+    // vale com confirmação (RN02). Campos de mão de obra (RN06) e contagem
+    // do limite de prorrogação editável (RN07, casos de borda).
+    regimeLegal: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.enum(regimesLegais).optional(),
+    ),
+    regimeLegalOutro: z.string().optional(),
+    regimeSugeridoIa: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.enum(regimesLegais).optional(),
+    ),
+    regimeSugeridoTrecho: z.string().optional(),
+    regimeConfirmado: z.string().optional(),
+    inicioContagemLimite: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.date().optional(),
+    ),
+    limiteProrrogacaoMeses: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.number().int().positive().max(240).optional(),
+    ),
+    inicioPrestacaoServicos: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.date().optional(),
+    ),
+    diaFechamentoCompetencia: z.preprocess(
+      (v) => (v === "" || v == null || v === "ULTIMO" ? undefined : v),
+      z.coerce.number().int().min(1).max(28).optional(),
+    ),
+    termoInicialPagamento: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.enum(termosIniciaisPagamento).optional(),
+    ),
+    termoInicialPagamentoOutro: z.string().optional(),
   })
   .superRefine((v, ctx) => {
-    if (v.modalidadeEntrega !== "SOB_DEMANDA" && !v.marcoInicialPrazo) {
+    const cmo = isContratoMaoDeObra(v.tipo);
+    if (!v.regimeLegal) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["regimeLegal"],
+        message: "Informe o regime legal do contrato (Lei 8.666, 14.133, 13.303 ou outro)",
+      });
+    }
+    if (v.regimeLegal === "OUTRO" && !v.regimeLegalOutro?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["regimeLegalOutro"],
+        message: "Descreva qual é o regime",
+      });
+    }
+    if (v.regimeSugeridoIa && v.regimeConfirmado !== "1") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["regimeLegal"],
+        message: "Confirme o regime sugerido pela IA ou escolha outro",
+      });
+    }
+    if (cmo && v.termoInicialPagamento === "OUTRO" && !v.termoInicialPagamentoOutro?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["termoInicialPagamentoOutro"],
+        message: "Descreva o termo inicial do prazo de pagamento",
+      });
+    }
+    // Contrato de mão de obra não tem entrega (RN06): as exigências abaixo
+    // valem só para os demais tipos.
+    if (!cmo && v.modalidadeEntrega !== "SOB_DEMANDA" && !v.marcoInicialPrazo) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["marcoInicialPrazo"],
@@ -706,8 +791,16 @@ export const ROTULO_TIPO: Record<(typeof tiposObjeto)[number], string> = {
   SERVICOS: "Serviços",
   SERVICOS_CONTINUOS: "Serviços contínuos",
   SERVICOS_DEDICACAO_EXCLUSIVA: "Serviços contínuos com dedicação exclusiva de mão de obra",
+  SERVICOS_PREDOMINANCIA_MAO_DE_OBRA: "Serviços com predominância de mão de obra (sem dedicação exclusiva)",
   LOCACAO: "Locação",
   OBRAS_ENGENHARIA: "Obras e serviços de engenharia",
+};
+
+export const ROTULO_REGIME_LEGAL: Record<(typeof regimesLegais)[number], string> = {
+  LEI_8666: "Lei 8.666/1993",
+  LEI_14133: "Lei 14.133/2021",
+  LEI_13303: "Lei 13.303/2016 (estatais)",
+  OUTRO: "Outro",
 };
 
 export const ROTULO_MODALIDADE_ENTREGA: Record<(typeof modalidadesEntrega)[number], string> = {

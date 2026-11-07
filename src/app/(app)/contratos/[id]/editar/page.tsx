@@ -105,6 +105,17 @@ export default async function EditarContratoPage({ params }: { params: Promise<{
     modalidadeEntrega: contrato.modalidadeEntrega,
     marcoInicialPrazo: contrato.marcoInicialPrazo,
     marcoInicialDescricao: contrato.marcoInicialDescricao,
+    // Módulo Terceirização (ESP-001)
+    regimeLegal: contrato.regimeLegal,
+    regimeLegalOutro: contrato.regimeLegalOutro,
+    regimeSugerido: contrato.regimeLegal ? null : contrato.regimeSugerido,
+    regimeSugeridoTrecho: contrato.regimeLegal ? null : contrato.regimeSugeridoTrecho,
+    inicioContagemLimite: toDateInput(contrato.inicioContagemLimite),
+    limiteProrrogacaoMeses: contrato.limiteProrrogacaoMeses,
+    inicioPrestacaoServicos: toDateInput(contrato.inicioPrestacaoServicos),
+    diaFechamentoCompetencia: contrato.diaFechamentoCompetencia,
+    termoInicialPagamento: contrato.termoInicialPagamento,
+    termoInicialPagamentoOutro: contrato.termoInicialPagamentoOutro,
     itens: contrato.itens.map((i) => ({
       id: i.id,
       descricao: i.descricao,

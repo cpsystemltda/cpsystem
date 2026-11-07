@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { get } from "@vercel/blob";
 import { zipSync } from "fflate";
 import { prisma } from "@/lib/prisma";
 import { getUsuarioAtual } from "@/lib/auth";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
+import { lerBytesDoAnexo } from "@/lib/anexoBytes";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -76,12 +76,12 @@ export async function GET(req: Request) {
   const faltaram: string[] = [];
   const usados = new Set<string>();
   for (const a of anexos) {
-    const bytes = await lerAnexo(a.url, contaId, !!usuario.superAdmin);
-    if (!bytes) {
+    const lido = await lerBytesDoAnexo(a.url, contaId, !!usuario.superAdmin);
+    if (!lido) {
       faltaram.push(a.nome);
       continue;
     }
-    arquivos[nomeUnico(a.nome, usados)] = [bytes, { level: 0 }];
+    arquivos[nomeUnico(a.nome, usados)] = [lido.bytes, { level: 0 }];
   }
 
   const incluidos = Object.keys(arquivos).length;
@@ -135,42 +135,5 @@ function nomeUnico(nome: string, usados: Set<string>): string {
       usados.add(tentativa);
       return tentativa;
     }
-  }
-}
-
-/**
- * Lê os bytes de um anexo pelo mesmo caminho que /api/arquivo/[id] usa para
- * servi-lo — inclusive a conferência de dono, repetida aqui porque o `Anexo`
- * aponta para o `Arquivo` só pela URL.
- */
-async function lerAnexo(url: string, contaId: string, superAdmin: boolean): Promise<Uint8Array | null> {
-  try {
-    const interno = /^\/api\/arquivo\/([\w-]+)$/.exec(url);
-    if (interno) {
-      const arq = await prisma.arquivo.findUnique({
-        where: { id: interno[1] },
-        select: { pathname: true, contaId: true, urlPublica: true },
-      });
-      if (!arq || (arq.contaId !== contaId && !superAdmin)) return null;
-      if (arq.urlPublica) {
-        const r = await fetch(arq.urlPublica);
-        if (!r.ok) return null;
-        return new Uint8Array(await r.arrayBuffer());
-      }
-      const res = await get(arq.pathname, { access: "private" });
-      if (!res || res.statusCode !== 200 || !res.stream) return null;
-      return new Uint8Array(await new Response(res.stream as unknown as BodyInit).arrayBuffer());
-    }
-    if (/^https?:\/\//.test(url)) {
-      // Anexo antigo, gravado com a URL pública do armazenamento.
-      const r = await fetch(url);
-      if (!r.ok) return null;
-      return new Uint8Array(await r.arrayBuffer());
-    }
-    // Legado /api/anexos/<nome>: filesystem efêmero, não existe em produção.
-    return null;
-  } catch (e) {
-    console.error("[api/anexos/zip] falha ao ler anexo:", url, e);
-    return null;
   }
 }

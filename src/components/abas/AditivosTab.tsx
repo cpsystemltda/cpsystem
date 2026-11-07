@@ -113,6 +113,7 @@ export function AditivosTab({
   contratoTipo,
   valorInicialContrato,
   valorAtualContrato,
+  prazoMaximoVigencia,
 }: {
   aditivos: Aditivo[];
   contratoId?: string;
@@ -121,6 +122,8 @@ export function AditivosTab({
   contratoTipo?: keyof typeof ROTULO_TIPO;
   valorInicialContrato?: number;
   valorAtualContrato?: number;
+  /** ESP-001 RN08: prazo máximo de vigência pelo regime (ISO). Prorrogação além dele gera alerta, não bloqueio. */
+  prazoMaximoVigencia?: string | null;
 }) {
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
@@ -159,6 +162,7 @@ export function AditivosTab({
               contratoId={contratoId}
               empenhoId={empenhoId}
               ataId={ataId}
+              prazoMaximoVigencia={prazoMaximoVigencia}
               naoContinuado={naoContinuado}
               valorInicial={valorInicialContrato}
               valorAtual={valorAtualContrato}
@@ -188,6 +192,7 @@ export function AditivosTab({
           naoContinuado={naoContinuado}
           valorInicial={valorInicialContrato}
           valorAtual={valorAtualContrato}
+          prazoMaximoVigencia={prazoMaximoVigencia}
           onCancelar={() => setCriando(false)}
           onSalvo={() => setCriando(false)}
         />
@@ -214,6 +219,7 @@ function CardAditivo({
   naoContinuado,
   valorInicial,
   valorAtual,
+  prazoMaximoVigencia,
 }: {
   a: Aditivo;
   editando: boolean;
@@ -226,6 +232,7 @@ function CardAditivo({
   naoContinuado: boolean;
   valorInicial?: number;
   valorAtual?: number;
+  prazoMaximoVigencia?: string | null;
 }) {
   const [excluirState, excluirAction] = useActionState(excluirTermoAditivoAction, null);
 
@@ -240,6 +247,7 @@ function CardAditivo({
         naoContinuado={naoContinuado}
         valorInicial={valorInicial}
         valorAtual={valorAtual}
+        prazoMaximoVigencia={prazoMaximoVigencia}
         onCancelar={onCancelar}
         onSalvo={onSalvo}
       />
@@ -414,6 +422,7 @@ function FormularioAditivo({
   naoContinuado,
   valorInicial,
   valorAtual,
+  prazoMaximoVigencia,
   onCancelar,
   onSalvo,
 }: {
@@ -425,6 +434,7 @@ function FormularioAditivo({
   naoContinuado: boolean;
   valorInicial?: number;
   valorAtual?: number;
+  prazoMaximoVigencia?: string | null;
   onCancelar: () => void;
   onSalvo: () => void;
 }) {
@@ -792,6 +802,15 @@ function FormularioAditivo({
               />
             </CampoLabel>
           </div>
+          {/* ESP-001 RN08 (Igor 07/11/2026): prorrogação além do limite
+              ordinário do regime avisa, não bloqueia — o fundamento pode ser
+              o art. 57, §4º da 8.666 ou regulamento próprio do ente. */}
+          {alteraVig && prazoMaximoVigencia && dataVigFim && dataVigFim > prazoMaximoVigencia.slice(0, 10) && (
+            <p className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">
+              Esta prorrogação ultrapassa o limite ordinário do regime (prazo máximo de vigência:{" "}
+              {new Date(prazoMaximoVigencia).toLocaleDateString("pt-BR", { timeZone: "UTC" })}). Confira o fundamento.
+            </p>
+          )}
         </BlocoToggle>
 
         {/* BLOCO 3: PRAZO DE ENTREGA/EXECUÇÃO */}

@@ -70,6 +70,7 @@ const ENUM_LABEL: Record<string, Record<string, string>> = {
     SERVICOS: "Serviços",
     SERVICOS_CONTINUOS: "Serviços contínuos",
     SERVICOS_DEDICACAO_EXCLUSIVA: "Serviços (dedicação exclusiva)",
+    SERVICOS_PREDOMINANCIA_MAO_DE_OBRA: "Serviços (predominância de mão de obra)",
     LOCACAO: "Locação",
     OBRAS_ENGENHARIA: "Obras de engenharia",
   },

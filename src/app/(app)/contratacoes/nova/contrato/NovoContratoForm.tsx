@@ -20,7 +20,11 @@ import {
   OPCOES_TIPO,
   OPCOES_MODALIDADE_ENTREGA,
   OPCOES_MARCO_INICIAL,
+  isContratoMaoDeObra,
+  termosIniciaisPagamento,
+  ROTULO_TERMO_INICIAL_PAGAMENTO,
 } from "@/lib/validators";
+import { REGIMES_LEGAIS, ROTULO_REGIME, DICA_REGIME_VAZIO, type RegimeLegal } from "@/lib/regimeLegal";
 import { Plus, Trash2 } from "lucide-react";
 import type { ContratoExtraido } from "@/lib/extrairAta";
 import {
@@ -65,6 +69,17 @@ export type ContratoValoresIniciais = {
   modalidadeEntrega: "INTEGRAL" | "PARCELADA" | "SOB_DEMANDA";
   marcoInicialPrazo: string | null;
   marcoInicialDescricao: string | null;
+  // Módulo Terceirização (ESP-001)
+  regimeLegal?: string | null;
+  regimeLegalOutro?: string | null;
+  regimeSugerido?: string | null;
+  regimeSugeridoTrecho?: string | null;
+  inicioContagemLimite?: string | null;
+  limiteProrrogacaoMeses?: number | null;
+  inicioPrestacaoServicos?: string | null;
+  diaFechamentoCompetencia?: number | null;
+  termoInicialPagamento?: string | null;
+  termoInicialPagamentoOutro?: string | null;
   itens: ItemInicial[];
   parcelas: {
     id: string;
@@ -104,6 +119,17 @@ export default function NovoContratoForm({
   const [ataId, setAtaId] = useState(vi?.ataId ?? "");
   const [vinculadoArp, setVinculadoArp] = useState<"SIM" | "NAO">(vi?.ataId ? "SIM" : "NAO");
   const [dados, setDados] = useState<ContratoExtraido | null>(null);
+  // ESP-001 (Igor 07/11/2026): o tipo passa a ser controlado — contrato de mão
+  // de obra (CMO) troca os campos de entrega pelos de prestação mensal (RN06).
+  const [tipo, setTipo] = useState<string>(vi?.tipo ?? "");
+  const cmo = isContratoMaoDeObra(tipo);
+  // Regime legal (RN01/RN02): a sugestão da IA vem pré-marcada e só é salva
+  // com confirmação explícita (checkbox) ou troca do valor pela pessoa.
+  const [regimeLegal, setRegimeLegal] = useState<string>(vi?.regimeLegal ?? vi?.regimeSugerido ?? "");
+  const [regimeSugerido, setRegimeSugerido] = useState<string>(vi?.regimeLegal ? "" : vi?.regimeSugerido ?? "");
+  const [regimeTrecho, setRegimeTrecho] = useState<string>(vi?.regimeLegal ? "" : vi?.regimeSugeridoTrecho ?? "");
+  const [regimeConfirmado, setRegimeConfirmado] = useState<boolean>(!!vi?.regimeLegal);
+  const [termoInicialPagamento, setTermoInicialPagamento] = useState<string>(vi?.termoInicialPagamento ?? "ATESTE_NF");
   const [modalidadeEntrega, setModalidadeEntrega] = useState<"INTEGRAL" | "PARCELADA" | "SOB_DEMANDA">(
     vi?.modalidadeEntrega ?? "INTEGRAL",
   );
@@ -169,6 +195,18 @@ export default function NovoContratoForm({
     if (!dados) return;
     if (dados.vigenciaInicio) setVigenciaInicio(dados.vigenciaInicio);
     if (dados.dataAssinatura) setDataAssinaturaState(dados.dataAssinatura);
+    // ESP-001 RN02: regime sugerido pela IA vem pré-marcado, com o trecho, e
+    // fica aguardando confirmação. RN05: objeto com dedicação exclusiva de
+    // mão de obra sugere o tipo, se a pessoa ainda não escolheu.
+    if (dados.regimeLegal) {
+      setRegimeLegal(dados.regimeLegal);
+      setRegimeSugerido(dados.regimeLegal);
+      setRegimeTrecho(dados.regimeLegalTrecho ?? "");
+      setRegimeConfirmado(false);
+    }
+    if (dados.dedicacaoExclusivaMaoDeObra) {
+      setTipo((atual) => atual || "SERVICOS_DEDICACAO_EXCLUSIVA");
+    }
     if (dados.vigenciaInicio && dados.vigenciaFim) {
       const det = detectarPrazoVigencia(dados.vigenciaInicio, dados.vigenciaFim);
       if (det) {
@@ -320,7 +358,98 @@ export default function NovoContratoForm({
         <Secao titulo="Identificação">
           <div className="grid grid-cols-4 gap-4">
             <Select label="Empresa" name="empresaId" options={empresas} required erro={e.empresaId} span={2} defaultValue={vi?.empresaId} />
-            <Select label="Tipo de objeto" name="tipo" options={OPCOES_TIPO} required erro={e.tipo} span={2} defaultValue={vi?.tipo} ajuda={AJUDA.tipoContrato} />
+            <Select
+              label="Tipo de objeto"
+              name="tipo"
+              options={OPCOES_TIPO}
+              required
+              erro={e.tipo}
+              span={2}
+              value={tipo}
+              onChange={(ev) => setTipo(ev.currentTarget.value)}
+              ajuda={AJUDA.tipoContrato}
+            />
+
+            {/* Regime legal — ESP-001 (Igor 07/11/2026). Obrigatório; a
+                sugestão da IA vem pré-marcada e só é salva com confirmação. */}
+            <div className="col-span-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="grid grid-cols-4 gap-4">
+                <Select
+                  label="Regime legal"
+                  name="regimeLegal"
+                  options={REGIMES_LEGAIS.map((r) => ({ value: r, label: ROTULO_REGIME[r] }))}
+                  required
+                  erro={e.regimeLegal}
+                  span={2}
+                  value={regimeLegal}
+                  onChange={(ev) => {
+                    setRegimeLegal(ev.currentTarget.value);
+                    setRegimeConfirmado(true);
+                  }}
+                />
+                {regimeLegal === "OUTRO" && (
+                  <Field
+                    label="Qual regime?"
+                    name="regimeLegalOutro"
+                    required
+                    erro={e.regimeLegalOutro}
+                    span={2}
+                    defaultValue={vi?.regimeLegalOutro ?? ""}
+                  />
+                )}
+                <input type="hidden" name="regimeSugeridoIa" value={regimeSugerido} />
+                <input type="hidden" name="regimeSugeridoTrecho" value={regimeTrecho} />
+                <input type="hidden" name="regimeConfirmado" value={regimeConfirmado ? "1" : ""} />
+                {regimeSugerido ? (
+                  <div className="col-span-4 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs text-slate-700">
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800">
+                      Sugerido pela IA — confirme
+                    </span>
+                    <span className="ml-2 font-semibold text-slate-900">{ROTULO_REGIME[regimeSugerido as RegimeLegal]}</span>
+                    {regimeTrecho && <p className="mt-1 italic">“{regimeTrecho}”</p>}
+                    <label className="mt-2 inline-flex items-center gap-1.5 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={regimeConfirmado}
+                        onChange={(ev) => setRegimeConfirmado(ev.target.checked)}
+                      />
+                      Confirmo o regime sugerido pela IA
+                    </label>
+                  </div>
+                ) : (
+                  !regimeLegal && (
+                    <p className="col-span-4 text-[11px] text-slate-500">{DICA_REGIME_VAZIO}</p>
+                  )
+                )}
+                <details className="col-span-4 text-xs">
+                  <summary className="cursor-pointer font-medium text-slate-600">
+                    Limite de prorrogação (avançado)
+                  </summary>
+                  <div className="mt-2 grid grid-cols-4 gap-4">
+                    <Field
+                      label="Início da contagem do limite"
+                      name="inicioContagemLimite"
+                      type="date"
+                      span={2}
+                      defaultValue={vi?.inicioContagemLimite ?? ""}
+                    />
+                    <Field
+                      label="Limite de vigência (meses)"
+                      name="limiteProrrogacaoMeses"
+                      type="number"
+                      min="1"
+                      span={2}
+                      defaultValue={vi?.limiteProrrogacaoMeses?.toString() ?? ""}
+                    />
+                    <p className="col-span-4 text-[11px] text-slate-500">
+                      Em branco, vale o padrão do regime contado da 1ª vigência: Lei 8.666 = 60 meses (art. 57, II);
+                      Lei 14.133 = 10 anos (arts. 106 e 107); Lei 13.303 = 5 anos (art. 71). Preencha quando uma nova
+                      licitação interrompeu a contagem ou o regulamento do ente tem limite próprio.
+                    </p>
+                  </div>
+                </details>
+              </div>
+            </div>
 
             {/* Toggle Vinculado a ARP */}
             <div className="col-span-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -576,7 +705,11 @@ export default function NovoContratoForm({
               )}
             </div>
 
-            {/* Prazo de entrega/execução — 2 modos: RELATIVO ou DATA_CERTA */}
+            {/* Prazo de entrega/execução — 2 modos: RELATIVO ou DATA_CERTA.
+                Contrato de mão de obra não tem entrega (ESP-001 RN06): no
+                lugar entram início da prestação, fechamento da competência e
+                termo inicial do pagamento. */}
+            {!cmo && (
             <div className="col-span-2">
               <span
                 className="mb-1.5 block text-[11px] font-bold uppercase"
@@ -671,6 +804,30 @@ export default function NovoContratoForm({
                     : "Data definida posteriormente pelo cliente — preenchida no Empenho/Ordem."}
               </span>
             </div>
+            )}
+
+            {cmo && (
+              <>
+                <Field
+                  label="Início da prestação dos serviços"
+                  name="inicioPrestacaoServicos"
+                  type="date"
+                  span={1}
+                  erro={e.inicioPrestacaoServicos}
+                  defaultValue={vi?.inicioPrestacaoServicos ?? vigenciaInicio}
+                />
+                <Select
+                  label="Fechamento da competência"
+                  name="diaFechamentoCompetencia"
+                  span={1}
+                  options={[
+                    { value: "ULTIMO", label: "Último dia do mês" },
+                    ...Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `Dia ${i + 1}` })),
+                  ]}
+                  defaultValue={vi?.diaFechamentoCompetencia?.toString() ?? "ULTIMO"}
+                />
+              </>
+            )}
 
             <Field
               label="Prazo de pagamento (dias)"
@@ -681,6 +838,29 @@ export default function NovoContratoForm({
               span={1}
               defaultValue={dados?.prazoPagamentoDias?.toString() ?? vi?.prazoPagamentoDias?.toString() ?? ""}
             />
+
+            {cmo && (
+              <>
+                <Select
+                  label="Prazo de pagamento conta a partir de"
+                  name="termoInicialPagamento"
+                  span={termoInicialPagamento === "OUTRO" ? 2 : 1}
+                  options={termosIniciaisPagamento.map((t) => ({ value: t, label: ROTULO_TERMO_INICIAL_PAGAMENTO[t] }))}
+                  value={termoInicialPagamento}
+                  onChange={(ev) => setTermoInicialPagamento(ev.currentTarget.value)}
+                />
+                {termoInicialPagamento === "OUTRO" && (
+                  <Field
+                    label="Qual?"
+                    name="termoInicialPagamentoOutro"
+                    required
+                    erro={e.termoInicialPagamentoOutro}
+                    span={2}
+                    defaultValue={vi?.termoInicialPagamentoOutro ?? ""}
+                  />
+                )}
+              </>
+            )}
 
             {/* Marco de reajuste — mesma estrutura da ARP */}
             <div className="col-span-4">
@@ -740,6 +920,8 @@ export default function NovoContratoForm({
           </div>
         </Secao>
 
+        {/* Contrato de mão de obra não tem modalidade de entrega (ESP-001 RN06). */}
+        {!cmo && (
         <Secao titulo="Modalidade de entrega">
           <p className="mb-4 text-xs text-slate-600">
             Conforme Lei 14.133 (fluxograma do contrato independente). Em entrega
@@ -803,6 +985,7 @@ export default function NovoContratoForm({
             </p>
           )}
         </Secao>
+        )}
 
         <Secao titulo="Endereços de entrega/execução">
           <p className="mb-3 text-xs text-slate-600">

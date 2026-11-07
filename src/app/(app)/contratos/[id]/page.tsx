@@ -12,6 +12,7 @@ import {
   ROTULO_TIPO,
   ROTULO_MODALIDADE_ENTREGA,
   ROTULO_MARCO_INICIAL,
+  ROTULO_REGIME_LEGAL,
   isContratoNaoContinuado,
 } from "@/lib/validators";
 import { Tabs } from "@/components/Tabs";
@@ -29,6 +30,8 @@ import { GarantiasTab } from "@/components/abas/GarantiasTab";
 import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
+import { RegimeLegalPanel } from "@/components/RegimeLegalPanel";
+import { avisoDoLimite, prazoMaximoVigencia, prorrogacoesRestantesEstimadas } from "@/lib/regimeLegal";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 import { SaldoVigenciasPanel } from "@/components/SaldoVigenciasPanel";
@@ -54,6 +57,8 @@ export default async function ContratoDetalhePage({
       empresa: true,
       criadoPor: { select: { nome: true, email: true } },
       itens: { select: { quantidade: true, valorTotal: true } },
+      // ESP-001 RN07: o limite de prorrogação conta da 1ª vigência.
+      vigencias: { select: { ordem: true, dataInicio: true }, orderBy: { ordem: "asc" } },
       ata: true,
       empenhos: { orderBy: { criadoEm: "desc" } },
       parcelas: { orderBy: { numero: "asc" } },
@@ -105,6 +110,17 @@ export default async function ContratoDetalhePage({
     include: { usuario: { select: { nome: true, email: true } } },
   });
 
+  // ESP-001 RN07: prazo máximo de vigência pelo regime, contado da 1ª
+  // vigência (ou da data editada pela pessoa), e prorrogações restantes.
+  const primeiraVigencia = contrato.vigencias[0]?.dataInicio ?? contrato.vigenciaInicio;
+  const limite = prazoMaximoVigencia({
+    regime: contrato.regimeLegal,
+    inicioPrimeiraVigencia: primeiraVigencia,
+    inicioContagemLimite: contrato.inicioContagemLimite,
+    limiteMesesOverride: contrato.limiteProrrogacaoMeses,
+  });
+  const prazoMaximoIso = limite ? limite.prazoMaximo.toISOString() : null;
+
   return (
     <div className="mx-auto max-w-7xl px-8 py-8">
       <Link href="/contratos" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
@@ -155,6 +171,23 @@ export default async function ContratoDetalhePage({
         contratoId={contrato.id}
       />
 
+      {/* Regime legal (ESP-001): cabeçalho com lei + prazo máximo, ou o
+          banner "Regime pendente" para contrato anterior ao campo (RN04). */}
+      <RegimeLegalPanel
+        contratoId={contrato.id}
+        regimeLegal={contrato.regimeLegal}
+        regimeLegalOutro={contrato.regimeLegalOutro}
+        regimeSugerido={contrato.regimeSugerido}
+        regimeSugeridoTrecho={contrato.regimeSugeridoTrecho}
+        prazoMaximo={prazoMaximoIso}
+        limiteMeses={limite?.limiteMeses ?? null}
+        inicioContagem={limite ? limite.inicioContagem.toISOString() : null}
+        avisoLimite={avisoDoLimite(contrato.regimeLegal)}
+        prorrogacoesRestantes={limite ? prorrogacoesRestantesEstimadas(contrato.vigenciaFim, limite.prazoMaximo) : null}
+        vigenciaFim={contrato.vigenciaFim.toISOString()}
+        podeEditar={podeEditar}
+      />
+
       {/* Atestado de Capacidade Técnica (Regina 11/09) — encerrado o contrato,
           é hora de pedir ao órgão o documento que comprova a execução. */}
       <div className="mt-4">
@@ -195,6 +228,7 @@ export default async function ContratoDetalhePage({
                   contratoTipo={contrato.tipo}
                   valorInicialContrato={contrato.valorInicial ?? saldo.valorTotal}
                   valorAtualContrato={saldo.valorTotal}
+                  prazoMaximoVigencia={prazoMaximoIso}
                 />
               ),
             },
@@ -507,6 +541,8 @@ function DadosContrato({
     modalidadeEntrega: string;
     marcoInicialPrazo: string | null;
     marcoInicialDescricao: string | null;
+    regimeLegal: "LEI_8666" | "LEI_14133" | "LEI_13303" | "OUTRO" | null;
+    regimeLegalOutro: string | null;
     parcelas: { id: string; numero: number; prazoDias: number; descricao: string | null; valorEstimado: number | null }[];
   };
 }) {
@@ -515,6 +551,14 @@ function DadosContrato({
     <div className="space-y-6">
       <div className="grid gap-x-8 gap-y-3 text-sm md:grid-cols-2">
         <Info label="Tipo" valor={ROTULO_TIPO[c.tipo as keyof typeof ROTULO_TIPO]} />
+        <Info
+          label="Regime legal"
+          valor={
+            c.regimeLegal
+              ? `${ROTULO_REGIME_LEGAL[c.regimeLegal]}${c.regimeLegal === "OUTRO" && c.regimeLegalOutro ? ` — ${c.regimeLegalOutro}` : ""}`
+              : "Pendente"
+          }
+        />
         <Info label="Procedimento" valor={ROTULO_PROCEDIMENTO[c.procedimentoSelecao as keyof typeof ROTULO_PROCEDIMENTO]} />
         <Info label="Processo administrativo" valor={c.processoAdministrativo} />
         <Info label="Nº Licitação" valor={c.numeroLicitacao || "—"} />

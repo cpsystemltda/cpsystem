@@ -883,6 +883,10 @@ enum TipoObjeto {
   SERVICOS
   SERVICOS_CONTINUOS
   SERVICOS_DEDICACAO_EXCLUSIVA
+  /// Serviços com predominância de mão de obra, sem dedicação exclusiva
+  /// (ESP-001 RN05, Igor 07/11/2026). Junto com o anterior, é "contrato de
+  /// mão de obra" para o Módulo Terceirização.
+  SERVICOS_PREDOMINANCIA_MAO_DE_OBRA
   LOCACAO
   OBRAS_ENGENHARIA
 }
@@ -1174,6 +1178,31 @@ model Contrato {
   marcoOrcamentoEstimado DateTime?
   marcoReajusteOrigem    MarcoReajusteOrigem?
 
+  // ── Módulo Terceirização (Igor, ESP-001/002/004, 07/11/2026) ──
+  /// Regime legal (ESP-001). Obrigatório no formulário; nulo em contrato
+  /// antigo até a pessoa confirmar — a lista marca "Regime pendente".
+  regimeLegal                 RegimeLegal?
+  regimeLegalOutro            String?
+  /// Sugestão da IA (preâmbulo/aditivos) e o trecho que a justificou. Só
+  /// vira `regimeLegal` com confirmação do usuário (RN02).
+  regimeSugerido              RegimeLegal?
+  regimeSugeridoTrecho        String?
+  regimeConfirmadoEm          DateTime?
+  /// RN07: a contagem do limite de prorrogação é editável (nova licitação
+  /// interrompeu a contagem; regulamento do ente com limite próprio).
+  inicioContagemLimite        DateTime?
+  limiteProrrogacaoMeses      Int?
+  /// RN06 — só em contrato de mão de obra, no lugar dos campos de entrega.
+  inicioPrestacaoServicos     DateTime?
+  diaFechamentoCompetencia    Int? // null = último dia do mês
+  termoInicialPagamento       TermoInicialPagamento?
+  termoInicialPagamentoOutro  String?
+  /// ESP-002 RN06: a pessoa confirmou que os valores dos itens são mensais.
+  valoresMensaisConfirmadosEm DateTime?
+  /// ESP-004: ciclo da competência e pro rata do primeiro/último mês.
+  cicloCompetencia            CicloCompetencia?
+  criterioProRata             CriterioProRata?
+
   // Valor inicial do contrato (somatório de itens no momento da criação).
   // Preservado pra exibir "Valor Inicial" mesmo após aditivos com reajuste.
   // null em contratos pré-M3-aditivo (backfill aplica o valor corrente).
@@ -1274,6 +1303,16 @@ model ContratoItem {
   // avulso que tenha lotes proprios.
   lote   String?
   numero String?
+
+  // Módulo Terceirização (ESP-002, Igor 07/11/2026): em contrato de mão de
+  // obra o item é um posto (ou empregado) com valor MENSAL. Um posto 12x36
+  // costuma exigir 2 colaboradores — é esse total que alimenta o quadro de
+  // postos descobertos (ESP-008) e a faixa de cobrança (ESP-011).
+  cbo                   String?
+  unidadeMaoDeObra      UnidadeMaoDeObra?
+  jornada               String? // "44h semanais", "12x36 diurno"...
+  localPrestacao        String?
+  colaboradoresPorPosto Int?
 
   contratoId String
   contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -3047,4 +3086,44 @@ model DespesaPlataforma {
   atualizadoEm DateTime @updatedAt
 
   @@index([competencia])
+}
+
+// ============================================================
+// MÓDULO TERCEIRIZAÇÃO — contratos de mão de obra (Igor, ESP-001/002, 07/11/2026)
+// ============================================================
+
+// Regime legal do contrato. Contrato assinado sob a 8.666 continua regido
+// por ela até o fim (Lei 14.133, art. 190). Decide limite de prorrogação,
+// textos de alerta e fundamento dos pedidos gerados pela IA.
+enum RegimeLegal {
+  LEI_8666
+  LEI_14133
+  LEI_13303
+  OUTRO
+}
+
+// A partir de quê conta o prazo de pagamento num contrato de mão de obra.
+enum TermoInicialPagamento {
+  ATESTE_NF
+  RECEBIMENTO_NF
+  OUTRO
+}
+
+// Unidade do item num contrato de mão de obra (ESP-002): posto de trabalho
+// ou empregado. Um posto 12x36 costuma exigir 2 colaboradores.
+enum UnidadeMaoDeObra {
+  POSTO
+  EMPREGADO
+}
+
+// Ciclo da competência mensal (ESP-004): mês civil ou aniversário do contrato.
+enum CicloCompetencia {
+  MES_CIVIL
+  ANIVERSARIO
+}
+
+// Pro rata do primeiro/último mês (ESP-004).
+enum CriterioProRata {
+  DIAS_CORRIDOS
+  MES_COMERCIAL
 }

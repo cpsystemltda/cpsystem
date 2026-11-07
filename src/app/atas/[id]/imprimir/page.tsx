@@ -13,16 +13,16 @@ import { formatarCnpj } from "@/lib/cnpj";
 // que e do contrato derivado, com lista de Contratos derivados em vez
 // de empenhos diretos).
 
+// AJ-01 (Igor 07/11/2026): mapa do enum atual — o antigo imprimia o código cru.
 const ROTULOS_TIPO: Record<string, string> = {
-  COMPRAS: "Compras",
+  FORNECIMENTO: "Fornecimento de bens",
+  FORNECIMENTO_CONTINUO: "Fornecimento contínuo de bens",
   SERVICOS: "Serviços",
-  OBRA: "Obra",
-  FORNECIMENTO: "Fornecimento",
-  SERVICO_CONTINUADO: "Serviço Continuado",
-  AQUISICAO: "Aquisição",
-  ALUGUEL: "Aluguel",
-  CONVENIO: "Convênio",
-  OUTRO: "Outro",
+  SERVICOS_CONTINUOS: "Serviços contínuos",
+  SERVICOS_DEDICACAO_EXCLUSIVA: "Serviços contínuos com dedicação exclusiva de mão de obra",
+  SERVICOS_PREDOMINANCIA_MAO_DE_OBRA: "Serviços com predominância de mão de obra",
+  LOCACAO: "Locação",
+  OBRAS_ENGENHARIA: "Obras e serviços de engenharia",
 };
 
 const ROTULOS_PROCEDIMENTO: Record<string, string> = {

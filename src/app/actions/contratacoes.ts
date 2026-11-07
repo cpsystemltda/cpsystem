@@ -22,7 +22,45 @@ import {
   novoContratoSchema,
   novoEmpenhoSchema,
   normalizarCnpj,
+  isContratoMaoDeObra,
 } from "@/lib/validators";
+
+type ContratoInput = ReturnType<typeof novoContratoSchema.parse>;
+
+/**
+ * Regime legal (ESP-001, Igor 07/11/2026). O que a IA sugeriu fica guardado
+ * ao lado do que a pessoa confirmou, para o histórico mostrar os dois.
+ */
+function camposRegimeLegal(v: ContratoInput) {
+  return {
+    regimeLegal: v.regimeLegal ?? null,
+    regimeLegalOutro: v.regimeLegal === "OUTRO" ? v.regimeLegalOutro?.trim() || null : null,
+    regimeSugerido: v.regimeSugeridoIa ?? null,
+    regimeSugeridoTrecho: v.regimeSugeridoIa ? v.regimeSugeridoTrecho?.trim().slice(0, 600) || null : null,
+    regimeConfirmadoEm: v.regimeLegal ? new Date() : null,
+    inicioContagemLimite: v.inicioContagemLimite ?? null,
+    limiteProrrogacaoMeses: v.limiteProrrogacaoMeses ?? null,
+  };
+}
+
+/** Campos que só existem em contrato de mão de obra (ESP-001, RN06). */
+function camposMaoDeObra(v: ContratoInput, cmo: boolean) {
+  if (!cmo) {
+    return {
+      inicioPrestacaoServicos: null,
+      diaFechamentoCompetencia: null,
+      termoInicialPagamento: null,
+      termoInicialPagamentoOutro: null,
+    };
+  }
+  return {
+    inicioPrestacaoServicos: v.inicioPrestacaoServicos ?? v.vigenciaInicio,
+    diaFechamentoCompetencia: v.diaFechamentoCompetencia ?? null,
+    termoInicialPagamento: v.termoInicialPagamento ?? null,
+    termoInicialPagamentoOutro:
+      v.termoInicialPagamento === "OUTRO" ? v.termoInicialPagamentoOutro?.trim() || null : null,
+  };
+}
 import { salvarArquivo } from "@/lib/uploads";
 import { anexarArquivosDaIa, lerArquivosDaIa } from "@/lib/anexosDaIa";
 import { registrarAuditoria } from "@/lib/auditoria";
@@ -758,6 +796,7 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
 
   const v = parsed.data;
   await pegarEmpresaDoUsuario(v.empresaId, usuario.contaId);
+  const cmo = isContratoMaoDeObra(v.tipo);
 
   // Bloqueia cadastro duplicado: mesmo número + mesmo órgão na conta
   // inteira (Regina 28/05). Trim do número evita diferença por espaço.
@@ -833,17 +872,21 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
         dataPublicacao: v.dataPublicacao || null,
         vigenciaInicio: v.vigenciaInicio,
         vigenciaFim: v.vigenciaFim,
-        prazoEntregaDias: v.prazoEntregaDias || null,
+        // Contrato de mão de obra (ESP-001, RN06): não há entrega — os campos
+        // de prazo/modalidade ficam neutros e entram os de prestação mensal.
+        prazoEntregaDias: cmo ? null : v.prazoEntregaDias || null,
         prazoEntregaUnidade: v.prazoEntregaUnidade,
-        prazoEntregaModo: v.prazoEntregaModo,
-        dataEntregaCerta: v.dataEntregaCerta ?? null,
+        prazoEntregaModo: cmo ? "SOB_DEMANDA" : v.prazoEntregaModo,
+        dataEntregaCerta: cmo ? null : v.dataEntregaCerta ?? null,
         prazoPagamentoDias: v.prazoPagamentoDias || null,
         marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
         marcoReajusteOrigem: v.marcoReajusteOrigem ?? null,
-        modalidadeEntrega: v.modalidadeEntrega,
-        marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
+        modalidadeEntrega: cmo ? "SOB_DEMANDA" : v.modalidadeEntrega,
+        marcoInicialPrazo: cmo || v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
         marcoInicialDescricao:
-          v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
+          !cmo && v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
+        ...camposRegimeLegal(v),
+        ...camposMaoDeObra(v, cmo),
         itens: {
           create: v.itens.map((i) => ({
             descricao: i.descricao,
@@ -1056,6 +1099,7 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
         }))
       : [];
 
+  const cmo = isContratoMaoDeObra(v.tipo);
   try {
     await prisma.$transaction(async (tx) => {
       await tx.contrato.update({

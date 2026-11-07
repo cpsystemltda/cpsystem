@@ -196,6 +196,7 @@ export default async function ContratosPage({
       id: c.id,
       numero: c.numero,
       tipo: c.tipo,
+      regimeLegal: c.regimeLegal,
       objeto: c.objeto,
       orgaoNome: c.orgaoNome,
       empresaNome: c.empresa.nomeFantasia || c.empresa.razaoSocial,

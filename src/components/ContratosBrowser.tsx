@@ -22,6 +22,8 @@ export type ContratoCard = {
   id: string;
   numero: string;
   tipo: string;
+  /** ESP-001: null = "Regime pendente" (contrato anterior ao campo). */
+  regimeLegal: string | null;
   objeto: string;
   orgaoNome: string;
   empresaNome: string;
@@ -80,6 +82,11 @@ export function ContratosBrowser({
   const q = sp.get("q") || "";
   const orgao = sp.get("orgao") || "";
   const visao = sp.get("v") || "grid";
+  // ESP-001: filtro por regime legal; "PENDENTE" = ainda sem regime.
+  const regime = sp.get("regime") || "";
+  const lista = regime
+    ? contratos.filter((c) => (regime === "PENDENTE" ? !c.regimeLegal : c.regimeLegal === regime))
+    : contratos;
   const [filtroAberto, setFiltroAberto] = useState(false);
   const [confirmando, setConfirmando] = useState<string | null>(null);
 
@@ -169,6 +176,22 @@ export function ContratosBrowser({
       {/* Painel de filtros expandido */}
       {filtroAberto && (
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+          {/* ESP-001: filtro por regime legal */}
+          <label className="flex items-center gap-2 text-xs">
+            <span className="font-semibold text-slate-700">Regime:</span>
+            <select
+              value={regime}
+              onChange={(e) => navega({ regime: e.target.value || null })}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs"
+            >
+              <option value="">Todos</option>
+              <option value="LEI_8666">Lei 8.666/1993</option>
+              <option value="LEI_14133">Lei 14.133/2021</option>
+              <option value="LEI_13303">Lei 13.303/2016</option>
+              <option value="OUTRO">Outro</option>
+              <option value="PENDENTE">Regime pendente</option>
+            </select>
+          </label>
           <label className="flex items-center gap-2 text-xs">
             <span className="font-semibold text-slate-700">Órgão:</span>
             <select
@@ -215,7 +238,7 @@ export function ContratosBrowser({
         </div>
       ) : visao === "grid" ? (
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {contratos.map((c) => (
+          {lista.map((c) => (
             <Card
               key={c.id}
               c={c}
@@ -239,7 +262,7 @@ export function ContratosBrowser({
               </tr>
             </thead>
             <tbody>
-              {contratos.map((c) => (
+              {lista.map((c) => (
                 <Linha
                   key={c.id}
                   c={c}
@@ -354,6 +377,16 @@ function Card({
               >
                 {ROTULOS_TIPO[c.tipo] || c.tipo}
               </span>
+              {/* ESP-001 RN04: contrato sem regime legal definido */}
+              {!c.regimeLegal && (
+                <span
+                  className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase"
+                  style={{ background: "rgba(251,191,36,0.22)", color: "#92400E", letterSpacing: "0.08em" }}
+                  title="Defina o regime legal (Lei 8.666 ou 14.133) no detalhe do contrato"
+                >
+                  Regime pendente
+                </span>
+              )}
               {c.ataNumero && (
                 <span
                   className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase"

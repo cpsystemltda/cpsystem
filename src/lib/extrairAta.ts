@@ -59,6 +59,11 @@ export type ContratoExtraido = {
   prazoEntregaDias: number | null;
   prazoPagamentoDias: number | null;
   itens: ItemExtraido[];
+  // ESP-001 (Igor 07/11/2026): regime legal sugerido pelo texto, com o trecho
+  // que o justifica; e se o objeto é mão de obra com dedicação exclusiva.
+  regimeLegal: "LEI_8666" | "LEI_14133" | "LEI_13303" | null;
+  regimeLegalTrecho: string | null;
+  dedicacaoExclusivaMaoDeObra: boolean | null;
 };
 
 export type EmpenhoExtraido = {
@@ -575,12 +580,19 @@ export async function extrairContratoDoPdf(entrada: File | File[]): Promise<Cont
       prazoEntregaDias: { type: ["integer", "null"] },
       prazoPagamentoDias: { type: ["integer", "null"] },
       itens: { type: "array", items: ITEM_SCHEMA },
+      // ESP-001 (Igor 07/11/2026): regime legal com o trecho que o justifica.
+      // A saída estruturada não aceita enum misturado com null: "SEM_EVIDENCIA"
+      // vira null em `normalizarRegimeIa`.
+      regimeLegal: { type: "string", enum: ["LEI_8666", "LEI_14133", "LEI_13303", "SEM_EVIDENCIA"] },
+      regimeLegalTrecho: { type: ["string", "null"] },
+      dedicacaoExclusivaMaoDeObra: { type: ["boolean", "null"] },
     },
     required: [
       "numero", "numeroNotaEmpenho", "processoAdministrativo", "procedimentoSelecao",
       "numeroLicitacao", "objeto", "orgaoNome", "orgaoCnpj", "orgaoEndereco",
       "orgaoEmail", "orgaoTelefone", "dataAssinatura", "dataPublicacao",
       "vigenciaInicio", "vigenciaFim", "prazoEntregaDias", "prazoPagamentoDias", "itens",
+      "regimeLegal", "regimeLegalTrecho", "dedicacaoExclusivaMaoDeObra",
     ],
     additionalProperties: false,
   };
@@ -589,8 +601,16 @@ export async function extrairContratoDoPdf(entrada: File | File[]): Promise<Cont
       chamarClaudeComPdf(
         entrada,
         schema,
-        "Extraia os dados deste Contrato administrativo conforme o schema JSON.",
-      ) as Promise<ContratoExtraido>,
+        "Extraia os dados deste Contrato administrativo conforme o schema JSON. " +
+          "REGIME LEGAL: informe LEI_8666 quando o contrato (ou seus aditivos) cita a Lei 8.666/1993 ou artigos dela " +
+          "(ex.: art. 57, II; art. 65); LEI_14133 quando cita a Lei 14.133/2021 ou artigos dela (ex.: art. 106, 107, 124); " +
+          "LEI_13303 quando cita a Lei 13.303/2016. Se mais de uma lei aparecer, prevalece a que fundamenta o contrato no " +
+          "preâmbulo ou nas cláusulas de prorrogação/alteração. Em regimeLegalTrecho copie literalmente a passagem que justifica " +
+          "(até 300 caracteres). Sem evidência textual, devolva null nos dois — não deduza pela data. " +
+          "dedicacaoExclusivaMaoDeObra: true quando o objeto é prestação de serviços contínuos com empregados da contratada " +
+          "alocados em postos de trabalho nas dependências do órgão (vigilância, limpeza, apoio administrativo, recepção, " +
+          "copeiragem, portaria, motoristas); false quando é fornecimento de bens, obra ou serviço sem postos; null se não der para saber.",
+      ).then((d: ContratoExtraido) => ({ ...d, regimeLegal: normalizarRegimeIa(d.regimeLegal) })) as Promise<ContratoExtraido>,
     () => mockContrato(listaDeArquivos(entrada)[0]?.name ?? "contrato.pdf"),
   );
 }
@@ -907,6 +927,9 @@ function mockContrato(filename: string): ContratoExtraido {
     vigenciaFim: dataIso(365),
     prazoEntregaDias: null,
     prazoPagamentoDias: 30,
+    regimeLegal: "LEI_14133",
+    regimeLegalTrecho: "[DEMO] ...regido pela Lei nº 14.133, de 1º de abril de 2021...",
+    dedicacaoExclusivaMaoDeObra: false,
     itens: [
       {
         descricao: "Manutenção preventiva e corretiva de sistema elétrico predial — quadros, cabeamento e iluminação",
@@ -1334,4 +1357,52 @@ export async function extrairNotaFiscalDoPdf(file: File): Promise<NotaFiscalExtr
       tomadorNome: null, discriminacao: null,
     }),
   );
+}
+
+// ============================================================
+// REGIME LEGAL a partir dos anexos de um contrato já cadastrado (ESP-001, RN04)
+// ============================================================
+
+export type RegimeExtraido = {
+  regimeLegal: "LEI_8666" | "LEI_14133" | "LEI_13303" | null;
+  trecho: string | null;
+};
+
+/**
+ * Lê o contrato e os aditivos já anexados e devolve o regime legal com o
+ * trecho que o justifica (citação da lei, "art. 57, II", "art. 107", data do
+ * edital). Sem evidência, `regimeLegal` vem nulo e o formulário mostra a dica
+ * da RN03. Sem chave de API, devolve nulo (não há mock: sugerir regime por
+ * palpite seria pior do que não sugerir).
+ */
+export async function extrairRegimeDosAnexos(entrada: File | File[]): Promise<RegimeExtraido> {
+  const files = listaDeArquivos(entrada);
+  if (files.length === 0 || !process.env.ANTHROPIC_API_KEY?.trim()) return { regimeLegal: null, trecho: null };
+  // A API de saída estruturada não aceita `enum` misturado com `null`
+  // ("Enum value 'LEI_8666' does not match declared type ['string','null']");
+  // por isso o "sem evidência" é um valor do enum, traduzido para null aqui.
+  const schema = {
+    type: "object",
+    properties: {
+      regimeLegal: { type: "string", enum: ["LEI_8666", "LEI_14133", "LEI_13303", "SEM_EVIDENCIA"] },
+      trecho: { type: ["string", "null"] },
+    },
+    required: ["regimeLegal", "trecho"],
+    additionalProperties: false,
+  };
+  const prompt =
+    "Identifique o REGIME LEGAL deste contrato administrativo a partir dos documentos anexados (contrato e termos aditivos). " +
+    "Responda LEI_8666 quando o instrumento cita a Lei 8.666/1993 ou seus artigos (ex.: art. 57, II; art. 65); " +
+    "LEI_14133 quando cita a Lei 14.133/2021 ou seus artigos (ex.: art. 106, 107, 124); LEI_13303 quando cita a Lei 13.303/2016 " +
+    "(estatais). Se os documentos citarem mais de uma lei, prevalece a que fundamenta o contrato no preâmbulo ou nas cláusulas de " +
+    "prorrogação/alteração. Em `trecho`, copie literalmente a passagem (até 300 caracteres) que justifica a resposta. " +
+    "Sem evidência textual, devolva regimeLegal null e trecho null — não deduza pela data.";
+  const r = (await chamarClaudeComPdf(files, schema, prompt)) as { regimeLegal: string | null; trecho: string | null };
+  const regime = normalizarRegimeIa(r?.regimeLegal);
+  return { regimeLegal: regime, trecho: regime ? r?.trecho ?? null : null };
+}
+
+/** "SEM_EVIDENCIA" (ou lixo) → null; só os três regimes conhecidos passam. */
+export function normalizarRegimeIa(v: unknown): "LEI_8666" | "LEI_14133" | "LEI_13303" | null {
+  return v === "LEI_8666" || v === "LEI_14133" || v === "LEI_13303" ? v : null;
 }
