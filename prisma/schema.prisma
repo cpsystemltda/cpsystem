@@ -3026,3 +3026,25 @@ model BatimentoPonte {
   /// Quantas mensagens a ponte levou na última visita — zero é normal.
   levouAgora Int      @default(0)
 }
+
+// ============================================================
+// DRE DA PLATAFORMA (Regina 07/11/2026)
+// "Gere DRE mensais no módulo de adm do sistema para a gente ter a visão
+// financeira, inclusive dos meses anteriores." Receita (faturas pagas) e
+// comissões já vivem no banco; o que o sistema não sabe sozinho — Vercel,
+// Neon, Anthropic, Z-API, Google Ads, contador, impostos — entra aqui, à
+// mão, por competência. Sem isso o "DRE" seria só receita menos comissão.
+// ============================================================
+
+model DespesaPlataforma {
+  id          String   @id @default(cuid())
+  competencia String // YYYY-MM
+  categoria   String // ver CATEGORIAS_DESPESA em src/lib/dre.ts
+  descricao   String
+  valor       Float
+  criadoPorId String?
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([competencia])
+}
