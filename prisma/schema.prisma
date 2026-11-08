@@ -45,64 +45,68 @@ model Conta {
   ///
   /// Trial sem uso: arquiva em 30 dias, apaga em 60. A exclusão é a última
   /// etapa, nunca a primeira.
-  arquivadaEm             DateTime?
-  tipo                    TipoConta        @default(EMPRESA)
-  plano                   Plano            @default(BASICO)
-  statusAssinatura        StatusAssinatura @default(TRIAL)
-  trialAteEm              DateTime?
-  proximoVencimento       DateTime?
-  termosAceitosEm         DateTime?
+  arquivadaEm                    DateTime?
+  tipo                           TipoConta          @default(EMPRESA)
+  plano                          Plano              @default(BASICO)
+  statusAssinatura               StatusAssinatura   @default(TRIAL)
+  trialAteEm                     DateTime?
+  proximoVencimento              DateTime?
+  termosAceitosEm                DateTime?
   // Versao do contrato aceita (Regina 13/07). Permite forcar re-aceite apos
   // bump de versao — se termosAceitosVersao != VERSAO atual do contrato do
   // tipo da conta, o /termos volta a mostrar botao "Li e aceito".
-  termosAceitosVersao     String?
+  termosAceitosVersao            String?
+  /// ESP-007 RN07/RN08: retenção de dados de colaboradores após o fim do contrato e aceite do adendo LGPD.
+  retencaoDadosColaboradoresAnos Int                @default(5)
+  adendoLgpdVersao               String?
+  aceitesAdendoLgpd              AceiteAdendoLgpd[]
   // Cupom aplicado no signup (trial estendido + analista vinculado). Regina 09/07.
-  cupomAplicadoId         String?
-  cupomAplicado           Cupom?           @relation(fields: [cupomAplicadoId], references: [id])
-  embaixadorId            String? // analista que indicou esta conta (programa de embaixadores SaaS — não confundir com VinculoAnalista B2G)
+  cupomAplicadoId                String?
+  cupomAplicado                  Cupom?             @relation(fields: [cupomAplicadoId], references: [id])
+  embaixadorId                   String? // analista que indicou esta conta (programa de embaixadores SaaS — não confundir com VinculoAnalista B2G)
   // Programa de referral cliente-indica-cliente (Regina 08/06, plano marketing v7).
   // Quando cliente atual compartilha link `/conta/indicar` e outra empresa
   // se cadastra via ?ref=conta-<id>, fica vinculada aqui. A cada indicacao
   // que paga 1a fatura, o cliente que indicou ganha 1 mes gratis (creditado
   // como Cobranca de valor 0 no proximo ciclo).
-  indicadoPorContaId      String?
+  indicadoPorContaId             String?
   // Gateway de pagamento (ASAAS por padrão)
-  gatewayProvider         GatewayProvider?
-  gatewayCustomerId       String? // customer_id no gateway
-  gatewaySubscriptionId   String? // subscription_id no gateway
-  ultimaTentativaCobranca DateTime?
-  bloqueadoEm             DateTime?
+  gatewayProvider                GatewayProvider?
+  gatewayCustomerId              String? // customer_id no gateway
+  gatewaySubscriptionId          String? // subscription_id no gateway
+  ultimaTentativaCobranca        DateTime?
+  bloqueadoEm                    DateTime?
   // Regina 13/07: cliente escolhe dia de vencimento fixo pra cobrança mensal
   // (10, 15 ou 20). Primeiro nextDueDate = próximo dia escolhido APÓS trial.
   // Asaas renova mensalmente respeitando esse dia.
-  diaVencimento           Int? // 10, 15 ou 20
+  diaVencimento                  Int? // 10, 15 ou 20
   // CPF do titular do cartão (obrigatório pra tokenização Asaas).
   // Pode ser diferente do CNPJ da empresa (representante legal).
-  cpfTitularCartao        String? // apenas dígitos, 11 chars
+  cpfTitularCartao               String? // apenas dígitos, 11 chars
   // Conciliação bancária (Regina 21/07): feature INTERMEDIARIO+PREMIUM.
   // Cliente escolhe janela mensal (dia 1-31) — cron dispara lembretes 5d/1d/no dia.
   // null = não configurado (opt-out). Se plano BASICO, ignorar mesmo se preenchido.
-  conciliacaoDiaMes       Int?
-  conciliacaoOptIn        Boolean          @default(true)
+  conciliacaoDiaMes              Int?
+  conciliacaoOptIn               Boolean            @default(true)
   // Cortesia temporaria: quando setada, a conta ganha acesso a conciliacao
   // bancaria mesmo estando no plano BASICO ate a data indicada. Regina 30/07
   // (Leo Santos foi o 1o beneficiado — 30 dias).
-  conciliacaoCortesiaAte  DateTime?
+  conciliacaoCortesiaAte         DateTime?
   // Atribuicao de marketing (Regina 10/08). O gclid e o identificador que o
   // Google poe na URL quando alguem chega por um anuncio; guardamos no signup
   // pra depois conseguir dizer QUAL clique virou assinatura paga. Sem ele a
   // campanha so mede visita, nunca receita. Preenchido so quando a visita veio
   // de anuncio — trafego organico deixa nulo.
-  gclid                   String?
-  utmSource               String?
-  utmMedium               String?
-  utmCampaign             String?
-  utmTerm                 String?
+  gclid                          String?
+  utmSource                      String?
+  utmMedium                      String?
+  utmCampaign                    String?
+  utmTerm                        String?
   // Marca quando a conversao "assinatura paga" ja foi exportada pro Google Ads
   // (upload offline), pra nao contar a mesma venda duas vezes.
-  conversaoEnviadaEm      DateTime?
-  criadoEm                DateTime         @default(now())
-  atualizadoEm            DateTime         @updatedAt
+  conversaoEnviadaEm             DateTime?
+  criadoEm                       DateTime           @default(now())
+  atualizadoEm                   DateTime           @updatedAt
 
   usuarios         Usuario[]
   empresas         Empresa[]
@@ -142,43 +146,46 @@ enum PerfilUsuario {
   ADMIN
   OPERACIONAL
   VISUALIZADOR
+  RH_CONTRATO // ESP-007 RN04: cuida dos colaboradores dos contratos de mão de obra; não edita contratos
 }
 
 model Usuario {
-  id                  String        @id @default(cuid())
-  nome                String
-  email               String        @unique
-  senhaHash           String
-  perfil              PerfilUsuario @default(ADMIN)
-  superAdmin          Boolean       @default(false) // gestor da plataforma (Igor) — vê tudo
-  emailVerificadoEm   DateTime?
+  id                          String        @id @default(cuid())
+  nome                        String
+  email                       String        @unique
+  senhaHash                   String
+  perfil                      PerfilUsuario @default(ADMIN)
+  superAdmin                  Boolean       @default(false) // gestor da plataforma (Igor) — vê tudo
+  emailVerificadoEm           DateTime?
   // Notificacoes WhatsApp (Regina 02/07): opt-in por usuario. Telefone
   // em E.164 sem "+" (ex: 5521997209623). optIn ausente = sem envio.
-  telefoneWhatsApp    String?
-  optInWhatsApp       Boolean       @default(false)
+  telefoneWhatsApp            String?
+  optInWhatsApp               Boolean       @default(false)
   // Dados pessoais completados no onboarding do 1o login (Regina 02/07).
   // Contas migradas (ex: Igor -> Leo) chegam com dados null e usuario
   // preenche antes de acessar o sistema. dataNascimento tambem serve
   // pra CP System mandar mensagem de aniversario no dia.
-  cpf                 String?
-  cargo               String?
-  dataNascimento      DateTime?
-  onboardingConcluido Boolean       @default(true)
+  cpf                         String?
+  cargo                       String?
+  dataNascimento              DateTime?
+  onboardingConcluido         Boolean       @default(true)
   // Acesso por modulo (Regina 21/08, a partir do pedido do Leo). O titular da
   // conta cadastra ate 2 colaboradores e marca, numa caixa de opcoes, em quais
   // modulos cada um entra. `acessoRestrito=false` significa acesso completo —
   // e o valor de todo usuario que ja existia, entao ninguem perde acesso pela
   // migration. Com `true`, so vale o que estiver em `modulosPermitidos`.
-  acessoRestrito      Boolean       @default(false)
-  modulosPermitidos   String[]      @default([])
+  acessoRestrito              Boolean       @default(false)
+  modulosPermitidos           String[]      @default([])
+  /// ESP-007 RN04: enxerga nome, CPF e documentos de colaboradores (ADMIN e RH_CONTRATO sempre podem).
+  permissaoDadosColaboradores Boolean       @default(false)
   // 2FA TOTP opt-in (Regina 22/07 — SEG P1). totpSecret guarda o segredo
   // em BASE32 puro (nao eh hash — precisamos dele pra validar codigos).
   // Coluna criptografada em repouso (Neon AES-256). totpAtivadoEm marca
   // a confirmacao — enquanto null, secret existe mas 2FA ainda nao ta ativo.
-  totpSecret          String?
-  totpAtivadoEm       DateTime?
-  criadoEm            DateTime      @default(now())
-  atualizadoEm        DateTime      @updatedAt
+  totpSecret                  String?
+  totpAtivadoEm               DateTime?
+  criadoEm                    DateTime      @default(now())
+  atualizadoEm                DateTime      @updatedAt
 
   contaId String
   conta   Conta  @relation(fields: [contaId], references: [id], onDelete: Cascade)
@@ -2297,6 +2304,7 @@ enum AcaoAuditoria {
   EXPORTAR
   UPLOAD
   DOWNLOAD
+  ACESSO // ESP-007 RN05: consulta a dado pessoal de colaborador
 }
 
 // Cache de geocodificação por CNPJ. Evita bater no Nominatim toda vez que
@@ -3466,4 +3474,23 @@ model ParametroPlataforma {
   valor           Json
   atualizadoEm    DateTime @updatedAt
   atualizadoPorId String?
+}
+
+// ============================================================
+// LGPD — ADENDO DE TRATAMENTO DE DADOS (ESP-007 RN08, Igor 07/11/2026)
+// Aceite eletrônico do adendo no primeiro acesso ao Módulo Terceirização,
+// com usuário, conta (CNPJ), data/hora, IP e versão. Histórico completo.
+// ============================================================
+
+model AceiteAdendoLgpd {
+  id        String   @id @default(cuid())
+  contaId   String
+  conta     Conta    @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  usuarioId String?
+  versao    String
+  ip        String?
+  userAgent String?
+  aceitoEm  DateTime @default(now())
+
+  @@index([contaId, versao])
 }

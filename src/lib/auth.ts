@@ -102,6 +102,9 @@ export const getUsuarioAtual = cache(async function getUsuarioAtual() {
     conta: contaAlvo,
     superAdmin: false,
     perfil: "VISUALIZADOR" as const,
+    // ESP-007 RN06: no acesso de suporte, CPF e documentos de colaboradores
+    // ficam ocultos — a permissão pessoal do espião não vale aqui.
+    permissaoDadosColaboradores: false,
     espionando: true,
   };
   return usuarioEspiao;

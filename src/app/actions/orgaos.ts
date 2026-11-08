@@ -26,7 +26,7 @@ async function escopoDoRecursoFilho(
   usuario: {
     id: string;
     contaId: string;
-    perfil: "ADMIN" | "OPERACIONAL" | "VISUALIZADOR";
+    perfil: "ADMIN" | "OPERACIONAL" | "VISUALIZADOR" | "RH_CONTRATO";
     superAdmin: boolean;
   },
   rec: { ataId: string | null; contratoId: string | null; empenhoId: string | null },

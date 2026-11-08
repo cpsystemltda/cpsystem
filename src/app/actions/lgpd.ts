@@ -176,3 +176,61 @@ export async function executarExclusaoContaAction(
   revalidatePath("/admin-plataforma/clientes");
   return { ok: true, mensagem: `Conta ${nome} excluída definitivamente.` };
 }
+
+// ─────────────────────────────────────────────
+// ESP-007 (Igor 07/11/2026): adendo LGPD do Módulo Terceirização e retenção
+// ─────────────────────────────────────────────
+
+/**
+ * RN08: aceite do adendo de tratamento de dados pessoais. Só o ADMIN da
+ * empresa (controladora) aceita; fica registrado quem, quando, de onde e
+ * qual versão. Depois disso o Módulo Terceirização abre para a conta.
+ */
+export async function aceitarAdendoLgpdAction(_prev: ResultadoLgpd | null, formData: FormData): Promise<ResultadoLgpd> {
+  const { headers } = await import("next/headers");
+  const { VERSAO_ADENDO_LGPD } = await import("@/lib/lgpd");
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  if (usuario.perfil !== "ADMIN") return { erro: "Só o administrador da empresa pode aceitar o adendo." };
+  if (formData.get("li") !== "1") return { erro: "Marque que leu e concorda com o adendo." };
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") || h.get("x-real-ip") || "").split(",")[0].trim() || null;
+  const userAgent = (h.get("user-agent") || "").slice(0, 300) || null;
+  await prisma.$transaction([
+    prisma.aceiteAdendoLgpd.create({ data: { contaId: usuario.contaId, usuarioId: usuario.id, versao: VERSAO_ADENDO_LGPD, ip, userAgent } }),
+    prisma.conta.update({ where: { id: usuario.contaId }, data: { adendoLgpdVersao: VERSAO_ADENDO_LGPD } }),
+  ]);
+  await registrarAuditoria({
+    contaId: usuario.contaId,
+    usuarioId: usuario.id,
+    acao: "CRIAR",
+    recurso: "AceiteAdendoLgpd",
+    resumo: `Adendo de tratamento de dados pessoais v${VERSAO_ADENDO_LGPD} aceito por ${usuario.nome ?? usuario.email}${ip ? ` (IP ${ip})` : ""}`,
+  });
+  revalidatePath("/termos/adendo-lgpd");
+  revalidatePath("/conta/privacidade");
+  revalidatePath("/contratos", "layout");
+  return { ok: true, mensagem: "Adendo aceito. O Módulo Terceirização está liberado para a sua empresa." };
+}
+
+/** RN07: prazo de guarda dos dados de colaboradores depois do fim do contrato (1 a 10 anos). */
+export async function definirRetencaoDadosAction(_prev: ResultadoLgpd | null, formData: FormData): Promise<ResultadoLgpd> {
+  const { anosRetencaoValidos } = await import("@/lib/lgpd");
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  if (usuario.perfil !== "ADMIN") return { erro: "Só o administrador da empresa altera o prazo de retenção." };
+  const anos = Number(formData.get("anos"));
+  if (!anosRetencaoValidos(anos)) return { erro: "Informe um prazo entre 1 e 10 anos." };
+  const antes = await prisma.conta.findUnique({ where: { id: usuario.contaId }, select: { retencaoDadosColaboradoresAnos: true } });
+  await prisma.conta.update({ where: { id: usuario.contaId }, data: { retencaoDadosColaboradoresAnos: anos } });
+  await registrarAuditoria({
+    contaId: usuario.contaId,
+    usuarioId: usuario.id,
+    acao: "ATUALIZAR",
+    recurso: "Conta",
+    recursoId: usuario.contaId,
+    resumo: `Retenção de dados de colaboradores após o fim do contrato: ${antes?.retencaoDadosColaboradoresAnos ?? 5} → ${anos} ano(s)`,
+  });
+  revalidatePath("/conta/privacidade");
+  return { ok: true, mensagem: `Prazo de retenção: ${anos} ano(s) após o encerramento do contrato.` };
+}

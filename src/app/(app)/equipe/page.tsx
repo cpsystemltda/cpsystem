@@ -23,6 +23,7 @@ export default async function EquipePage() {
       criadoEm: true,
       acessoRestrito: true,
       modulosPermitidos: true,
+      permissaoDadosColaboradores: true,
       funcaoNaEmpresa: true,
       telefoneWhatsApp: true,
     },

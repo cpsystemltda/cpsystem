@@ -38,7 +38,9 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
 
   const email = String(formData.get("email") || "").toLowerCase().trim();
   const nome = String(formData.get("nome") || "").trim();
-  const perfil = String(formData.get("perfil") || "OPERACIONAL") as "ADMIN" | "OPERACIONAL" | "VISUALIZADOR";
+  const perfil = String(formData.get("perfil") || "OPERACIONAL") as "ADMIN" | "OPERACIONAL" | "VISUALIZADOR" | "RH_CONTRATO";
+  // ESP-007 RN04: quem vê nome, CPF e documentos de colaboradores.
+  const permissaoDadosColaboradores = String(formData.get("permissaoDadosColaboradores") || "") === "1";
   const funcaoNaEmpresa = String(formData.get("funcaoNaEmpresa") || "").trim() || null;
   // Só dígitos: o WhatsApp é chave de envio, não texto livre. Sem número a
   // pessoa pode ser responsável, mas não recebe aviso — e a tela mostra isso.
@@ -77,6 +79,7 @@ export async function convidarUsuarioAction(_p: Result | null, formData: FormDat
       contaId: usuario.contaId,
       acessoRestrito: acesso.acessoRestrito,
       modulosPermitidos: acesso.modulos,
+      permissaoDadosColaboradores,
     },
   });
 
@@ -101,7 +104,7 @@ export async function alterarPerfilAction(formData: FormData) {
   if (usuario.perfil !== "ADMIN") throw new Error("Apenas admins.");
 
   const usuarioAlvoId = String(formData.get("usuarioId"));
-  const novoPerfil = String(formData.get("perfil")) as "ADMIN" | "OPERACIONAL" | "VISUALIZADOR";
+  const novoPerfil = String(formData.get("perfil")) as "ADMIN" | "OPERACIONAL" | "VISUALIZADOR" | "RH_CONTRATO";
 
   const alvo = await prisma.usuario.findFirst({ where: { id: usuarioAlvoId, contaId: usuario.contaId } });
   if (!alvo) throw new Error("Usuário não encontrado.");
@@ -148,10 +151,11 @@ export async function atualizarAcessoAction(_p: Result | null, formData: FormDat
 
   const acesso = lerAcessoDoForm(formData);
   if ("erro" in acesso) return { erro: acesso.erro };
+  const permissaoDadosColaboradores = String(formData.get("permissaoDadosColaboradores") || "") === "1";
 
   await prisma.usuario.update({
     where: { id: alvo.id },
-    data: { acessoRestrito: acesso.acessoRestrito, modulosPermitidos: acesso.modulos },
+    data: { acessoRestrito: acesso.acessoRestrito, modulosPermitidos: acesso.modulos, permissaoDadosColaboradores },
   });
 
   await registrarAuditoria({
@@ -160,9 +164,10 @@ export async function atualizarAcessoAction(_p: Result | null, formData: FormDat
     acao: "ATUALIZAR",
     recurso: "Usuario",
     recursoId: alvo.id,
-    resumo: acesso.acessoRestrito
-      ? `Acesso de ${alvo.email} → ${acesso.modulos.map(rotuloDoModulo).join(", ")}`
-      : `Acesso de ${alvo.email} → completo`,
+    resumo:
+      (acesso.acessoRestrito
+        ? `Acesso de ${alvo.email} → ${acesso.modulos.map(rotuloDoModulo).join(", ")}`
+        : `Acesso de ${alvo.email} → completo`) + (permissaoDadosColaboradores ? " · vê dados de colaboradores" : " · sem dados de colaboradores"),
   });
 
   revalidatePath("/equipe");

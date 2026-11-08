@@ -11,10 +11,11 @@ import "server-only";
  * — aqui assumimos que o documento já passou nesse filtro.
  */
 export function podeEditarDocumento(
-  usuario: { id: string; perfil: "ADMIN" | "OPERACIONAL" | "VISUALIZADOR"; superAdmin: boolean },
+  usuario: { id: string; perfil: "ADMIN" | "OPERACIONAL" | "VISUALIZADOR" | "RH_CONTRATO"; superAdmin: boolean },
   documento: { criadoPorId: string | null },
 ): boolean {
-  if (usuario.perfil === "VISUALIZADOR") return false;
+  // RH do contrato (ESP-007) cuida de colaboradores; documentos ele só lê.
+  if (usuario.perfil === "VISUALIZADOR" || usuario.perfil === "RH_CONTRATO") return false;
   if (usuario.superAdmin || usuario.perfil === "ADMIN") return true;
   if (!documento.criadoPorId) return false; // registro legado: só ADMIN
   return documento.criadoPorId === usuario.id;

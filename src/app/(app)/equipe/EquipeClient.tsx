@@ -24,9 +24,11 @@ type Membro = {
   funcaoNaEmpresa: string | null;
   telefoneWhatsApp: string | null;
   modulosPermitidos: string[];
+  permissaoDadosColaboradores: boolean;
 };
 
 const ROTULO_PERFIL: Record<string, string> = {
+  RH_CONTRATO: "RH do contrato",
   ADMIN: "Admin",
   OPERACIONAL: "Operacional",
   VISUALIZADOR: "Visualizador",
@@ -36,6 +38,7 @@ const COR_PERFIL: Record<string, string> = {
   ADMIN: "bg-blue-100 text-blue-800",
   OPERACIONAL: "bg-emerald-100 text-emerald-800",
   VISUALIZADOR: "bg-slate-200 text-slate-700",
+  RH_CONTRATO: "bg-violet-100 text-violet-800",
 };
 
 function resumoAcesso(m: Membro): string {
@@ -219,6 +222,7 @@ export function EquipeClient({
                 <select name="perfil" required className="rounded border border-slate-300 px-2 py-1.5 text-sm">
                   <option value="OPERACIONAL">Operacional (cria/edita)</option>
                   <option value="VISUALIZADOR">Visualizador (somente leitura)</option>
+                  <option value="RH_CONTRATO">RH do contrato (colaboradores dos contratos de mão de obra)</option>
                   <option value="ADMIN">Admin (todos os poderes)</option>
                 </select>
               </label>
@@ -229,6 +233,8 @@ export function EquipeClient({
               restritoInicial
               modulosIniciais={MODULOS_PADRAO_COLABORADOR}
             />
+            <PermissaoDadosColaboradores idPrefixo="novo" />
+
 
             {proximoEhCobrado && (
               <p
@@ -334,6 +340,7 @@ function FragmentoMembro({
                 <option value="ADMIN">Admin</option>
                 <option value="OPERACIONAL">Operacional</option>
                 <option value="VISUALIZADOR">Visualizador</option>
+                <option value="RH_CONTRATO">RH do contrato</option>
               </select>
             </form>
           ) : (
@@ -381,6 +388,7 @@ function FragmentoMembro({
                 restritoInicial={membro.acessoRestrito}
                 modulosIniciais={membro.modulosPermitidos}
               />
+              <PermissaoDadosColaboradores idPrefixo={membro.id} inicial={membro.permissaoDadosColaboradores} perfil={membro.perfil} />
               {state?.erro && <div className="text-xs font-semibold text-red-700">{state.erro}</div>}
               {state?.ok && <div className="text-xs font-semibold text-emerald-700">Acessos atualizados.</div>}
               <button
@@ -411,6 +419,25 @@ function Campo({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> 
     <label className="flex flex-col gap-1">
       <span className="text-xs font-medium text-slate-600">{label}</span>
       <input {...props} className="rounded border border-slate-300 px-2 py-1.5 text-sm" />
+    </label>
+  );
+}
+
+/**
+ * ESP-007 RN04 (Igor 07/11/2026): permissão "Dados de colaboradores". Sem
+ * ela, OPERACIONAL e VISUALIZADOR veem só quantidades nos contratos de mão
+ * de obra — nome, CPF e documentos ficam ocultos. ADMIN e RH do contrato
+ * sempre veem.
+ */
+function PermissaoDadosColaboradores({ idPrefixo, inicial = false, perfil }: { idPrefixo: string; inicial?: boolean; perfil?: string }) {
+  const sempre = perfil === "ADMIN" || perfil === "RH_CONTRATO";
+  return (
+    <label className="flex items-start gap-2 rounded-[12px] border border-violet-200 bg-violet-50/60 px-3 py-2 text-xs text-slate-700">
+      <input type="checkbox" name="permissaoDadosColaboradores" value="1" id={`${idPrefixo}-dados-colab`} defaultChecked={inicial || sempre} disabled={sempre} className="mt-0.5" />
+      <span>
+        <strong>Dados de colaboradores</strong> (LGPD) — vê nome, CPF e documentos dos empregados alocados nos contratos de mão de obra.
+        {sempre ? " Admin e RH do contrato sempre têm." : " Sem isso, a pessoa vê só as quantidades."}
+      </span>
     </label>
   );
 }

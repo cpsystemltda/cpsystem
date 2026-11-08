@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { serializarResumo, type Mudanca } from "@/lib/diff";
 
-type Acao = "CRIAR" | "ATUALIZAR" | "EXCLUIR" | "LOGIN" | "LOGOUT" | "EXPORTAR" | "UPLOAD" | "DOWNLOAD";
+type Acao = "CRIAR" | "ATUALIZAR" | "EXCLUIR" | "LOGIN" | "LOGOUT" | "EXPORTAR" | "UPLOAD" | "DOWNLOAD" | "ACESSO";
 
 export async function registrarAuditoria(opts: {
   contaId: string;

@@ -39,6 +39,8 @@ import { ImrTab } from "@/components/abas/ImrTab";
 import { faixasDe } from "@/lib/glosas";
 import { ContaVinculadaTab } from "@/components/abas/ContaVinculadaTab";
 import { resumoContaVinculada } from "@/lib/contaVinculadaServer";
+import { AceiteAdendoLgpd } from "@/components/AceiteAdendoLgpd";
+import { adendoAceito } from "@/lib/lgpdServer";
 import {
   carregarContextoCompetencias,
   competenciasFaltantes,
@@ -105,6 +107,10 @@ export default async function ContratoDetalhePage({
   const podeEditar = podeEditarDocumento(usuario, contrato);
   const saldo = await calcularSaldoContrato(contrato.id);
   const cmo = isContratoMaoDeObra(contrato.tipo);
+  // ESP-007 RN08: o Módulo Terceirização (abas de competências, planilha,
+  // conta vinculada, IMR) só abre depois que o ADMIN aceita o adendo LGPD.
+  const adendoOk = !cmo || adendoAceito(usuario.conta);
+  const moduloLiberado = cmo && adendoOk;
 
   const itensTodos = await prisma.contratoItem.findMany({
     where: { contratoId: contrato.id },
@@ -287,7 +293,13 @@ export default async function ContratoDetalhePage({
 
       {/* ESP-002 RN06: contrato de mão de obra anterior ao módulo — o sistema
           não sabe se os itens são mensais ou da vigência inteira. */}
-      {isContratoMaoDeObra(contrato.tipo) && !contrato.valoresMensaisConfirmadosEm && (
+      {cmo && !adendoOk && (
+        <div className="mt-4">
+          <AceiteAdendoLgpd ehAdmin={usuario.perfil === "ADMIN"} />
+        </div>
+      )}
+
+      {moduloLiberado && !contrato.valoresMensaisConfirmadosEm && (
         <ValoresMensaisBanner
           contratoId={contrato.id}
           somaItens={saldo.vigenciaAtual?.itens.reduce((s, i) => s + i.valorTotal, 0) ?? saldo.valorTotal}
@@ -340,7 +352,7 @@ export default async function ContratoDetalhePage({
               ),
             },
             // ESP-004: competências mensais, só em CMO.
-            ...(cmo
+            ...(moduloLiberado
               ? [
                   {
                     key: "competencias",
@@ -365,7 +377,7 @@ export default async function ContratoDetalhePage({
                 ]
               : []),
             // ESP-006: conta vinculada / verbas trabalhistas, só em CMO.
-            ...(cmo && resumoCv
+            ...(moduloLiberado && resumoCv
               ? [
                   {
                     key: "conta-vinculada",
@@ -376,7 +388,7 @@ export default async function ContratoDetalhePage({
                 ]
               : []),
             // ESP-005 RN03: IMR opcional, só em CMO.
-            ...(cmo
+            ...(moduloLiberado
               ? [
                   {
                     key: "imr",
@@ -387,7 +399,7 @@ export default async function ContratoDetalhePage({
                 ]
               : []),
             // ESP-003: planilha de custos e formação de preços, só em CMO.
-            ...(cmo
+            ...(moduloLiberado
               ? [
                   {
                     key: "planilha-custos",

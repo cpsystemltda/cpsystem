@@ -1,7 +1,11 @@
-import { Download, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { Download, ShieldCheck, Users } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { PedirExclusaoForm } from "./PedirExclusaoForm";
+import { RetencaoDadosForm } from "./RetencaoDadosForm";
+import { adendoAceito, ultimoAceiteAdendo } from "@/lib/lgpdServer";
+import { VERSAO_ADENDO_LGPD } from "@/lib/lgpd";
 
 /**
  * Direitos do titular sobre os próprios dados (LGPD).
@@ -15,6 +19,9 @@ export const dynamic = "force-dynamic";
 export default async function PrivacidadePage() {
   const usuario = await exigirUsuario();
   const ehAdmin = usuario.perfil === "ADMIN";
+  const adendoOk = adendoAceito(usuario.conta);
+  const aceite = adendoOk ? await ultimoAceiteAdendo(usuario.contaId) : null;
+  const aceitante = aceite?.usuarioId ? await prisma.usuario.findUnique({ where: { id: aceite.usuarioId }, select: { nome: true, email: true } }) : null;
 
   const pedidoEmAberto = await prisma.chamadoSuporte.findFirst({
     where: {
@@ -89,6 +96,46 @@ export default async function PrivacidadePage() {
                 Só quem administra a conta pode pedir o apagamento.
               </p>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* ESP-007 (Igor 07/11/2026): dados de colaboradores do Módulo Terceirização */}
+      <section className="mt-5 rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="flex items-start gap-3">
+          <Users className="mt-0.5 h-5 w-5 shrink-0 text-violet-700" />
+          <div className="flex-1">
+            <h2 className="text-base font-semibold text-slate-900">Dados de colaboradores (Módulo Terceirização)</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Nos contratos de mão de obra o sistema guarda dados de empregados da sua empresa. Você é a controladora desses dados; a CP System é a operadora, nos termos do adendo de tratamento de dados.
+            </p>
+            {adendoOk ? (
+              <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-900">
+                Adendo v{VERSAO_ADENDO_LGPD} aceito{aceite ? ` em ${aceite.aceitoEm.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : ""}
+                {aceitante ? ` por ${aceitante.nome ?? aceitante.email}` : ""}.{" "}
+                <Link href="/termos/adendo-lgpd" className="font-semibold underline">
+                  Ler o adendo
+                </Link>
+              </p>
+            ) : (
+              <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+                Adendo ainda não aceito. O Módulo Terceirização abre quando o administrador aceitar.{" "}
+                <Link href="/termos/adendo-lgpd" className="font-semibold underline">
+                  Ler e aceitar
+                </Link>
+              </p>
+            )}
+            <p className="mt-4 text-sm text-slate-700">
+              <strong>Retenção.</strong> Encerrado o contrato, os dados dos colaboradores ficam guardados pelo prazo abaixo (para comprovação perante o órgão e defesa em processos) e depois são anonimizados, com aviso de 30 dias ao administrador.
+            </p>
+            <RetencaoDadosForm anosAtual={usuario.conta.retencaoDadosColaboradoresAnos} ehAdmin={ehAdmin} />
+            <p className="mt-3 text-xs text-slate-500">
+              Quem vê nome, CPF e documentos: Admin, RH do contrato e quem tiver a permissão “Dados de colaboradores” em{" "}
+              <Link href="/equipe" className="font-semibold text-violet-700 hover:underline">
+                Equipe
+              </Link>
+              . Todo acesso a dado pessoal fica registrado na auditoria. O sistema não guarda dado de saúde (atestado, ASO, CID).
+            </p>
           </div>
         </div>
       </section>

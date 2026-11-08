@@ -26,15 +26,21 @@ export async function salvarConfigGatewayAction(_p: Result | null, formData: For
     return { erro: "Chave de API obrigatória para este provedor." };
   }
 
+  // ESP-007 RN01 (Igor 07/11/2026): segredo de integração nunca mais em
+  // texto puro no banco — mesma cifra do token fiscal (AES-256-GCM).
+  const { cifrar, segredoConfigurado } = await import("@/lib/segredos");
+  if ((apiKey || webhookToken) && !segredoConfigurado()) {
+    return { erro: "SEGREDO_CHAVE não configurada: o sistema se recusa a guardar a chave de API sem cifrar." };
+  }
   await prisma.configuracaoGateway.upsert({
     where: { id: "singleton" },
-    update: { provider, ambiente, apiKey: apiKey || null, webhookToken: webhookToken || null, atualizadoPor: usuario.id },
+    update: { provider, ambiente, apiKey: apiKey ? cifrar(apiKey) : null, webhookToken: webhookToken ? cifrar(webhookToken) : null, atualizadoPor: usuario.id },
     create: {
       id: "singleton",
       provider,
       ambiente,
-      apiKey: apiKey || null,
-      webhookToken: webhookToken || null,
+      apiKey: apiKey ? cifrar(apiKey) : null,
+      webhookToken: webhookToken ? cifrar(webhookToken) : null,
       atualizadoPor: usuario.id,
     },
   });
