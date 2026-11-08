@@ -1215,6 +1215,7 @@ model Contrato {
   suspensaoInicio              DateTime?
   suspensaoFim                 DateTime?
   competencias                 Competencia[]
+  indicadoresImr               IndicadorImr[]
 
   // Valor inicial do contrato (somatório de itens no momento da criação).
   // Preservado pra exibir "Valor Inicial" mesmo após aditivos com reajuste.
@@ -1338,6 +1339,7 @@ model ContratoItem {
   substituiItemId      String?
   alteradoPorAditivoId String?
   alteradoPorAditivo   TermoAditivo? @relation("ItensAlteradosPorAditivo", fields: [alteradoPorAditivoId], references: [id], onDelete: SetNull)
+  glosas               Glosa[]
 
   contratoId String
   contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -3286,7 +3288,10 @@ model Competencia {
   criadoEm              DateTime @default(now())
   atualizadoEm          DateTime @updatedAt
 
-  empenhos CompetenciaEmpenho[]
+  empenhos      CompetenciaEmpenho[]
+  glosas        Glosa[]
+  /// ESP-005 RN03: pontuação por indicador do IMR — [{indicadorId, pontuacao, percentualPagamento}]
+  imrPontuacoes Json?
 
   @@index([contratoId, competencia])
   @@index([vigenciaId])
@@ -3304,4 +3309,71 @@ model CompetenciaEmpenho {
 
   @@unique([competenciaId, empenhoId])
   @@index([empenhoId])
+}
+
+// ============================================================
+// MEDIÇÃO, GLOSAS E IMR (ESP-005, Igor 07/11/2026)
+// Glosa = desconto aplicado pelo órgão na competência (falta não coberta,
+// posto descoberto, IMR, material não fornecido). Tem status próprio para
+// acompanhar a contestação; revertida volta a compor o valor a receber.
+// ============================================================
+
+enum TipoGlosa {
+  FALTA_NAO_COBERTA
+  POSTO_DESCOBERTO
+  IMR
+  MATERIAL_NAO_FORNECIDO
+  OUTRO
+}
+
+enum StatusGlosa {
+  APLICADA
+  CONTESTADA
+  MANTIDA
+  REVERTIDA
+}
+
+model Glosa {
+  id                   String        @id @default(cuid())
+  competenciaId        String
+  competencia          Competencia   @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  contratoItemId       String?
+  contratoItem         ContratoItem? @relation(fields: [contratoItemId], references: [id], onDelete: SetNull)
+  data                 DateTime
+  tipo                 TipoGlosa
+  status               StatusGlosa   @default(APLICADA)
+  valor                Float
+  motivo               String
+  arquivoUrl           String? // documento do órgão
+  /// Caso de borda: glosa descontada nesta competência mas referente a outra (já paga).
+  competenciaOrigemRef String?
+  contestacao          String? // minuta/texto da contestação (RN04)
+  contestadaEm         DateTime?
+  decididaEm           DateTime?
+  /// Revertida depois da NF: a diferença virou esta competência complementar.
+  complementarId       String?
+  criadoPorId          String?
+  criadoEm             DateTime      @default(now())
+  atualizadoEm         DateTime      @updatedAt
+
+  @@index([competenciaId])
+  @@index([contratoItemId])
+}
+
+/// RN03: indicador do Instrumento de Medição de Resultado, com faixas de
+/// pontuação → percentual do valor a pagar. [{de, ate, percentualPagamento}]
+model IndicadorImr {
+  id           String   @id @default(cuid())
+  contratoId   String
+  contrato     Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  ordem        Int      @default(0)
+  nome         String
+  meta         String?
+  descricao    String?
+  faixas       Json
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([contratoId])
 }

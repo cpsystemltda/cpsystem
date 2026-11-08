@@ -268,6 +268,7 @@ export async function empenhosDoContratoComSaldo(contratoId: string): Promise<Em
 export type ResumoCompetencia = {
   id: string;
   contratoId: string;
+  vigenciaId: string | null;
   contratoNumero: string;
   orgaoNome: string;
   tipo: "REGULAR" | "COMPLEMENTAR";
@@ -302,6 +303,26 @@ export type ResumoCompetencia = {
   complementarDetalhe: unknown;
   criadaAutomaticamente: boolean;
   observacoes: string | null;
+  /** ESP-005: glosas da competência e pontuação do IMR. */
+  glosas: GlosaDto[];
+  imrPontuacoes: { indicadorId: string; pontuacao: number; percentualPagamento: number | null }[];
+};
+
+export type GlosaDto = {
+  id: string;
+  data: string;
+  tipo: string;
+  status: string;
+  valor: number;
+  motivo: string;
+  arquivoUrl: string | null;
+  contratoItemId: string | null;
+  itemDescricao: string | null;
+  competenciaOrigemRef: string | null;
+  contestacao: string | null;
+  contestadaEm: string | null;
+  decididaEm: string | null;
+  complementarId: string | null;
 };
 
 type CompetenciaRow = Awaited<ReturnType<typeof buscarCompetencias>>[number];
@@ -313,6 +334,7 @@ async function buscarCompetencias(where: { contratoId?: string; id?: string; con
     include: {
       contrato: { select: { id: true, numero: true, orgaoNome: true, termoInicialPagamento: true, prazoPagamentoDias: true } },
       empenhos: { select: { empenhoId: true, valor: true, empenho: { select: { numero: true, instrumento: true } } } },
+      glosas: { orderBy: [{ data: "asc" }, { criadoEm: "asc" }], include: { contratoItem: { select: { descricao: true } } } },
     },
   });
 }
@@ -356,6 +378,7 @@ function montarResumo(c: CompetenciaRow, saldos: Map<string, EmpenhoResumo>, hoj
   return {
     id: c.id,
     contratoId: c.contratoId,
+    vigenciaId: c.vigenciaId,
     contratoNumero: c.contrato.numero,
     orgaoNome: c.contrato.orgaoNome,
     tipo: c.tipo,
@@ -389,6 +412,23 @@ function montarResumo(c: CompetenciaRow, saldos: Map<string, EmpenhoResumo>, hoj
     complementarDetalhe: c.complementarDetalhe,
     criadaAutomaticamente: c.criadaAutomaticamente,
     observacoes: c.observacoes,
+    glosas: c.glosas.map((g) => ({
+      id: g.id,
+      data: g.data.toISOString(),
+      tipo: g.tipo,
+      status: g.status,
+      valor: g.valor,
+      motivo: g.motivo,
+      arquivoUrl: g.arquivoUrl,
+      contratoItemId: g.contratoItemId,
+      itemDescricao: g.contratoItem?.descricao ?? null,
+      competenciaOrigemRef: g.competenciaOrigemRef,
+      contestacao: g.contestacao,
+      contestadaEm: g.contestadaEm ? g.contestadaEm.toISOString() : null,
+      decididaEm: g.decididaEm ? g.decididaEm.toISOString() : null,
+      complementarId: g.complementarId,
+    })),
+    imrPontuacoes: Array.isArray(c.imrPontuacoes) ? (c.imrPontuacoes as ResumoCompetencia["imrPontuacoes"]) : [],
   };
 }
 

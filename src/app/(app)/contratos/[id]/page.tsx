@@ -35,6 +35,8 @@ import { ValoresMensaisBanner } from "@/components/ValoresMensaisBanner";
 import { PlanilhaCustosTab } from "@/components/abas/PlanilhaCustosTab";
 import { ehModulo, type ItemFuncao, type PlanilhaDto } from "@/lib/planilhaCustos";
 import { CompetenciasTab } from "@/components/abas/CompetenciasTab";
+import { ImrTab } from "@/components/abas/ImrTab";
+import { faixasDe } from "@/lib/glosas";
 import {
   carregarContextoCompetencias,
   competenciasFaltantes,
@@ -171,6 +173,16 @@ export default async function ContratoDetalhePage({
     }
   }
   const competenciasAtencao = competencias.filter((c) => c.status === "A_CONFIRMAR" || c.empenhoInsuficiente || (c.atrasoDias > 0 && c.status !== "PAGA")).length;
+  // ESP-005 RN03: indicadores do IMR (aba opcional, só em CMO).
+  const indicadoresImr = cmo
+    ? (await prisma.indicadorImr.findMany({ where: { contratoId: contrato.id }, orderBy: { ordem: "asc" } })).map((i) => ({
+        id: i.id,
+        nome: i.nome,
+        meta: i.meta,
+        descricao: i.descricao,
+        faixas: faixasDe(i.faixas),
+      }))
+    : [];
   const parcelaIds = contrato.parcelas.map((p) => p.id);
   const enderecoIds = contrato.enderecosEntrega.map((e) => e.id);
   const pontoFocalIds = contrato.pontosFocais.map((p) => p.id);
@@ -345,6 +357,17 @@ export default async function ContratoDetalhePage({
                         hojeIso={hojeIso}
                       />
                     ),
+                  },
+                ]
+              : []),
+            // ESP-005 RN03: IMR opcional, só em CMO.
+            ...(cmo
+              ? [
+                  {
+                    key: "imr",
+                    label: "IMR",
+                    badge: indicadoresImr.length,
+                    content: <ImrTab contratoId={contrato.id} indicadores={indicadoresImr} podeEditar={podeEditar} />,
                   },
                 ]
               : []),

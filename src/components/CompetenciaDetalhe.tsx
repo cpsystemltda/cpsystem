@@ -26,6 +26,7 @@ import {
   vincularEmpenhoAction,
 } from "@/app/actions/competencias";
 import { ChipStatusCompetencia } from "@/components/abas/CompetenciasTab";
+import { GlosasBloco, type IndicadorImrDto } from "@/components/GlosasBloco";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
@@ -47,6 +48,8 @@ export function CompetenciaDetalhe({
   ehAdmin,
   hojeIso,
   nomeUsuario,
+  itens,
+  indicadores,
 }: {
   c: ResumoCompetencia;
   empenhosDoContrato: EmpenhoResumo[];
@@ -55,6 +58,9 @@ export function CompetenciaDetalhe({
   ehAdmin: boolean;
   hojeIso: string;
   nomeUsuario: string;
+  /** ESP-005: postos do contrato (para a glosa) e indicadores do IMR. */
+  itens: { id: string; descricao: string }[];
+  indicadores: IndicadorImrDto[];
 }) {
   const router = useRouter();
   const [pendente, start] = useTransition();
@@ -215,6 +221,9 @@ export function CompetenciaDetalhe({
             </ol>
           </section>
 
+          {/* Medição e glosas (ESP-005) */}
+          <GlosasBloco c={c} itens={itens} indicadores={indicadores} podeEditar={podeEditar} hojeIso={hojeIso} onAviso={(m) => setAviso(m)} />
+
           {/* Empenhos */}
           <section className="rounded-2xl border border-slate-200 bg-white">
             <header className="border-b border-slate-100 px-4 py-3">
@@ -256,7 +265,7 @@ export function CompetenciaDetalhe({
             <dl className="mt-3 space-y-2 text-sm">
               <Linha rotulo="Valor mensal vigente" valor={brl(c.valorMensalBase)} sub={c.tipo === "REGULAR" && c.diasPeriodo < c.diasBase ? `pro rata ${c.diasPeriodo}/${c.diasBase} dias` : undefined} />
               <Linha rotulo="Previsto" valor={brl(c.valorPrevisto)} forte />
-              <Linha rotulo="Glosas" valor={c.valorGlosas ? `− ${brl(c.valorGlosas)}` : "—"} sub="registradas na etapa Medição" />
+              <Linha rotulo="Glosas" valor={c.valorGlosas ? `− ${brl(c.valorGlosas)}` : "—"} sub={c.glosas.length ? `${c.glosas.length} registrada(s) em Medição e glosas` : "nenhuma registrada"} />
               <Linha rotulo="Ajustes" valor={c.ajustes ? `${c.ajustes > 0 ? "+" : "−"} ${brl(Math.abs(c.ajustes))}` : "—"} sub={c.ajustesJustificativa ?? undefined} />
               <Linha rotulo={c.faturadoFixado ? "Faturado (NF)" : "Faturado previsto"} valor={brl(c.valorFaturado)} forte />
               {c.retencoes.filter((r) => r.valor).map((r) => (

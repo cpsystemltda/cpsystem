@@ -13,6 +13,7 @@ import {
   type StatusCompetencia,
 } from "@/lib/competencias";
 import type { ResumoCompetencia } from "@/lib/competenciasServer";
+import { indicadorGlosas } from "@/lib/glosas";
 import {
   criarCompetenciaComplementarAction,
   decidirRetroativasAction,
@@ -84,6 +85,8 @@ export function CompetenciasTab({
     },
     { previsto: 0, faturado: 0, recebido: 0, emAtraso: 0, aConfirmar: 0, empenhoInsuficiente: 0 },
   );
+  // ESP-005 RN05: total glosado e % sobre o faturado (faturado + glosado).
+  const glosas = indicadorGlosas(competencias.map((c) => ({ valorFaturado: c.valorFaturado, valorGlosas: c.valorGlosas, faturada: faturadaOuAlem(c.status) })));
 
   function rodar(fn: () => Promise<{ ok?: boolean; erro?: string; mensagem?: string } | null>) {
     setErro(null);
@@ -152,9 +155,10 @@ export function CompetenciasTab({
       )}
 
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-5">
           <Resumo rotulo="Previsto (todas)" valor={brl(totais.previsto)} />
           <Resumo rotulo="Faturado (NF emitida)" valor={brl(totais.faturado)} />
+          <Resumo rotulo="Glosado" valor={glosas.glosado ? `${brl(glosas.glosado)} · ${glosas.percentual}%` : "—"} destaque={glosas.glosado > 0} />
           <Resumo rotulo="Recebido" valor={brl(totais.recebido)} />
           <Resumo
             rotulo="Atenção"
