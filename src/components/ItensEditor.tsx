@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Trash2, Plus, Layers, Sparkles } from "lucide-react";
 import { brl } from "@/lib/validators";
+import { JORNADAS, sugerirColaboradoresPorPosto } from "@/lib/maoDeObra";
 
 export type SugestaoMatchIa = {
   indexExtraido: number;
@@ -38,6 +39,11 @@ export type LinhaItem = {
   ataItemId: string;
   lote: string;
   numero: string;
+  // Mão de obra (ESP-002): posto/empregado, jornada, colaboradores por posto.
+  cbo: string;
+  jornada: string;
+  localPrestacao: string;
+  colaboradoresPorPosto: string;
 };
 
 const VAZIA = (lote = "", numero = ""): LinhaItem => ({
@@ -50,6 +56,10 @@ const VAZIA = (lote = "", numero = ""): LinhaItem => ({
   ataItemId: "",
   lote,
   numero,
+  cbo: "",
+  jornada: "",
+  localPrestacao: "",
+  colaboradoresPorPosto: "",
 });
 
 export type ItemInicial = {
@@ -61,6 +71,11 @@ export type ItemInicial = {
   valorUnitario: number;
   lote?: string | null;
   numero?: string | null;
+  cbo?: string | null;
+  jornada?: string | null;
+  localPrestacao?: string | null;
+  unidadeMaoDeObra?: string | null;
+  colaboradoresPorPosto?: number | null;
   // Quando o item já vem vinculado a um item da Ata pai (ex: empenho
   // derivado de Ata), o select "Item da Ata" aparece pré-selecionado.
   ataItemId?: string;
@@ -99,6 +114,7 @@ export function ItensEditor({
   itensIniciais,
   permitirLotes = true,
   sugestoesIa,
+  maoDeObra = false,
 }: {
   ataItens?: AtaItemRef[];
   itensIniciais?: ItemInicial[];
@@ -106,6 +122,12 @@ export function ItensEditor({
   /** Sugestões de matching IA — quando presente, pré-popula o ataItemId
    *  na ordem dos itens iniciais. Confidence >= 0.6 = badge AUTO verde. */
   sugestoesIa?: SugestaoMatchIa[];
+  /**
+   * Contrato de mão de obra (ESP-002, Igor 07/11/2026): o item é um posto ou
+   * empregado com valor MENSAL — entram função, jornada, colaboradores por
+   * posto, CBO e local; sai a marca.
+   */
+  maoDeObra?: boolean;
 }) {
   // Mapeia sugestões IA por indexExtraido pra fácil lookup
   const sugestoesPorIndex = new Map<number, SugestaoMatchIa>();
@@ -121,10 +143,17 @@ export function ItensEditor({
           const ataItemIdLinha =
             i.ataItemId ||
             (sug && sug.ataItemId && sug.confidence >= 0.6 ? sug.ataItemId : "");
+          // Mão de obra: item antigo guardava a jornada no campo "unidade"
+          // ("40 HORAS SEMANAIS"); vira jornada e a unidade passa a ser POSTO.
+          const unidadeEhMaoDeObra = i.unidade === "POSTO" || i.unidade === "EMPREGADO";
           return {
             id: i.id ?? "",
             descricao: i.descricao,
-            unidade: i.unidade,
+            unidade: maoDeObra ? (i.unidadeMaoDeObra ?? (unidadeEhMaoDeObra ? i.unidade : "POSTO")) : i.unidade,
+            cbo: i.cbo ?? "",
+            jornada: i.jornada ?? (maoDeObra && !unidadeEhMaoDeObra ? i.unidade : ""),
+            localPrestacao: i.localPrestacao ?? "",
+            colaboradoresPorPosto: i.colaboradoresPorPosto != null ? String(i.colaboradoresPorPosto) : "",
             // qtd=0 vira input vazio pra usuário digitar (auto-populado da Ata/Contrato)
             quantidade: i.quantidade === 0 ? "" : String(i.quantidade),
             marca: i.marca ?? "",
@@ -351,7 +380,7 @@ export function ItensEditor({
                 className="px-3 py-3 text-left text-[10px] font-bold uppercase"
                 style={{ letterSpacing: "0.18em", color: "var(--text-mute)" }}
               >
-                Descrição
+                {maoDeObra ? "Função" : "Descrição"}
               </th>
               <th
                 className="px-3 py-3 text-left text-[10px] font-bold uppercase"
@@ -363,25 +392,25 @@ export function ItensEditor({
                 className="px-3 py-3 text-right text-[10px] font-bold uppercase"
                 style={{ letterSpacing: "0.18em", color: "var(--text-mute)" }}
               >
-                Qtd.
+                {maoDeObra ? "Postos" : "Qtd."}
               </th>
               <th
                 className="px-3 py-3 text-left text-[10px] font-bold uppercase"
                 style={{ letterSpacing: "0.18em", color: "var(--text-mute)" }}
               >
-                Marca
+                {maoDeObra ? "Jornada · colab./posto · CBO" : "Marca"}
               </th>
               <th
                 className="px-3 py-3 text-right text-[10px] font-bold uppercase"
                 style={{ letterSpacing: "0.18em", color: "var(--text-mute)" }}
               >
-                Valor unit.
+                {maoDeObra ? "Valor mensal unit." : "Valor unit."}
               </th>
               <th
                 className="px-3 py-3 text-right text-[10px] font-bold uppercase"
                 style={{ letterSpacing: "0.18em", color: "var(--text-mute)" }}
               >
-                Total
+                {maoDeObra ? "Mensal" : "Total"}
               </th>
               <th className="px-3 py-3"></th>
             </tr>
@@ -533,14 +562,30 @@ export function ItensEditor({
                   />
                 </td>
                 <td className="px-2 py-2 align-middle">
-                  <input
-                    name={`itens[${idx}][unidade]`}
-                    value={l.unidade}
-                    onChange={(ev) => update(idx, { unidade: ev.target.value })}
-                    required
-                    placeholder="UN"
-                    className="w-full rounded-md px-1 py-1.5 text-center text-xs"
-                  />
+                  {maoDeObra ? (
+                    <>
+                      {/* ESP-002 RN01: unidade = posto ou empregado */}
+                      <select
+                        name={`itens[${idx}][unidade]`}
+                        value={l.unidade === "EMPREGADO" ? "EMPREGADO" : "POSTO"}
+                        onChange={(ev) => update(idx, { unidade: ev.target.value })}
+                        className="w-full rounded-md px-1 py-1.5 text-xs"
+                      >
+                        <option value="POSTO">Posto</option>
+                        <option value="EMPREGADO">Empregado</option>
+                      </select>
+                      <input type="hidden" name={`itens[${idx}][unidadeMaoDeObra]`} value={l.unidade === "EMPREGADO" ? "EMPREGADO" : "POSTO"} />
+                    </>
+                  ) : (
+                    <input
+                      name={`itens[${idx}][unidade]`}
+                      value={l.unidade}
+                      onChange={(ev) => update(idx, { unidade: ev.target.value })}
+                      required
+                      placeholder="UN"
+                      className="w-full rounded-md px-1 py-1.5 text-center text-xs"
+                    />
+                  )}
                 </td>
                 <td className="px-2 py-2 align-middle">
                   <input
@@ -555,12 +600,80 @@ export function ItensEditor({
                   />
                 </td>
                 <td className="px-2 py-2 align-middle">
-                  <input
-                    name={`itens[${idx}][marca]`}
-                    value={l.marca}
-                    onChange={(ev) => update(idx, { marca: ev.target.value })}
-                    className="w-full rounded-md px-2 py-1.5 text-xs"
-                  />
+                  {maoDeObra ? (
+                    <div className="flex flex-col gap-1">
+                      {/* ESP-002 RN01/RN02: jornada, colaboradores por posto, CBO, local */}
+                      <select
+                        value={(JORNADAS as readonly string[]).includes(l.jornada) || !l.jornada ? l.jornada : "Outra"}
+                        onChange={(ev) => {
+                          const j = ev.target.value;
+                          update(idx, {
+                            jornada: j === "Outra" ? "Outra" : j,
+                            colaboradoresPorPosto: l.colaboradoresPorPosto || String(sugerirColaboradoresPorPosto(j)),
+                          });
+                        }}
+                        className="w-full rounded-md px-1 py-1 text-xs"
+                        title="Jornada / escala"
+                      >
+                        <option value="">Jornada…</option>
+                        {JORNADAS.map((j) => (
+                          <option key={j} value={j}>{j}</option>
+                        ))}
+                      </select>
+                      {(l.jornada === "Outra" || (l.jornada && !(JORNADAS as readonly string[]).includes(l.jornada))) ? (
+                        <input
+                          name={`itens[${idx}][jornada]`}
+                          value={l.jornada === "Outra" ? "" : l.jornada}
+                          onChange={(ev) => update(idx, { jornada: ev.target.value || "Outra" })}
+                          placeholder="Descreva a jornada"
+                          className="w-full rounded-md px-2 py-1 text-xs"
+                        />
+                      ) : (
+                        <input type="hidden" name={`itens[${idx}][jornada]`} value={l.jornada} />
+                      )}
+                      <div className="flex gap-1">
+                        <input
+                          type="number"
+                          min="1"
+                          name={`itens[${idx}][colaboradoresPorPosto]`}
+                          value={l.unidade === "EMPREGADO" ? "" : l.colaboradoresPorPosto}
+                          disabled={l.unidade === "EMPREGADO"}
+                          onChange={(ev) => update(idx, { colaboradoresPorPosto: ev.target.value })}
+                          placeholder="colab./posto"
+                          title="Colaboradores por posto (12x36 costuma exigir 2)"
+                          className="w-1/2 rounded-md px-2 py-1 text-xs disabled:opacity-40"
+                        />
+                        <input
+                          name={`itens[${idx}][cbo]`}
+                          value={l.cbo}
+                          onChange={(ev) => update(idx, { cbo: ev.target.value })}
+                          placeholder="CBO"
+                          className="w-1/2 rounded-md px-2 py-1 text-xs"
+                        />
+                      </div>
+                      <input
+                        name={`itens[${idx}][localPrestacao]`}
+                        value={l.localPrestacao}
+                        onChange={(ev) => update(idx, { localPrestacao: ev.target.value })}
+                        placeholder="Local de prestação (opcional)"
+                        className="w-full rounded-md px-2 py-1 text-xs"
+                      />
+                      <span className="text-[10px]" style={{ color: "var(--text-mute)" }}>
+                        {(() => {
+                          const q = Number(l.quantidade) || 0;
+                          const cpp = l.unidade === "EMPREGADO" ? 1 : Math.max(1, Number(l.colaboradoresPorPosto) || 1);
+                          return `${Math.round(q * cpp)} colaborador(es) necessário(s)`;
+                        })()}
+                      </span>
+                    </div>
+                  ) : (
+                    <input
+                      name={`itens[${idx}][marca]`}
+                      value={l.marca}
+                      onChange={(ev) => update(idx, { marca: ev.target.value })}
+                      className="w-full rounded-md px-2 py-1.5 text-xs"
+                    />
+                  )}
                 </td>
                 <td className="px-2 py-2 align-middle">
                   <input

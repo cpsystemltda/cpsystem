@@ -563,7 +563,22 @@ export async function atualizarContratoItemAction(_p: Result | null, formData: F
     return { erro: "Preencha descrição, unidade, quantidade > 0 e valor unitário > 0." };
   }
 
-  const dadosNovos = { descricao, unidade, quantidade, marca, valorUnitario };
+  // Mão de obra (ESP-002): a unidade vem como POSTO/EMPREGADO e entram
+  // jornada, colaboradores por posto, CBO e local. Só gravados quando o
+  // formulário os envia (contrato comum não manda nada disso).
+  const ehMaoDeObra = unidade === "POSTO" || unidade === "EMPREGADO";
+  const extrasMaoDeObra = ehMaoDeObra
+    ? {
+        unidadeMaoDeObra: unidade as "POSTO" | "EMPREGADO",
+        jornada: String(formData.get("jornada") || "").trim() || null,
+        cbo: String(formData.get("cbo") || "").trim() || null,
+        localPrestacao: String(formData.get("localPrestacao") || "").trim() || null,
+        colaboradoresPorPosto:
+          unidade === "POSTO" ? Math.max(1, Math.round(Number(formData.get("colaboradoresPorPosto") || 1))) : null,
+      }
+    : {};
+
+  const dadosNovos = { descricao, unidade, quantidade, marca, valorUnitario, ...extrasMaoDeObra };
 
   await prisma.contratoItem.update({
     where: { id },

@@ -2,6 +2,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { brl } from "@/lib/validators";
 import { calcularSaldoAta } from "@/lib/saldo";
+import { valorExibidoDoContrato } from "@/lib/maoDeObra";
 import { BarChart3, TrendingUp, Building2, AlertTriangle, Download } from "lucide-react";
 import { PageHeader } from "@/components/ui/SecaoGlass";
 
@@ -22,7 +23,10 @@ export default async function RelatoriosPage() {
     }),
     prisma.contrato.findMany({
       where: { empresa: { contaId } },
-      include: { itens: { select: { valorTotal: true } } },
+      include: {
+        itens: { select: { valorTotal: true, vigenciaId: true } },
+        vigencias: { select: { id: true, ordem: true, dataInicio: true, dataFim: true } },
+      },
     }),
     prisma.empenho.findMany({
       where: { empresa: { contaId } },
@@ -30,10 +34,9 @@ export default async function RelatoriosPage() {
     }),
   ]);
 
-  const valorTotalContratos = contratos.reduce(
-    (s, c) => s + c.itens.reduce((s2, i) => s2 + i.valorTotal, 0),
-    0,
-  );
+  // ESP-002 RN08: contrato de mão de obra entra pelo valor da vigência
+  // (mensal × meses), não pela soma dos itens.
+  const valorTotalContratos = contratos.reduce((s, c) => s + valorExibidoDoContrato(c), 0);
   const valorTotalEmpenhos = empenhos.reduce(
     (s, e) => s + e.itens.reduce((s2, i) => s2 + i.valorTotal, 0),
     0,

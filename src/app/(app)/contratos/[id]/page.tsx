@@ -31,6 +31,9 @@ import { NotificacoesTab } from "@/components/abas/NotificacoesTab";
 import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { RegimeLegalPanel } from "@/components/RegimeLegalPanel";
+import { ValoresMensaisBanner } from "@/components/ValoresMensaisBanner";
+import { isContratoMaoDeObra } from "@/lib/validators";
+import { mesesDaVigencia } from "@/lib/maoDeObra";
 import { avisoDoLimite, prazoMaximoVigencia, prorrogacoesRestantesEstimadas } from "@/lib/regimeLegal";
 import { EnderecosPontosFocaisTab } from "@/components/abas/OrgaosTab";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
@@ -188,6 +191,20 @@ export default async function ContratoDetalhePage({
         podeEditar={podeEditar}
       />
 
+      {/* ESP-002 RN06: contrato de mão de obra anterior ao módulo — o sistema
+          não sabe se os itens são mensais ou da vigência inteira. */}
+      {isContratoMaoDeObra(contrato.tipo) && !contrato.valoresMensaisConfirmadosEm && (
+        <ValoresMensaisBanner
+          contratoId={contrato.id}
+          somaItens={saldo.vigenciaAtual?.itens.reduce((s, i) => s + i.valorTotal, 0) ?? saldo.valorTotal}
+          meses={mesesDaVigencia(
+            saldo.vigenciaAtual?.dataInicio ?? contrato.vigenciaInicio,
+            saldo.vigenciaAtual?.dataFim ?? contrato.vigenciaFim,
+          )}
+          podeEditar={podeEditar}
+        />
+      )}
+
       {/* Atestado de Capacidade Técnica (Regina 11/09) — encerrado o contrato,
           é hora de pedir ao órgão o documento que comprova a execução. */}
       <div className="mt-4">
@@ -207,13 +224,15 @@ export default async function ContratoDetalhePage({
           abas={[
             {
               key: "saldo",
-              label: "Saldo de itens",
+              // ESP-002 RN05: em contrato de mão de obra a aba vira "Postos".
+              label: saldo.maoDeObra ? "Postos" : "Saldo de itens",
               content: (
                 <SaldoVigenciasPanel
                   saldo={saldo}
                   tipoItens="CONTRATO"
                   contratoId={contrato.id}
                   podeIniciarManual={podeEditar && !isContratoNaoContinuado(contrato.tipo)}
+                  maoDeObra={saldo.maoDeObra}
                 />
               ),
             },

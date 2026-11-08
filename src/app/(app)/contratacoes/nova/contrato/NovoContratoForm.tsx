@@ -1014,6 +1014,7 @@ export default function NovoContratoForm({
             itensIniciais={vi?.itens ?? dados?.itens}
             permitirLotes={true}
             sugestoesIa={sugestoesItens}
+            maoDeObra={cmo}
           />
         </Secao>
 

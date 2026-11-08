@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, TrendingUp, TrendingDown, ChevronDown } from "lucide-react";
+import { CalendarClock, TrendingUp, TrendingDown, ChevronDown, CalendarDays } from "lucide-react";
 import { brl } from "@/lib/validators";
 import type { SaldoAta, SaldoContrato } from "@/lib/saldo";
 
@@ -15,10 +15,16 @@ import type { SaldoAta, SaldoContrato } from "@/lib/saldo";
 //   (acumulado de todas as vigencias), com setinha que abre/recolhe.
 // - Quando ha apenas 1 vigencia, nao mostra a Serie historica
 //   (duplicaria os mesmos numeros).
+//
+// Contrato de mão de obra (ESP-002 RN04, Igor 07/11/2026): quatro números —
+// valor mensal vigente, valor da vigência (mensal × meses), executado e a
+// executar. Era este o erro de leitura do contrato da Sonne: a soma dos
+// itens (R$ 612 mil) aparecia como valor total da vigência.
 
 export function KpisSaldoVigencia({ saldo }: { saldo: SaldoAta | SaldoContrato }) {
   const vig = saldo.vigenciaAtual;
   const temMultiplas = saldo.vigencias.length > 1;
+  const maoDeObra = "maoDeObra" in saldo && saldo.maoDeObra === true;
 
   // Fallback pra documentos sem vigencia (nao deveria acontecer pos-backfill)
   if (!vig) {
@@ -41,6 +47,9 @@ export function KpisSaldoVigencia({ saldo }: { saldo: SaldoAta | SaldoContrato }
     );
   }
 
+  const valorMensal = "valorMensal" in vig ? vig.valorMensal : undefined;
+  const meses = "meses" in vig ? vig.meses : undefined;
+
   return (
     <div className="mt-6 space-y-4">
       {/* Vigente — sempre visivel. Quando ha mais de uma vigencia,
@@ -59,25 +68,44 @@ export function KpisSaldoVigencia({ saldo }: { saldo: SaldoAta | SaldoContrato }
             </span>
           </header>
         )}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Stat
-            titulo="Valor total contratado"
-            valor={brl(vig.valorTotal)}
-            icone={CalendarClock}
-          />
-          <Stat
-            titulo="Já executado"
-            valor={brl(vig.valorUsado)}
-            sub={`${vig.percentualUsado.toFixed(1)}%`}
-            icone={TrendingUp}
-          />
-          <Stat
-            titulo="A executar"
-            valor={brl(vig.valorDisponivel)}
-            cor="emerald"
-            icone={TrendingDown}
-          />
-        </div>
+        {maoDeObra && valorMensal != null ? (
+          <div className="grid gap-4 md:grid-cols-4">
+            <Stat titulo="Valor mensal vigente" valor={brl(valorMensal)} icone={CalendarDays} sub="soma dos postos" />
+            <Stat
+              titulo="Valor da vigência"
+              valor={brl(vig.valorTotal)}
+              icone={CalendarClock}
+              sub={meses != null ? `${Number.isInteger(meses) ? meses : meses.toFixed(2)} meses × valor mensal` : undefined}
+            />
+            <Stat
+              titulo="Executado"
+              valor={brl(vig.valorUsado)}
+              sub={`${vig.percentualUsado.toFixed(1)}% da vigência`}
+              icone={TrendingUp}
+            />
+            <Stat titulo="A executar" valor={brl(vig.valorDisponivel)} cor="emerald" icone={TrendingDown} />
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            <Stat
+              titulo="Valor total contratado"
+              valor={brl(vig.valorTotal)}
+              icone={CalendarClock}
+            />
+            <Stat
+              titulo="Já executado"
+              valor={brl(vig.valorUsado)}
+              sub={`${vig.percentualUsado.toFixed(1)}%`}
+              icone={TrendingUp}
+            />
+            <Stat
+              titulo="A executar"
+              valor={brl(vig.valorDisponivel)}
+              cor="emerald"
+              icone={TrendingDown}
+            />
+          </div>
+        )}
       </section>
 
       {temMultiplas && (

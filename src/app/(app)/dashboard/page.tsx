@@ -23,6 +23,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { podeAcessarModulo } from "@/lib/modulosAcesso";
 import { AvisoColaboradores } from "@/components/AvisoColaboradores";
 import { prisma } from "@/lib/prisma";
+import { valorExibidoDoContrato } from "@/lib/maoDeObra";
 import { ondeDoUsuario } from "@/lib/escopoUsuario";
 import { dadosPorUf, extrairUf } from "@/lib/agregacaoUf";
 import { coletarPinsOrgaos } from "@/lib/pinsOrgaos";
@@ -172,9 +173,13 @@ export default async function DashboardPage({
         orgaoCnpj: true,
         orgaoEndereco: true,
         tipo: true,
+        vigenciaInicio: true,
         vigenciaFim: true,
         valorInicial: true,
-        itens: { select: { valorTotal: true } },
+        // ESP-002 RN08: contrato de mão de obra vale mensal × meses da vigência.
+        valoresMensaisConfirmadosEm: true,
+        itens: { select: { valorTotal: true, vigenciaId: true } },
+        vigencias: { select: { id: true, ordem: true, dataInicio: true, dataFim: true } },
       },
     }),
     prisma.ata.findMany({
@@ -368,9 +373,10 @@ export default async function DashboardPage({
     0,
   );
 
-  // Valor total dos Contratos vigentes
+  // Valor total dos Contratos vigentes. ESP-002 RN08: contrato de mão de
+  // obra entra pelo valor da vigência (mensal × meses), não pela soma dos itens.
   const valorTotalContratosVigentes = contratosVigentesDetalhe.reduce(
-    (s, c) => s + c.itens.reduce((ss, it) => ss + it.valorTotal, 0),
+    (s, c) => s + valorExibidoDoContrato(c, hoje),
     0,
   );
 

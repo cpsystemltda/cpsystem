@@ -43,6 +43,26 @@ function camposRegimeLegal(v: ContratoInput) {
   };
 }
 
+/**
+ * Campos de posto num item de contrato de mão de obra (ESP-002). Em contrato
+ * comum tudo fica nulo; em CMO a unidade POSTO/EMPREGADO também vai para o
+ * campo `unidade` (texto), para as telas antigas continuarem legíveis.
+ */
+function camposItemMaoDeObra(
+  i: { unidade: string; unidadeMaoDeObra?: "POSTO" | "EMPREGADO"; cbo?: string; jornada?: string; localPrestacao?: string; colaboradoresPorPosto?: number },
+  cmo: boolean,
+) {
+  if (!cmo) return { cbo: null, jornada: null, localPrestacao: null, unidadeMaoDeObra: null, colaboradoresPorPosto: null };
+  const unidadeMao = i.unidadeMaoDeObra ?? (i.unidade === "EMPREGADO" ? "EMPREGADO" : "POSTO");
+  return {
+    cbo: i.cbo?.trim() || null,
+    jornada: i.jornada?.trim() || null,
+    localPrestacao: i.localPrestacao?.trim() || null,
+    unidadeMaoDeObra: unidadeMao,
+    colaboradoresPorPosto: unidadeMao === "POSTO" ? Math.max(1, i.colaboradoresPorPosto ?? 1) : null,
+  };
+}
+
 /** Campos que só existem em contrato de mão de obra (ESP-001, RN06). */
 function camposMaoDeObra(v: ContratoInput, cmo: boolean) {
   if (!cmo) {
@@ -98,6 +118,12 @@ function parseItens(formData: FormData) {
     ataItemId?: string;
     lote?: string;
     numero?: string;
+    // Mão de obra (ESP-002)
+    cbo?: string;
+    jornada?: string;
+    localPrestacao?: string;
+    unidadeMaoDeObra?: string;
+    colaboradoresPorPosto?: string;
   }[] = [];
 
   // formato: itens[0][descricao], itens[0][unidade], etc.
@@ -110,6 +136,12 @@ function parseItens(formData: FormData) {
       quantidade: Number(formData.get(`itens[${i}][quantidade]`) || 0),
       marca: String(formData.get(`itens[${i}][marca]`) || "") || undefined,
       valorUnitario: Number(formData.get(`itens[${i}][valorUnitario]`) || 0),
+      // Mão de obra (ESP-002)
+      cbo: String(formData.get(`itens[${i}][cbo]`) || "") || undefined,
+      jornada: String(formData.get(`itens[${i}][jornada]`) || "") || undefined,
+      localPrestacao: String(formData.get(`itens[${i}][localPrestacao]`) || "") || undefined,
+      unidadeMaoDeObra: String(formData.get(`itens[${i}][unidadeMaoDeObra]`) || "") || undefined,
+      colaboradoresPorPosto: String(formData.get(`itens[${i}][colaboradoresPorPosto]`) || "") || undefined,
       ataItemId: String(formData.get(`itens[${i}][ataItemId]`) || "") || undefined,
       lote: String(formData.get(`itens[${i}][lote]`) || "") || undefined,
       numero: String(formData.get(`itens[${i}][numero]`) || "") || undefined,
@@ -898,8 +930,13 @@ export async function criarContratoAction(_prev: ActionResult | null, formData: 
             ataItemId: i.ataItemId || null,
             lote: i.lote || null,
             numero: i.numero || null,
+            ...camposItemMaoDeObra(i, cmo),
           })),
         },
+        // ESP-002 RN06: contrato de mão de obra cadastrado pelo formulário novo
+        // já nasce com os valores dos itens lidos como MENSAIS (é o rótulo do
+        // campo). O banner de confirmação é só para contrato antigo.
+        ...(cmo && { valoresMensaisConfirmadosEm: new Date() }),
         ...(parcelasParaCriar.length > 0 && { parcelas: { create: parcelasParaCriar } }),
         ...(v.enderecosEntrega && v.enderecosEntrega.length > 0 && {
           enderecosEntrega: {
@@ -1124,17 +1161,24 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
           dataPublicacao: v.dataPublicacao || null,
           vigenciaInicio: v.vigenciaInicio,
           vigenciaFim: v.vigenciaFim,
-          prazoEntregaDias: v.prazoEntregaDias || null,
+          // Contrato de mão de obra (ESP-001 RN06): sem entrega; campos de
+          // prestação mensal no lugar. Mesma regra do cadastro.
+          prazoEntregaDias: cmo ? null : v.prazoEntregaDias || null,
           prazoEntregaUnidade: v.prazoEntregaUnidade,
-          prazoEntregaModo: v.prazoEntregaModo,
-          dataEntregaCerta: v.dataEntregaCerta ?? null,
+          prazoEntregaModo: cmo ? "SOB_DEMANDA" : v.prazoEntregaModo,
+          dataEntregaCerta: cmo ? null : v.dataEntregaCerta ?? null,
           prazoPagamentoDias: v.prazoPagamentoDias || null,
           marcoOrcamentoEstimado: v.marcoOrcamentoEstimado || null,
           marcoReajusteOrigem: v.marcoReajusteOrigem ?? null,
-          modalidadeEntrega: v.modalidadeEntrega,
-          marcoInicialPrazo: v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
+          modalidadeEntrega: cmo ? "SOB_DEMANDA" : v.modalidadeEntrega,
+          marcoInicialPrazo: cmo || v.modalidadeEntrega === "SOB_DEMANDA" ? null : v.marcoInicialPrazo ?? null,
           marcoInicialDescricao:
-            v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
+            !cmo && v.marcoInicialPrazo === "OUTRO" ? v.marcoInicialDescricao?.trim() || null : null,
+          ...camposRegimeLegal(v),
+          ...camposMaoDeObra(v, cmo),
+          // ESP-002 RN06: quem edita pelo formulário vê "valor mensal unitário"
+          // nos itens — salvar é confirmar que os valores são mensais.
+          ...(cmo && { valoresMensaisConfirmadosEm: new Date() }),
         },
       });
 
@@ -1159,6 +1203,7 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
               ataItemId: it.ataItemId || null,
               lote: it.lote || null,
               numero: it.numero || null,
+              ...camposItemMaoDeObra(it, cmo),
             },
           });
         } else {
@@ -1174,6 +1219,7 @@ export async function editarContratoAction(_prev: ActionResult | null, formData:
               ataItemId: it.ataItemId || null,
               lote: it.lote || null,
               numero: it.numero || null,
+              ...camposItemMaoDeObra(it, cmo),
             },
           });
         }

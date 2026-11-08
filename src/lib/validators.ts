@@ -389,6 +389,18 @@ const itemSchema = z.object({
   ataItemId: z.string().optional(),
   lote: z.string().optional(), // briefing PDF 2.7 — agrupar em lotes
   numero: z.string().optional(), // número do item dentro do lote
+  // Mão de obra (ESP-002, Igor 07/11/2026): posto/empregado com valor mensal.
+  cbo: z.string().optional(),
+  jornada: z.string().optional(),
+  localPrestacao: z.string().optional(),
+  unidadeMaoDeObra: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.enum(["POSTO", "EMPREGADO"]).optional(),
+  ),
+  colaboradoresPorPosto: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.coerce.number().int().min(1).max(50).optional(),
+  ),
 });
 
 // Variante usada pelo Empenho: permite quantidade=0 nos itens herdados de

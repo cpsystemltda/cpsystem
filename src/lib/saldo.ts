@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ehValorMensal, mesesDaVigencia, colaboradoresNecessarios } from "@/lib/maoDeObra";
 
 export type SaldoItem = {
   // Item da Ata — id no campo ataItemId.
@@ -33,6 +34,13 @@ export type SaldoItemContrato = {
   valorTotal: number;
   valorUsado: number;
   valorDisponivel: number;
+  // Mão de obra (ESP-002): posto/empregado, jornada e colaboradores.
+  cbo?: string | null;
+  jornada?: string | null;
+  unidadeMaoDeObra?: string | null;
+  colaboradoresPorPosto?: number | null;
+  colaboradoresNecessarios?: number;
+  localPrestacao?: string | null;
 };
 
 type SaldoVigenciaBase = {
@@ -42,6 +50,9 @@ type SaldoVigenciaBase = {
   dataFim: Date;
   status: "ATIVA" | "ENCERRADA" | "FUTURA";
   termoAditivoId: string | null;
+  /** Mão de obra (ESP-002): soma mensal dos postos e meses da vigência; valorTotal = mensal × meses. */
+  valorMensal?: number;
+  meses?: number;
   valorTotal: number;
   valorUsado: number;
   valorDisponivel: number;
@@ -89,6 +100,8 @@ export type SaldoContrato = {
     valorUsado: number;
     valorDisponivel: number;
   };
+  /** Contrato de mão de obra com valores confirmados como mensais (ESP-002). */
+  maoDeObra: boolean;
 };
 
 // Determina status de uma vigência relativo a "hoje":
@@ -583,17 +596,26 @@ function acharAlvoEmCascata<
 // Saldo de um Contrato por vigência. Empenhos de uma vigência abatem só
 // dos itens dessa vigência.
 export async function calcularSaldoContrato(contratoId: string): Promise<SaldoContrato> {
-  const vigencias = await prisma.vigencia.findMany({
-    where: { contratoId },
-    orderBy: { ordem: "asc" },
-    select: {
-      id: true,
-      ordem: true,
-      dataInicio: true,
-      dataFim: true,
-      termoAditivoId: true,
-    },
-  });
+  const [vigencias, contratoFlags] = await Promise.all([
+    prisma.vigencia.findMany({
+      where: { contratoId },
+      orderBy: { ordem: "asc" },
+      select: {
+        id: true,
+        ordem: true,
+        dataInicio: true,
+        dataFim: true,
+        termoAditivoId: true,
+      },
+    }),
+    // ESP-002 (Igor 07/11/2026): contrato de mão de obra com valores
+    // confirmados como mensais → valor da vigência = mensal × meses.
+    prisma.contrato.findUnique({
+      where: { id: contratoId },
+      select: { tipo: true, valoresMensaisConfirmadosEm: true },
+    }),
+  ]);
+  const maoDeObra = !!contratoFlags && ehValorMensal(contratoFlags);
 
   if (vigencias.length === 0) {
     return calcularSaldoContratoLegacy(contratoId);
@@ -612,6 +634,11 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
       valorTotal: true,
       ataItemId: true,
       vigenciaId: true,
+      cbo: true,
+      jornada: true,
+      unidadeMaoDeObra: true,
+      colaboradoresPorPosto: true,
+      localPrestacao: true,
     },
     orderBy: { id: "asc" },
   });
@@ -672,10 +699,22 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
         valorTotal: it.valorTotal,
         valorUsado,
         valorDisponivel: disponivel * it.valorUnitario,
+        cbo: it.cbo,
+        jornada: it.jornada,
+        unidadeMaoDeObra: it.unidadeMaoDeObra,
+        colaboradoresPorPosto: it.colaboradoresPorPosto,
+        localPrestacao: it.localPrestacao,
+        colaboradoresNecessarios: colaboradoresNecessarios(it),
       };
     });
 
-    const valorTotal = itensSaldo.reduce((s, i) => s + i.valorTotal, 0);
+    // ESP-002 RN03: em contrato de mão de obra a soma dos itens é o valor
+    // MENSAL; a vigência vale mensal × meses (com fração). "Executado"
+    // continua sendo o que os empenhos registraram até a ESP-004 trocar
+    // isso pelas competências faturadas.
+    const somaItens = itensSaldo.reduce((s, i) => s + i.valorTotal, 0);
+    const meses = maoDeObra ? mesesDaVigencia(vig.dataInicio, vig.dataFim) : undefined;
+    const valorTotal = maoDeObra ? Math.round(somaItens * (meses ?? 0) * 100) / 100 : somaItens;
     const valorUsado = itensSaldo.reduce((s, i) => s + i.valorUsado, 0);
 
     return {
@@ -686,6 +725,7 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
       status: classificarStatus(vig.dataInicio, vig.dataFim),
       termoAditivoId: vig.termoAditivoId,
       itens: itensSaldo,
+      ...(maoDeObra && { valorMensal: somaItens, meses }),
       valorTotal,
       valorUsado,
       valorDisponivel: valorTotal - valorUsado,
@@ -709,6 +749,7 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
     vigenciaAtual,
     vigencias: saldosPorVig,
     acumulado,
+    maoDeObra,
   };
 }
 
@@ -771,5 +812,6 @@ async function calcularSaldoContratoLegacy(contratoId: string): Promise<SaldoCon
     vigenciaAtual: null,
     vigencias: [],
     acumulado: { valorTotal, valorUsado, valorDisponivel },
+    maoDeObra: false,
   };
 }

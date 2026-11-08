@@ -30,6 +30,7 @@ export function SaldoVigenciasPanel({
   contratoId,
   ataId,
   podeIniciarManual,
+  maoDeObra = false,
 }: {
   saldo: SaldoAta | SaldoContrato;
   // Decide qual tabela renderizar internamente (em vez de receber função
@@ -38,6 +39,8 @@ export function SaldoVigenciasPanel({
   contratoId?: string;
   ataId?: string;
   podeIniciarManual?: boolean;
+  /** Contrato de mão de obra com valores mensais (ESP-002): quadro de postos. */
+  maoDeObra?: boolean;
 }) {
   const temMultiplasVigencias = saldo.vigencias.length > 1;
 
@@ -87,7 +90,7 @@ export function SaldoVigenciasPanel({
 
       {/* Fallback pra documentos sem vigência (não deveria acontecer
           pós-backfill — mostra a tabela do saldo legado) */}
-      {saldo.vigencias.length === 0 && <TabelaItens tipoItens={tipoItens} itens={saldo.itens} />}
+      {saldo.vigencias.length === 0 && <TabelaItens tipoItens={tipoItens} itens={saldo.itens} maoDeObra={maoDeObra} />}
 
       {/* Histórico de vigências (só quando >1) */}
       {temMultiplasVigencias && (
@@ -145,9 +148,12 @@ export function SaldoVigenciasPanel({
 function TabelaItens({
   tipoItens,
   itens,
+  maoDeObra = false,
 }: {
   tipoItens: "ATA" | "CONTRATO";
   itens: unknown[];
+  /** Contrato de mão de obra (ESP-002): quadro de postos no lugar do saldo por quantidade. */
+  maoDeObra?: boolean;
 }) {
   if (tipoItens === "ATA") {
     return (
@@ -159,6 +165,7 @@ function TabelaItens({
   return (
     <ItensContratoTab
       saldo={{ itens: itens as Parameters<typeof ItensContratoTab>[0]["saldo"]["itens"] }}
+      maoDeObra={maoDeObra}
     />
   );
 }
@@ -212,9 +219,17 @@ function BlocoVigencia({
             <StatusBadge status={vigencia.status} grande />
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
-            <span>
-              Contratado <strong className="text-slate-900">{brl(vigencia.valorTotal)}</strong>
-            </span>
+            {"valorMensal" in vigencia && vigencia.valorMensal != null ? (
+              <span>
+                Mensal <strong className="text-slate-900">{brl(vigencia.valorMensal)}</strong> · Vigência{" "}
+                <strong className="text-slate-900">{brl(vigencia.valorTotal)}</strong>
+                {vigencia.meses != null && <span className="text-slate-500"> ({Number.isInteger(vigencia.meses) ? vigencia.meses : vigencia.meses.toFixed(2)} meses)</span>}
+              </span>
+            ) : (
+              <span>
+                Contratado <strong className="text-slate-900">{brl(vigencia.valorTotal)}</strong>
+              </span>
+            )}
             <span>
               Executado <strong className="text-slate-900">{brl(vigencia.valorUsado)}</strong> ·{" "}
               {vigencia.percentualUsado.toFixed(1)}%
@@ -241,7 +256,11 @@ function BlocoVigencia({
       )}
 
       <div className="p-3">
-        <TabelaItens tipoItens={tipoItens} itens={vigencia.itens} />
+        <TabelaItens
+          tipoItens={tipoItens}
+          itens={vigencia.itens}
+          maoDeObra={"valorMensal" in vigencia && vigencia.valorMensal != null}
+        />
       </div>
     </section>
   );

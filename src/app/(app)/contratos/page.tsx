@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { valorExibidoDoContrato } from "@/lib/maoDeObra";
 import { ContratosBrowser, type ContratoCard } from "@/components/ContratosBrowser";
 import { filtroEmpresaWhere } from "@/lib/empresaContexto";
 import { BannerEmpresaEmFoco } from "@/components/BannerEmpresaEmFoco";
@@ -99,7 +100,10 @@ export default async function ContratosPage({
         include: {
           empresa: { select: { nomeFantasia: true, razaoSocial: true } },
           ata: { select: { numero: true } },
-          itens: { select: { valorTotal: true } },
+          // ESP-002 RN08: contrato de mão de obra vale mensal × meses da
+          // vigência atual — precisa dos itens por vigência.
+          itens: { select: { valorTotal: true, vigenciaId: true } },
+          vigencias: { select: { id: true, ordem: true, dataInicio: true, dataFim: true } },
           empenhos: { select: { itens: { select: { valorTotal: true } } } },
         },
       }),
@@ -188,7 +192,8 @@ export default async function ContratosPage({
 
   // Saldo calculado em memória — zero queries extras
   const contratosCard: ContratoCard[] = todos.map((c) => {
-    const valorTotal = c.itens.reduce((s, i) => s + i.valorTotal, 0);
+    // ESP-002 RN08: contrato de mão de obra vale mensal × meses da vigência.
+    const valorTotal = valorExibidoDoContrato(c, hojeDate);
     const valorExecutado = c.empenhos.reduce((s, e) => s + e.itens.reduce((ss, i) => ss + i.valorTotal, 0), 0);
     const pctExecutado = valorTotal === 0 ? 0 : (valorExecutado / valorTotal) * 100;
     const dias = Math.ceil((c.vigenciaFim.getTime() - hojeDate.getTime()) / 86400000);
