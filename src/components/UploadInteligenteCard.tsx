@@ -39,6 +39,7 @@ const ROTULO_TIPO: Record<TipoDocumento, string> = {
   GARANTIA: "Garantia contratual",
   NOTIFICACAO: "Notificação administrativa",
   PROCEDIMENTO: "Procedimento apuratório",
+  PLANILHA_CUSTOS: "Planilha de custos e formação de preços",
   DESCONHECIDO: "Documento não identificado",
 };
 
@@ -48,6 +49,8 @@ const ORIENTACOES_MANUAL: Partial<Record<TipoDocumento, string>> = {
   GARANTIA: "Abra o contrato (ou empenho) e use a aba Garantias para anexar.",
   NOTIFICACAO: "Abra o contrato (ou empenho) e use a aba Notificações para registrar.",
   PROCEDIMENTO: "Abra o contrato (ou empenho) e use a aba Procedimentos apuratórios.",
+  PLANILHA_CUSTOS:
+    "Abra o contrato de mão de obra a que ela se refere e use a aba Planilha de custos: lá a leitura separa uma planilha por função e você confere antes de salvar.",
 };
 
 // Tipos com rota direta + label pra usuário escolher manualmente quando IA falha

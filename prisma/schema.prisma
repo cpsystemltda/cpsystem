@@ -427,11 +427,11 @@ model FollowUpCliente {
   /// Com quem falamos na empresa.
   contatoNome String?
   /// O que o cliente contou: como está usando, o que trava, o que mudou.
-  resumo      String  @db.Text
+  resumo      String    @db.Text
   /// O que orientamos o cliente a fazer no sistema.
-  orientacoes String? @db.Text
+  orientacoes String?   @db.Text
   /// Pedidos, críticas e ideias — matéria-prima para a melhoria do sistema.
-  feedback    String? @db.Text
+  feedback    String?   @db.Text
   /// Pontos de atenção que o sistema apontava no momento do contato.
   diagnostico Json?
   /// Cliente pediu para voltarmos antes do próximo marco.
@@ -1152,6 +1152,8 @@ model Contrato {
   id                     String              @id @default(cuid())
   tipo                   TipoObjeto
   numero                 String
+  /// ESP-003: planilhas de custos e formação de preços por função.
+  planilhasCustos        PlanilhaCustos[]
   numeroNotaEmpenho      String?
   processoAdministrativo String
   procedimentoSelecao    ProcedimentoSelecao
@@ -1288,14 +1290,16 @@ model ParcelaContrato {
 }
 
 model ContratoItem {
-  id            String  @id @default(cuid())
-  descricao     String
-  unidade       String
-  quantidade    Float
-  marca         String?
-  valorUnitario Float
-  valorTotal    Float
-  moeda         Moeda   @default(BRL)
+  id              String           @id @default(cuid())
+  descricao       String
+  unidade         String
+  /// ESP-003: planilhas de custos vinculadas a esta função (versões).
+  planilhasCustos PlanilhaCustos[]
+  quantidade      Float
+  marca           String?
+  valorUnitario   Float
+  valorTotal      Float
+  moeda           Moeda            @default(BRL)
 
   // Mesmo esquema do AtaItem: contratos podem ser estruturados em
   // Lotes (cada item carrega o rotulo do lote e o numero/posicao
@@ -3076,13 +3080,13 @@ model BatimentoPonte {
 // ============================================================
 
 model DespesaPlataforma {
-  id          String   @id @default(cuid())
-  competencia String // YYYY-MM
-  categoria   String // ver CATEGORIAS_DESPESA em src/lib/dre.ts
-  descricao   String
-  valor       Float
-  criadoPorId String?
-  criadoEm    DateTime @default(now())
+  id           String   @id @default(cuid())
+  competencia  String // YYYY-MM
+  categoria    String // ver CATEGORIAS_DESPESA em src/lib/dre.ts
+  descricao    String
+  valor        Float
+  criadoPorId  String?
+  criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
   @@index([competencia])
@@ -3126,4 +3130,53 @@ enum CicloCompetencia {
 enum CriterioProRata {
   DIAS_CORRIDOS
   MES_COMERCIAL
+}
+
+// ============================================================
+// PLANILHA DE CUSTOS E FORMAÇÃO DE PREÇOS (ESP-003, Igor 07/11/2026)
+// Uma planilha por função do contrato de mão de obra, versionada: a da
+// proposta é a versão 1; cada repactuação/reajuste gera nova versão com
+// data de efeito. É a base da conta vinculada (ESP-006), do simulador de
+// repactuação (ESP-014) e dos relatórios (ESP-019).
+// ============================================================
+
+model PlanilhaCustos {
+  id                       String                @id @default(cuid())
+  contratoId               String
+  contrato                 Contrato              @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  /// Função (item) do contrato a que a planilha se refere. Nulo quando a
+  /// pessoa ainda não vinculou (fica como "a vincular").
+  contratoItemId           String?
+  contratoItem             ContratoItem?         @relation(fields: [contratoItemId], references: [id], onDelete: SetNull)
+  funcao                   String // nome da função como veio da planilha
+  versao                   Int                   @default(1)
+  dataEfeito               DateTime
+  origem                   String // PROPOSTA | REPACTUACAO | REAJUSTE | MANUAL
+  origemRef                String? // nº da apostila/aditivo que originou a versão
+  cct                      String? // texto livre nesta fase; vínculo estruturado na ESP-012
+  totalMensal              Float
+  justificativaDivergencia String? // quando o total difere > R$ 0,05 do item
+  mapeamentoARevisar       Boolean               @default(false)
+  arquivoUrl               String? // /api/arquivo/<id> do PDF/XLSX de origem
+  criadoPorId              String?
+  criadoEm                 DateTime              @default(now())
+  atualizadoEm             DateTime              @updatedAt
+  linhas                   PlanilhaCustosLinha[]
+
+  @@index([contratoId])
+  @@index([contratoItemId])
+}
+
+model PlanilhaCustosLinha {
+  id         String         @id @default(cuid())
+  planilhaId String
+  planilha   PlanilhaCustos @relation(fields: [planilhaId], references: [id], onDelete: Cascade)
+  modulo     String // "1" | "2.1" | "2.2" | "2.3" | "3" | "4" | "5" | "6" | "OUTROS"
+  ordem      Int
+  descricao  String
+  percentual Float?
+  valor      Float
+  aRevisar   Boolean        @default(false)
+
+  @@index([planilhaId])
 }

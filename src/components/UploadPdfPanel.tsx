@@ -27,8 +27,10 @@ const MAX_BYTES_PDF = 25 * 1024 * 1024;
 const MAX_BYTES_LOTE = 20 * 1024 * 1024;
 const MAX_ARQUIVOS = 8;
 
-function ehPdf(file: File): boolean {
-  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+function aceito(file: File, extensoes: string[]): boolean {
+  const nome = file.name.toLowerCase();
+  if (extensoes.some((e) => nome.endsWith(e))) return true;
+  return extensoes.includes(".pdf") && file.type === "application/pdf";
 }
 
 function formatarTamanho(bytes: number): string {
@@ -57,6 +59,8 @@ export function UploadPdfPanel<T>({
   onArquivosSalvos,
   badgeAposExtracao,
   multiplos = false,
+  extensoes = [".pdf"],
+  rotuloLista,
 }: {
   titulo: string;
   descricao: string;
@@ -69,7 +73,13 @@ export function UploadPdfPanel<T>({
   /** ex: (dados) => `${dados.itens.length} item(ns) preenchido(s)` */
   badgeAposExtracao?: (dados: T) => string;
   multiplos?: boolean;
+  /** Extensões aceitas (ESP-003: planilha de custos vem em PDF ou Excel). */
+  extensoes?: string[];
+  /** Frase de rodapé da fila; sem ela vale a do cadastro ("o primeiro é o principal"). */
+  rotuloLista?: string;
 }) {
+  const soPdf = extensoes.length === 1 && extensoes[0] === ".pdf";
+  const rotuloArq = soPdf ? "PDF" : "arquivo";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [extraindo, setExtraindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -116,7 +126,11 @@ export function UploadPdfPanel<T>({
 
   /** Validação no navegador: rejeita ANTES de bater no servidor, pra não gastar IA à toa. */
   function validar(file: File): string | null {
-    if (!ehPdf(file)) return `"${file.name}" não é PDF (${file.type || "tipo desconhecido"}).`;
+    if (!aceito(file, extensoes)) {
+      return soPdf
+        ? `"${file.name}" não é PDF (${file.type || "tipo desconhecido"}).`
+        : `"${file.name}" não é um tipo aceito (${extensoes.join(", ")}).`;
+    }
     if (file.size === 0) return `"${file.name}" está vazio (0 bytes).`;
     if (file.size > MAX_BYTES_PDF) {
       return `"${file.name}" tem ${formatarTamanho(file.size)} — o limite por arquivo é ${formatarTamanho(MAX_BYTES_PDF)}.`;
@@ -206,7 +220,7 @@ export function UploadPdfPanel<T>({
       setErro(
         e instanceof Error
           ? `Falha de comunicação: ${e.message}`
-          : "Falha ao enviar o PDF. Verifique sua conexão e tente novamente.",
+          : `Falha ao enviar o ${rotuloArq}. Verifique sua conexão e tente novamente.`,
       );
     } finally {
       setExtraindo(false);
@@ -217,7 +231,7 @@ export function UploadPdfPanel<T>({
   }
 
   const bytesFila = fila.reduce((s, f) => s + f.size, 0);
-  const textoSoltar = multiplos ? "Solte os PDFs aqui" : "Solte o PDF aqui";
+  const textoSoltar = multiplos ? `Solte os ${rotuloArq}s aqui` : `Solte o ${rotuloArq} aqui`;
 
   return (
     <section
@@ -280,14 +294,14 @@ export function UploadPdfPanel<T>({
             {dragOver
               ? `${textoSoltar}…`
               : multiplos
-              ? "Arraste um ou mais PDFs aqui, ou clique em Escolher arquivos. Todos vão para a aba Anexos."
-              : "Arraste o PDF aqui ou clique no botão abaixo."}
+              ? `Arraste um ou mais ${rotuloArq}s aqui, ou clique em Escolher arquivos. Todos vão para a aba Anexos.`
+              : `Arraste o ${rotuloArq} aqui ou clique no botão abaixo.`}
           </p>
 
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf"
+            accept={soPdf ? "application/pdf" : extensoes.join(",")}
             multiple={multiplos}
             className="hidden"
             onChange={(ev) => receber(ev.target.files)}
@@ -304,7 +318,7 @@ export function UploadPdfPanel<T>({
                   <FileText className="h-4 w-4 shrink-0" style={{ color: "var(--lavender-deep, #6B4FC9)" }} />
                   <span className="min-w-0 flex-1 truncate" style={{ color: "var(--text)" }}>
                     {f.name}
-                    {i === 0 && (
+                    {i === 0 && !rotuloLista && (
                       <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "rgba(197,180,255,0.35)", color: "#4B3A9E" }}>
                         principal
                       </span>
@@ -324,8 +338,9 @@ export function UploadPdfPanel<T>({
               ))}
               <li className="px-1 text-[11px]" style={{ color: "var(--text-mute)" }}>
                 {fila.length} arquivo{fila.length === 1 ? "" : "s"} · {formatarTamanho(bytesFila)} de {formatarTamanho(MAX_BYTES_LOTE)}.
-                {" "}O primeiro da lista é tratado como o documento principal; os outros completam itens, prazos e dados do órgão.
-                {lidos.length > 0 && " Uma nova leitura substitui os campos já preenchidos."}
+                {" "}
+                {rotuloLista ?? "O primeiro da lista é tratado como o documento principal; os outros completam itens, prazos e dados do órgão."}
+                {lidos.length > 0 && !rotuloLista && " Uma nova leitura substitui os campos já preenchidos."}
               </li>
             </ul>
           )}
@@ -376,7 +391,7 @@ export function UploadPdfPanel<T>({
                 ) : (
                   <>
                     <Upload className="h-4 w-4" />
-                    {lidos.length > 0 ? "Outro PDF" : "Anexar PDF"}
+                    {lidos.length > 0 ? `Outro ${rotuloArq}` : `Anexar ${rotuloArq}`}
                   </>
                 )}
               </button>

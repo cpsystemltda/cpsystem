@@ -40,6 +40,7 @@ export type TipoDocumento =
   | "GARANTIA"
   | "NOTIFICACAO"
   | "PROCEDIMENTO"
+  | "PLANILHA_CUSTOS"
   | "DESCONHECIDO";
 
 const ROTAS_FORM: Partial<Record<TipoDocumento, string>> = {
@@ -105,6 +106,7 @@ async function classificar(file: File): Promise<{
           "GARANTIA",
           "NOTIFICACAO",
           "PROCEDIMENTO",
+          "PLANILHA_CUSTOS",
           "DESCONHECIDO",
         ],
       },
@@ -131,6 +133,7 @@ async function classificar(file: File): Promise<{
 - GARANTIA: Apólice de seguro-garantia, fiança bancária, comprovante de caução.
 - NOTIFICACAO: Notificação administrativa (antes de procedimento apuratório). Tipicamente cobrança, intimação ou alerta de órgão.
 - PROCEDIMENTO: Procedimento administrativo apuratório (portaria de abertura, art. 158+).
+- PLANILHA_CUSTOS: Planilha de custos e formação de preços de proposta para serviços com mão de obra (modelo IN SEGES/MP 5/2017: módulos de remuneração, encargos, provisão para rescisão, reposição, insumos, custos indiretos/tributos/lucro), uma por função ou posto.
 - DESCONHECIDO: nenhum dos acima.
 
 REGRAS:
@@ -184,6 +187,7 @@ function mockClassificacao(filename: string): {
   else if (lower.includes("garantia") || lower.includes("apolice") || lower.includes("fianca")) tipo = "GARANTIA";
   else if (lower.includes("notifica")) tipo = "NOTIFICACAO";
   else if (lower.includes("procedimento") || lower.includes("apuratório") || lower.includes("apuratorio") || lower.includes("portaria")) tipo = "PROCEDIMENTO";
+  else if (lower.includes("planilha") || lower.includes("custos") || lower.includes("formacao de precos")) tipo = "PLANILHA_CUSTOS";
   return {
     tipo,
     confidence: tipo === "DESCONHECIDO" ? 0.2 : 0.85,
@@ -264,6 +268,11 @@ export async function processarPdfIaAction(formData: FormData): Promise<Processa
         break;
       case "NOTIFICACAO":
         // Notificação não tem extrator dedicado ainda — passa só o PDF
+        break;
+      case "PLANILHA_CUSTOS":
+        // ESP-003: a planilha pertence a um contrato de mão de obra — a
+        // leitura acontece na aba "Planilha de custos" do contrato, onde a
+        // pessoa confere função por função antes de salvar.
         break;
     }
 

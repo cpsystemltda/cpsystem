@@ -32,6 +32,8 @@ import { ProcedimentosTab } from "@/components/abas/ProcedimentosTab";
 import { AnexosTab, AnotacoesTab } from "@/components/abas/AnexosTab";
 import { RegimeLegalPanel } from "@/components/RegimeLegalPanel";
 import { ValoresMensaisBanner } from "@/components/ValoresMensaisBanner";
+import { PlanilhaCustosTab } from "@/components/abas/PlanilhaCustosTab";
+import { ehModulo, type ItemFuncao, type PlanilhaDto } from "@/lib/planilhaCustos";
 import { isContratoMaoDeObra } from "@/lib/validators";
 import { mesesDaVigencia } from "@/lib/maoDeObra";
 import { avisoDoLimite, prazoMaximoVigencia, prorrogacoesRestantesEstimadas } from "@/lib/regimeLegal";
@@ -89,10 +91,61 @@ export default async function ContratoDetalhePage({
 
   const podeEditar = podeEditarDocumento(usuario, contrato);
   const saldo = await calcularSaldoContrato(contrato.id);
+  const cmo = isContratoMaoDeObra(contrato.tipo);
 
-  const itemIds = (
-    await prisma.contratoItem.findMany({ where: { contratoId: contrato.id }, select: { id: true } })
-  ).map((i) => i.id);
+  const itensTodos = await prisma.contratoItem.findMany({
+    where: { contratoId: contrato.id },
+    select: { id: true, descricao: true, unidade: true, quantidade: true, valorUnitario: true, vigenciaId: true },
+    orderBy: [{ numero: "asc" }, { descricao: "asc" }],
+  });
+  const itemIds = itensTodos.map((i) => i.id);
+
+  // ESP-003: planilhas de custos por função (só em contrato de mão de obra).
+  const vigenciaAtualId = saldo.vigenciaAtual?.vigenciaId ?? null;
+  const itensFuncao: ItemFuncao[] = cmo
+    ? itensTodos.map((i) => ({
+        id: i.id,
+        descricao: i.descricao,
+        unidade: i.unidade,
+        quantidade: i.quantidade,
+        valorUnitario: i.valorUnitario,
+        atual: vigenciaAtualId ? i.vigenciaId === vigenciaAtualId : true,
+      }))
+    : [];
+  const planilhasCustos: PlanilhaDto[] = cmo
+    ? (
+        await prisma.planilhaCustos.findMany({
+          where: { contratoId: contrato.id },
+          include: { linhas: { orderBy: { ordem: "asc" } } },
+          orderBy: [{ funcao: "asc" }, { versao: "desc" }],
+        })
+      ).map((p) => ({
+        id: p.id,
+        contratoItemId: p.contratoItemId,
+        funcao: p.funcao,
+        versao: p.versao,
+        dataEfeito: p.dataEfeito.toISOString(),
+        origem: p.origem,
+        origemRef: p.origemRef,
+        cct: p.cct,
+        totalMensal: p.totalMensal,
+        justificativaDivergencia: p.justificativaDivergencia,
+        mapeamentoARevisar: p.mapeamentoARevisar,
+        arquivoUrl: p.arquivoUrl,
+        criadoEm: p.criadoEm.toISOString(),
+        linhas: p.linhas.map((l) => ({
+          id: l.id,
+          modulo: ehModulo(l.modulo) ? l.modulo : "OUTROS",
+          descricao: l.descricao,
+          percentual: l.percentual,
+          valor: l.valor,
+          aRevisar: l.aRevisar,
+        })),
+      }))
+    : [];
+  const funcoesComPlanilha = new Set(planilhasCustos.map((p) => p.contratoItemId ?? `f:${p.funcao}`)).size;
+  const hojeIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const dataEfeitoPadrao = (saldo.vigenciaAtual?.dataInicio ?? contrato.vigenciaInicio).toISOString().slice(0, 10);
   const parcelaIds = contrato.parcelas.map((p) => p.id);
   const enderecoIds = contrato.enderecosEntrega.map((e) => e.id);
   const pontoFocalIds = contrato.pontosFocais.map((p) => p.id);
@@ -236,6 +289,26 @@ export default async function ContratoDetalhePage({
                 />
               ),
             },
+            // ESP-003: planilha de custos e formação de preços, só em CMO.
+            ...(cmo
+              ? [
+                  {
+                    key: "planilha-custos",
+                    label: "Planilha de custos",
+                    badge: funcoesComPlanilha,
+                    content: (
+                      <PlanilhaCustosTab
+                        contratoId={contrato.id}
+                        itens={itensFuncao}
+                        planilhas={planilhasCustos}
+                        podeEditar={podeEditar}
+                        hojeIso={hojeIso}
+                        dataEfeitoPadrao={dataEfeitoPadrao}
+                      />
+                    ),
+                  },
+                ]
+              : []),
             {
               key: "aditivos",
               label: "Aditivos",

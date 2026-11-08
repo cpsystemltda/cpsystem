@@ -1406,3 +1406,122 @@ export async function extrairRegimeDosAnexos(entrada: File | File[]): Promise<Re
 export function normalizarRegimeIa(v: unknown): "LEI_8666" | "LEI_14133" | "LEI_13303" | null {
   return v === "LEI_8666" || v === "LEI_14133" || v === "LEI_13303" ? v : null;
 }
+
+// ============================================================
+// PLANILHA DE CUSTOS E FORMAÇÃO DE PREÇOS (ESP-003, Igor 07/11/2026)
+// ============================================================
+
+export type LinhaPlanilhaExtraida = {
+  modulo: "1" | "2.1" | "2.2" | "2.3" | "3" | "4" | "5" | "6" | "OUTROS";
+  descricao: string;
+  percentual: number | null;
+  valor: number;
+  aRevisar: boolean;
+};
+
+export type PlanilhaCustosExtraida = {
+  funcao: string;
+  cct: string | null;
+  totalMensal: number;
+  linhas: LinhaPlanilhaExtraida[];
+};
+
+const PROMPT_PLANILHA_CUSTOS = `Os documentos anexados contêm PLANILHAS DE CUSTOS E FORMAÇÃO DE PREÇOS de uma proposta para contrato de serviços com mão de obra (modelo da IN SEGES/MP 5/2017, Anexo VII-D, ou modelo próprio do órgão). Pode haver uma planilha por função/posto (ex.: auxiliar administrativo, vigia 12x36, copeira). Extraia UMA entrada por função.
+
+Para cada função, classifique cada linha de custo em um módulo:
+- "1" Composição da remuneração (salário-base, adicionais de periculosidade/insalubridade/noturno, hora noturna reduzida, outros);
+- "2.1" 13º salário e férias com 1/3;
+- "2.2" GPS, FGTS e outras contribuições (INSS, salário-educação, SAT/RAT, SESC/SESI, SENAC/SENAI, SEBRAE, INCRA, FGTS);
+- "2.3" Benefícios mensais e diários (transporte, auxílio-alimentação, assistência médica, seguro de vida, outros);
+- "3" Provisão para rescisão (aviso prévio indenizado/trabalhado e suas incidências, multa do FGTS);
+- "4" Custo de reposição do profissional ausente (ausências legais, licenças, afastamentos, intervalo intrajornada);
+- "5" Insumos diversos (uniformes, materiais, equipamentos);
+- "6" Custos indiretos, tributos e lucro (custos indiretos/administração, lucro, PIS, COFINS, ISS e outros tributos);
+- "OUTROS" quando não couber em nenhum.
+
+Regras: valores numéricos sem formatação (ponto decimal); "percentual" só quando a linha traz um percentual (ex.: 8.33 para 8,33%), senão null; NÃO invente linhas; subtotais e totais de módulo NÃO são linhas (não os inclua), exceto o total mensal da função, que vai em "totalMensal". Marque aRevisar = true quando a classificação foi por aproximação ou a leitura do número ficou incerta (planilha escaneada, célula cortada). Em "cct", copie a convenção coletiva citada na planilha (sindicato/ano) ou null. Se o arquivo não for planilha de custos, devolva "planilhas" vazio.`;
+
+const SCHEMA_PLANILHA_CUSTOS = {
+  type: "object",
+  properties: {
+    planilhas: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          funcao: { type: "string" },
+          cct: { type: ["string", "null"] },
+          totalMensal: { type: "number" },
+          linhas: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                modulo: { type: "string", enum: ["1", "2.1", "2.2", "2.3", "3", "4", "5", "6", "OUTROS"] },
+                descricao: { type: "string" },
+                percentual: { type: ["number", "null"] },
+                valor: { type: "number" },
+                aRevisar: { type: "boolean" },
+              },
+              required: ["modulo", "descricao", "percentual", "valor", "aRevisar"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["funcao", "cct", "totalMensal", "linhas"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["planilhas"],
+  additionalProperties: false,
+};
+
+/**
+ * Lê planilhas de custos de PDFs e/ou de planilhas Excel já convertidas em
+ * texto (CSV por aba). Os PDFs vão como documento; o texto do Excel vai como
+ * bloco de texto, porque a API não lê .xlsx diretamente.
+ */
+export async function extrairPlanilhasCustos(
+  pdfs: File[],
+  textosExcel: { nome: string; csv: string }[],
+): Promise<PlanilhaCustosExtraida[]> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey.trim() === "") return [];
+  if (pdfs.length === 0 && textosExcel.length === 0) return [];
+
+  const totalPdf = pdfs.reduce((s, f) => s + f.size, 0);
+  if (totalPdf > MAX_BYTES_REQUISICAO) {
+    throw new Error(`Os PDFs somam ${(totalPdf / 1024 / 1024).toFixed(1)} MB; a leitura aceita até 24 MB por vez. Envie menos arquivos.`);
+  }
+  const conteudo: Anthropic.Messages.ContentBlockParam[] = [];
+  for (const [i, f] of pdfs.entries()) {
+    const base64 = Buffer.from(await f.arrayBuffer()).toString("base64");
+    conteudo.push({ type: "text", text: `Arquivo ${i + 1}: "${f.name}"` });
+    conteudo.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } });
+  }
+  for (const t of textosExcel) {
+    conteudo.push({ type: "text", text: `Planilha Excel "${t.nome}" (conteúdo em CSV, uma aba por bloco):\n\n${t.csv.slice(0, 120_000)}` });
+  }
+  conteudo.push({ type: "text", text: PROMPT_PLANILHA_CUSTOS });
+
+  const client = new Anthropic({ apiKey });
+  const inicio = Date.now();
+  const response = await client.messages
+    .stream({
+      model: "claude-haiku-4-5",
+      max_tokens: 32000,
+      system: [{ type: "text", text: SYSTEM_PROMPT_BASE, cache_control: { type: "ephemeral" } }],
+      output_config: { format: { type: "json_schema", schema: SCHEMA_PLANILHA_CUSTOS } },
+      messages: [{ role: "user", content: conteudo }],
+    })
+    .finalMessage();
+  if (response.stop_reason === "max_tokens") {
+    throw new Error("A planilha é grande demais para uma leitura só. Envie uma função por vez.");
+  }
+  const bloco = response.content.find((b) => b.type === "text");
+  if (!bloco || bloco.type !== "text") throw new Error("Modelo não retornou conteúdo textual.");
+  const parsed = JSON.parse(bloco.text) as { planilhas: PlanilhaCustosExtraida[] };
+  console.log(`[extrairPlanilhasCustos] ${parsed.planilhas.length} planilha(s) em ${Date.now() - inicio}ms`);
+  return parsed.planilhas;
+}

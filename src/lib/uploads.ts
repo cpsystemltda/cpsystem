@@ -8,6 +8,9 @@ const TIPOS_PERMITIDOS: Record<string, string> = {
   "application/pdf": ".pdf",
   "image/png": ".png",
   "image/jpeg": ".jpg",
+  // Planilha de custos (ESP-003, Igor 07/11/2026) chega em Excel.
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+  "application/vnd.ms-excel": ".xls",
 };
 
 export type ArquivoSalvo = {
@@ -43,7 +46,7 @@ export async function salvarArquivo(file: File): Promise<ArquivoSalvo> {
 
   const ext = TIPOS_PERMITIDOS[file.type] || extname(file.name).toLowerCase();
   if (!ext || !Object.values(TIPOS_PERMITIDOS).includes(ext)) {
-    throw new Error("Tipo de arquivo não permitido. Use PDF, PNG ou JPG.");
+    throw new Error("Tipo de arquivo não permitido. Use PDF, PNG, JPG ou Excel (.xlsx).");
   }
 
   const { getUsuarioAtual } = await import("@/lib/auth");
