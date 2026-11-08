@@ -195,6 +195,9 @@ export default async function ExecucaoPage({
                 O QUE está em cada etapa — não QUANTO está parado nem HÁ QUANTO
                 TEMPO. O painel responde essas duas, e o atalho fica aqui pra
                 não virar tela paralela que ninguém encontra. */}
+            <Link href="/competencias" className="btn-secondary" title="Execução mensal dos contratos de mão de obra">
+              Competências de mão de obra
+            </Link>
             <Link href="/notas" className="btn-secondary">
               <Receipt className="h-4 w-4" /> Controle de notas
             </Link>

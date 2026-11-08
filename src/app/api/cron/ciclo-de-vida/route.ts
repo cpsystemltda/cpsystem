@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { rodarCicloDeVida } from "@/lib/cicloDeVida";
 import { avisarEquipe } from "@/lib/alertaInterno";
 import { montarLembreteFollowUp, enviarConvitesFollowUp } from "@/lib/followUpClientes";
+import { rodarGeracaoDiaria } from "@/lib/competenciasServer";
 
 /** Segunda-feira no fuso de Brasília — o dia em que a equipe planeja a semana. */
 function ehSegundaBRT(d: Date): boolean {
@@ -71,12 +72,26 @@ export async function GET(req: Request) {
     ).catch(() => {});
   }
 
+  // Competências mensais (ESP-004 RN01): abre a do mês em cada contrato de
+  // mão de obra com valores confirmados. Pega carona aqui pelo mesmo motivo
+  // do follow-up — cron novo é custo de infra.
+  const competencias = await rodarGeracaoDiaria().catch((e) => {
+    console.error("[ciclo-de-vida] geração de competências falhou:", e);
+    return { contratos: 0, criadas: 0, detalhes: [`falhou: ${e instanceof Error ? e.message : String(e)}`] };
+  });
+  if (competencias.criadas > 0) {
+    await avisarEquipe(
+      `📅 *Competências do mês abertas*\n\n` + competencias.detalhes.map((d) => `▫ ${d}`).join("\n"),
+    ).catch(() => {});
+  }
+
   return NextResponse.json({
     ok: true,
     duracaoMs: Date.now() - inicio,
     resumo: r,
     followUp: lembreteFollowUp ? "lembrete enviado" : "sem lembrete",
     convites,
+    competencias,
     executadoEm: new Date().toISOString(),
   });
 }

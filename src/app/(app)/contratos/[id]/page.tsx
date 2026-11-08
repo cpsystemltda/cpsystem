@@ -34,6 +34,15 @@ import { RegimeLegalPanel } from "@/components/RegimeLegalPanel";
 import { ValoresMensaisBanner } from "@/components/ValoresMensaisBanner";
 import { PlanilhaCustosTab } from "@/components/abas/PlanilhaCustosTab";
 import { ehModulo, type ItemFuncao, type PlanilhaDto } from "@/lib/planilhaCustos";
+import { CompetenciasTab } from "@/components/abas/CompetenciasTab";
+import {
+  carregarContextoCompetencias,
+  competenciasFaltantes,
+  contratoGeraCompetencias,
+  listarCompetenciasDoContrato,
+  precisaDecidirRetroativas,
+  type ResumoCompetencia,
+} from "@/lib/competenciasServer";
 import { isContratoMaoDeObra } from "@/lib/validators";
 import { mesesDaVigencia } from "@/lib/maoDeObra";
 import { avisoDoLimite, prazoMaximoVigencia, prorrogacoesRestantesEstimadas } from "@/lib/regimeLegal";
@@ -146,6 +155,22 @@ export default async function ContratoDetalhePage({
   const funcoesComPlanilha = new Set(planilhasCustos.map((p) => p.contratoItemId ?? `f:${p.funcao}`)).size;
   const hojeIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const dataEfeitoPadrao = (saldo.vigenciaAtual?.dataInicio ?? contrato.vigenciaInicio).toISOString().slice(0, 10);
+
+  // ESP-004: competências mensais (só em CMO).
+  let competencias: ResumoCompetencia[] = [];
+  let geraCompetencias = false;
+  let precisaDecidir = false;
+  let faltantes = 0;
+  if (cmo) {
+    const ctx = await carregarContextoCompetencias(contrato.id);
+    if (ctx) {
+      const hoje = new Date();
+      geraCompetencias = contratoGeraCompetencias(ctx);
+      [competencias, precisaDecidir] = await Promise.all([listarCompetenciasDoContrato(contrato.id, hoje), precisaDecidirRetroativas(ctx, hoje)]);
+      if (geraCompetencias && !precisaDecidir) faltantes = (await competenciasFaltantes(ctx, hoje)).length;
+    }
+  }
+  const competenciasAtencao = competencias.filter((c) => c.status === "A_CONFIRMAR" || c.empenhoInsuficiente || (c.atrasoDias > 0 && c.status !== "PAGA")).length;
   const parcelaIds = contrato.parcelas.map((p) => p.id);
   const enderecoIds = contrato.enderecosEntrega.map((e) => e.id);
   const pontoFocalIds = contrato.pontosFocais.map((p) => p.id);
@@ -286,9 +311,43 @@ export default async function ContratoDetalhePage({
                   contratoId={contrato.id}
                   podeIniciarManual={podeEditar && !isContratoNaoContinuado(contrato.tipo)}
                   maoDeObra={saldo.maoDeObra}
+                  alteracaoPostos={
+                    cmo && podeEditar
+                      ? {
+                          contratoId: contrato.id,
+                          aditivos: contrato.termosAditivos.map((a) => ({ id: a.id, numero: a.numero, dataAssinatura: a.dataAssinatura.toISOString() })),
+                          hojeIso,
+                        }
+                      : undefined
+                  }
                 />
               ),
             },
+            // ESP-004: competências mensais, só em CMO.
+            ...(cmo
+              ? [
+                  {
+                    key: "competencias",
+                    label: "Competências",
+                    badge: competenciasAtencao || competencias.length,
+                    content: (
+                      <CompetenciasTab
+                        contratoId={contrato.id}
+                        competencias={competencias}
+                        podeEditar={podeEditar}
+                        geraCompetencias={geraCompetencias}
+                        precisaDecidir={precisaDecidir}
+                        faltantes={faltantes}
+                        suspensao={{
+                          inicio: contrato.suspensaoInicio ? contrato.suspensaoInicio.toISOString() : null,
+                          fim: contrato.suspensaoFim ? contrato.suspensaoFim.toISOString() : null,
+                        }}
+                        hojeIso={hojeIso}
+                      />
+                    ),
+                  },
+                ]
+              : []),
             // ESP-003: planilha de custos e formação de preços, só em CMO.
             ...(cmo
               ? [
@@ -403,7 +462,9 @@ export default async function ContratoDetalhePage({
             },
             {
               key: "empenhos",
-              label: "Execuções",
+              // Em contrato de mão de obra a execução é a competência; o
+              // empenho fica como documento orçamentário vinculado (RN06).
+              label: cmo ? "Empenhos" : "Execuções",
               badge: contrato.empenhos.length,
               content: <EmpenhosVinculados contratoId={contrato.id} empenhos={contrato.empenhos} />,
             },

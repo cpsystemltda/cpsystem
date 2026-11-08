@@ -71,14 +71,34 @@ function camposMaoDeObra(v: ContratoInput, cmo: boolean) {
       diaFechamentoCompetencia: null,
       termoInicialPagamento: null,
       termoInicialPagamentoOutro: null,
+      cicloCompetencia: null,
+      criterioProRata: null,
+      retencoesPadrao: undefined,
     };
   }
+  const ciclo = v.cicloCompetencia ?? "MES_CIVIL";
+  // ESP-004 RN05: percentuais sugeridos na NF de cada competência. Só grava
+  // quando a pessoa informou algum; senão o padrão (INSS 11%) vale.
+  const informou = [v.retencaoInssPct, v.retencaoIrPct, v.retencaoCsllPisCofinsPct, v.retencaoIssPct].some((p) => p != null);
+  const retencoesPadrao = informou
+    ? [
+        { codigo: "INSS", rotulo: "INSS (retenção de 11%, Lei 8.212, art. 31)", pct: v.retencaoInssPct ?? 0 },
+        { codigo: "IR", rotulo: "IR na fonte", pct: v.retencaoIrPct ?? 0 },
+        { codigo: "CSLL_PIS_COFINS", rotulo: "CSLL / PIS / COFINS", pct: v.retencaoCsllPisCofinsPct ?? 0 },
+        { codigo: "ISS", rotulo: "ISS", pct: v.retencaoIssPct ?? 0 },
+        { codigo: "CONTA_VINCULADA", rotulo: "Conta vinculada (verbas trabalhistas)", pct: 0 },
+      ]
+    : undefined;
   return {
     inicioPrestacaoServicos: v.inicioPrestacaoServicos ?? v.vigenciaInicio,
-    diaFechamentoCompetencia: v.diaFechamentoCompetencia ?? null,
+    // Ciclo por aniversário dispensa dia de fechamento.
+    diaFechamentoCompetencia: ciclo === "ANIVERSARIO" ? null : v.diaFechamentoCompetencia ?? null,
     termoInicialPagamento: v.termoInicialPagamento ?? null,
     termoInicialPagamentoOutro:
       v.termoInicialPagamento === "OUTRO" ? v.termoInicialPagamentoOutro?.trim() || null : null,
+    cicloCompetencia: ciclo,
+    criterioProRata: v.criterioProRata ?? "DIAS_CORRIDOS",
+    retencoesPadrao,
   };
 }
 import { salvarArquivo } from "@/lib/uploads";

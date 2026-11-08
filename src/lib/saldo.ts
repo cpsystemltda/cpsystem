@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ehValorMensal, mesesDaVigencia, colaboradoresNecessarios } from "@/lib/maoDeObra";
+import { diaUtc, fimEfetivoDaVigencia, itensVigentesEm } from "@/lib/competencias";
+import { executadoPorVigencia } from "@/lib/competenciasServer";
 
 export type SaldoItem = {
   // Item da Ata — id no campo ataItemId.
@@ -639,9 +641,16 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
       unidadeMaoDeObra: true,
       colaboradoresPorPosto: true,
       localPrestacao: true,
+      vigenteDe: true,
+      vigenteAte: true,
     },
     orderBy: { id: "asc" },
   });
+
+  // ESP-004 RN11: em contrato de mão de obra o executado é o faturado das
+  // competências com NF emitida, não o que os empenhos registram.
+  const executadoCmo = maoDeObra ? await executadoPorVigencia(contratoId) : null;
+  const hojeDia = diaUtc(new Date());
 
   const empenhoItens = await prisma.empenhoItem.findMany({
     where: { empenho: { contratoId } },
@@ -656,7 +665,15 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
   });
 
   const saldosPorVig: SaldoVigenciaContrato[] = vigencias.map((vig) => {
-    const itensDaVig = itensTodos.filter((it) => it.vigenciaId === vig.id);
+    // ESP-002 RN07: postos têm versão por data de efeito; o quadro mostra a
+    // versão vigente hoje (ou no fim da vigência, se ela já acabou).
+    const todosDaVig = itensTodos.filter((it) => it.vigenciaId === vig.id);
+    let itensDaVig = todosDaVig;
+    if (maoDeObra) {
+      const fimEf = fimEfetivoDaVigencia(vig.dataInicio, vig.dataFim);
+      const ref = hojeDia < diaUtc(vig.dataInicio) ? diaUtc(vig.dataInicio) : hojeDia > fimEf ? fimEf : hojeDia;
+      itensDaVig = itensVigentesEm(todosDaVig, ref);
+    }
     const empenhosDaVig = empenhoItens.filter((e) => e.empenho.vigenciaId === vig.id);
 
     // Alocacao 1-para-1: cada EmpenhoItem consome 1 ContratoItem.
@@ -715,7 +732,7 @@ export async function calcularSaldoContrato(contratoId: string): Promise<SaldoCo
     const somaItens = itensSaldo.reduce((s, i) => s + i.valorTotal, 0);
     const meses = maoDeObra ? mesesDaVigencia(vig.dataInicio, vig.dataFim) : undefined;
     const valorTotal = maoDeObra ? Math.round(somaItens * (meses ?? 0) * 100) / 100 : somaItens;
-    const valorUsado = itensSaldo.reduce((s, i) => s + i.valorUsado, 0);
+    const valorUsado = executadoCmo ? executadoCmo.get(vig.id) ?? 0 : itensSaldo.reduce((s, i) => s + i.valorUsado, 0);
 
     return {
       vigenciaId: vig.id,

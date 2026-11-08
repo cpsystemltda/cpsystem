@@ -1183,27 +1183,38 @@ model Contrato {
   // ── Módulo Terceirização (Igor, ESP-001/002/004, 07/11/2026) ──
   /// Regime legal (ESP-001). Obrigatório no formulário; nulo em contrato
   /// antigo até a pessoa confirmar — a lista marca "Regime pendente".
-  regimeLegal                 RegimeLegal?
-  regimeLegalOutro            String?
+  regimeLegal                  RegimeLegal?
+  regimeLegalOutro             String?
   /// Sugestão da IA (preâmbulo/aditivos) e o trecho que a justificou. Só
   /// vira `regimeLegal` com confirmação do usuário (RN02).
-  regimeSugerido              RegimeLegal?
-  regimeSugeridoTrecho        String?
-  regimeConfirmadoEm          DateTime?
+  regimeSugerido               RegimeLegal?
+  regimeSugeridoTrecho         String?
+  regimeConfirmadoEm           DateTime?
   /// RN07: a contagem do limite de prorrogação é editável (nova licitação
   /// interrompeu a contagem; regulamento do ente com limite próprio).
-  inicioContagemLimite        DateTime?
-  limiteProrrogacaoMeses      Int?
+  inicioContagemLimite         DateTime?
+  limiteProrrogacaoMeses       Int?
   /// RN06 — só em contrato de mão de obra, no lugar dos campos de entrega.
-  inicioPrestacaoServicos     DateTime?
-  diaFechamentoCompetencia    Int? // null = último dia do mês
-  termoInicialPagamento       TermoInicialPagamento?
-  termoInicialPagamentoOutro  String?
+  inicioPrestacaoServicos      DateTime?
+  diaFechamentoCompetencia     Int? // null = último dia do mês
+  termoInicialPagamento        TermoInicialPagamento?
+  termoInicialPagamentoOutro   String?
   /// ESP-002 RN06: a pessoa confirmou que os valores dos itens são mensais.
-  valoresMensaisConfirmadosEm DateTime?
+  valoresMensaisConfirmadosEm  DateTime?
   /// ESP-004: ciclo da competência e pro rata do primeiro/último mês.
-  cicloCompetencia            CicloCompetencia?
-  criterioProRata             CriterioProRata?
+  cicloCompetencia             CicloCompetencia?
+  criterioProRata              CriterioProRata?
+  /// ESP-004 RN05: percentuais de retenção sugeridos na NF de cada
+  /// competência — [{codigo, rotulo, pct}]. Null = padrão (INSS 11%).
+  retencoesPadrao              Json?
+  /// ESP-004 RN08: resposta a "Gerar as competências já transcorridas?".
+  /// Enquanto null, a rotina diária só abre a competência corrente.
+  competenciasRetroativasEm    DateTime?
+  competenciasRetroativasGerar Boolean?
+  /// ESP-004 RN10: suspensão registrada — nenhuma competência nasce no período.
+  suspensaoInicio              DateTime?
+  suspensaoFim                 DateTime?
+  competencias                 Competencia[]
 
   // Valor inicial do contrato (somatório de itens no momento da criação).
   // Preservado pra exibir "Valor Inicial" mesmo após aditivos com reajuste.
@@ -1317,6 +1328,16 @@ model ContratoItem {
   jornada               String? // "44h semanais", "12x36 diurno"...
   localPrestacao        String?
   colaboradoresPorPosto Int?
+
+  // ESP-002 RN07 / ESP-004: acréscimo ou supressão de postos por aditivo
+  // gera nova versão do item com data de efeito. Item sem `vigenteDe` vale
+  // desde o início da vigência; sem `vigenteAte`, até o fim dela. As
+  // competências a partir de `vigenteDe` usam a versão nova.
+  vigenteDe            DateTime?
+  vigenteAte           DateTime?
+  substituiItemId      String?
+  alteradoPorAditivoId String?
+  alteradoPorAditivo   TermoAditivo? @relation("ItensAlteradosPorAditivo", fields: [alteradoPorAditivoId], references: [id], onDelete: SetNull)
 
   contratoId String
   contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -1514,8 +1535,9 @@ model Empenho {
   vigenciaId String?
   vigencia   Vigencia? @relation(fields: [vigenciaId], references: [id], onDelete: SetNull)
 
-  criadoPorId String?
-  criadoPor   Usuario? @relation("EmpenhosCriados", fields: [criadoPorId], references: [id])
+  criadoPorId  String?
+  criadoPor    Usuario?             @relation("EmpenhosCriados", fields: [criadoPorId], references: [id])
+  competencias CompetenciaEmpenho[]
 
   /// Colaborador da EMPRESA que acompanha este fornecimento.
   ///
@@ -1705,6 +1727,7 @@ model TermoAditivo {
   // Vigência que este aditivo originou (quando alterou prazo de vigência).
   // Lado inverso de Vigencia.termoAditivoId (relação 1:1 opcional).
   vigenciaOriginada Vigencia?
+  itensAlterados    ContratoItem[] @relation("ItensAlteradosPorAditivo")
 
   @@index([contratoId])
   @@index([empenhoId])
@@ -1740,6 +1763,7 @@ model Vigencia {
   contratoItens ContratoItem[]
   ataItens      AtaItem[]
   empenhos      Empenho[]
+  competencias  Competencia[]
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @default(now()) @updatedAt
@@ -3179,4 +3203,105 @@ model PlanilhaCustosLinha {
   aRevisar   Boolean        @default(false)
 
   @@index([planilhaId])
+}
+
+// ============================================================
+// COMPETÊNCIAS MENSAIS (ESP-004, Igor 07/11/2026)
+// Em contrato de mão de obra a execução é mensal e nasce sozinha: uma
+// competência por mês (ou por ciclo de aniversário), com valor previsto
+// pro rata nas pontas, etapas de faturamento e vínculo com empenho.
+// ============================================================
+
+enum StatusCompetencia {
+  A_CONFIRMAR // gerada retroativamente (RN08): a pessoa preenche as etapas
+  EM_EXECUCAO
+  MEDICAO // medição/glosas registradas (ESP-005)
+  DOC_TRABALHISTA // documentação trabalhista enviada (ESP-009; manual até lá)
+  NF_EMITIDA
+  NF_ENCAMINHADA
+  ATESTADA
+  PAGA
+}
+
+enum TipoCompetencia {
+  REGULAR
+  COMPLEMENTAR // diferença retroativa de repactuação/reajuste (RN09)
+}
+
+model Competencia {
+  id         String    @id @default(cuid())
+  contratoId String
+  contrato   Contrato  @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  vigenciaId String?
+  vigencia   Vigencia? @relation(fields: [vigenciaId], references: [id], onDelete: SetNull)
+
+  tipo          TipoCompetencia @default(REGULAR)
+  competencia   String // "2026-05"
+  periodoInicio DateTime
+  periodoFim    DateTime // inclusivo
+  diasPeriodo   Int
+  diasBase      Int // dias do ciclo cheio (ou 30 no mês comercial)
+
+  valorMensalBase      Float // valor mensal vigente usado no cálculo
+  valorPrevisto        Float
+  ajustes              Float   @default(0)
+  ajustesJustificativa String?
+  valorGlosas          Float   @default(0) // ESP-005
+  valorFaturado        Float? // fixado na emissão da NF
+  retencoes            Json? // [{codigo, rotulo, pct, valor}]
+  valorRetencoes       Float   @default(0)
+  valorLiquidoEsperado Float?
+  valorRecebido        Float?
+
+  status StatusCompetencia @default(EM_EXECUCAO)
+
+  // Etapas (RN04): data, responsável e anexo.
+  dataMedicao               DateTime?
+  responsavelMedicao        String?
+  arquivoMedicao            String?
+  dataDocTrabalhista        DateTime?
+  responsavelDocTrabalhista String?
+  arquivoDocTrabalhista     String?
+  dataNfEmitida             DateTime?
+  numeroNf                  String?
+  responsavelNfEmitida      String?
+  arquivoNfEmitida          String?
+  dataNfEncaminhada         DateTime?
+  responsavelNfEncaminhada  String?
+  arquivoNfEncaminhada      String?
+  dataAteste                DateTime?
+  responsavelAteste         String?
+  arquivoAteste             String?
+  dataPagamento             DateTime?
+  responsavelPagamento      String?
+  arquivoPagamento          String?
+  prazoPagamento            DateTime? // RN07: termo inicial + prazo do contrato
+
+  complementarRef     String? // apostila/aditivo que originou (RN09)
+  complementarDetalhe Json? // [{competencia, valorAnterior, valorNovo, diferenca}]
+
+  criadaAutomaticamente Boolean  @default(true)
+  observacoes           String?
+  criadoPorId           String?
+  criadoEm              DateTime @default(now())
+  atualizadoEm          DateTime @updatedAt
+
+  empenhos CompetenciaEmpenho[]
+
+  @@index([contratoId, competencia])
+  @@index([vigenciaId])
+  @@index([status])
+}
+
+/// RN06: competência ↔ empenho, com rateio quando há mais de um (caso de borda).
+model CompetenciaEmpenho {
+  id            String      @id @default(cuid())
+  competenciaId String
+  competencia   Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  empenhoId     String
+  empenho       Empenho     @relation(fields: [empenhoId], references: [id], onDelete: Cascade)
+  valor         Float? // parte desta competência coberta por este empenho; null = tudo
+
+  @@unique([competenciaId, empenhoId])
+  @@index([empenhoId])
 }

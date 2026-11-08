@@ -80,7 +80,7 @@ export function KpisSaldoVigencia({ saldo }: { saldo: SaldoAta | SaldoContrato }
             <Stat
               titulo="Executado"
               valor={brl(vig.valorUsado)}
-              sub={`${vig.percentualUsado.toFixed(1)}% da vigência`}
+              sub={`${vig.percentualUsado.toFixed(1)}% da vigência · competências com NF`}
               icone={TrendingUp}
             />
             <Stat titulo="A executar" valor={brl(vig.valorDisponivel)} cor="emerald" icone={TrendingDown} />

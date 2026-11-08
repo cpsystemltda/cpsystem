@@ -80,6 +80,9 @@ export type ContratoValoresIniciais = {
   diaFechamentoCompetencia?: number | null;
   termoInicialPagamento?: string | null;
   termoInicialPagamentoOutro?: string | null;
+  cicloCompetencia?: string | null;
+  criterioProRata?: string | null;
+  retencoesPadrao?: { codigo: string; pct: number | null }[] | null;
   itens: ItemInicial[];
   parcelas: {
     id: string;
@@ -130,6 +133,12 @@ export default function NovoContratoForm({
   const [regimeTrecho, setRegimeTrecho] = useState<string>(vi?.regimeLegal ? "" : vi?.regimeSugeridoTrecho ?? "");
   const [regimeConfirmado, setRegimeConfirmado] = useState<boolean>(!!vi?.regimeLegal);
   const [termoInicialPagamento, setTermoInicialPagamento] = useState<string>(vi?.termoInicialPagamento ?? "ATESTE_NF");
+  // ESP-004: ciclo da competência (mês civil × aniversário) e retenções sugeridas.
+  const [cicloCompetencia, setCicloCompetencia] = useState<string>(vi?.cicloCompetencia ?? "MES_CIVIL");
+  const pctInicial = (codigo: string, padrao: number) => {
+    const r = vi?.retencoesPadrao?.find((x) => x.codigo === codigo);
+    return r && r.pct != null ? String(r.pct).replace(".", ",") : vi?.retencoesPadrao ? "0" : String(padrao);
+  };
   const [modalidadeEntrega, setModalidadeEntrega] = useState<"INTEGRAL" | "PARCELADA" | "SOB_DEMANDA">(
     vi?.modalidadeEntrega ?? "INTEGRAL",
   );
@@ -817,15 +826,55 @@ export default function NovoContratoForm({
                   defaultValue={vi?.inicioPrestacaoServicos ?? vigenciaInicio}
                 />
                 <Select
-                  label="Fechamento da competência"
-                  name="diaFechamentoCompetencia"
+                  label="Ciclo da competência"
+                  name="cicloCompetencia"
                   span={1}
                   options={[
-                    { value: "ULTIMO", label: "Último dia do mês" },
-                    ...Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `Dia ${i + 1}` })),
+                    { value: "MES_CIVIL", label: "Mês civil (padrão)" },
+                    { value: "ANIVERSARIO", label: "Aniversário do contrato (ex.: dia 9 a dia 8)" },
                   ]}
-                  defaultValue={vi?.diaFechamentoCompetencia?.toString() ?? "ULTIMO"}
+                  value={cicloCompetencia}
+                  onChange={(ev) => setCicloCompetencia(ev.currentTarget.value)}
                 />
+                {cicloCompetencia === "MES_CIVIL" && (
+                  <Select
+                    label="Fechamento da competência"
+                    name="diaFechamentoCompetencia"
+                    span={1}
+                    options={[
+                      { value: "ULTIMO", label: "Último dia do mês" },
+                      ...Array.from({ length: 28 }, (_, i) => ({ value: String(i + 1), label: `Dia ${i + 1}` })),
+                    ]}
+                    defaultValue={vi?.diaFechamentoCompetencia?.toString() ?? "ULTIMO"}
+                  />
+                )}
+                <Select
+                  label="Pro rata no 1º e no último mês"
+                  name="criterioProRata"
+                  span={1}
+                  options={[
+                    { value: "DIAS_CORRIDOS", label: "Dias corridos do mês (padrão)" },
+                    { value: "MES_COMERCIAL", label: "Mês comercial de 30 dias" },
+                  ]}
+                  defaultValue={vi?.criterioProRata ?? "DIAS_CORRIDOS"}
+                />
+                <div className="col-span-4">
+                  <span
+                    className="mb-1.5 block text-[11px] font-bold uppercase"
+                    style={{ letterSpacing: "0.16em", color: "var(--text-mute)" }}
+                  >
+                    Retenções sugeridas na NF de cada competência (%)
+                  </span>
+                  <div className="grid grid-cols-4 gap-3">
+                    <Field label="INSS (Lei 8.212, art. 31)" name="retencaoInssPct" inputMode="decimal" span={1} defaultValue={pctInicial("INSS", 11)} />
+                    <Field label="IR na fonte" name="retencaoIrPct" inputMode="decimal" span={1} defaultValue={pctInicial("IR", 0)} />
+                    <Field label="CSLL / PIS / COFINS" name="retencaoCsllPisCofinsPct" inputMode="decimal" span={1} defaultValue={pctInicial("CSLL_PIS_COFINS", 0)} />
+                    <Field label="ISS" name="retencaoIssPct" inputMode="decimal" span={1} defaultValue={pctInicial("ISS", 0)} />
+                  </div>
+                  <span className="mt-1 block text-[11px] text-slate-500">
+                    Só sugestão: o sistema não calcula tributos. Na nota de cada mês você confirma o percentual ou informa o valor retido.
+                  </span>
+                </div>
               </>
             )}
 

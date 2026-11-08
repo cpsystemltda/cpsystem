@@ -11,6 +11,14 @@ import { IniciarNovaVigenciaModal } from "@/components/IniciarNovaVigenciaModal"
 import { ExcluirVigenciaBotao } from "@/components/ExcluirVigenciaBotao";
 import { ItensAtaTab } from "@/components/abas/ItensAtaTab";
 import { ItensContratoTab } from "@/components/abas/ItensContratoTab";
+import { AlterarPostosForm } from "@/components/AlterarPostosForm";
+
+/** ESP-002 RN07: dados para o formulário de acréscimo/supressão de postos. */
+export type AlteracaoPostosProps = {
+  contratoId: string;
+  aditivos: { id: string; numero: string; dataAssinatura: string }[];
+  hojeIso: string;
+};
 
 // Painel da aba "Saldo de itens" — mostra UMA tabela por vigência, em
 // sequência (uma embaixo da outra), além do bloco "Histórico de
@@ -31,6 +39,7 @@ export function SaldoVigenciasPanel({
   ataId,
   podeIniciarManual,
   maoDeObra = false,
+  alteracaoPostos,
 }: {
   saldo: SaldoAta | SaldoContrato;
   // Decide qual tabela renderizar internamente (em vez de receber função
@@ -41,6 +50,8 @@ export function SaldoVigenciasPanel({
   podeIniciarManual?: boolean;
   /** Contrato de mão de obra com valores mensais (ESP-002): quadro de postos. */
   maoDeObra?: boolean;
+  /** Presente quando a pessoa pode registrar acréscimo/supressão de postos. */
+  alteracaoPostos?: AlteracaoPostosProps;
 }) {
   const temMultiplasVigencias = saldo.vigencias.length > 1;
 
@@ -85,6 +96,7 @@ export function SaldoVigenciasPanel({
           // Mesma permissão de quem pode iniciar — quem cria, desfaz.
           podeExcluir={!!podeIniciarManual && !v.termoAditivoId && v.ordem > 1}
           temSeguintes={saldo.vigencias.some((o) => o.ordem > v.ordem)}
+          alteracaoPostos={alteracaoPostos}
         />
       ))}
 
@@ -178,13 +190,16 @@ function BlocoVigencia({
   tipoItens,
   podeExcluir,
   temSeguintes,
+  alteracaoPostos,
 }: {
   vigencia: SaldoVigencia | SaldoVigenciaContrato;
   temMultiplas: boolean;
   tipoItens: "ATA" | "CONTRATO";
   podeExcluir: boolean;
   temSeguintes: boolean;
+  alteracaoPostos?: AlteracaoPostosProps;
 }) {
+  const ehMaoDeObra = "valorMensal" in vigencia && vigencia.valorMensal != null;
   return (
     <section
       className="rounded-2xl border border-slate-200"
@@ -259,8 +274,23 @@ function BlocoVigencia({
         <TabelaItens
           tipoItens={tipoItens}
           itens={vigencia.itens}
-          maoDeObra={"valorMensal" in vigencia && vigencia.valorMensal != null}
+          maoDeObra={ehMaoDeObra}
         />
+        {ehMaoDeObra && alteracaoPostos && vigencia.status !== "ENCERRADA" && tipoItens === "CONTRATO" && (
+          <AlterarPostosForm
+            contratoId={alteracaoPostos.contratoId}
+            vigenciaId={vigencia.vigenciaId}
+            itens={(vigencia.itens as { contratoItemId: string; descricao: string; unidade: string; quantidadeTotal: number; valorUnitario: number }[]).map((i) => ({
+              id: i.contratoItemId,
+              descricao: i.descricao,
+              unidade: i.unidade,
+              quantidade: i.quantidadeTotal,
+              valorUnitario: i.valorUnitario,
+            }))}
+            aditivos={alteracaoPostos.aditivos}
+            hojeIso={alteracaoPostos.hojeIso}
+          />
+        )}
       </div>
     </section>
   );

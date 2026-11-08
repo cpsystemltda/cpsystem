@@ -528,6 +528,12 @@ const parcelaSchema = z.object({
   valorEstimado: z.coerce.number().nonnegative().optional(),
 });
 
+/** Percentual opcional (0–100), aceitando vírgula; vazio = não informado. */
+const pctOpcional = z.preprocess(
+  (v) => (v === "" || v == null ? undefined : typeof v === "string" ? v.replace(",", ".") : v),
+  z.coerce.number().min(0).max(100).optional(),
+);
+
 export const novoContratoSchema = contratacaoBase
   .extend({
     ataId: z.string().optional(),
@@ -592,6 +598,20 @@ export const novoContratoSchema = contratacaoBase
       z.enum(termosIniciaisPagamento).optional(),
     ),
     termoInicialPagamentoOutro: z.string().optional(),
+    // ESP-004: ciclo da competência, critério de pro rata e retenções
+    // sugeridas na NF (percentuais; o sistema não calcula tributos).
+    cicloCompetencia: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.enum(["MES_CIVIL", "ANIVERSARIO"]).optional(),
+    ),
+    criterioProRata: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.enum(["DIAS_CORRIDOS", "MES_COMERCIAL"]).optional(),
+    ),
+    retencaoInssPct: pctOpcional,
+    retencaoIrPct: pctOpcional,
+    retencaoCsllPisCofinsPct: pctOpcional,
+    retencaoIssPct: pctOpcional,
   })
   .superRefine((v, ctx) => {
     const cmo = isContratoMaoDeObra(v.tipo);
