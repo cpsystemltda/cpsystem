@@ -60,6 +60,7 @@ model Conta {
   retencaoDadosColaboradoresAnos Int                @default(5)
   adendoLgpdVersao               String?
   aceitesAdendoLgpd              AceiteAdendoLgpd[]
+  colaboradores                  Colaborador[]
   // Cupom aplicado no signup (trial estendido + analista vinculado). Regina 09/07.
   cupomAplicadoId                String?
   cupomAplicado                  Cupom?             @relation(fields: [cupomAplicadoId], references: [id])
@@ -290,6 +291,9 @@ enum TipoNotificacaoWhatsApp {
   // publicada que não está cadastrada aqui. Um aviso por empresa por rodada,
   // e cada fato é anunciado uma única vez (marca `avisadoEm` na origem).
   PORTAL_TRANSPARENCIA
+  /// ESP-007 RN07 (Igor 07/11/2026) — aviso ao Admin 30 dias antes da
+  /// anonimização de colaboradores pelo prazo de retenção.
+  LGPD_ANONIMIZACAO
   /// Igor 30/10 — convite para a conversa de follow-up quando o cliente entra
   /// na janela do marco (30/60/90/180 dias e trimestral). Um por marco, pela
   /// chave (usuarioId, tipo, referenciaId="convite-<contaId>-<marco>"). A
@@ -1231,6 +1235,7 @@ model Contrato {
   prazoAlertaLiberacaoDias     Int? // RN06; null = 30
   pedidosLiberacao             PedidoLiberacaoVerbas[]
   extratosContaVinculada       ExtratoContaVinculada[]
+  alocacoes                    Alocacao[]
 
   // Valor inicial do contrato (somatório de itens no momento da criação).
   // Preservado pra exibir "Valor Inicial" mesmo após aditivos com reajuste.
@@ -1355,6 +1360,7 @@ model ContratoItem {
   alteradoPorAditivoId String?
   alteradoPorAditivo   TermoAditivo? @relation("ItensAlteradosPorAditivo", fields: [alteradoPorAditivoId], references: [id], onDelete: SetNull)
   glosas               Glosa[]
+  alocacoes            Alocacao[]
 
   contratoId String
   contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
@@ -3493,4 +3499,73 @@ model AceiteAdendoLgpd {
   aceitoEm  DateTime @default(now())
 
   @@index([contaId, versao])
+}
+
+// ============================================================
+// COLABORADORES E ALOCAÇÃO EM POSTOS (ESP-008, Igor 07/11/2026)
+// Cadastro da empresa, reaproveitável em vários contratos. CPF cifrado
+// (AES-256-GCM) + hash com pimenta para busca/duplicidade + máscara para
+// listas. Sem nenhum campo de saúde (ESP-007 RN03).
+// ============================================================
+
+enum SituacaoColaborador {
+  ATIVO
+  AFASTADO
+  DESLIGADO
+}
+
+enum TipoAlocacao {
+  TITULAR
+  COBERTURA
+  VOLANTE
+}
+
+model Colaborador {
+  id                  String              @id @default(cuid())
+  contaId             String
+  conta               Conta               @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  nome                String
+  cpfCifrado          String
+  cpfHash             String
+  cpfMascarado        String // ***.456.789-**
+  dataAdmissao        DateTime
+  funcao              String
+  cbo                 String?
+  jornada             String?
+  situacao            SituacaoColaborador @default(ATIVO)
+  dataDesligamento    DateTime?
+  telefone            String?
+  /// Readmissão: novo vínculo aponta para o anterior (histórico preservado).
+  vinculoAnteriorId   String?
+  anonimizadoEm       DateTime?
+  avisoAnonimizacaoEm DateTime?
+  criadoPorId         String?
+  criadoEm            DateTime            @default(now())
+  atualizadoEm        DateTime            @updatedAt
+  alocacoes           Alocacao[]
+
+  @@index([contaId, situacao])
+  @@index([contaId, cpfHash])
+}
+
+/// RN03: quem ocupa cada posto, com histórico — correção gera nova linha.
+model Alocacao {
+  id             String        @id @default(cuid())
+  colaboradorId  String
+  colaborador    Colaborador   @relation(fields: [colaboradorId], references: [id], onDelete: Cascade)
+  contratoId     String
+  contrato       Contrato      @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  contratoItemId String?
+  contratoItem   ContratoItem? @relation(fields: [contratoItemId], references: [id], onDelete: SetNull)
+  tipo           TipoAlocacao  @default(TITULAR)
+  dataInicio     DateTime
+  dataFim        DateTime?
+  motivoFim      String? // DESLIGAMENTO | TROCA | CORRECAO | FIM_COBERTURA | OUTRO
+  observacao     String?
+  criadoPorId    String?
+  criadoEm       DateTime      @default(now())
+
+  @@index([contratoId, dataInicio])
+  @@index([colaboradorId, dataInicio])
+  @@index([contratoItemId])
 }

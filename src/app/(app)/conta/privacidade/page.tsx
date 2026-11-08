@@ -134,7 +134,11 @@ export default async function PrivacidadePage() {
               <Link href="/equipe" className="font-semibold text-violet-700 hover:underline">
                 Equipe
               </Link>
-              . Todo acesso a dado pessoal fica registrado na auditoria. O sistema não guarda dado de saúde (atestado, ASO, CID).
+              . Todo acesso a dado pessoal fica registrado na{" "}
+              <Link href="/equipe/lgpd" className="font-semibold text-violet-700 hover:underline">
+                auditoria de acessos
+              </Link>
+              . O sistema não guarda dado de saúde (atestado, ASO, CID).
             </p>
           </div>
         </div>

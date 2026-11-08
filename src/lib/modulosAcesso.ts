@@ -31,7 +31,8 @@ export type ChaveModulo =
   | "JURIDICO"
   | "RELATORIOS"
   | "FINANCEIRO"
-  | "PROSPECCAO";
+  | "PROSPECCAO"
+  | "COLABORADORES";
 
 export type Modulo = {
   chave: ChaveModulo;
@@ -91,6 +92,13 @@ export const MODULOS: Modulo[] = [
     descricao:
       "Lista de empresas com contrato público vencendo, para ligação, e o follow-up da carteira de clientes, com o registro de cada contato. Só faz sentido para quem trabalha a prospecção e o relacionamento do CP System.",
     rotas: ["/prospeccao", "/follow-up"],
+  },
+  {
+    chave: "COLABORADORES",
+    label: "Colaboradores (mão de obra)",
+    descricao:
+      "Empregados alocados nos contratos de mão de obra: cadastro, importação, postos cobertos e descobertos, desligamentos. Nome e CPF só aparecem para quem tem a permissão \"Dados de colaboradores\".",
+    rotas: ["/colaboradores"],
   },
 ];
 

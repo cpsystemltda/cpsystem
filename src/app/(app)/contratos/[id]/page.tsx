@@ -41,6 +41,9 @@ import { ContaVinculadaTab } from "@/components/abas/ContaVinculadaTab";
 import { resumoContaVinculada } from "@/lib/contaVinculadaServer";
 import { AceiteAdendoLgpd } from "@/components/AceiteAdendoLgpd";
 import { adendoAceito } from "@/lib/lgpdServer";
+import { EquipeAlocadaTab } from "@/components/abas/EquipeAlocadaTab";
+import { quadroContrato, listarColaboradores, type QuadroContrato } from "@/lib/colaboradoresServer";
+import { podeEditarColaboradores, podeVerDadosColaboradores } from "@/lib/lgpd";
 import {
   carregarContextoCompetencias,
   competenciasFaltantes,
@@ -66,7 +69,8 @@ export default async function ContratoDetalhePage({
 }: {
   params: Promise<{ id: string }>;
   // `?aba=` abre o detalhe já na aba certa — ver comentário igual em /atas/[id].
-  searchParams: Promise<{ aba?: string }>;
+  // `?dia=` é a consulta "posição em data" da aba Equipe alocada (ESP-008).
+  searchParams: Promise<{ aba?: string; dia?: string }>;
 }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const usuario = await exigirUsuario();
@@ -183,6 +187,18 @@ export default async function ContratoDetalhePage({
   const competenciasAtencao = competencias.filter((c) => c.status === "A_CONFIRMAR" || c.empenhoInsuficiente || (c.atrasoDias > 0 && c.status !== "PAGA")).length;
   // ESP-006: conta vinculada / fato gerador (só em CMO).
   const resumoCv = cmo ? await resumoContaVinculada(contrato.id) : null;
+  // ESP-008: equipe alocada — quadro na data consultada (hoje por padrão).
+  const podeVerColab = podeVerDadosColaboradores(usuario);
+  const podeEditarColab = podeEditarColaboradores(usuario);
+  const diaConsulta = sp.dia && /^\d{4}-\d{2}-\d{2}$/.test(sp.dia) ? sp.dia : hojeIso;
+  let quadroEquipe: QuadroContrato | null = null;
+  let colaboradoresParaAlocar: { id: string; nome: string; funcao: string; cpfMascarado: string }[] = [];
+  if (moduloLiberado) {
+    quadroEquipe = await quadroContrato(contrato.id, new Date(`${diaConsulta}T12:00:00.000Z`), podeVerColab);
+    if (podeEditarColab) {
+      colaboradoresParaAlocar = (await listarColaboradores(usuario.contaId, { situacao: "ATIVO" }, true)).map((c) => ({ id: c.id, nome: c.nome, funcao: c.funcao, cpfMascarado: c.cpfMascarado }));
+    }
+  }
   // ESP-005 RN03: indicadores do IMR (aba opcional, só em CMO).
   const indicadoresImr = cmo
     ? (await prisma.indicadorImr.findMany({ where: { contratoId: contrato.id }, orderBy: { ordem: "asc" } })).map((i) => ({
@@ -371,6 +387,27 @@ export default async function ContratoDetalhePage({
                           fim: contrato.suspensaoFim ? contrato.suspensaoFim.toISOString() : null,
                         }}
                         hojeIso={hojeIso}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+            // ESP-008: equipe alocada (postos cobertos/descobertos), só em CMO.
+            ...(moduloLiberado && quadroEquipe
+              ? [
+                  {
+                    key: "equipe",
+                    label: "Equipe alocada",
+                    badge: quadroEquipe.descobertosTotal || quadroEquipe.totalAlocados,
+                    content: (
+                      <EquipeAlocadaTab
+                        contratoId={contrato.id}
+                        quadro={quadroEquipe}
+                        dia={diaConsulta}
+                        hojeIso={hojeIso}
+                        podeVer={podeVerColab}
+                        podeEditar={podeEditarColab}
+                        colaboradores={colaboradoresParaAlocar}
                       />
                     ),
                   },

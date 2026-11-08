@@ -52,6 +52,8 @@ const GRUPOS_EMPRESA_OPERACAO: Grupo[] = [
     itens: [
       { href: "/atas", label: "Atas de Registro de Preços", icon: FileText },
       { href: "/contratos", label: "Contratos", icon: ClipboardList },
+      // ESP-008 (Igor 07/11/2026): empregados dos contratos de mão de obra.
+      { href: "/colaboradores", label: "Colaboradores", icon: Users2 },
       { href: "/execucao", label: "Fornecimento/Execução", icon: Truck },
       { href: "/notas", label: "Controle de notas", icon: Receipt },
       // Vem logo depois das contratações porque é o que sobra delas: o acervo
