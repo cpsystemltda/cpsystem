@@ -40,6 +40,8 @@ import { BannerConciliacaoOnboarding } from "@/components/BannerConciliacaoOnboa
 import { contaTemAcessoConciliacao } from "@/lib/conciliacao/planoGuard";
 import { Block } from "@/components/ui/Block";
 import { KPI, CurrencyValue } from "@/components/ui/KPI";
+import { Landmark } from "lucide-react";
+import { saldoContasVinculadasDaConta } from "@/lib/contaVinculadaServer";
 import { ChartCard } from "@/components/ui/ChartCard";
 import { TimelineVencimentos } from "@/components/TimelineVencimentos";
 import { UploadInteligenteCard } from "@/components/UploadInteligenteCard";
@@ -430,6 +432,10 @@ export default async function DashboardPage({
     return !!dataNf && dataNf <= ha30dias;
   });
   const valoresAReceberAtrasados = empenhosAtrasados.reduce((s, e) => s + sumItens(e), 0);
+
+  // ESP-006: dinheiro da empresa parado no órgão (conta vinculada) ou
+  // provisionado e ainda não pago (fato gerador) nos contratos de mão de obra.
+  const contasVinculadas = await saldoContasVinculadasDaConta(filtroEmpresa).catch(() => ({ contaVinculada: 0, provisionado: 0, contratos: 0 }));
 
   const empenhosPagos = empenhosCompletos.filter((e) => e.status === "PAGO").length;
   const nfsPendentes = empenhosCompletos.filter((e) =>
@@ -889,6 +895,20 @@ export default async function DashboardPage({
             meta={`${empenhosPagos} empenhos pagos`}
             href="/execucao?status=PAGO"
           />
+          {contasVinculadas.contratos > 0 && (
+            <KPI
+              tone="lavender"
+              icon={Landmark}
+              label="Saldo em contas vinculadas"
+              value={<CurrencyValue amount={contasVinculadas.contaVinculada + contasVinculadas.provisionado} />}
+              meta={
+                contasVinculadas.provisionado > 0
+                  ? `inclui ${contasVinculadas.provisionado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} provisionados (fato gerador) · ${contasVinculadas.contratos} contrato(s)`
+                  : `${contasVinculadas.contratos} contrato(s) de mão de obra`
+              }
+              href="/competencias"
+            />
+          )}
           <KPI
             tone="rose"
             icon={CreditCard}

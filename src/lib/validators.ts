@@ -612,6 +612,16 @@ export const novoContratoSchema = contratacaoBase
     retencaoIrPct: pctOpcional,
     retencaoCsllPisCofinsPct: pctOpcional,
     retencaoIssPct: pctOpcional,
+    // ESP-006 RN01: garantia de verbas trabalhistas e RAT (incidência 2.2).
+    garantiaVerbas: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.enum(["CONTA_VINCULADA", "FATO_GERADOR", "NENHUMA", "OUTRA"]).optional(),
+    ),
+    garantiaVerbasOutra: z.string().optional(),
+    ratPct: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.coerce.number().int().min(1).max(3).optional(),
+    ),
   })
   .superRefine((v, ctx) => {
     const cmo = isContratoMaoDeObra(v.tipo);
@@ -634,6 +644,13 @@ export const novoContratoSchema = contratacaoBase
         code: z.ZodIssueCode.custom,
         path: ["regimeLegal"],
         message: "Confirme o regime sugerido pela IA ou escolha outro",
+      });
+    }
+    if (cmo && v.garantiaVerbas === "OUTRA" && !v.garantiaVerbasOutra?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["garantiaVerbasOutra"],
+        message: "Descreva qual é a garantia de verbas trabalhistas",
       });
     }
     if (cmo && v.termoInicialPagamento === "OUTRO" && !v.termoInicialPagamentoOutro?.trim()) {

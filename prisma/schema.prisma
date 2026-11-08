@@ -1216,6 +1216,14 @@ model Contrato {
   suspensaoFim                 DateTime?
   competencias                 Competencia[]
   indicadoresImr               IndicadorImr[]
+  /// ESP-006: garantia de verbas trabalhistas (conta vinculada ou fato gerador)
+  garantiaVerbas               GarantiaVerbasTrabalhistas?
+  garantiaVerbasOutra          String?
+  ratPct                       Int? // 1, 2 ou 3 → incidência do submódulo 2.2
+  percentuaisContaVinculada    Json? // override por contrato; null = tabela-padrão do admin
+  prazoAlertaLiberacaoDias     Int? // RN06; null = 30
+  pedidosLiberacao             PedidoLiberacaoVerbas[]
+  extratosContaVinculada       ExtratoContaVinculada[]
 
   // Valor inicial do contrato (somatório de itens no momento da criação).
   // Preservado pra exibir "Valor Inicial" mesmo após aditivos com reajuste.
@@ -3288,10 +3296,14 @@ model Competencia {
   criadoEm              DateTime @default(now())
   atualizadoEm          DateTime @updatedAt
 
-  empenhos      CompetenciaEmpenho[]
-  glosas        Glosa[]
+  empenhos            CompetenciaEmpenho[]
+  glosas              Glosa[]
   /// ESP-005 RN03: pontuação por indicador do IMR — [{indicadorId, pontuacao, percentualPagamento}]
-  imrPontuacoes Json?
+  imrPontuacoes       Json?
+  /// ESP-006 RN03: retenção para a conta vinculada — estimada pelas planilhas e, se informada, a do comprovante.
+  retencaoCvEstimada  Float?
+  retencaoCvDetalhe   Json?
+  retencaoCvInformada Float?
 
   @@index([contratoId, competencia])
   @@index([vigenciaId])
@@ -3376,4 +3388,82 @@ model IndicadorImr {
   atualizadoEm DateTime @updatedAt
 
   @@index([contratoId])
+}
+
+// ============================================================
+// CONTA VINCULADA E PAGAMENTO PELO FATO GERADOR (ESP-006, Igor 07/11/2026)
+// ============================================================
+
+enum GarantiaVerbasTrabalhistas {
+  CONTA_VINCULADA
+  FATO_GERADOR
+  NENHUMA
+  OUTRA
+}
+
+enum FatoGeradorLiberacao {
+  FERIAS
+  DECIMO_TERCEIRO
+  RESCISAO
+  OUTRO
+}
+
+enum StatusPedidoLiberacao {
+  RASCUNHO
+  PROTOCOLADO
+  EM_ANALISE
+  DEFERIDO_PARCIAL
+  DEFERIDO
+  INDEFERIDO
+}
+
+/// RN05: pedido de liberação de valores da conta vinculada (ou de pagamento
+/// pelo fato gerador). Colaboradores em texto nesta fase; a ESP-008 estrutura.
+model PedidoLiberacaoVerbas {
+  id               String                @id @default(cuid())
+  contratoId       String
+  contrato         Contrato              @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  fatoGerador      FatoGeradorLiberacao
+  fatoGeradorOutro String?
+  competenciaRef   String? // "2026-12"
+  colaboradores    String?
+  valorSolicitado  Float
+  documentos       Json? // [{nome, url}]
+  dataPedido       DateTime
+  protocolo        String?
+  status           StatusPedidoLiberacao @default(RASCUNHO)
+  valorLiberado    Float?
+  dataLiberacao    DateTime?
+  observacoes      String?
+  minuta           String? // RN09: texto gerado pela IA
+  criadoPorId      String?
+  criadoEm         DateTime              @default(now())
+  atualizadoEm     DateTime              @updatedAt
+
+  @@index([contratoId, status])
+}
+
+/// RN04: saldo informado pelo extrato bancário da conta vinculada.
+model ExtratoContaVinculada {
+  id          String   @id @default(cuid())
+  contratoId  String
+  contrato    Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  dataSaldo   DateTime
+  saldoBanco  Float
+  rendimentos Float? // rendimentos creditados no período informado
+  arquivoUrl  String?
+  observacao  String?
+  criadoPorId String?
+  criadoEm    DateTime @default(now())
+
+  @@index([contratoId, dataSaldo])
+}
+
+/// Parâmetros globais editáveis pelo super admin (ex.: percentuais do Anexo
+/// XII da IN 5/2017 para a conta vinculada). Chave livre, valor em JSON.
+model ParametroPlataforma {
+  chave           String   @id
+  valor           Json
+  atualizadoEm    DateTime @updatedAt
+  atualizadoPorId String?
 }

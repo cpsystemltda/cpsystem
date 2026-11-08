@@ -83,6 +83,9 @@ export type ContratoValoresIniciais = {
   cicloCompetencia?: string | null;
   criterioProRata?: string | null;
   retencoesPadrao?: { codigo: string; pct: number | null }[] | null;
+  garantiaVerbas?: string | null;
+  garantiaVerbasOutra?: string | null;
+  ratPct?: number | null;
   itens: ItemInicial[];
   parcelas: {
     id: string;
@@ -135,6 +138,8 @@ export default function NovoContratoForm({
   const [termoInicialPagamento, setTermoInicialPagamento] = useState<string>(vi?.termoInicialPagamento ?? "ATESTE_NF");
   // ESP-004: ciclo da competência (mês civil × aniversário) e retenções sugeridas.
   const [cicloCompetencia, setCicloCompetencia] = useState<string>(vi?.cicloCompetencia ?? "MES_CIVIL");
+  // ESP-006 RN01: garantia de verbas trabalhistas.
+  const [garantiaVerbas, setGarantiaVerbas] = useState<string>(vi?.garantiaVerbas ?? "");
   const pctInicial = (codigo: string, padrao: number) => {
     const r = vi?.retencoesPadrao?.find((x) => x.codigo === codigo);
     return r && r.pct != null ? String(r.pct).replace(".", ",") : vi?.retencoesPadrao ? "0" : String(padrao);
@@ -875,6 +880,35 @@ export default function NovoContratoForm({
                     Só sugestão: o sistema não calcula tributos. Na nota de cada mês você confirma o percentual ou informa o valor retido.
                   </span>
                 </div>
+                <Select
+                  label="Garantia de verbas trabalhistas"
+                  name="garantiaVerbas"
+                  span={garantiaVerbas === "OUTRA" ? 1 : 2}
+                  options={[
+                    { value: "", label: "Não informada ainda" },
+                    { value: "CONTA_VINCULADA", label: "Conta-depósito vinculada" },
+                    { value: "FATO_GERADOR", label: "Pagamento pelo fato gerador" },
+                    { value: "NENHUMA", label: "Nenhuma" },
+                    { value: "OUTRA", label: "Outra" },
+                  ]}
+                  value={garantiaVerbas}
+                  onChange={(ev) => setGarantiaVerbas(ev.currentTarget.value)}
+                />
+                {garantiaVerbas === "OUTRA" && (
+                  <Field label="Qual garantia?" name="garantiaVerbasOutra" required erro={e.garantiaVerbasOutra} span={1} defaultValue={vi?.garantiaVerbasOutra ?? ""} />
+                )}
+                <Select
+                  label="RAT da empresa (incidência 2.2)"
+                  name="ratPct"
+                  span={1}
+                  options={[
+                    { value: "", label: "Não informado (usa 1%)" },
+                    { value: "1", label: "1% → 7,39%" },
+                    { value: "2", label: "2% → 7,60%" },
+                    { value: "3", label: "3% → 7,82%" },
+                  ]}
+                  defaultValue={vi?.ratPct?.toString() ?? ""}
+                />
               </>
             )}
 

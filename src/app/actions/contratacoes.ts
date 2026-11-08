@@ -74,6 +74,9 @@ function camposMaoDeObra(v: ContratoInput, cmo: boolean) {
       cicloCompetencia: null,
       criterioProRata: null,
       retencoesPadrao: undefined,
+      garantiaVerbas: null,
+      garantiaVerbasOutra: null,
+      ratPct: null,
     };
   }
   const ciclo = v.cicloCompetencia ?? "MES_CIVIL";
@@ -99,6 +102,10 @@ function camposMaoDeObra(v: ContratoInput, cmo: boolean) {
     cicloCompetencia: ciclo,
     criterioProRata: v.criterioProRata ?? "DIAS_CORRIDOS",
     retencoesPadrao,
+    // ESP-006 RN01
+    garantiaVerbas: v.garantiaVerbas ?? null,
+    garantiaVerbasOutra: v.garantiaVerbas === "OUTRA" ? v.garantiaVerbasOutra?.trim() || null : null,
+    ratPct: v.ratPct ?? null,
   };
 }
 import { salvarArquivo } from "@/lib/uploads";

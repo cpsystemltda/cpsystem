@@ -121,6 +121,9 @@ export default async function EditarContratoPage({ params }: { params: Promise<{
     retencoesPadrao: Array.isArray(contrato.retencoesPadrao)
       ? (contrato.retencoesPadrao as { codigo: string; pct: number | null }[])
       : null,
+    garantiaVerbas: contrato.garantiaVerbas,
+    garantiaVerbasOutra: contrato.garantiaVerbasOutra,
+    ratPct: contrato.ratPct,
     itens: contrato.itens.map((i) => ({
       id: i.id,
       descricao: i.descricao,

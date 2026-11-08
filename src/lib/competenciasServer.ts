@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { isContratoMaoDeObra } from "@/lib/validators";
+import { estimarRetencaoDaCompetencia } from "@/lib/contaVinculadaServer";
 import {
   ETAPAS,
   calcularFaturado,
@@ -167,6 +168,9 @@ export async function gerarCompetencias(
       },
       select: { id: true, competencia: true, valorPrevisto: true, status: true },
     });
+    // ESP-006 RN03: a competência já nasce com a retenção estimada da conta
+    // vinculada (quando o contrato tem). Falha aqui não impede a criação.
+    await estimarRetencaoDaCompetencia(c.id).catch((e) => console.warn("[competencias] estimativa da conta vinculada falhou:", e));
     criadas.push(c);
   }
   return criadas;
@@ -306,6 +310,9 @@ export type ResumoCompetencia = {
   /** ESP-005: glosas da competência e pontuação do IMR. */
   glosas: GlosaDto[];
   imrPontuacoes: { indicadorId: string; pontuacao: number; percentualPagamento: number | null }[];
+  /** ESP-006: garantia de verbas do contrato e retenção da conta vinculada. */
+  garantiaVerbas: string | null;
+  retencaoCv: { estimada: number | null; informada: number | null; detalhe: unknown };
 };
 
 export type GlosaDto = {
@@ -332,7 +339,7 @@ async function buscarCompetencias(where: { contratoId?: string; id?: string; con
     where,
     orderBy: [{ competencia: "desc" }, { tipo: "asc" }, { criadoEm: "desc" }],
     include: {
-      contrato: { select: { id: true, numero: true, orgaoNome: true, termoInicialPagamento: true, prazoPagamentoDias: true } },
+      contrato: { select: { id: true, numero: true, orgaoNome: true, termoInicialPagamento: true, prazoPagamentoDias: true, garantiaVerbas: true } },
       empenhos: { select: { empenhoId: true, valor: true, empenho: { select: { numero: true, instrumento: true } } } },
       glosas: { orderBy: [{ data: "asc" }, { criadoEm: "asc" }], include: { contratoItem: { select: { descricao: true } } } },
     },
@@ -429,6 +436,8 @@ function montarResumo(c: CompetenciaRow, saldos: Map<string, EmpenhoResumo>, hoj
       complementarId: g.complementarId,
     })),
     imrPontuacoes: Array.isArray(c.imrPontuacoes) ? (c.imrPontuacoes as ResumoCompetencia["imrPontuacoes"]) : [],
+    garantiaVerbas: c.contrato.garantiaVerbas,
+    retencaoCv: { estimada: c.retencaoCvEstimada, informada: c.retencaoCvInformada, detalhe: c.retencaoCvDetalhe },
   };
 }
 

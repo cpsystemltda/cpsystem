@@ -37,6 +37,8 @@ import { ehModulo, type ItemFuncao, type PlanilhaDto } from "@/lib/planilhaCusto
 import { CompetenciasTab } from "@/components/abas/CompetenciasTab";
 import { ImrTab } from "@/components/abas/ImrTab";
 import { faixasDe } from "@/lib/glosas";
+import { ContaVinculadaTab } from "@/components/abas/ContaVinculadaTab";
+import { resumoContaVinculada } from "@/lib/contaVinculadaServer";
 import {
   carregarContextoCompetencias,
   competenciasFaltantes,
@@ -173,6 +175,8 @@ export default async function ContratoDetalhePage({
     }
   }
   const competenciasAtencao = competencias.filter((c) => c.status === "A_CONFIRMAR" || c.empenhoInsuficiente || (c.atrasoDias > 0 && c.status !== "PAGA")).length;
+  // ESP-006: conta vinculada / fato gerador (só em CMO).
+  const resumoCv = cmo ? await resumoContaVinculada(contrato.id) : null;
   // ESP-005 RN03: indicadores do IMR (aba opcional, só em CMO).
   const indicadoresImr = cmo
     ? (await prisma.indicadorImr.findMany({ where: { contratoId: contrato.id }, orderBy: { ordem: "asc" } })).map((i) => ({
@@ -357,6 +361,17 @@ export default async function ContratoDetalhePage({
                         hojeIso={hojeIso}
                       />
                     ),
+                  },
+                ]
+              : []),
+            // ESP-006: conta vinculada / verbas trabalhistas, só em CMO.
+            ...(cmo && resumoCv
+              ? [
+                  {
+                    key: "conta-vinculada",
+                    label: "Conta vinculada",
+                    badge: resumoCv.alertas.length,
+                    content: <ContaVinculadaTab contratoId={contrato.id} resumo={resumoCv} podeEditar={podeEditar} hojeIso={hojeIso} />,
                   },
                 ]
               : []),

@@ -27,6 +27,7 @@ import {
 } from "@/app/actions/competencias";
 import { ChipStatusCompetencia } from "@/components/abas/CompetenciasTab";
 import { GlosasBloco, type IndicadorImrDto } from "@/components/GlosasBloco";
+import { RetencaoCvBloco } from "@/components/RetencaoCvBloco";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
@@ -281,6 +282,21 @@ export function CompetenciaDetalhe({
               />
             </dl>
           </section>
+
+          {(c.garantiaVerbas === "CONTA_VINCULADA" || c.garantiaVerbas === "FATO_GERADOR") && c.tipo === "REGULAR" && (
+            <RetencaoCvBloco
+              competenciaId={c.id}
+              fatoGerador={c.garantiaVerbas === "FATO_GERADOR"}
+              estimada={c.retencaoCv.estimada}
+              informada={c.retencaoCv.informada}
+              detalhe={(c.retencaoCv.detalhe as { porRubrica?: { codigo: string; rotulo: string; pct: number; valor: number }[]; semPlanilha?: string[]; totalPct?: number } | null) ?? null}
+              podeEditar={podeEditar}
+              onOk={(m) => {
+                setAviso(m);
+                router.refresh();
+              }}
+            />
+          )}
 
           {podeEditar && <FormEdicao c={c} onOk={(m) => { setAviso(m); router.refresh(); }} />}
 

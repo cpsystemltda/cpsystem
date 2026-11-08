@@ -151,6 +151,7 @@ const GRUPOS_ADMIN_PLATAFORMA: Grupo[] = [
       { href: "/painel-analista", label: "Painel do analista", icon: LayoutDashboard },
       { href: "/admin-plataforma/financeiro", label: "Financeiro · MRR", icon: Wallet },
       { href: "/admin-plataforma/dre", label: "Financeiro · DRE", icon: FileSpreadsheet },
+      { href: "/admin-plataforma/conta-vinculada", label: "Conta vinculada · tabela", icon: FileSpreadsheet },
       { href: "/admin-plataforma/atividade", label: "Atividade", icon: Activity },
       { href: "/admin/cupons", label: "Cupons promocionais", icon: Ticket },
     ],
