@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { pagamentosAsaas, STATUS_EM_ABERTO, STATUS_ESTORNO, STATUS_RECEBIDO } from "@/lib/asaasFinanceiro";
+import { aportesPorPagador, pagamentosAsaas, type AporteSocio, STATUS_EM_ABERTO, STATUS_ESTORNO, STATUS_RECEBIDO } from "@/lib/asaasFinanceiro";
 import {
   CATEGORIAS_DESPESA,
   ROTULO_CATEGORIA,
@@ -54,6 +54,8 @@ export type LinhaDre = {
   receitaLiquida: number;
   /** Dinheiro que efetivamente entrou no mês (data do pagamento no Asaas). */
   recebidoNoMes: number;
+  /** Aportes dos sócios que entraram no mês (fora da receita). */
+  aportesNoMes: number;
   comissoes: number;
   comissoesPagas: number;
   margemContribuicao: number;
@@ -82,8 +84,10 @@ export type Dre = {
   fonte: "ASAAS" | "LOCAL";
   fonteErro: string | null;
   lidoEm: Date | null;
-  /** Pagamentos do Asaas sem cliente correspondente no CP System. */
+  /** Pagamentos do Asaas sem cliente correspondente no CP System (que não são aporte). */
   semCliente: { id: string; valor: number; vencimento: string; status: string }[];
+  /** Aportes dos sócios na conta do Asaas — dinheiro que entrou mas NÃO é receita. */
+  aportes: AporteSocio[];
 };
 
 /** "2026-07-BONUS-INICIO" → "2026-07". */
@@ -101,6 +105,7 @@ function linhaVazia(competencia: string): LinhaDre {
     taxasGateway: 0,
     receitaLiquida: 0,
     recebidoNoMes: 0,
+    aportesNoMes: 0,
     comissoes: 0,
     comissoesPagas: 0,
     margemContribuicao: 0,
@@ -128,7 +133,7 @@ export async function montarDre(opts?: { ate?: string }): Promise<Dre> {
       orderBy: [{ competencia: "desc" }, { criadoEm: "desc" }],
       select: { id: true, competencia: true, categoria: true, descricao: true, valor: true, criadoEm: true },
     }),
-    pagamentosAsaas("2026-01-01"),
+    pagamentosAsaas(),
   ]);
 
   // Regina 09/11/2026: o DRE lê o Asaas. Competência = mês do vencimento da
@@ -138,10 +143,15 @@ export async function montarDre(opts?: { ate?: string }): Promise<Dre> {
   type Mov = { contaId: string; competencia: string; status: "PAGA" | "ESTORNADA" | "ABERTA"; valor: number; taxa: number; pagoEm: string | null };
   let movs: Mov[];
   const semCliente: Dre["semCliente"] = [];
+  const porMesAporte: { mes: string; valor: number }[] = [];
   if (asaas.ok) {
     movs = [];
     for (const p of asaas.dados) {
       if (p.contaInterna) continue;
+      if (p.aporte) {
+        porMesAporte.push({ mes: (p.pagamento ?? p.vencimento).slice(0, 7), valor: p.valor });
+        continue;
+      }
       const st = STATUS_RECEBIDO.includes(p.status) ? "PAGA" : STATUS_ESTORNO.includes(p.status) ? "ESTORNADA" : STATUS_EM_ABERTO.includes(p.status) ? "ABERTA" : null;
       if (!st) continue;
       if (!p.contaId) semCliente.push({ id: p.id, valor: p.valor, vencimento: p.vencimento, status: p.status });
@@ -183,6 +193,10 @@ export async function montarDre(opts?: { ate?: string }): Promise<Dre> {
       l.aReceber += c.valor;
     }
   }
+  for (const a of porMesAporte) {
+    const l = porMes.get(a.mes);
+    if (l) l.aportesNoMes += a.valor;
+  }
   for (const [c, set] of pagantesPorMes) porMes.get(c)!.clientesPagantes = set.size;
 
   for (const c of comissoes) {
@@ -216,6 +230,7 @@ export async function montarDre(opts?: { ate?: string }): Promise<Dre> {
     totais.estornos += l.estornos;
     totais.taxasGateway += l.taxasGateway;
     totais.recebidoNoMes += l.recebidoNoMes;
+    totais.aportesNoMes += l.aportesNoMes;
     totais.receitaLiquida += l.receitaLiquida;
     totais.comissoes += l.comissoes;
     totais.comissoesPagas += l.comissoesPagas;
@@ -241,5 +256,6 @@ export async function montarDre(opts?: { ate?: string }): Promise<Dre> {
     fonteErro: asaas.ok ? null : asaas.erro,
     lidoEm: asaas.ok ? asaas.lidoEm : null,
     semCliente,
+    aportes: asaas.ok ? aportesPorPagador(asaas.dados) : [],
   };
 }

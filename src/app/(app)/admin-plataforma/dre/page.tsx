@@ -153,10 +153,43 @@ export default async function AdminDrePage() {
               <Linha rotulo="Faturas da competência ainda em aberto" meses={meses} total={dre.totais} pega={(l) => l.aReceber} mudo />
               <Linha rotulo="Dinheiro que entrou no mês (líquido, data do pagamento)" meses={meses} total={dre.totais} pega={(l) => l.recebidoNoMes} mudo />
               <Linha rotulo="Comissões já repassadas por PIX" meses={meses} total={dre.totais} pega={(l) => l.comissoesPagas} mudo />
+              <Linha rotulo="Aportes dos sócios na conta do Asaas (não é receita)" meses={meses} total={dre.totais} pega={(l) => l.aportesNoMes} mudo />
             </tbody>
           </table>
         </div>
       </section>
+
+      {dre.aportes.length > 0 && (
+        <section className="mt-8">
+          <h2 className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}>
+            Aportes dos sócios · desde o início (Asaas)
+          </h2>
+          <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
+            PIX enviados direto para a chave da conta, sem cobrança emitida. Ficam fora da receita do DRE: é capital colocado pelos sócios, não venda.
+          </p>
+          <div className="mt-3 grid gap-4 md:grid-cols-3">
+            {dre.aportes.map((a) => (
+              <div key={a.pagador} className="glass rounded-[20px] px-5 py-4">
+                <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{a.pagador}</p>
+                <p className="mt-1 text-2xl font-extrabold" style={{ color: "var(--primary-deep)" }}>{brl(a.total)}</p>
+                <p className="text-xs" style={{ color: "var(--text-soft)" }}>{a.quantidade} aporte{a.quantidade === 1 ? "" : "s"}</p>
+                <ul className="mt-2 space-y-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
+                  {a.lancamentos.map((x, i) => (
+                    <li key={i} className="flex justify-between gap-3">
+                      <span>{x.data.split("-").reverse().join("/")}</span>
+                      <span className="num">{brl(x.valor)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <div className="glass rounded-[20px] px-5 py-4">
+              <p className="text-sm font-bold" style={{ color: "var(--text)" }}>Total aportado</p>
+              <p className="mt-1 text-2xl font-extrabold" style={{ color: "var(--text)" }}>{brl(dre.aportes.reduce((s, a) => s + a.total, 0))}</p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
         <div>
