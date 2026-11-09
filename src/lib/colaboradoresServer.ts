@@ -10,6 +10,7 @@ import {
   ROTULO_MOTIVO_FIM,
   conflitoTitular,
   diaUtc,
+  mapaParaItemVigente,
   quadroDoContrato,
   validarGrade,
   type AlocacaoBase,
@@ -304,16 +305,17 @@ export async function quadroContrato(contratoId: string, dia: Date, podeVer: boo
   const vig = contrato?.vigencias.find((v) => diaUtc(v.dataInicio) <= diaUtc(dia) && diaUtc(dia) <= diaUtc(v.dataFim)) ?? contrato?.vigencias.at(-1) ?? null;
   const itens = await prisma.contratoItem.findMany({
     where: { contratoId, ...(vig ? { vigenciaId: vig.id } : {}) },
-    select: { id: true, descricao: true, quantidade: true, unidadeMaoDeObra: true, colaboradoresPorPosto: true, vigenteDe: true, vigenteAte: true },
+    select: { id: true, descricao: true, quantidade: true, unidadeMaoDeObra: true, colaboradoresPorPosto: true, vigenteDe: true, vigenteAte: true, substituiItemId: true },
     orderBy: { descricao: "asc" },
   });
   const vigentes = itensVigentesEm(itens, dia);
+  const paraVigente = mapaParaItemVigente(itens, vigentes);
   const alocs = await prisma.alocacao.findMany({
     where: { contratoId, ...(opts?.incluirEncerradas ? {} : { OR: [{ dataFim: null }, { dataFim: { gte: diaUtc(dia) } }] }) },
     include: { colaborador: { select: { id: true, nome: true, cpfMascarado: true } }, contratoItem: { select: { descricao: true } } },
     orderBy: [{ dataInicio: "desc" }],
   });
-  const base: AlocacaoBase[] = alocs.map((a) => ({ id: a.id, colaboradorId: a.colaboradorId, contratoId: a.contratoId, contratoItemId: a.contratoItemId, tipo: a.tipo, dataInicio: a.dataInicio, dataFim: a.dataFim }));
+  const base: AlocacaoBase[] = alocs.map((a) => ({ id: a.id, colaboradorId: a.colaboradorId, contratoId: a.contratoId, contratoItemId: a.contratoItemId ? paraVigente.get(a.contratoItemId) ?? a.contratoItemId : null, tipo: a.tipo, dataInicio: a.dataInicio, dataFim: a.dataFim }));
   const q = quadroDoContrato(vigentes.map((i) => ({ id: i.id, descricao: i.descricao, necessarios: colaboradoresNecessarios(i) })), base, dia);
   const vigentesDia = alocs.filter((a) => diaUtc(a.dataInicio) <= diaUtc(dia) && (!a.dataFim || diaUtc(a.dataFim) >= diaUtc(dia)));
   return {

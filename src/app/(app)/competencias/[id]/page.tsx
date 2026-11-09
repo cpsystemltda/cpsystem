@@ -7,6 +7,7 @@ import { RETENCOES_PADRAO } from "@/lib/competencias";
 import { faixasDe } from "@/lib/glosas";
 import { certidoesRecentes, garantirChecklist, listarChecklist } from "@/lib/checklistMensalServer";
 import type { CertidaoOpcao } from "@/components/ChecklistBloco";
+import { historicoDossies } from "@/lib/dossieServer";
 import { CompetenciaDetalhe } from "@/components/CompetenciaDetalhe";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 
@@ -72,6 +73,7 @@ export default async function CompetenciaPage({ params }: { params: Promise<{ id
         indicadores={indicadores}
         checklist={checklist}
         certidoes={certidoes}
+        dossies={await historicoDossies(c.id)}
       />
       <div className="mx-auto max-w-6xl px-8 pb-10">
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-700">Histórico</h2>

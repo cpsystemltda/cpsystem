@@ -29,6 +29,7 @@ import { ChipStatusCompetencia } from "@/components/abas/CompetenciasTab";
 import { GlosasBloco, type IndicadorImrDto } from "@/components/GlosasBloco";
 import { RetencaoCvBloco } from "@/components/RetencaoCvBloco";
 import { ChecklistBloco, type CertidaoOpcao } from "@/components/ChecklistBloco";
+import { DossieBloco } from "@/components/DossieBloco";
 import type { ItemChecklistDto } from "@/lib/checklistMensalServer";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
@@ -55,6 +56,7 @@ export function CompetenciaDetalhe({
   indicadores,
   checklist,
   certidoes,
+  dossies,
 }: {
   c: ResumoCompetencia;
   empenhosDoContrato: EmpenhoResumo[];
@@ -69,6 +71,8 @@ export function CompetenciaDetalhe({
   /** ESP-009: checklist mensal e certidões reaproveitáveis por código. */
   checklist: ItemChecklistDto[];
   certidoes: Record<string, CertidaoOpcao[]>;
+  /** ESP-010: histórico de gerações do dossiê. */
+  dossies: { id: string; versao: number; formato: string; incompleto: boolean; colaboradores: number; anexos: number; geradoEm: string; por: string | null }[];
 }) {
   const router = useRouter();
   const [pendente, start] = useTransition();
@@ -292,6 +296,18 @@ export function CompetenciaDetalhe({
               />
             </dl>
           </section>
+
+          {c.tipo === "REGULAR" && (
+            <DossieBloco
+              competenciaId={c.id}
+              pendencias={checklist.filter((i) => i.obrigatorio && !["ENVIADO", "ACEITO", "ANEXADO"].includes(i.status)).map((i) => i.nome)}
+              docMarcada={!!c.datas.DOC_TRABALHISTA}
+              podeEditar={podeEditar}
+              hojeIso={hojeIso}
+              historico={dossies}
+              onAviso={(m) => setAviso(m)}
+            />
+          )}
 
           {(c.garantiaVerbas === "CONTA_VINCULADA" || c.garantiaVerbas === "FATO_GERADOR") && c.tipo === "REGULAR" && (
             <RetencaoCvBloco

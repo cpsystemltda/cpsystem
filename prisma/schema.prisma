@@ -3320,6 +3320,7 @@ model Competencia {
   retencaoCvDetalhe   Json?
   retencaoCvInformada Float?
   itensChecklist      ChecklistItemCompetencia[]
+  dossies             DossieCompetencia[]
 
   @@index([contratoId, competencia])
   @@index([vigenciaId])
@@ -3629,4 +3630,25 @@ model ChecklistItemCompetencia {
 
   @@index([competenciaId])
   @@index([codigo, validade])
+}
+
+// ============================================================
+// DOSSIÊ DA COMPETÊNCIA PARA O FISCAL (ESP-010, Igor 07/11/2026)
+// Cada geração fica registrada (data, usuário, versão, completo ou não).
+// ============================================================
+
+model DossieCompetencia {
+  id            String      @id @default(cuid())
+  competenciaId String
+  competencia   Competencia @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  versao        Int
+  formato       String // PDF | ZIP | XLSX
+  incompleto    Boolean     @default(false)
+  pendencias    Json? // ["Folha de pagamento", ...]
+  colaboradores Int         @default(0)
+  anexos        Int         @default(0)
+  geradoPorId   String?
+  geradoEm      DateTime    @default(now())
+
+  @@index([competenciaId, geradoEm])
 }

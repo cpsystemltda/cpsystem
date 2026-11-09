@@ -204,3 +204,21 @@ export function validarGrade(grade: (string | number)[][]): ResultadoValidacao {
 }
 
 export { mascararCpf };
+
+/**
+ * Posto versionado por aditivo (ESP-002 RN07): a alocação feita no item
+ * anterior continua valendo para a versão nova. Devolve, para cada id de
+ * item (antigo ou atual), o id do item vigente da mesma cadeia.
+ */
+export function mapaParaItemVigente(todos: { id: string; substituiItemId: string | null }[], vigentes: { id: string }[]): Map<string, string> {
+  const porId = new Map(todos.map((i) => [i.id, i]));
+  const mapa = new Map<string, string>();
+  for (const v of vigentes) {
+    let atual: { id: string; substituiItemId: string | null } | undefined = porId.get(v.id);
+    for (let k = 0; k < 10 && atual; k++) {
+      if (!mapa.has(atual.id)) mapa.set(atual.id, v.id);
+      atual = atual.substituiItemId ? porId.get(atual.substituiItemId) : undefined;
+    }
+  }
+  return mapa;
+}
