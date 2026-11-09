@@ -28,6 +28,8 @@ import {
 import { ChipStatusCompetencia } from "@/components/abas/CompetenciasTab";
 import { GlosasBloco, type IndicadorImrDto } from "@/components/GlosasBloco";
 import { RetencaoCvBloco } from "@/components/RetencaoCvBloco";
+import { ChecklistBloco, type CertidaoOpcao } from "@/components/ChecklistBloco";
+import type { ItemChecklistDto } from "@/lib/checklistMensalServer";
 import { labelInstrumento } from "@/lib/instrumentoLabel";
 import type { InstrumentoContratual } from "@/generated/prisma/client";
 
@@ -51,6 +53,8 @@ export function CompetenciaDetalhe({
   nomeUsuario,
   itens,
   indicadores,
+  checklist,
+  certidoes,
 }: {
   c: ResumoCompetencia;
   empenhosDoContrato: EmpenhoResumo[];
@@ -62,6 +66,9 @@ export function CompetenciaDetalhe({
   /** ESP-005: postos do contrato (para a glosa) e indicadores do IMR. */
   itens: { id: string; descricao: string }[];
   indicadores: IndicadorImrDto[];
+  /** ESP-009: checklist mensal e certidões reaproveitáveis por código. */
+  checklist: ItemChecklistDto[];
+  certidoes: Record<string, CertidaoOpcao[]>;
 }) {
   const router = useRouter();
   const [pendente, start] = useTransition();
@@ -221,6 +228,9 @@ export function CompetenciaDetalhe({
               })}
             </ol>
           </section>
+
+          {/* Comprovação mensal (ESP-009) */}
+          {c.tipo === "REGULAR" && <ChecklistBloco competenciaId={c.id} itens={checklist} certidoes={certidoes} podeEditar={podeEditar} hojeIso={hojeIso} onAviso={(m) => setAviso(m)} />}
 
           {/* Medição e glosas (ESP-005) */}
           <GlosasBloco c={c} itens={itens} indicadores={indicadores} podeEditar={podeEditar} hojeIso={hojeIso} onAviso={(m) => setAviso(m)} />

@@ -5,6 +5,8 @@ import { podeEditarDocumento } from "@/lib/permissoes";
 import { buscarCompetencia, empenhosDoContratoComSaldo } from "@/lib/competenciasServer";
 import { RETENCOES_PADRAO } from "@/lib/competencias";
 import { faixasDe } from "@/lib/glosas";
+import { certidoesRecentes, garantirChecklist, listarChecklist } from "@/lib/checklistMensalServer";
+import type { CertidaoOpcao } from "@/components/ChecklistBloco";
 import { CompetenciaDetalhe } from "@/components/CompetenciaDetalhe";
 import { HistoricoLista } from "@/components/abas/HistoricoLista";
 
@@ -35,6 +37,13 @@ export default async function CompetenciaPage({ params }: { params: Promise<{ id
     .filter((i) => (!i.vigenteDe || i.vigenteDe <= fimPeriodo) && (!i.vigenteAte || i.vigenteAte >= new Date(c.periodoInicio)))
     .map((i) => ({ id: i.id, descricao: i.descricao }));
   const indicadores = contrato.indicadoresImr.map((i) => ({ ...i, faixas: faixasDe(i.faixas) }));
+  // ESP-009: checklist mensal (nasce com a competência; competência antiga ganha aqui).
+  if (c.tipo === "REGULAR") await garantirChecklist(c.id);
+  const checklist = c.tipo === "REGULAR" ? await listarChecklist(c.id) : [];
+  const certidoes: Record<string, CertidaoOpcao[]> = {};
+  for (const item of checklist.filter((i) => i.temValidade)) {
+    certidoes[item.codigo] = (await certidoesRecentes(usuario.contaId, item.codigo)).filter((o) => o.id !== item.id).map((o) => ({ id: o.id, validade: o.validade, competencia: o.competencia, contratoNumero: o.contratoNumero, anexos: o.anexos.map((a) => ({ nome: a.nome })) }));
+  }
   const podeEditar = podeEditarDocumento(usuario, contrato);
   const ehAdmin = usuario.superAdmin || usuario.perfil === "ADMIN";
   const empenhos = await empenhosDoContratoComSaldo(c.contratoId);
@@ -61,6 +70,8 @@ export default async function CompetenciaPage({ params }: { params: Promise<{ id
         nomeUsuario={usuario.nome ?? ""}
         itens={itens}
         indicadores={indicadores}
+        checklist={checklist}
+        certidoes={certidoes}
       />
       <div className="mx-auto max-w-6xl px-8 pb-10">
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-700">Histórico</h2>

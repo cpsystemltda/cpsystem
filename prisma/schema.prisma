@@ -1236,6 +1236,7 @@ model Contrato {
   pedidosLiberacao             PedidoLiberacaoVerbas[]
   extratosContaVinculada       ExtratoContaVinculada[]
   alocacoes                    Alocacao[]
+  checklistModelo              ChecklistItemModelo[]
 
   // Valor inicial do contrato (somatório de itens no momento da criação).
   // Preservado pra exibir "Valor Inicial" mesmo após aditivos com reajuste.
@@ -3318,6 +3319,7 @@ model Competencia {
   retencaoCvEstimada  Float?
   retencaoCvDetalhe   Json?
   retencaoCvInformada Float?
+  itensChecklist      ChecklistItemCompetencia[]
 
   @@index([contratoId, competencia])
   @@index([vigenciaId])
@@ -3568,4 +3570,63 @@ model Alocacao {
   @@index([contratoId, dataInicio])
   @@index([colaboradorId, dataInicio])
   @@index([contratoItemId])
+}
+
+// ============================================================
+// CHECKLIST MENSAL DE COMPROVAÇÃO TRABALHISTA (ESP-009, Igor 07/11/2026)
+// O modelo do contrato (por regime, editável) vira itens em cada
+// competência; certidões com validade são reaproveitadas enquanto valem.
+// ============================================================
+
+enum StatusItemChecklist {
+  PENDENTE
+  ANEXADO
+  ENVIADO
+  ACEITO
+  DEVOLVIDO
+}
+
+model ChecklistItemModelo {
+  id                  String   @id @default(cuid())
+  contratoId          String
+  contrato            Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  codigo              String // ex.: PONTO, FOLHA, FGTS, FERIAS, RESCISOES, BENEFICIOS, CND_FEDERAL, CRF_FGTS, CNDT...
+  nome                String
+  descricao           String?
+  obrigatorio         Boolean  @default(true)
+  temValidade         Boolean  @default(false) // certidão: reaproveita entre competências enquanto válida
+  prazoDiaMesSeguinte Int? // dia do mês seguinte à competência; null = sem prazo
+  ordem               Int      @default(0)
+  ativo               Boolean  @default(true)
+  criadoEm            DateTime @default(now())
+  atualizadoEm        DateTime @updatedAt
+
+  @@index([contratoId, ordem])
+}
+
+model ChecklistItemCompetencia {
+  id                String              @id @default(cuid())
+  competenciaId     String
+  competencia       Competencia         @relation(fields: [competenciaId], references: [id], onDelete: Cascade)
+  modeloId          String?
+  codigo            String
+  nome              String
+  obrigatorio       Boolean             @default(true)
+  temValidade       Boolean             @default(false)
+  ordem             Int                 @default(0)
+  status            StatusItemChecklist @default(PENDENTE)
+  anexos            Json? // [{nome, url, enviadoEm}]
+  validade          DateTime? // certidão
+  reaproveitadoDeId String? // item de competência anterior de onde veio o anexo
+  prazo             DateTime?
+  dataEnvio         DateTime?
+  dataAceite        DateTime?
+  motivoDevolucao   String?
+  observacao        String?
+  atualizadoPorId   String?
+  criadoEm          DateTime            @default(now())
+  atualizadoEm      DateTime            @updatedAt
+
+  @@index([competenciaId])
+  @@index([codigo, validade])
 }

@@ -42,6 +42,8 @@ import { resumoContaVinculada } from "@/lib/contaVinculadaServer";
 import { AceiteAdendoLgpd } from "@/components/AceiteAdendoLgpd";
 import { adendoAceito } from "@/lib/lgpdServer";
 import { EquipeAlocadaTab } from "@/components/abas/EquipeAlocadaTab";
+import { ChecklistTab } from "@/components/abas/ChecklistTab";
+import { alertasCertidoesDoContrato, garantirModeloDoContrato, indicadorDoContrato } from "@/lib/checklistMensalServer";
 import { quadroContrato, listarColaboradores, type QuadroContrato } from "@/lib/colaboradoresServer";
 import { podeEditarColaboradores, podeVerDadosColaboradores } from "@/lib/lgpd";
 import {
@@ -199,6 +201,10 @@ export default async function ContratoDetalhePage({
       colaboradoresParaAlocar = (await listarColaboradores(usuario.contaId, { situacao: "ATIVO" }, true)).map((c) => ({ id: c.id, nome: c.nome, funcao: c.funcao, cpfMascarado: c.cpfMascarado }));
     }
   }
+  // ESP-009: modelo do checklist mensal, indicador e certidões vencendo.
+  const [modeloChecklist, indicadorChecklistContrato, alertasCertidoes] = moduloLiberado
+    ? await Promise.all([garantirModeloDoContrato(contrato.id), indicadorDoContrato(contrato.id), alertasCertidoesDoContrato(contrato.id)])
+    : [[], { completas: 0, incompletas: 0, semChecklist: 0, diasMediosEnvio: null }, []];
   // ESP-005 RN03: indicadores do IMR (aba opcional, só em CMO).
   const indicadoresImr = cmo
     ? (await prisma.indicadorImr.findMany({ where: { contratoId: contrato.id }, orderBy: { ordem: "asc" } })).map((i) => ({
@@ -410,6 +416,17 @@ export default async function ContratoDetalhePage({
                         colaboradores={colaboradoresParaAlocar}
                       />
                     ),
+                  },
+                ]
+              : []),
+            // ESP-009: checklist mensal de comprovação, só em CMO.
+            ...(moduloLiberado
+              ? [
+                  {
+                    key: "checklist",
+                    label: "Checklist",
+                    badge: alertasCertidoes.length || indicadorChecklistContrato.incompletas,
+                    content: <ChecklistTab contratoId={contrato.id} modelo={modeloChecklist} indicador={indicadorChecklistContrato} alertas={alertasCertidoes} podeEditar={podeEditar} />,
                   },
                 ]
               : []),

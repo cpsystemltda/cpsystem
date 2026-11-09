@@ -2,6 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { isContratoMaoDeObra } from "@/lib/validators";
 import { estimarRetencaoDaCompetencia } from "@/lib/contaVinculadaServer";
+import { criarItensDaCompetencia } from "@/lib/checklistMensalServer";
+import { situacaoChecklist } from "@/lib/checklistMensal";
 import {
   ETAPAS,
   calcularFaturado,
@@ -171,6 +173,8 @@ export async function gerarCompetencias(
     // ESP-006 RN03: a competência já nasce com a retenção estimada da conta
     // vinculada (quando o contrato tem). Falha aqui não impede a criação.
     await estimarRetencaoDaCompetencia(c.id).catch((e) => console.warn("[competencias] estimativa da conta vinculada falhou:", e));
+    // ESP-009 RN01: o checklist mensal nasce com a competência.
+    await criarItensDaCompetencia(c.id).catch((e) => console.warn("[competencias] checklist mensal falhou:", e));
     criadas.push(c);
   }
   return criadas;
@@ -313,6 +317,8 @@ export type ResumoCompetencia = {
   /** ESP-006: garantia de verbas do contrato e retenção da conta vinculada. */
   garantiaVerbas: string | null;
   retencaoCv: { estimada: number | null; informada: number | null; detalhe: unknown };
+  /** ESP-009: situação do checklist mensal. */
+  docs: { itens: number; obrigatorios: number; pendentes: number; completo: boolean; devolvido: boolean };
 };
 
 export type GlosaDto = {
@@ -342,6 +348,7 @@ async function buscarCompetencias(where: { contratoId?: string; id?: string; con
       contrato: { select: { id: true, numero: true, orgaoNome: true, termoInicialPagamento: true, prazoPagamentoDias: true, garantiaVerbas: true } },
       empenhos: { select: { empenhoId: true, valor: true, empenho: { select: { numero: true, instrumento: true } } } },
       glosas: { orderBy: [{ data: "asc" }, { criadoEm: "asc" }], include: { contratoItem: { select: { descricao: true } } } },
+      itensChecklist: { select: { obrigatorio: true, status: true } },
     },
   });
 }
@@ -438,6 +445,10 @@ function montarResumo(c: CompetenciaRow, saldos: Map<string, EmpenhoResumo>, hoj
     imrPontuacoes: Array.isArray(c.imrPontuacoes) ? (c.imrPontuacoes as ResumoCompetencia["imrPontuacoes"]) : [],
     garantiaVerbas: c.contrato.garantiaVerbas,
     retencaoCv: { estimada: c.retencaoCvEstimada, informada: c.retencaoCvInformada, detalhe: c.retencaoCvDetalhe },
+    docs: (() => {
+      const s = situacaoChecklist(c.itensChecklist);
+      return { itens: c.itensChecklist.length, obrigatorios: s.obrigatorios, pendentes: s.pendentes, completo: s.completo, devolvido: s.devolvido };
+    })(),
   };
 }
 

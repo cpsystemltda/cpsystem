@@ -208,6 +208,7 @@ export function CompetenciasTab({
                 <th className="px-3 py-2 text-right font-semibold">Líquido esperado</th>
                 <th className="px-3 py-2 text-right font-semibold">Recebido</th>
                 <th className="px-3 py-2 text-left font-semibold">Pagamento</th>
+                <th className="px-3 py-2 text-left font-semibold">Docs</th>
                 <th className="px-3 py-2 text-left font-semibold">Empenho</th>
                 <th className="w-8" />
               </tr>
@@ -245,6 +246,19 @@ export function CompetenciasTab({
                       </span>
                     ) : (
                       <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-xs" title="Checklist mensal de comprovação (ESP-009)">
+                    {c.tipo !== "REGULAR" || c.docs.itens === 0 ? (
+                      <span className="text-slate-400">—</span>
+                    ) : c.docs.devolvido ? (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-800">devolvido</span>
+                    ) : c.docs.completo ? (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-800">completa</span>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-700">
+                        {c.docs.obrigatorios - c.docs.pendentes}/{c.docs.obrigatorios}
+                      </span>
                     )}
                   </td>
                   <td className="px-3 py-2 text-xs">
