@@ -1,4 +1,5 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { acessoDaConta } from "@/lib/faixasTerceirizacaoServer";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { podeEditarDocumento } from "@/lib/permissoes";
@@ -17,6 +18,8 @@ export default async function CompetenciaPage({ params }: { params: Promise<{ id
   const usuario = await exigirUsuario();
   const c = await buscarCompetencia(id, usuario.contaId);
   if (!c) notFound();
+  // ESP-011 RN01: fora do Premium/trial (e passados os 90 dias), volta ao contrato, que mostra o convite.
+  if ((await acessoDaConta(usuario.conta)) === "BLOQUEADO") redirect(`/contratos/${c.contratoId}`);
 
   const contrato = await prisma.contrato.findUnique({
     where: { id: c.contratoId },

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
+import { bloqueioModulo } from "@/lib/faixasTerceirizacaoServer";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { salvarArquivo } from "@/lib/uploads";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
@@ -34,6 +35,10 @@ async function itemDaConta(itemId: string, contaId: string) {
 export async function atualizarItemChecklistAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const item = await itemDaConta(String(formData.get("itemId") || ""), usuario.contaId);
   if (!item) return { erro: "Item não encontrado." };
   if (!podeEditarDocumento(usuario, item.competencia.contrato)) return { erro: mensagemSemPermissao(item.competencia.contrato) };
@@ -83,6 +88,10 @@ export async function atualizarItemChecklistAction(_p: Result, formData: FormDat
 export async function removerAnexoItemAction(itemId: string, url: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const item = await itemDaConta(itemId, usuario.contaId);
   if (!item) return { erro: "Item não encontrado." };
   if (!podeEditarDocumento(usuario, item.competencia.contrato)) return { erro: mensagemSemPermissao(item.competencia.contrato) };
@@ -98,6 +107,10 @@ export async function removerAnexoItemAction(itemId: string, url: string): Promi
 export async function reaproveitarCertidaoAction(itemId: string, origemId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const item = await itemDaConta(itemId, usuario.contaId);
   if (!item) return { erro: "Item não encontrado." };
   if (!podeEditarDocumento(usuario, item.competencia.contrato)) return { erro: mensagemSemPermissao(item.competencia.contrato) };
@@ -115,6 +128,10 @@ export async function reaproveitarCertidaoAction(itemId: string, origemId: strin
 export async function montarChecklistAction(competenciaId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const c = await prisma.competencia.findFirst({ where: { id: competenciaId, contrato: { empresa: { contaId: usuario.contaId } } }, select: { id: true, contratoId: true, contrato: { select: { criadoPorId: true } } } });
   if (!c) return { erro: "Competência não encontrada." };
   if (!podeEditarDocumento(usuario, c.contrato)) return { erro: mensagemSemPermissao(c.contrato) };
@@ -134,6 +151,10 @@ async function contratoDaConta(contratoId: string, contaId: string) {
 export async function salvarItemModeloAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const contrato = await contratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
@@ -173,6 +194,10 @@ export async function salvarItemModeloAction(_p: Result, formData: FormData): Pr
 export async function excluirItemModeloAction(id: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const item = await prisma.checklistItemModelo.findFirst({ where: { id, contrato: { empresa: { contaId: usuario.contaId } } }, select: { id: true, nome: true, contratoId: true, contrato: { select: { criadoPorId: true } } } });
   if (!item) return { erro: "Item não encontrado." };
   if (!podeEditarDocumento(usuario, item.contrato)) return { erro: mensagemSemPermissao(item.contrato) };

@@ -4,6 +4,7 @@ import { avisarEquipe } from "@/lib/alertaInterno";
 import { montarLembreteFollowUp, enviarConvitesFollowUp } from "@/lib/followUpClientes";
 import { rodarGeracaoDiaria } from "@/lib/competenciasServer";
 import { rodarRetencaoColaboradores } from "@/lib/colaboradoresServer";
+import { apurarColaboradoresDoDia } from "@/lib/faixasTerceirizacaoServer";
 
 /** Segunda-feira no fuso de Brasília — o dia em que a equipe planeja a semana. */
 function ehSegundaBRT(d: Date): boolean {
@@ -96,8 +97,15 @@ export async function GET(req: Request) {
     await avisarEquipe(`🔒 *Retenção de dados de colaboradores*\n\n` + retencao.detalhes.map((d) => `▫ ${d}`).join("\n")).catch(() => {});
   }
 
+  // ESP-011 RN03: pico diário de colaboradores ativos por conta (faixa do mês).
+  const faixas = await apurarColaboradoresDoDia().catch((e) => {
+    console.error("[ciclo-de-vida] apuração de colaboradores falhou:", e);
+    return { contas: 0, avisos: 0, detalhes: [`falhou: ${e instanceof Error ? e.message : String(e)}`] };
+  });
+
   return NextResponse.json({
     ok: true,
+    faixas,
     duracaoMs: Date.now() - inicio,
     resumo: r,
     followUp: lembreteFollowUp ? "lembrete enviado" : "sem lembrete",

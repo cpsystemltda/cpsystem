@@ -6,6 +6,9 @@ import { listarCompetenciasDaConta } from "@/lib/competenciasServer";
 import { ORDEM_STATUS, ROTULO_STATUS, dataBrDia, faturadaOuAlem, rotuloCompetencia, type StatusCompetencia } from "@/lib/competencias";
 import { brl } from "@/lib/validators";
 import { ChipStatusCompetencia } from "@/components/abas/CompetenciasTab";
+import { AvisoModuloTerceirizacao } from "@/components/AvisoModuloTerceirizacao";
+import { avisoModuloDaConta } from "@/lib/faixasTerceirizacaoServer";
+
 
 /**
  * Competências de mão de obra de todos os contratos da conta (ESP-004 —
@@ -19,7 +22,8 @@ export default async function CompetenciasPage({
   const usuario = await exigirUsuario();
   const sp = await searchParams;
   const filtro = await filtroEmpresaWhere(usuario.contaId);
-  let lista = await listarCompetenciasDaConta(filtro);
+  const aviso = await avisoModuloDaConta(usuario.conta); // ESP-011
+  let lista = aviso.acesso === "BLOQUEADO" ? [] : await listarCompetenciasDaConta(filtro);
 
   const status = ORDEM_STATUS.includes(sp.status as StatusCompetencia) ? (sp.status as StatusCompetencia) : "";
   if (status) lista = lista.filter((c) => c.status === status);
@@ -43,6 +47,7 @@ export default async function CompetenciasPage({
       <Link href="/execucao" className="inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900">
         <ChevronLeft className="h-4 w-4" /> Fornecimento/Execução
       </Link>
+      <AvisoModuloTerceirizacao acesso={aviso.acesso} perdidaEm={aviso.perdidaEm} estimativaTrial={aviso.estimativaTrial} />
       <div className="mt-4 flex items-start gap-4">
         <div className="grid h-12 w-12 place-items-center rounded-lg bg-amber-50">
           <CalendarDays className="h-6 w-6 text-amber-700" />

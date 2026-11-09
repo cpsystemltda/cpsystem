@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
+import { bloqueioModulo } from "@/lib/faixasTerceirizacaoServer";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { salvarArquivo } from "@/lib/uploads";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
@@ -83,6 +84,10 @@ export async function salvarPercentuaisPadraoAction(_p: Result, formData: FormDa
 export async function definirGarantiaVerbasAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const contrato = await contratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
@@ -106,6 +111,10 @@ export async function definirGarantiaVerbasAction(_p: Result, formData: FormData
 export async function salvarPercentuaisContratoAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const contrato = await contratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
@@ -136,6 +145,10 @@ export async function salvarPercentuaisContratoAction(_p: Result, formData: Form
 export async function recalcularRetencoesAction(contratoId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contrato = await contratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
   if (!podeEditarDocumento(usuario, contrato)) return { erro: mensagemSemPermissao(contrato) };
@@ -151,6 +164,10 @@ export async function recalcularRetencoesAction(contratoId: string): Promise<Res
 export async function informarRetencaoAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const competenciaId = String(formData.get("competenciaId") || "");
   const c = await prisma.competencia.findFirst({
     where: { id: competenciaId, contrato: { empresa: { contaId: usuario.contaId } } },
@@ -176,6 +193,10 @@ export async function informarRetencaoAction(_p: Result, formData: FormData): Pr
 export async function salvarPedidoLiberacaoAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const contrato = await contratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
@@ -221,6 +242,10 @@ export async function salvarPedidoLiberacaoAction(_p: Result, formData: FormData
 export async function mudarStatusPedidoAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const id = String(formData.get("id") || "");
   const pedido = await prisma.pedidoLiberacaoVerbas.findFirst({ where: { id, contrato: { empresa: { contaId: usuario.contaId } } }, include: { contrato: { select: { id: true, criadoPorId: true } } } });
   if (!pedido) return { erro: "Pedido não encontrado." };
@@ -248,6 +273,10 @@ export async function mudarStatusPedidoAction(_p: Result, formData: FormData): P
 export async function excluirPedidoLiberacaoAction(id: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const pedido = await prisma.pedidoLiberacaoVerbas.findFirst({ where: { id, contrato: { empresa: { contaId: usuario.contaId } } }, include: { contrato: { select: { id: true, criadoPorId: true } } } });
   if (!pedido) return { erro: "Pedido não encontrado." };
   if (!podeEditarDocumento(usuario, pedido.contrato)) return { erro: mensagemSemPermissao(pedido.contrato) };
@@ -260,6 +289,10 @@ export async function excluirPedidoLiberacaoAction(id: string): Promise<Result> 
 export async function gerarMinutaLiberacaoAction(pedidoId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const pedido = await prisma.pedidoLiberacaoVerbas.findFirst({ where: { id: pedidoId, contrato: { empresa: { contaId: usuario.contaId } } } });
   if (!pedido) return { erro: "Pedido não encontrado." };
   const contrato = await contratoDaConta(pedido.contratoId, usuario.contaId);
@@ -297,6 +330,10 @@ export async function gerarMinutaLiberacaoAction(pedidoId: string): Promise<Resu
 export async function salvarMinutaLiberacaoAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const id = String(formData.get("id") || "");
   const pedido = await prisma.pedidoLiberacaoVerbas.findFirst({ where: { id, contrato: { empresa: { contaId: usuario.contaId } } }, include: { contrato: { select: { id: true, criadoPorId: true } } } });
   if (!pedido) return { erro: "Pedido não encontrado." };
@@ -313,6 +350,10 @@ export async function salvarMinutaLiberacaoAction(_p: Result, formData: FormData
 export async function registrarExtratoAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const contrato = await contratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
@@ -341,6 +382,10 @@ export async function registrarExtratoAction(_p: Result, formData: FormData): Pr
 export async function excluirExtratoAction(id: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const e = await prisma.extratoContaVinculada.findFirst({ where: { id, contrato: { empresa: { contaId: usuario.contaId } } }, include: { contrato: { select: { id: true, criadoPorId: true } } } });
   if (!e) return { erro: "Extrato não encontrado." };
   if (!podeEditarDocumento(usuario, e.contrato)) return { erro: mensagemSemPermissao(e.contrato) };

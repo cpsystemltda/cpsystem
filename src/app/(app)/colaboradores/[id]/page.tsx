@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ShieldAlert } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
+import { acessoDaConta } from "@/lib/faixasTerceirizacaoServer";
 import { podeEditarColaboradores, podeVerDadosColaboradores } from "@/lib/lgpd";
 import { buscarColaborador } from "@/lib/colaboradoresServer";
 import { adendoAceito } from "@/lib/lgpdServer";
@@ -27,5 +28,5 @@ export default async function ColaboradorPage({ params }: { params: Promise<{ id
   const c = await buscarColaborador(id, usuario.contaId, true, usuario.id);
   if (!c) notFound();
   const hojeIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-  return <ColaboradorDetalhe c={c} podeEditar={podeEditarColaboradores(usuario)} ehAdmin={usuario.perfil === "ADMIN"} hojeIso={hojeIso} />;
+  return <ColaboradorDetalhe c={c} podeEditar={podeEditarColaboradores(usuario) && (await acessoDaConta(usuario.conta)) === "LIBERADO"} ehAdmin={usuario.perfil === "ADMIN"} hojeIso={hojeIso} />;
 }

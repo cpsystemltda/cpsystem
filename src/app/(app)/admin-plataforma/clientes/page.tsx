@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Crown, Search, ArrowUpRight, AlertTriangle, CheckCircle2, Clock, XCircle, Eye, ShieldCheck } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { faixasDasContas } from "@/lib/faixasTerceirizacaoServer";
 import { asaasDisponivel, pagamentosAsaas, resumoPorConta, type ResumoCobrancaConta } from "@/lib/asaasFinanceiro";
 import { contaEhPagante, mensalidadeDaConta } from "@/lib/metricasReceita";
 import { entrarEspionagemAction } from "@/lib/espionagem";
@@ -27,7 +28,7 @@ function brl(n: number): string {
 export default async function AdminClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; tipo?: string; arquivadas?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; tipo?: string; arquivadas?: string; terceirizacao?: string }>;
 }) {
   const usuario = await exigirUsuario();
   if (!usuario.superAdmin) {
@@ -48,7 +49,7 @@ export default async function AdminClientesPage({
 
   const verArquivadas = sp?.arquivadas === "1";
 
-  const contas = await prisma.conta.findMany({
+  const contasTodas = await prisma.conta.findMany({
     where: {
       // Mostra todas as contas — inclusive as de super admin (Regina/Igor),
       // pra permitir entrar via modo espionagem se necessário. Linhas com
@@ -93,6 +94,11 @@ export default async function AdminClientesPage({
     },
     orderBy: { criadoEm: "desc" },
   });
+
+  // ESP-011 RN08: colaboradores ativos (pico do mês) e faixa; filtro "usa Módulo Terceirização".
+  const faixasConta = await faixasDasContas(contasTodas.map((c) => c.id));
+  const soTerceirizacao = sp.terceirizacao === "1";
+  const contas = soTerceirizacao ? contasTodas.filter((c) => faixasConta.get(c.id)?.usaModulo) : contasTodas;
 
   // Regina 09/11/2026: "ao lado de cada cliente, quando é feita a cobrança
   // e qual a data do próximo pagamento — temos que ter clareza". Lido do
@@ -160,6 +166,9 @@ export default async function AdminClientesPage({
           <option value="INADIMPLENTE">Inadimplente</option>
           <option value="CANCELADA">Cancelada</option>
         </select>
+        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" name="terceirizacao" value="1" defaultChecked={soTerceirizacao} /> Usa Módulo Terceirização
+        </label>
         <button type="submit" className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white">
           Filtrar
         </button>
@@ -184,6 +193,7 @@ export default async function AdminClientesPage({
               <th className="px-4 py-3 text-left font-medium">Tipo</th>
               <th className="px-4 py-3 text-left font-medium">Status</th>
               <th className="px-4 py-3 text-left font-medium">Plano</th>
+              <th className="px-4 py-3 text-left font-medium">Colaboradores · faixa</th>
               <th className="px-4 py-3 text-right font-medium">MRR</th>
               <th className="px-4 py-3 text-left font-medium">Origem</th>
               <th className="px-4 py-3 text-left font-medium">Última cobrança paga</th>
@@ -269,6 +279,21 @@ export default async function AdminClientesPage({
                     )}
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-700">{ehContaTeste ? <span className="text-slate-400">— (demonstração)</span> : c.plano}</td>
+                  <td className="px-4 py-3 text-xs text-slate-700">
+                    {(() => {
+                      const fx = faixasConta.get(c.id);
+                      if (!fx?.usaModulo) return <span className="text-slate-400">—</span>;
+                      return (
+                        <>
+                          <span className="font-semibold text-slate-900">{fx.pico} ativo(s)</span>
+                          <span className="block text-slate-500">
+                            faixa {fx.faixa}
+                            {fx.valor > 0 ? ` · ${brl(fx.valor)}` : " · incluída"}
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </td>
                   <td className="px-4 py-3 text-right tabular-nums text-slate-900">
                     {mrr > 0 ? brl(mrr) : "—"}
                   </td>
@@ -370,7 +395,7 @@ export default async function AdminClientesPage({
             })}
             {contas.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 py-12 text-center text-sm text-slate-400">
+                <td colSpan={12} className="px-4 py-12 text-center text-sm text-slate-400">
                   Nenhum cliente encontrado com esses filtros.
                 </td>
               </tr>

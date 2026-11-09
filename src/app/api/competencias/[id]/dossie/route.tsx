@@ -1,3 +1,4 @@
+import { bloqueioModulo } from "@/lib/faixasTerceirizacaoServer";
 import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { zipSync, strToU8 } from "fflate";
@@ -18,6 +19,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const usuario = await getUsuarioAtual();
   if (!usuario) return new NextResponse("Não autorizado", { status: 401 });
+  const bloqueio = await bloqueioModulo(usuario.contaId, "leitura"); // ESP-011 RN07: exportar vale nos 90 dias
+  if (bloqueio) return new NextResponse(bloqueio, { status: 403 });
   const podeVer = podeVerDadosColaboradores(usuario);
   const d = await montarDossie(id, usuario.contaId, podeVer);
   if (!d) return new NextResponse("Competência não encontrada", { status: 404 });

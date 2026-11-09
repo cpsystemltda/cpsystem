@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
+import { bloqueioModulo, registrarContagem } from "@/lib/faixasTerceirizacaoServer";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { podeEditarColaboradores, cpfValido, pareceDocumentoDeSaude } from "@/lib/lgpd";
 import { MOTIVOS_FIM, TIPOS_ALOCACAO, type TipoAlocacao } from "@/lib/colaboradores";
@@ -34,6 +35,9 @@ async function usuarioQueEdita() {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
   if (!podeEditarColaboradores(usuario)) return { usuario, erro: "Você não tem a permissão “Dados de colaboradores”. Peça ao administrador da conta (tela Equipe)." };
+  // ESP-011 RN01/RN07: Premium ou trial; fora disso, somente leitura por 90 dias. Anonimizar (LGPD) continua sempre liberado.
+  const bloqueio = await bloqueioModulo(usuario.contaId);
+  if (bloqueio) return { usuario, erro: bloqueio };
   return { usuario, erro: null };
 }
 
@@ -97,6 +101,7 @@ export async function desligarColaboradorAction(_p: ResultadoColab, formData: Fo
   revalidatePath(`/colaboradores/${id}`);
   revalidatePath("/colaboradores");
   for (const c of r.contratos) revalidatePath(`/contratos/${c.id}`);
+  await registrarContagem(usuario.contaId).catch(() => {}); // ESP-011 RN03
   return {
     ok: true,
     contratos: r.contratos,
@@ -158,6 +163,7 @@ export async function alocarAction(_p: ResultadoColab, formData: FormData): Prom
   if ("erro" in r) return { erro: r.erro };
   revalidatePath(`/contratos/${contratoId}`);
   revalidatePath("/colaboradores");
+  await registrarContagem(usuario.contaId).catch(() => {}); // ESP-011 RN03
   return { ok: true, id: r.id, mensagem: "Alocação registrada." };
 }
 
@@ -174,5 +180,6 @@ export async function encerrarAlocacaoAction(_p: ResultadoColab, formData: FormD
   const contratoId = String(formData.get("contratoId") || "");
   if (contratoId) revalidatePath(`/contratos/${contratoId}`);
   revalidatePath("/colaboradores");
+  await registrarContagem(usuario.contaId).catch(() => {}); // ESP-011 RN03
   return { ok: true, mensagem: "Alocação encerrada." };
 }

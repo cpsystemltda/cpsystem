@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
+import { bloqueioModulo } from "@/lib/faixasTerceirizacaoServer";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { salvarArquivo } from "@/lib/uploads";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
@@ -93,6 +94,10 @@ function revalidar(competenciaId: string, contratoId: string) {
 export async function criarGlosaAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const competenciaId = String(formData.get("competenciaId") || "");
   const c = await carregarCompetencia(competenciaId, usuario.contaId);
   if (!c) return { erro: "Competência não encontrada." };
@@ -149,6 +154,10 @@ const TRANSICOES: Record<StatusGlosa, StatusGlosa[]> = {
 export async function mudarStatusGlosaAction(glosaId: string, novo: StatusGlosa): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const g = await carregarGlosa(glosaId, usuario.contaId);
   if (!g) return { erro: "Glosa não encontrada." };
   const contrato = g.competencia.contrato;
@@ -203,6 +212,10 @@ export async function mudarStatusGlosaAction(glosaId: string, novo: StatusGlosa)
 export async function excluirGlosaAction(glosaId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const g = await carregarGlosa(glosaId, usuario.contaId);
   if (!g) return { erro: "Glosa não encontrada." };
   const contrato = g.competencia.contrato;
@@ -222,6 +235,10 @@ export async function excluirGlosaAction(glosaId: string): Promise<Result> {
 export async function salvarContestacaoAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const glosaId = String(formData.get("glosaId") || "");
   const g = await carregarGlosa(glosaId, usuario.contaId);
   if (!g) return { erro: "Glosa não encontrada." };
@@ -242,6 +259,10 @@ export async function salvarContestacaoAction(_p: Result, formData: FormData): P
 export async function gerarMinutaContestacaoAction(glosaId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const g = await carregarGlosa(glosaId, usuario.contaId);
   if (!g) return { erro: "Glosa não encontrada." };
   const contrato = g.competencia.contrato;
@@ -283,6 +304,10 @@ export async function gerarMinutaContestacaoAction(glosaId: string): Promise<Res
 export async function registrarImrAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const competenciaId = String(formData.get("competenciaId") || "");
   const c = await carregarCompetencia(competenciaId, usuario.contaId);
   if (!c) return { erro: "Competência não encontrada." };
@@ -324,6 +349,10 @@ export async function registrarImrAction(_p: Result, formData: FormData): Promis
 export async function salvarIndicadorImrAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const contrato = await prisma.contrato.findFirst({ where: { id: contratoId, empresa: { contaId: usuario.contaId } }, select: { id: true, criadoPorId: true } });
   if (!contrato) return { erro: "Contrato não encontrado." };
@@ -354,6 +383,10 @@ export async function salvarIndicadorImrAction(_p: Result, formData: FormData): 
 export async function excluirIndicadorImrAction(id: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const ind = await prisma.indicadorImr.findFirst({ where: { id, contrato: { empresa: { contaId: usuario.contaId } } }, select: { id: true, nome: true, contrato: { select: { id: true, criadoPorId: true } } } });
   if (!ind) return { erro: "Indicador não encontrado." };
   if (!podeEditarDocumento(usuario, ind.contrato)) return { erro: mensagemSemPermissao(ind.contrato) };

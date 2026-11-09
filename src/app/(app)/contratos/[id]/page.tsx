@@ -40,6 +40,8 @@ import { faixasDe } from "@/lib/glosas";
 import { ContaVinculadaTab } from "@/components/abas/ContaVinculadaTab";
 import { resumoContaVinculada } from "@/lib/contaVinculadaServer";
 import { AceiteAdendoLgpd } from "@/components/AceiteAdendoLgpd";
+import { AvisoModuloTerceirizacao } from "@/components/AvisoModuloTerceirizacao";
+import { avisoModuloDaConta } from "@/lib/faixasTerceirizacaoServer";
 import { adendoAceito } from "@/lib/lgpdServer";
 import { EquipeAlocadaTab } from "@/components/abas/EquipeAlocadaTab";
 import { ChecklistTab } from "@/components/abas/ChecklistTab";
@@ -116,7 +118,9 @@ export default async function ContratoDetalhePage({
   // ESP-007 RN08: o Módulo Terceirização (abas de competências, planilha,
   // conta vinculada, IMR) só abre depois que o ADMIN aceita o adendo LGPD.
   const adendoOk = !cmo || adendoAceito(usuario.conta);
-  const moduloLiberado = cmo && adendoOk;
+  // ESP-011 RN01/RN07: Premium ou trial; ao perder o plano, 90 dias de somente leitura.
+  const avisoModulo = cmo ? await avisoModuloDaConta(usuario.conta) : null;
+  const moduloLiberado = cmo && adendoOk && avisoModulo?.acesso !== "BLOQUEADO";
 
   const itensTodos = await prisma.contratoItem.findMany({
     where: { contratoId: contrato.id },
@@ -315,7 +319,9 @@ export default async function ContratoDetalhePage({
 
       {/* ESP-002 RN06: contrato de mão de obra anterior ao módulo — o sistema
           não sabe se os itens são mensais ou da vigência inteira. */}
-      {cmo && !adendoOk && (
+      {avisoModulo && <AvisoModuloTerceirizacao acesso={avisoModulo.acesso} perdidaEm={avisoModulo.perdidaEm} estimativaTrial={avisoModulo.estimativaTrial} />}
+
+      {cmo && !adendoOk && avisoModulo?.acesso !== "BLOQUEADO" && (
         <div className="mt-4">
           <AceiteAdendoLgpd ehAdmin={usuario.perfil === "ADMIN"} />
         </div>

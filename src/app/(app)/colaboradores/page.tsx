@@ -6,6 +6,8 @@ import { avisoRetencao, contagemColaboradores, listarColaboradores } from "@/lib
 import { adendoAceito } from "@/lib/lgpdServer";
 import { registrarAcessoDadosPessoais } from "@/lib/lgpdServer";
 import { AceiteAdendoLgpd } from "@/components/AceiteAdendoLgpd";
+import { AvisoModuloTerceirizacao } from "@/components/AvisoModuloTerceirizacao";
+import { avisoModuloDaConta } from "@/lib/faixasTerceirizacaoServer";
 import { ColaboradoresClient } from "./ColaboradoresClient";
 
 /**
@@ -16,10 +18,13 @@ export default async function ColaboradoresPage({ searchParams }: { searchParams
   const usuario = await exigirUsuario();
   const sp = await searchParams;
   const podeVer = podeVerDadosColaboradores(usuario);
-  const podeEditar = podeEditarColaboradores(usuario);
+  // ESP-011 RN01/RN07: Premium ou trial; fora disso, convite (ou somente leitura por 90 dias).
+  const aviso = await avisoModuloDaConta(usuario.conta);
+  const bloqueado = aviso.acesso === "BLOQUEADO";
+  const podeEditar = podeEditarColaboradores(usuario) && aviso.acesso === "LIBERADO";
   const adendoOk = adendoAceito(usuario.conta);
   const contagem = await contagemColaboradores(usuario.contaId);
-  const lista = adendoOk && podeVer ? await listarColaboradores(usuario.contaId, { busca: sp.q, situacao: sp.situacao }, true) : [];
+  const lista = !bloqueado && adendoOk && podeVer ? await listarColaboradores(usuario.contaId, { busca: sp.q, situacao: sp.situacao }, true) : [];
   if (adendoOk && podeVer && lista.length > 0) {
     await registrarAcessoDadosPessoais({ contaId: usuario.contaId, usuarioId: usuario.id, recurso: "ColaboradoresLista", resumo: `Listou ${lista.length} colaborador(es)${sp.q ? ` (busca "${sp.q}")` : ""}` });
   }
@@ -59,7 +64,9 @@ export default async function ColaboradoresPage({ searchParams }: { searchParams
         ))}
       </dl>
 
-      {!adendoOk ? (
+      <AvisoModuloTerceirizacao acesso={aviso.acesso} perdidaEm={aviso.perdidaEm} estimativaTrial={aviso.estimativaTrial} />
+
+      {bloqueado ? null : !adendoOk ? (
         <div className="mt-6">
           <AceiteAdendoLgpd ehAdmin={usuario.perfil === "ADMIN"} />
         </div>

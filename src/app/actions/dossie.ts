@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
+import { bloqueioModulo } from "@/lib/faixasTerceirizacaoServer";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
 import { indiceStatus, rotuloCompetencia, type StatusCompetencia } from "@/lib/competencias";
@@ -12,6 +13,10 @@ import { indiceStatus, rotuloCompetencia, type StatusCompetencia } from "@/lib/c
 export async function marcarDocPeloDossieAction(competenciaId: string, dataIso: string): Promise<{ ok?: boolean; erro?: string; mensagem?: string }> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId, "leitura");
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const c = await prisma.competencia.findFirst({
     where: { id: competenciaId, contrato: { empresa: { contaId: usuario.contaId } } },
     select: { id: true, competencia: true, status: true, contratoId: true, dataDocTrabalhista: true, contrato: { select: { criadoPorId: true } } },

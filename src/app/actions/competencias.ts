@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
+import { bloqueioModulo } from "@/lib/faixasTerceirizacaoServer";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { salvarArquivo } from "@/lib/uploads";
 import { podeEditarDocumento, mensagemSemPermissao } from "@/lib/permissoes";
@@ -71,6 +72,10 @@ async function carregarContratoDaConta(contratoId: string, contaId: string) {
 export async function decidirRetroativasAction(contratoId: string, gerar: boolean): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contrato = await carregarContratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
   if (!podeEditarDocumento(usuario, contrato)) return { erro: mensagemSemPermissao(contrato) };
@@ -105,6 +110,10 @@ export async function decidirRetroativasAction(contratoId: string, gerar: boolea
 export async function gerarPendentesAction(contratoId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contrato = await carregarContratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
   if (!podeEditarDocumento(usuario, contrato)) return { erro: mensagemSemPermissao(contrato) };
@@ -128,6 +137,10 @@ export async function gerarPendentesAction(contratoId: string): Promise<Result> 
 export async function confirmarCompetenciaAction(id: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const c = await carregarCompetencia(id, usuario.contaId);
   if (!c) return { erro: "Competência não encontrada." };
   if (!podeEditarDocumento(usuario, c.contrato)) return { erro: mensagemSemPermissao(c.contrato) };
@@ -146,6 +159,10 @@ export async function confirmarCompetenciaAction(id: string): Promise<Result> {
 export async function registrarEtapaAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const id = String(formData.get("competenciaId") || "");
   const etapa = String(formData.get("etapa") || "") as EtapaKey;
   const def = ETAPAS.find((e) => e.key === etapa);
@@ -243,6 +260,10 @@ export async function registrarEtapaAction(_p: Result, formData: FormData): Prom
 export async function desfazerEtapaAction(id: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const c = await carregarCompetencia(id, usuario.contaId);
   if (!c) return { erro: "Competência não encontrada." };
   if (!podeEditarDocumento(usuario, c.contrato)) return { erro: mensagemSemPermissao(c.contrato) };
@@ -275,6 +296,10 @@ export async function desfazerEtapaAction(id: string): Promise<Result> {
 export async function atualizarCompetenciaAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const id = String(formData.get("competenciaId") || "");
   const c = await carregarCompetencia(id, usuario.contaId);
   if (!c) return { erro: "Competência não encontrada." };
@@ -323,6 +348,10 @@ export async function atualizarCompetenciaAction(_p: Result, formData: FormData)
 export async function vincularEmpenhoAction(competenciaId: string, empenhoId: string, valor: number | null): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const c = await carregarCompetencia(competenciaId, usuario.contaId);
   if (!c) return { erro: "Competência não encontrada." };
   if (!podeEditarDocumento(usuario, c.contrato)) return { erro: mensagemSemPermissao(c.contrato) };
@@ -342,6 +371,10 @@ export async function vincularEmpenhoAction(competenciaId: string, empenhoId: st
 export async function desvincularEmpenhoAction(competenciaId: string, empenhoId: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const c = await carregarCompetencia(competenciaId, usuario.contaId);
   if (!c) return { erro: "Competência não encontrada." };
   if (!podeEditarDocumento(usuario, c.contrato)) return { erro: mensagemSemPermissao(c.contrato) };
@@ -354,6 +387,10 @@ export async function desvincularEmpenhoAction(competenciaId: string, empenhoId:
 export async function excluirCompetenciaAction(id: string, justificativa: string): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   if (!(usuario.superAdmin || usuario.perfil === "ADMIN")) return { erro: "Só um ADMIN da empresa pode excluir competência." };
   if (!justificativa.trim()) return { erro: "Informe a justificativa da exclusão." };
   const c = await carregarCompetencia(id, usuario.contaId);
@@ -374,6 +411,10 @@ export async function excluirCompetenciaAction(id: string, justificativa: string
 export async function criarCompetenciaComplementarAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const contrato = await carregarContratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
@@ -421,6 +462,10 @@ export async function criarCompetenciaComplementarAction(_p: Result, formData: F
 export async function registrarSuspensaoAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const contrato = await carregarContratoDaConta(contratoId, usuario.contaId);
   if (!contrato) return { erro: "Contrato não encontrado." };
@@ -463,6 +508,10 @@ type AlteracaoPosto = {
 export async function alterarPostosAction(_p: Result, formData: FormData): Promise<Result> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "");
   const vigenciaId = String(formData.get("vigenciaId") || "");
   const contrato = await carregarContratoDaConta(contratoId, usuario.contaId);

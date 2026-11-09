@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
+import { bloqueioModulo } from "@/lib/faixasTerceirizacaoServer";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { salvarArquivo } from "@/lib/uploads";
 import { anexarArquivosDaIa } from "@/lib/anexosDaIa";
@@ -40,6 +41,10 @@ const MAX_ARQUIVOS = 8;
 export async function lerPlanilhasCustosAction(formData: FormData): Promise<LeituraPlanilhasResult> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const contratoId = String(formData.get("contratoId") || "").trim();
   const files = formData.getAll("pdf").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) return { ok: false, erro: "Selecione ao menos um arquivo PDF ou Excel." };
@@ -131,6 +136,10 @@ export type SalvarPlanilhaResult = { ok: true; id: string; versao: number } | { 
 export async function salvarPlanilhaCustosAction(input: SalvarPlanilhaInput): Promise<SalvarPlanilhaResult> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const parsed = salvarSchema.safeParse(input);
   if (!parsed.success) return { ok: false, erro: parsed.error.issues[0]?.message ?? "Dados inválidos." };
   const v = parsed.data;
@@ -241,6 +250,10 @@ export async function salvarPlanilhaCustosAction(input: SalvarPlanilhaInput): Pr
 export async function excluirPlanilhaCustosAction(id: string): Promise<{ ok: true } | { ok: false; erro: string }> {
   const usuario = await exigirUsuario();
   await bloquearEspionagem();
+  {
+    const bloqueio = await bloqueioModulo(usuario.contaId);
+    if (bloqueio) return { erro: bloqueio } as never;
+  }
   const planilha = await prisma.planilhaCustos.findFirst({
     where: { id, contrato: { empresa: { contaId: usuario.contaId } } },
     select: { id: true, funcao: true, versao: true, contrato: { select: { id: true, criadoPorId: true } } },
