@@ -45,7 +45,7 @@ export default async function AdminAtividadePage({
     where: {
       // Ignora atividade dos super admins (Igor/Regina) — atividade é
       // pra monitorar uso dos clientes, não dos próprios gestores.
-      conta: { usuarios: { none: { superAdmin: true } } },
+      conta: { contaTeste: false, usuarios: { none: { superAdmin: true } } },
       ...(q && {
         OR: [
           { recurso: { contains: q, mode: "insensitive" } },

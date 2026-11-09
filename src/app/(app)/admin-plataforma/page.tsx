@@ -60,7 +60,7 @@ export default async function AdminPlataformaPage() {
   //   analista (/painel-analista/importar) — ninguém loga nela e ela nunca gerou
   //   fatura. Contar como "em trial" encheria o funil de empresa que não pediu
   //   nada; quando o cliente assina, o signup absorve o cadastro e aí ele entra.
-  const semSuperAdmin = { usuarios: { none: { superAdmin: true }, some: {} } };
+  const semSuperAdmin = { contaTeste: false, usuarios: { none: { superAdmin: true }, some: {} } };
 
   const [contas, contasUltimoMes, atividadeRecente] = await Promise.all([
     prisma.conta.findMany({

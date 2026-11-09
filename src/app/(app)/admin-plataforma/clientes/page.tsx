@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Crown, Search, ArrowUpRight, AlertTriangle, CheckCircle2, Clock, XCircle, Eye, ShieldCheck } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { asaasDisponivel, pagamentosAsaas, resumoPorConta, type ResumoCobrancaConta } from "@/lib/asaasFinanceiro";
 import { contaEhPagante, mensalidadeDaConta } from "@/lib/metricasReceita";
 import { entrarEspionagemAction } from "@/lib/espionagem";
 import { montarLabelEmpresa } from "@/lib/empresaLabel";
@@ -93,6 +94,27 @@ export default async function AdminClientesPage({
     orderBy: { criadoEm: "desc" },
   });
 
+  // Regina 09/11/2026: "ao lado de cada cliente, quando é feita a cobrança
+  // e qual a data do próximo pagamento — temos que ter clareza". Lido do
+  // Asaas; se a assinatura ainda não gerou a próxima cobrança, vale o
+  // nextDueDate da assinatura; sem Asaas, o vencimento gravado na conta.
+  const asaas = await pagamentosAsaas("2026-01-01");
+  const resumoCob: Map<string, ResumoCobrancaConta> = asaas.ok ? resumoPorConta(asaas.dados) : new Map();
+  const proxDaAssinatura = new Map<string, { vencimento: string; valor: number | null }>();
+  const gw = await asaasDisponivel();
+  if (gw) {
+    await Promise.all(
+      contas
+        .filter((c) => c.gatewaySubscriptionId && !resumoCob.get(c.id)?.proxima)
+        .map(async (c) => {
+          const sub = await gw.consultarAssinatura(c.gatewaySubscriptionId as string).catch(() => null);
+          if (sub?.proximoVencimento && sub.status === "ACTIVE") proxDaAssinatura.set(c.id, { vencimento: sub.proximoVencimento.toISOString().slice(0, 10), valor: null });
+        }),
+    );
+  }
+  const dBr = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+  const FORMA: Record<string, string> = { PIX: "PIX", CREDIT_CARD: "cartão", BOLETO: "boleto", UNDEFINED: "" };
+
   return (
     <div className="mx-auto max-w-[1400px] px-8 py-8">
       <div className="flex items-end justify-between gap-6">
@@ -149,6 +171,11 @@ export default async function AdminClientesPage({
           mas nao o achado: com 1100px de largura minima, a coluna de Acoes fica
           fora da tela num notebook e so aparece rolando pro lado. Agora ela e
           sticky na direita, entao o botao fica visivel sem rolagem nenhuma. */}
+      {asaas.ok ? (
+        <p className="mt-4 text-xs text-slate-500">Cobranças e próximos pagamentos lidos do Asaas em {asaas.lidoEm.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.</p>
+      ) : (
+        <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">Asaas não respondeu ({asaas.erro}). Próximo pagamento mostrado pelo registro interno.</p>
+      )}
       <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
@@ -159,6 +186,8 @@ export default async function AdminClientesPage({
               <th className="px-4 py-3 text-left font-medium">Plano</th>
               <th className="px-4 py-3 text-right font-medium">MRR</th>
               <th className="px-4 py-3 text-left font-medium">Origem</th>
+              <th className="px-4 py-3 text-left font-medium">Última cobrança paga</th>
+              <th className="px-4 py-3 text-left font-medium">Próximo pagamento</th>
               <th className="px-4 py-3 text-left font-medium">Adimplência</th>
               <th className="px-4 py-3 text-left font-medium">Criada em</th>
               <th className="sticky right-0 z-10 bg-slate-50 px-4 py-3 text-right font-medium shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)]">
@@ -177,6 +206,7 @@ export default async function AdminClientesPage({
               const conf = STATUS_LABEL[c.statusAssinatura] || STATUS_LABEL.ATIVA;
               const Icon = conf.icone;
               const ehContaAdmin = c.usuarios.some((u) => u.superAdmin);
+              const ehContaTeste = c.contaTeste;
               // Cadastro criado pela importacao de carteira do analista: existe
               // pra a empresa aparecer no painel dele, ninguem loga nela e ela
               // nunca gerou fatura. Sem usuario e sem cobranca e a marca desse
@@ -194,7 +224,7 @@ export default async function AdminClientesPage({
               // `PREMIUM ? 997 : 397`, e o plano INTERMEDIARIO (R$ 697)
               // aparecia como R$ 397 na tela.
               const mrr =
-                ehContaAdmin || ehCarteiraImportada ? 0 : contaEhPagante(c) ? mensalidadeDaConta(c) : 0;
+                ehContaAdmin || ehContaTeste || ehCarteiraImportada ? 0 : contaEhPagante(c) ? mensalidadeDaConta(c) : 0;
               const totalCob = c.cobrancas.length;
               const pagas = c.cobrancas.filter((cb) => cb.status === "PAGA").length;
               const adimplenciaPct = totalCob > 0 ? (pagas / totalCob) * 100 : null;
@@ -208,6 +238,11 @@ export default async function AdminClientesPage({
                         <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
                           <ShieldCheck className="h-2.5 w-2.5" />
                           Adm CP
+                        </span>
+                      )}
+                      {ehContaTeste && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                          Conta de teste
                         </span>
                       )}
                       {ehCarteiraImportada && (
@@ -224,18 +259,72 @@ export default async function AdminClientesPage({
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-600">{c.tipo}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center gap-1 rounded-full ${conf.bg} ${conf.cor} px-2 py-0.5 text-[11px] font-semibold`}>
-                      <Icon className="h-3 w-3" />
-                      {conf.rotulo}
-                    </span>
+                    {ehContaTeste ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Teste · não é cliente</span>
+                    ) : (
+                      <span className={`inline-flex items-center gap-1 rounded-full ${conf.bg} ${conf.cor} px-2 py-0.5 text-[11px] font-semibold`}>
+                        <Icon className="h-3 w-3" />
+                        {conf.rotulo}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-700">{c.plano}</td>
+                  <td className="px-4 py-3 text-xs text-slate-700">{ehContaTeste ? <span className="text-slate-400">— (demonstração)</span> : c.plano}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-slate-900">
                     {mrr > 0 ? brl(mrr) : "—"}
                   </td>
                   <td className="px-4 py-3 text-xs text-slate-600">
                     {c.embaixador?.nomeCompleto ? `Indicação: ${c.embaixador.nomeCompleto}` : "Direto"}
                   </td>
+                  {(() => {
+                    const rc = resumoCob.get(c.id);
+                    const prox = rc?.proxima ?? (proxDaAssinatura.get(c.id) ? { ...proxDaAssinatura.get(c.id)!, status: "PENDING", forma: null } : null) ?? (!asaas.ok && c.proximoVencimento ? { vencimento: c.proximoVencimento.toISOString().slice(0, 10), valor: null, status: "PENDING", forma: null } : null);
+                    const semCobranca = ehContaAdmin || ehContaTeste || ehCarteiraImportada || c.tipo !== "EMPRESA";
+                    return (
+                      <>
+                        <td className="px-4 py-3 text-xs text-slate-700">
+                          {semCobranca ? (
+                            <span className="text-slate-400">—</span>
+                          ) : rc?.ultimaPaga ? (
+                            <>
+                              <span className="font-semibold text-slate-900">{dBr(rc.ultimaPaga.data)}</span>
+                              <span className="block text-slate-500">
+                                {brl(rc.ultimaPaga.valor)}
+                                {rc.ultimaPaga.forma && FORMA[rc.ultimaPaga.forma] ? ` · ${FORMA[rc.ultimaPaga.forma]}` : ""}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-slate-400">nenhuma ainda</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-700">
+                          {semCobranca ? (
+                            <span className="text-slate-400">—</span>
+                          ) : (
+                            <>
+                              {rc && rc.emAtraso.length > 0 && (
+                                <span className="mb-0.5 block font-semibold text-red-700">
+                                  em atraso: {rc.emAtraso.map((a) => `${dBr(a.vencimento)} (${brl(a.valor)})`).join(", ")}
+                                </span>
+                              )}
+                              {prox ? (
+                                <>
+                                  <span className="font-semibold text-slate-900">{dBr(prox.vencimento)}</span>
+                                  <span className="block text-slate-500">
+                                    {prox.valor != null ? brl(prox.valor) : "conforme assinatura"}
+                                    {prox.forma && FORMA[prox.forma] ? ` · ${FORMA[prox.forma]}` : ""}
+                                  </span>
+                                </>
+                              ) : c.statusAssinatura === "TRIAL" && c.trialAteEm ? (
+                                <span className="text-slate-500">teste até {c.trialAteEm.toLocaleDateString("pt-BR")}</span>
+                              ) : (
+                                <span className="text-slate-400">sem cobrança agendada</span>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      </>
+                    );
+                  })()}
                   <td className="px-4 py-3 text-xs text-slate-700">
                     {adimplenciaPct === null ? (
                       <span className="text-slate-400">—</span>
@@ -281,7 +370,7 @@ export default async function AdminClientesPage({
             })}
             {contas.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-sm text-slate-400">
+                <td colSpan={11} className="px-4 py-12 text-center text-sm text-slate-400">
                   Nenhum cliente encontrado com esses filtros.
                 </td>
               </tr>

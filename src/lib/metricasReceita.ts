@@ -40,11 +40,13 @@ export type ContaParaReceita = {
   plano: string;
   usuarios?: { superAdmin?: boolean | null }[];
   cobrancas?: CobrancaParaReceita[];
+  /** Conta de demonstração/teste (Regina 09/11/2026). */
+  contaTeste?: boolean | null;
 };
 
 /** Conta interna do CP System (Regina/Igor) — existe pra operar, nunca paga. */
 export function ehContaInterna(c: ContaParaReceita): boolean {
-  return (c.usuarios ?? []).some((u) => u.superAdmin === true);
+  return !!c.contaTeste || (c.usuarios ?? []).some((u) => u.superAdmin === true);
 }
 
 /** Já pagou pelo menos uma fatura? É isso que separa cliente de cadastro. */

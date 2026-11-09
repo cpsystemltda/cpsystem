@@ -487,6 +487,49 @@ export class GatewayAsaas implements GatewayPagamento {
     }
   }
 
+  /**
+   * Todas as cobranças da conta Asaas (paginado), para o DRE e a lista de
+   * Clientes do admin lerem o dado real (Regina 09/11/2026: "no DRE você não
+   * puxou nada real do Asaas"). Filtros de data no formato AAAA-MM-DD.
+   */
+  async listarPagamentos(f: { dueDateDe?: string; dueDateAte?: string; paymentDateDe?: string; paymentDateAte?: string; status?: string; customer?: string; subscription?: string } = {}) {
+    type P = {
+      id: string;
+      customer: string;
+      subscription?: string | null;
+      value: number;
+      netValue?: number | null;
+      status: string;
+      dueDate: string;
+      originalDueDate?: string | null;
+      paymentDate?: string | null;
+      clientPaymentDate?: string | null;
+      confirmedDate?: string | null;
+      creditDate?: string | null;
+      estimatedCreditDate?: string | null;
+      billingType?: string;
+      description?: string | null;
+      deleted?: boolean;
+    };
+    const qs = new URLSearchParams();
+    if (f.dueDateDe) qs.set("dueDate[ge]", f.dueDateDe);
+    if (f.dueDateAte) qs.set("dueDate[le]", f.dueDateAte);
+    if (f.paymentDateDe) qs.set("paymentDate[ge]", f.paymentDateDe);
+    if (f.paymentDateAte) qs.set("paymentDate[le]", f.paymentDateAte);
+    if (f.status) qs.set("status", f.status);
+    if (f.customer) qs.set("customer", f.customer);
+    if (f.subscription) qs.set("subscription", f.subscription);
+    const out: P[] = [];
+    for (let offset = 0; offset < 5000; offset += 100) {
+      qs.set("offset", String(offset));
+      qs.set("limit", "100");
+      const r = await this.req<{ data: P[]; hasMore: boolean }>(`/payments?${qs.toString()}`);
+      out.push(...(r.data ?? []));
+      if (!r.hasMore) break;
+    }
+    return out.filter((p) => !p.deleted);
+  }
+
   async listarCobrancasDaAssinatura(subscriptionId: string) {
     type Resp = {
       data: Array<{

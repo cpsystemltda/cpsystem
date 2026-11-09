@@ -47,6 +47,7 @@ export default async function AdminFinanceiroPage() {
     where: {
       tipo: "EMPRESA",
       // Ignora super admins (Igor/Regina) — não são clientes pagantes
+      contaTeste: false,
       usuarios: { none: { superAdmin: true } },
     },
     include: {

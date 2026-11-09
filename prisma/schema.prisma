@@ -63,6 +63,8 @@ model Conta {
   colaboradores                  Colaborador[]
   /// ESP-011 RN07: quando a conta perdeu o acesso ao Módulo Terceirização (rebaixamento/cancelamento); 90 dias de leitura.
   terceirizacaoPerdidaEm         DateTime?
+  /// Conta de demonstração/teste (ex.: Construtora Modelo): não é cliente, não entra em MRR, DRE nem métricas.
+  contaTeste                     Boolean                    @default(false)
   apuracoesColaboradores         ApuracaoColaboradoresMes[]
   apiTokens                      ApiToken[]
   // Cupom aplicado no signup (trial estendido + analista vinculado). Regina 09/07.

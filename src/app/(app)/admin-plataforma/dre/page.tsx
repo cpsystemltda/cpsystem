@@ -50,9 +50,19 @@ export default async function AdminDrePage() {
             </em>
           </h1>
           <p className="mt-2 max-w-[720px] text-[14px]" style={{ color: "var(--text-soft)" }}>
-            Regime de competência: cada valor pertence ao mês a que se refere. Receita, estornos e comissões vêm das faturas e dos
-            repasses registrados; as despesas da plataforma são lançadas abaixo, por mês.
+            Regime de competência: cada valor pertence ao mês de vencimento da cobrança. A receita, as taxas, os estornos e o que está em
+            aberto vêm direto do Asaas; comissões vêm dos repasses registrados; as despesas da plataforma são lançadas abaixo, por mês.
           </p>
+          {dre.fonte === "ASAAS" ? (
+            <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+              ● Dados do Asaas lidos em {dre.lidoEm?.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+              {dre.semCliente.length > 0 && ` · ${dre.semCliente.length} cobrança(s) sem cliente correspondente no CP System`}
+            </p>
+          ) : (
+            <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
+              Asaas não respondeu ({dre.fonteErro}). Os números abaixo são do registro interno e podem estar desatualizados.
+            </p>
+          )}
         </div>
         <div className="flex flex-col items-end gap-2 text-sm font-semibold">
           <Link href="/admin-plataforma/financeiro" className="transition hover:opacity-70" style={{ color: "var(--text-soft)" }}>
@@ -108,6 +118,7 @@ export default async function AdminDrePage() {
               <Linha rotulo="Faturas pagas" meses={meses} total={dre.totais} pega={(l) => l.faturasPagas} formato="n" mudo />
               <Linha rotulo="Clientes pagantes" meses={meses} total={dre.totais} pega={(l) => l.clientesPagantes} formato="n" mudo />
               <Linha rotulo="(−) Estornos" meses={meses} total={dre.totais} pega={(l) => l.estornos} negativo />
+              <Linha rotulo="(−) Taxas do Asaas" meses={meses} total={dre.totais} pega={(l) => l.taxasGateway} negativo />
               <Linha rotulo="= Receita líquida" meses={meses} total={dre.totais} pega={(l) => l.receitaLiquida} forte />
 
               <Secao titulo="Custos variáveis" colunas={meses.length + 2} />
@@ -140,6 +151,7 @@ export default async function AdminDrePage() {
 
               <Secao titulo="Memorando (não entra no resultado)" colunas={meses.length + 2} />
               <Linha rotulo="Faturas da competência ainda em aberto" meses={meses} total={dre.totais} pega={(l) => l.aReceber} mudo />
+              <Linha rotulo="Dinheiro que entrou no mês (líquido, data do pagamento)" meses={meses} total={dre.totais} pega={(l) => l.recebidoNoMes} mudo />
               <Linha rotulo="Comissões já repassadas por PIX" meses={meses} total={dre.totais} pega={(l) => l.comissoesPagas} mudo />
             </tbody>
           </table>
