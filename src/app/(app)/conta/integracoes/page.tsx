@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { NOME_CALENDAR_CPS } from "@/lib/googleCalendar";
 import { DesconectarGoogleForm } from "./DesconectarForm";
 import { PreferenciasSyncForm } from "./PreferenciasSyncForm";
+import { ApiTokensSection } from "./ApiTokensSection";
 
 export default async function IntegracoesPage({
   searchParams,
@@ -42,6 +43,11 @@ export default async function IntegracoesPage({
       syncCobrancas: true,
     },
   });
+
+  // API do CP System (pedido do Léo, 06/11/2026): tokens da conta.
+  const apiTokens = (
+    await prisma.apiToken.findMany({ where: { contaId: usuario.contaId, revogadoEm: null }, orderBy: { criadoEm: "desc" }, select: { id: true, nome: true, prefixo: true, escopos: true, criadoEm: true, ultimoUsoEm: true, usos: true } })
+  ).map((t) => ({ ...t, criadoEm: t.criadoEm.toISOString(), ultimoUsoEm: t.ultimoUsoEm ? t.ultimoUsoEm.toISOString() : null }));
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -252,6 +258,8 @@ export default async function IntegracoesPage({
           </div>
         </div>
       </section>
+
+      <ApiTokensSection tokens={apiTokens} ehAdmin={usuario.perfil === "ADMIN" && !usuario.espionando} />
 
       <div className="mt-6 text-center text-xs" style={{ color: "var(--text-mute)" }}>
         <Link href="/conta/assinatura" className="hover:underline">

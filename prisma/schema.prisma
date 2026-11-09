@@ -46,9 +46,9 @@ model Conta {
   /// Trial sem uso: arquiva em 30 dias, apaga em 60. A exclusão é a última
   /// etapa, nunca a primeira.
   arquivadaEm                    DateTime?
-  tipo                           TipoConta          @default(EMPRESA)
-  plano                          Plano              @default(BASICO)
-  statusAssinatura               StatusAssinatura   @default(TRIAL)
+  tipo                           TipoConta                  @default(EMPRESA)
+  plano                          Plano                      @default(BASICO)
+  statusAssinatura               StatusAssinatura           @default(TRIAL)
   trialAteEm                     DateTime?
   proximoVencimento              DateTime?
   termosAceitosEm                DateTime?
@@ -57,13 +57,17 @@ model Conta {
   // tipo da conta, o /termos volta a mostrar botao "Li e aceito".
   termosAceitosVersao            String?
   /// ESP-007 RN07/RN08: retenção de dados de colaboradores após o fim do contrato e aceite do adendo LGPD.
-  retencaoDadosColaboradoresAnos Int                @default(5)
+  retencaoDadosColaboradoresAnos Int                        @default(5)
   adendoLgpdVersao               String?
   aceitesAdendoLgpd              AceiteAdendoLgpd[]
   colaboradores                  Colaborador[]
+  /// ESP-011 RN07: quando a conta perdeu o acesso ao Módulo Terceirização (rebaixamento/cancelamento); 90 dias de leitura.
+  terceirizacaoPerdidaEm         DateTime?
+  apuracoesColaboradores         ApuracaoColaboradoresMes[]
+  apiTokens                      ApiToken[]
   // Cupom aplicado no signup (trial estendido + analista vinculado). Regina 09/07.
   cupomAplicadoId                String?
-  cupomAplicado                  Cupom?             @relation(fields: [cupomAplicadoId], references: [id])
+  cupomAplicado                  Cupom?                     @relation(fields: [cupomAplicadoId], references: [id])
   embaixadorId                   String? // analista que indicou esta conta (programa de embaixadores SaaS — não confundir com VinculoAnalista B2G)
   // Programa de referral cliente-indica-cliente (Regina 08/06, plano marketing v7).
   // Quando cliente atual compartilha link `/conta/indicar` e outra empresa
@@ -88,7 +92,7 @@ model Conta {
   // Cliente escolhe janela mensal (dia 1-31) — cron dispara lembretes 5d/1d/no dia.
   // null = não configurado (opt-out). Se plano BASICO, ignorar mesmo se preenchido.
   conciliacaoDiaMes              Int?
-  conciliacaoOptIn               Boolean            @default(true)
+  conciliacaoOptIn               Boolean                    @default(true)
   // Cortesia temporaria: quando setada, a conta ganha acesso a conciliacao
   // bancaria mesmo estando no plano BASICO ate a data indicada. Regina 30/07
   // (Leo Santos foi o 1o beneficiado — 30 dias).
@@ -106,8 +110,8 @@ model Conta {
   // Marca quando a conversao "assinatura paga" ja foi exportada pro Google Ads
   // (upload offline), pra nao contar a mesma venda duas vezes.
   conversaoEnviadaEm             DateTime?
-  criadoEm                       DateTime           @default(now())
-  atualizadoEm                   DateTime           @updatedAt
+  criadoEm                       DateTime                   @default(now())
+  atualizadoEm                   DateTime                   @updatedAt
 
   usuarios         Usuario[]
   empresas         Empresa[]
@@ -294,6 +298,8 @@ enum TipoNotificacaoWhatsApp {
   /// ESP-007 RN07 (Igor 07/11/2026) — aviso ao Admin 30 dias antes da
   /// anonimização de colaboradores pelo prazo de retenção.
   LGPD_ANONIMIZACAO
+  /// ESP-011 RN04 — conta perto do limite da faixa de colaboradores ou mudou de faixa.
+  TERCEIRIZACAO_FAIXA
   /// Igor 30/10 — convite para a conversa de follow-up quando o cliente entra
   /// na janela do marco (30/60/90/180 dias e trimestral). Um por marco, pela
   /// chave (usuarioId, tipo, referenciaId="convite-<contaId>-<marco>"). A
@@ -3651,4 +3657,56 @@ model DossieCompetencia {
   geradoEm      DateTime    @default(now())
 
   @@index([competenciaId, geradoEm])
+}
+
+// ============================================================
+// COBRANÇA POR FAIXA DE COLABORADORES (ESP-011, Igor 07/11/2026)
+// Pico do mês de colaboradores ativos com alocação aberta (todos os CNPJs
+// da conta), apurado diariamente; a faixa do mês é a do pico.
+// ============================================================
+
+model ApuracaoColaboradoresMes {
+  id                        String    @id @default(cuid())
+  contaId                   String
+  conta                     Conta     @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  competencia               String // "2026-11"
+  pico                      Int       @default(0)
+  picoEm                    DateTime?
+  ultimoValor               Int       @default(0)
+  faixaIndice               Int       @default(0)
+  faixaValor                Float     @default(0)
+  aviso90Em                 DateTime?
+  mudancaFaixaAvisadaIndice Int?
+  /// Preenchido quando o adicional entrar numa cobrança (Asaas) — RN05 pendente de decisão.
+  cobradoEm                 DateTime?
+  cobrancaRef               String?
+  atualizadoEm              DateTime  @updatedAt
+  criadoEm                  DateTime  @default(now())
+
+  @@unique([contaId, competencia])
+}
+
+// ============================================================
+// API PÚBLICA DO CP SYSTEM (pedido do Léo/Green, vídeo de 06/11/2026)
+// Token por conta, guardado só como hash (sha256); o valor aparece uma
+// única vez na criação. Escopos: leitura e baixa de pagamento.
+// ============================================================
+
+model ApiToken {
+  id          String    @id @default(cuid())
+  contaId     String
+  conta       Conta     @relation(fields: [contaId], references: [id], onDelete: Cascade)
+  nome        String
+  prefixo     String // "cps_live_ab12" — para reconhecer na tela
+  hash        String    @unique
+  escopos     String[] // "leitura" | "pagamentos:escrita"
+  criadoPorId String?
+  criadoEm    DateTime  @default(now())
+  ultimoUsoEm DateTime?
+  ultimoIp    String?
+  usos        Int       @default(0)
+  revogadoEm  DateTime?
+  expiraEm    DateTime?
+
+  @@index([contaId])
 }
