@@ -530,6 +530,16 @@ export class GatewayAsaas implements GatewayPagamento {
     return out.filter((p) => !p.deleted);
   }
 
+  /** Nome/CPF-CNPJ do cliente no Asaas — para identificar cobrança sem conta no CP System. */
+  async nomeDoCliente(customerId: string): Promise<{ nome: string; documento: string | null; email: string | null } | null> {
+    try {
+      const c = await this.req<{ name?: string; cpfCnpj?: string | null; email?: string | null }>(`/customers/${encodeURIComponent(customerId)}`);
+      return { nome: c.name ?? "", documento: c.cpfCnpj ?? null, email: c.email ?? null };
+    } catch {
+      return null;
+    }
+  }
+
   async listarCobrancasDaAssinatura(subscriptionId: string) {
     type Resp = {
       data: Array<{
