@@ -187,7 +187,7 @@ export function alertasContaVinculada(opts: {
     if (!pedidoAberto(p.status)) continue;
     const dias = Math.floor((opts.hoje.getTime() - p.dataPedido.getTime()) / DIA_MS);
     if (dias > prazo) {
-      out.push({ tipo: "PEDIDO_PARADO", grave: true, texto: `Pedido de liberação (${ROTULO_FATO_GERADOR[p.fatoGerador as FatoGerador] ?? p.fatoGerador}, R$ ${p.valorSolicitado.toFixed(2)}) protocolado há ${dias} dias sem resposta — prazo de ${prazo} dias.` });
+      out.push({ tipo: "PEDIDO_PARADO", grave: true, texto: `Pedido de liberação (${ROTULO_FATO_GERADOR[p.fatoGerador as FatoGerador] ?? p.fatoGerador}, ${moedaBr(p.valorSolicitado)}) protocolado há ${dias} dias sem resposta — prazo de ${prazo} dias.` });
     }
   }
   // 13º: de 1º/11 a 30/11, retenção acumulada no ano e nenhum pedido de 13º neste ano.
@@ -195,11 +195,16 @@ export function alertasContaVinculada(opts: {
   const mes = opts.hoje.getUTCMonth() + 1;
   if (mes === 11 && opts.retidoNoAno > 0) {
     const temPedido13 = opts.pedidos.some((p) => p.fatoGerador === "DECIMO_TERCEIRO" && p.status !== "INDEFERIDO" && (p.competenciaRef?.startsWith(String(ano)) || p.dataPedido.getUTCFullYear() === ano));
-    if (!temPedido13) out.push({ tipo: "DECIMO_SEM_PEDIDO", grave: false, texto: `Há R$ ${opts.retidoNoAno.toFixed(2)} ${opts.fatoGerador ? "provisionados" : "retidos"} em ${ano} e nenhum pedido de liberação do 13º até agora — o prazo de referência é 30/11.` });
+    if (!temPedido13) out.push({ tipo: "DECIMO_SEM_PEDIDO", grave: false, texto: `Há ${opts.retidoNoAno.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} ${opts.fatoGerador ? "provisionados" : "retidos"} em ${ano} e nenhum pedido de liberação do 13º até agora — o prazo de referência é 30/11.` });
   }
   const diasParaFim = Math.ceil((opts.vigenciaFim.getTime() - opts.hoje.getTime()) / DIA_MS);
   if (diasParaFim <= 60 && opts.saldo > 0) {
-    out.push({ tipo: "FIM_VIGENCIA_COM_SALDO", grave: diasParaFim <= 0, texto: diasParaFim <= 0 ? `Vigência encerrada com ${opts.fatoGerador ? "valores provisionados não pagos" : "saldo na conta vinculada"} de R$ ${opts.saldo.toFixed(2)}: situação "a resgatar".` : `Vigência termina em ${diasParaFim} dias e ainda há R$ ${opts.saldo.toFixed(2)} ${opts.fatoGerador ? "provisionados não pagos" : "na conta vinculada"}.` });
+    out.push({ tipo: "FIM_VIGENCIA_COM_SALDO", grave: diasParaFim <= 0, texto: diasParaFim <= 0 ? `Vigência encerrada com ${opts.fatoGerador ? "valores provisionados não pagos" : "saldo na conta vinculada"} de ${moedaBr(opts.saldo)}: situação "a resgatar".` : `Vigência termina em ${diasParaFim} dias e ainda há ${moedaBr(opts.saldo)} ${opts.fatoGerador ? "provisionados não pagos" : "na conta vinculada"}.` });
   }
   return out;
+}
+
+
+function moedaBr(v: number): string {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }

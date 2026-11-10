@@ -1,4 +1,5 @@
 "use client";
+import { ROTULO_STATUS, type StatusCompetencia } from "@/lib/competencias";
 
 import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
@@ -230,7 +231,7 @@ export function ContaVinculadaTab({ contratoId, resumo, podeEditar, hojeIso }: {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-1.5 text-xs text-slate-600">{r.status === "PAGA" ? "Paga" : r.status.replace(/_/g, " ").toLowerCase()}</td>
+                      <td className="px-4 py-1.5 text-xs text-slate-600">{ROTULO_STATUS[r.status as StatusCompetencia] ?? r.status}</td>
                       <td className="px-4 py-1.5 text-right tabular-nums">{r.estimada != null ? brl(r.estimada) : <span className="text-slate-400">—</span>}</td>
                       <td className="px-4 py-1.5 text-right tabular-nums">{r.informada != null ? brl(r.informada) : <span className="text-slate-400">—</span>}</td>
                       <td className={`px-4 py-1.5 text-right tabular-nums ${r.status === "PAGA" ? "font-semibold text-slate-900" : "text-slate-400"}`}>{r.status === "PAGA" ? brl(r.efetiva) : "—"}</td>
