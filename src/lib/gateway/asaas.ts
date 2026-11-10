@@ -530,6 +530,34 @@ export class GatewayAsaas implements GatewayPagamento {
     return out.filter((p) => !p.deleted);
   }
 
+  /**
+   * Extrato da conta Asaas (entradas e SAÍDAS): transferências/PIX enviados,
+   * pagamento de contas, taxas, estornos. Base das despesas reais do DRE
+   * (Regina 10/11/2026: "não está incluindo os pagamentos feitos").
+   */
+  async listarExtrato(desde: string, ate: string) {
+    type T = { id: string; value: number; balance?: number; type: string; date: string; description?: string | null; paymentId?: string | null; transferId?: string | null; billId?: string | null };
+    const out: T[] = [];
+    for (let offset = 0; offset < 10000; offset += 100) {
+      const r = await this.req<{ data: T[]; hasMore: boolean }>(`/financialTransactions?startDate=${desde}&finishDate=${ate}&offset=${offset}&limit=100`);
+      out.push(...(r.data ?? []));
+      if (!r.hasMore) break;
+    }
+    return out;
+  }
+
+  /** Transferências enviadas (PIX/TED) com o destinatário. */
+  async listarTransferencias(desde: string) {
+    type T = { id: string; value: number; netValue?: number; transferFee?: number; status: string; dateCreated: string; effectiveDate?: string | null; scheduleDate?: string | null; description?: string | null; externalReference?: string | null; operationType?: string; type?: string; bankAccount?: { ownerName?: string; cpfCnpj?: string; bank?: { name?: string } } | null; pixAddressKey?: string | null };
+    const out: T[] = [];
+    for (let offset = 0; offset < 5000; offset += 100) {
+      const r = await this.req<{ data: T[]; hasMore: boolean }>(`/transfers?dateCreated[ge]=${desde}&offset=${offset}&limit=100`);
+      out.push(...(r.data ?? []));
+      if (!r.hasMore) break;
+    }
+    return out;
+  }
+
   /** Nome/CPF-CNPJ do cliente no Asaas — para identificar cobrança sem conta no CP System. */
   async nomeDoCliente(customerId: string): Promise<{ nome: string; documento: string | null; email: string | null } | null> {
     try {

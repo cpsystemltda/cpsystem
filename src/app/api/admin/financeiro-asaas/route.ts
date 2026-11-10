@@ -15,8 +15,14 @@ export async function GET(req: Request) {
   const g = await asaasDisponivel();
   const semConta = Array.from(new Set(p.dados.filter((x) => !x.contaId).map((x) => x.customer)));
   const pagadores = g ? await Promise.all(semConta.map(async (c) => ({ customer: c, ...(await g.nomeDoCliente(c)), cobrancas: p.dados.filter((x) => x.customer === c).map((x) => ({ valor: x.valor, vencimento: x.vencimento, descricao: x.descricao, assinatura: !!x.subscription })) }))) : [];
+  const url = new URL(req.url);
+  const saidas = url.searchParams.get("saidas") === "1" && g ? {
+    extrato: await g.listarExtrato("2025-01-01", new Date().toISOString().slice(0, 10)).catch((e) => String(e)),
+    transferencias: await g.listarTransferencias("2025-01-01").catch((e) => String(e)),
+  } : null;
   return NextResponse.json({
     ok: true,
+    saidas,
     pagadores,
     pagamentos: p.dados.map((x) => ({ id: x.id, conta: x.contaNome, interna: x.contaInterna, status: x.status, valor: x.valor, liquido: x.liquido, vencimento: x.vencimento, pagamento: x.pagamento, forma: x.forma })),
     porConta: Array.from(resumo.entries()).map(([contaId, r]) => ({ contaId, nome: p.dados.find((x) => x.contaId === contaId)?.contaNome, ...r })),
