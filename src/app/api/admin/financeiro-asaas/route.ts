@@ -16,6 +16,12 @@ export async function GET(req: Request) {
   const semConta = Array.from(new Set(p.dados.filter((x) => !x.contaId).map((x) => x.customer)));
   const pagadores = g ? await Promise.all(semConta.map(async (c) => ({ customer: c, ...(await g.nomeDoCliente(c)), cobrancas: p.dados.filter((x) => x.customer === c).map((x) => ({ valor: x.valor, vencimento: x.vencimento, descricao: x.descricao, assinatura: !!x.subscription })) }))) : [];
   const url = new URL(req.url);
+  if (url.searchParams.get("fixture") === "1") {
+    // Cópia crua para pré-visualizar telas no ambiente local (ASAAS_FIXTURE_FILE).
+    const { saidasAsaas } = await import("@/lib/asaasFinanceiro");
+    const sd = await saidasAsaas();
+    return NextResponse.json({ pagamentos: p.dados, saidas: sd.ok ? sd.saidas : [], taxasPorMes: sd.ok ? Object.fromEntries(sd.taxasPorMes) : {} });
+  }
   if (url.searchParams.get("monitor") === "1") {
     const { monitorarCobrancas, textoDoMonitor } = await import("@/lib/monitorCobrancas");
     const m = await monitorarCobrancas();

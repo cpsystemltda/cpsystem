@@ -43,6 +43,19 @@ export const STATUS_ESTORNO = ["REFUNDED", "REFUND_REQUESTED", "CHARGEBACK_REQUE
 
 let cache: { em: number; dados: PagamentoAsaas[] } | null = null;
 
+/**
+ * Só no ambiente local: ASAAS_FIXTURE_FILE aponta para uma cópia dos dados do
+ * Asaas (rota de conferência `?fixture=1`) para pré-visualizar DRE e Clientes.
+ * Em produção é ignorado.
+ */
+type Fixture = { pagamentos: PagamentoAsaas[]; saidas: SaidaAsaas[]; taxasPorMes: Record<string, number> };
+async function fixtureLocal(): Promise<Fixture | null> {
+  const arq = process.env.ASAAS_FIXTURE_FILE;
+  if (!arq || process.env.NODE_ENV === "production") return null;
+  const { readFile } = await import("node:fs/promises");
+  return JSON.parse(await readFile(arq, "utf8")) as Fixture;
+}
+
 export async function asaasDisponivel(): Promise<GatewayAsaas | null> {
   const g = await getGateway();
   return g instanceof GatewayAsaas ? g : null;
@@ -50,6 +63,8 @@ export async function asaasDisponivel(): Promise<GatewayAsaas | null> {
 
 /** Todas as cobranças desde `desde` (vencimento), com o cliente do CP System ao lado. */
 export async function pagamentosAsaas(desde = "2025-01-01", forcar = false): Promise<{ ok: true; dados: PagamentoAsaas[]; lidoEm: Date } | { ok: false; erro: string }> {
+  const fx = await fixtureLocal();
+  if (fx) return { ok: true, dados: fx.pagamentos, lidoEm: new Date() };
   if (!forcar && cache && Date.now() - cache.em < 5 * 60_000) return { ok: true, dados: cache.dados, lidoEm: new Date(cache.em) };
   const g = await asaasDisponivel();
   if (!g) return { ok: false, erro: "Gateway Asaas não configurado neste ambiente." };
@@ -181,6 +196,8 @@ function classificar(destinatario: string, descricao: string, socios: string[]):
 }
 
 export async function saidasAsaas(desde = "2025-01-01"): Promise<{ ok: true; saidas: SaidaAsaas[]; taxasPorMes: Map<string, number> } | { ok: false; erro: string }> {
+  const fx = await fixtureLocal();
+  if (fx) return { ok: true, saidas: fx.saidas, taxasPorMes: new Map(Object.entries(fx.taxasPorMes)) };
   const g = await asaasDisponivel();
   if (!g) return { ok: false, erro: "Gateway Asaas não configurado neste ambiente." };
   try {
