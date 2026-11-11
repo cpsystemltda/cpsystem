@@ -21,7 +21,9 @@ export type PagamentoAsaas = {
   valor: number;
   liquido: number | null;
   status: string; // PENDING | RECEIVED | CONFIRMED | OVERDUE | REFUNDED | RECEIVED_IN_CASH | ...
-  vencimento: string; // AAAA-MM-DD
+  vencimento: string; // AAAA-MM-DD (atual no Asaas)
+  /** Mês a que a cobrança se refere: o do nosso registro (Cobranca.competencia), senão o vencimento ORIGINAL no Asaas. */
+  competencia: string;
   pagamento: string | null; // data em que foi pago
   credito: string | null; // data em que caiu (ou previsão)
   forma: string | null;
@@ -58,6 +60,10 @@ export async function pagamentosAsaas(desde = "2025-01-01", forcar = false): Pro
       select: { id: true, gatewayCustomerId: true, contaTeste: true, usuarios: { select: { superAdmin: true } }, empresas: { select: { razaoSocial: true, nomeFantasia: true }, take: 1, orderBy: { criadoEm: "asc" } } },
     });
     const porCustomer = new Map(contas.map((c) => [c.gatewayCustomerId as string, c]));
+    // Competência pelo nosso registro: ajustes no Asaas (troca de cartão, data
+    // remarcada) mudam o dueDate e jogavam a mensalidade para o mês errado.
+    const locais = await prisma.cobranca.findMany({ where: { gatewayChargeId: { in: brutos.map((p) => p.id) } }, select: { gatewayChargeId: true, competencia: true } });
+    const compLocal = new Map(locais.map((l) => [l.gatewayChargeId as string, l.competencia]));
     // Pagadores sem conta no CP System (Regina 09/11/2026: são os aportes dela e do Igor).
     const semConta = Array.from(new Set(brutos.filter((p) => !porCustomer.has(p.customer)).map((p) => p.customer)));
     const nomes = new Map(await Promise.all(semConta.map(async (c) => [c, (await g.nomeDoCliente(c))?.nome || null] as const)));
@@ -71,6 +77,7 @@ export async function pagamentosAsaas(desde = "2025-01-01", forcar = false): Pro
         liquido: p.netValue ?? null,
         status: p.status,
         vencimento: p.dueDate,
+        competencia: compLocal.get(p.id) ?? (p.originalDueDate ?? p.dueDate).slice(0, 7),
         pagamento: p.paymentDate ?? p.clientPaymentDate ?? p.confirmedDate ?? null,
         credito: p.creditDate ?? p.estimatedCreditDate ?? null,
         forma: p.billingType ?? null,

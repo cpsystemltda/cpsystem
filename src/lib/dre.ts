@@ -162,7 +162,7 @@ export async function montarDre(opts?: { ate?: string }): Promise<Dre> {
       const st = STATUS_RECEBIDO.includes(p.status) ? "PAGA" : STATUS_ESTORNO.includes(p.status) ? "ESTORNADA" : STATUS_EM_ABERTO.includes(p.status) ? "ABERTA" : null;
       if (!st) continue;
       if (!p.contaId) semCliente.push({ id: p.id, valor: p.valor, vencimento: p.vencimento, status: p.status });
-      movs.push({ contaId: p.contaId ?? `asaas:${p.customer}`, competencia: p.vencimento.slice(0, 7), status: st, valor: p.valor, taxa: st === "PAGA" && p.liquido != null ? Math.max(0, p.valor - p.liquido) : 0, pagoEm: st === "PAGA" ? p.pagamento : null });
+      movs.push({ contaId: p.contaId ?? `asaas:${p.customer}`, competencia: p.competencia.slice(0, 7), status: st, valor: p.valor, taxa: st === "PAGA" && p.liquido != null ? Math.max(0, p.valor - p.liquido) : 0, pagoEm: st === "PAGA" ? p.pagamento : null });
     }
   } else {
     movs = cobrancasLocais.map((c) => ({ contaId: c.contaId, competencia: c.competencia, status: c.status === "PAGA" ? "PAGA" : c.status === "ESTORNADA" ? "ESTORNADA" : "ABERTA", valor: c.valor, taxa: 0, pagoEm: null }));
