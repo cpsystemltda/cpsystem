@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Crown } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
+import { SeletorClasse } from "./SeletorClasse";
 import { montarDre, rotuloMes, ROTULO_CATEGORIA, CATEGORIAS_DESPESA, type LinhaDre, type CategoriaDespesa } from "@/lib/dre";
 import { FormDespesa, BotaoExcluirDespesa } from "./FormDespesa";
 
@@ -154,9 +155,53 @@ export default async function AdminDrePage() {
               <Linha rotulo="Dinheiro que entrou no mês (líquido, data do pagamento)" meses={meses} total={dre.totais} pega={(l) => l.recebidoNoMes} mudo />
               <Linha rotulo="Comissões já repassadas por PIX" meses={meses} total={dre.totais} pega={(l) => l.comissoesPagas} mudo />
               <Linha rotulo="Aportes dos sócios na conta do Asaas (não é receita)" meses={meses} total={dre.totais} pega={(l) => l.aportesNoMes} mudo />
+              <Linha rotulo="Retiradas e reembolsos aos sócios (não é despesa)" meses={meses} total={dre.totais} pega={(l) => l.retiradasNoMes} mudo />
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}>
+          Saídas da conta Asaas ({dre.saidas.length})
+        </h2>
+        <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
+          Tudo que saiu da conta (PIX, transferências, contas pagas), já somado nas despesas do mês. Taxas do Asaas e comissões de analistas aparecem nas linhas próprias. A
+          categoria vem de uma regra pelo destinatário; troque aqui quando estiver errada — o DRE recalcula na hora.
+        </p>
+        {dre.saidasErro ? (
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">Não foi possível ler o extrato do Asaas ({dre.saidasErro}). As despesas abaixo mostram só os lançamentos manuais.</p>
+        ) : (
+          <div className="glass mt-3 overflow-hidden rounded-[20px]">
+            <table className="table-glass">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Para quem</th>
+                  <th>Descrição</th>
+                  <th className="num">Valor</th>
+                  <th>Categoria</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dre.saidas.map((x) => (
+                  <tr key={x.id}>
+                    <td className="whitespace-nowrap">{x.data.split("-").reverse().join("/")}</td>
+                    <td>
+                      {x.destinatario}
+                      {x.revisar && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">conferir</span>}
+                    </td>
+                    <td className="text-xs" style={{ color: "var(--text-soft)" }}>{x.descricao || "—"}</td>
+                    <td className="num">{brl(x.valor)}</td>
+                    <td>
+                      <SeletorClasse id={x.id} classe={x.classe} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {dre.aportes.length > 0 && (

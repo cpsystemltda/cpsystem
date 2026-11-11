@@ -26,6 +26,6 @@ export async function GET(req: Request) {
     pagadores,
     pagamentos: p.dados.map((x) => ({ id: x.id, conta: x.contaNome, interna: x.contaInterna, status: x.status, valor: x.valor, liquido: x.liquido, vencimento: x.vencimento, pagamento: x.pagamento, forma: x.forma })),
     porConta: Array.from(resumo.entries()).map(([contaId, r]) => ({ contaId, nome: p.dados.find((x) => x.contaId === contaId)?.contaNome, ...r })),
-    dre: { fonte: dre.fonte, meses: dre.meses.map((m) => ({ c: m.competencia, bruta: m.receitaBruta, taxas: m.taxasGateway, estornos: m.estornos, liquida: m.receitaLiquida, recebido: m.recebidoNoMes, aberto: m.aReceber, pagantes: m.clientesPagantes })), semCliente: dre.semCliente, aportes: dre.aportes, aportesMes: dre.meses.map((m) => [m.competencia, m.aportesNoMes]) },
+    dre: { fonte: dre.fonte, meses: dre.meses.map((m) => ({ c: m.competencia, bruta: m.receitaBruta, taxas: m.taxasGateway, estornos: m.estornos, liquida: m.receitaLiquida, recebido: m.recebidoNoMes, aberto: m.aReceber, pagantes: m.clientesPagantes, despesas: m.despesas, totalDespesas: m.totalDespesas, comissoes: m.comissoes, retiradas: m.retiradasNoMes, resultado: m.resultado })), saidas: dre.saidas.map((x) => [x.data, x.destinatario, x.valor, x.classe, x.revisar]), saidasErro: dre.saidasErro, semCliente: dre.semCliente, aportes: dre.aportes, aportesMes: dre.meses.map((m) => [m.competencia, m.aportesNoMes]) },
   });
 }

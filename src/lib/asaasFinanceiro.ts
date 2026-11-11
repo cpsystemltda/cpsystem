@@ -132,3 +132,81 @@ export function aportesPorPagador(dados: PagamentoAsaas[]): AporteSocio[] {
   for (const a of m.values()) a.lancamentos.sort((x, y) => x.data.localeCompare(y.data));
   return Array.from(m.values()).sort((x, y) => y.total - x.total);
 }
+
+// ─────────────────────────────────────────────
+// Saídas da conta Asaas → despesas do DRE (Regina 10/11/2026: "o DRE não está
+// incluindo os pagamentos feitos para o Tales, para a Jéssica, para outros
+// serviços"). Classificação automática pelo destinatário; a Regina pode
+// trocar na tela (ParametroPlataforma `dre.classificacaoSaidas`).
+// ─────────────────────────────────────────────
+
+export const CHAVE_CLASSIFICACAO_SAIDAS = "dre.classificacaoSaidas";
+/** Categorias de despesa + duas especiais que NÃO entram no resultado. */
+export type ClasseSaida = "INFRAESTRUTURA" | "IA" | "FERRAMENTAS" | "MARKETING" | "CONTABILIDADE" | "IMPOSTOS" | "PESSOAL" | "OUTROS" | "RETIRADA_SOCIO" | "IGNORAR";
+
+export type SaidaAsaas = {
+  id: string;
+  data: string; // AAAA-MM-DD
+  valor: number; // positivo
+  tipo: string; // TRANSFER | BILL_PAYMENT | ...
+  destinatario: string;
+  descricao: string;
+  classe: ClasseSaida;
+  automatica: boolean; // true = regra; false = escolhida pela Regina
+  revisar: boolean; // regra incerta
+};
+
+const TIPOS_TAXA = ["PAYMENT_FEE", "PAYMENT_MESSAGING_NOTIFICATION_FEE", "INVOICE_FEE", "RECEIVABLE_ANTICIPATION_FEE", "TRANSFER_FEE", "PIX_TRANSACTION_FEE", "NOTIFICATION_FEE", "BILL_PAYMENT_FEE"];
+
+function classificar(destinatario: string, descricao: string, socios: string[]): { classe: ClasseSaida; revisar: boolean } {
+  const t = `${destinatario} ${descricao}`.toUpperCase();
+  if (/GOOGLE CLOUD|VERCEL|NEON|AMAZON WEB|REGISTRO\.BR|HOSTINGER/.test(t)) return { classe: "INFRAESTRUTURA", revisar: false };
+  if (/ANTHROPIC|OPENAI/.test(t)) return { classe: "IA", revisar: false };
+  if (/FACEBOOK|META PLATFORMS|GOOGLE BRASIL INTERNET|TR[AÁ]FEGO|AN[UÚ]NCIO/.test(t)) return { classe: "MARKETING", revisar: false };
+  if (/TELEFONICA|CLARO|TIM S|OI S\.A|Z-API|ASAAS|NOTION|CANVA/.test(t)) return { classe: "FERRAMENTAS", revisar: false };
+  if (/CONTAB|ESCRITEC|LEONARDO OLIVEIRA/.test(t)) return { classe: "CONTABILIDADE", revisar: false };
+  if (/MINISTERIO DA FAZENDA|RECEITA FEDERAL|DARF|DAS |SIMPLES|PROPRIEDADE INDUSTRIAL|INPI|PREFEITURA|SEFAZ/.test(t)) return { classe: "IMPOSTOS", revisar: false };
+  if (socios.some((s) => s && t.includes(s))) return { classe: "RETIRADA_SOCIO", revisar: true };
+  if (/IGREJA|DOA[CÇ][AÃ]O/.test(t)) return { classe: "OUTROS", revisar: true };
+  if (/PAGAMENTO DE CONTA/.test(t)) return { classe: "OUTROS", revisar: true };
+  // PIX para pessoa física/jurídica sem regra: serviço contratado (Tales, Jéssica…)
+  return { classe: "PESSOAL", revisar: true };
+}
+
+export async function saidasAsaas(desde = "2025-01-01"): Promise<{ ok: true; saidas: SaidaAsaas[]; taxasPorMes: Map<string, number> } | { ok: false; erro: string }> {
+  const g = await asaasDisponivel();
+  if (!g) return { ok: false, erro: "Gateway Asaas não configurado neste ambiente." };
+  try {
+    const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    const [extrato, transferencias, param] = await Promise.all([
+      g.listarExtrato(desde, hoje),
+      g.listarTransferencias(desde),
+      prisma.parametroPlataforma.findUnique({ where: { chave: CHAVE_CLASSIFICACAO_SAIDAS } }),
+    ]);
+    const escolhas = (param?.valor && typeof param.valor === "object" ? param.valor : {}) as Record<string, ClasseSaida>;
+    const porTransfer = new Map(transferencias.map((t) => [t.id, t]));
+    // Sócios = quem fez aporte (pagadores sem conta) — mesmos nomes do Asaas.
+    const socios = ["REGINA LUIZA DA SILVA FERNANDES", "IGOR DA SILVA FERNANDES"];
+    const taxasPorMes = new Map<string, number>();
+    const saidas: SaidaAsaas[] = [];
+    for (const e of extrato) {
+      if (e.value >= 0) continue;
+      const valor = Math.round(-e.value * 100) / 100;
+      if (TIPOS_TAXA.includes(e.type)) {
+        taxasPorMes.set(e.date.slice(0, 7), (taxasPorMes.get(e.date.slice(0, 7)) ?? 0) + valor);
+        continue;
+      }
+      const tr = e.transferId ? porTransfer.get(e.transferId) : undefined;
+      if (tr?.externalReference?.startsWith("comissao-")) continue; // já está na linha de comissões
+      const destinatario = tr?.bankAccount?.ownerName || (e.description ?? "").replace(/^Transação via Pix com (QR Code|chave) para /i, "") || e.type;
+      const descricao = tr?.description || (e.type === "BILL_PAYMENT" ? "Pagamento de conta (boleto)" : "");
+      const auto = classificar(destinatario, descricao, socios);
+      const escolhida = escolhas[e.id];
+      saidas.push({ id: e.id, data: e.date, valor, tipo: e.type, destinatario, descricao, classe: escolhida ?? auto.classe, automatica: !escolhida, revisar: !escolhida && auto.revisar });
+    }
+    saidas.sort((a, b) => b.data.localeCompare(a.data));
+    return { ok: true, saidas, taxasPorMes };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : String(e) };
+  }
+}

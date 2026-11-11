@@ -83,3 +83,20 @@ export async function excluirDespesaAction(_p: Result, formData: FormData): Prom
   revalidatePath(PAGINA);
   return { ok: true };
 }
+
+const CLASSES_SAIDA = ["INFRAESTRUTURA", "IA", "FERRAMENTAS", "MARKETING", "CONTABILIDADE", "IMPOSTOS", "PESSOAL", "OUTROS", "RETIRADA_SOCIO", "IGNORAR"] as const;
+
+/** Troca a categoria de uma saída da conta Asaas no DRE (Regina 10/11/2026). */
+export async function classificarSaidaAction(id: string, classe: string): Promise<Result> {
+  const usuario = await exigirUsuario();
+  if (!usuario.superAdmin) return { erro: "Apenas gestores da plataforma." };
+  await bloquearEspionagem();
+  if (!(CLASSES_SAIDA as readonly string[]).includes(classe)) return { erro: "Categoria inválida." };
+  const chave = "dre.classificacaoSaidas";
+  const atual = await prisma.parametroPlataforma.findUnique({ where: { chave } });
+  const mapa = { ...((atual?.valor && typeof atual.valor === "object" ? atual.valor : {}) as Record<string, string>), [id]: classe };
+  await prisma.parametroPlataforma.upsert({ where: { chave }, create: { chave, valor: mapa, atualizadoPorId: usuario.id }, update: { valor: mapa, atualizadoPorId: usuario.id } });
+  await registrarAuditoria({ contaId: usuario.contaId, usuarioId: usuario.id, acao: "ATUALIZAR", recurso: "ParametroPlataforma", recursoId: chave, resumo: `Saída do Asaas ${id} classificada como ${classe}` });
+  revalidatePath(PAGINA);
+  return { ok: true };
+}
