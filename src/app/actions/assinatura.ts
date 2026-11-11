@@ -454,6 +454,13 @@ export async function processarEventoGateway(opts: {
     },
   });
 
+  // ESP-011: adicional da faixa de colaboradores é cobrança avulsa SEPARADA da
+  // mensalidade. Pago, só marca a apuração; NÃO pode passar por ativarPlano
+  // (que avança o vencimento da assinatura e pularia um mês do cliente),
+  // nem gerar comissão ou aviso de inadimplência da conta.
+  // O status (paga/atrasada) já ficou gravado na própria Cobranca acima.
+  if (cobranca.competencia.endsWith("-TERCEIRIZACAO")) return;
+
   if (opts.status === "PAGA") {
     await ativarPlano(cobranca.contaId, cobranca.plano);
 

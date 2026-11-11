@@ -5,6 +5,7 @@ import { montarLembreteFollowUp, enviarConvitesFollowUp } from "@/lib/followUpCl
 import { rodarGeracaoDiaria } from "@/lib/competenciasServer";
 import { rodarRetencaoColaboradores } from "@/lib/colaboradoresServer";
 import { apurarColaboradoresDoDia } from "@/lib/faixasTerceirizacaoServer";
+import { monitorarCobrancas, textoDoMonitor } from "@/lib/monitorCobrancas";
 
 /** Segunda-feira no fuso de Brasília — o dia em que a equipe planeja a semana. */
 function ehSegundaBRT(d: Date): boolean {
@@ -103,9 +104,15 @@ export async function GET(req: Request) {
     return { contas: 0, avisos: 0, detalhes: [`falhou: ${e instanceof Error ? e.message : String(e)}`] };
   });
 
+  // Regina 10/11/2026: monitor das cobranças no Asaas (só aponta, não altera).
+  const monitor = await monitorarCobrancas().catch((e) => ({ ok: false as const, erro: e instanceof Error ? e.message : String(e), problemas: [], conferidas: 0 }));
+  const textoMonitor = textoDoMonitor(monitor);
+  if (textoMonitor) await avisarEquipe(textoMonitor).catch(() => {});
+
   return NextResponse.json({
     ok: true,
     faixas,
+    monitorCobrancas: { conferidas: monitor.conferidas, problemas: monitor.problemas.length },
     duracaoMs: Date.now() - inicio,
     resumo: r,
     followUp: lembreteFollowUp ? "lembrete enviado" : "sem lembrete",

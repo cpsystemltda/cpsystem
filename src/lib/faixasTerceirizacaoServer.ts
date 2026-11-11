@@ -207,3 +207,78 @@ export async function avisoModuloDaConta(conta: ContaAcesso, hoje = new Date()) 
   }
   return { acesso, perdidaEm: acesso === "SOMENTE_LEITURA" ? (conta.terceirizacaoPerdidaEm ?? hoje) : null, estimativaTrial };
 }
+
+// ─────────────────────────────────────────────
+// Lançamento do adicional (RN05). Regina 10/11/2026: "monitore para que a
+// cobrança seja feita na data correta". Cobrança avulsa no Asaas com o
+// MESMO vencimento da próxima mensalidade, competência "AAAA-MM-TERCEIRIZACAO"
+// (o webhook não mexe no ciclo da assinatura quando ela é paga). O lançamento
+// é feito por um gestor no admin, com um clique; o monitor diário avisa a
+// equipe enquanto houver adicional sem lançar.
+// ─────────────────────────────────────────────
+
+export type AdicionalALancar = { apuracaoId: string; contaId: string; nome: string; competencia: string; pico: number; faixa: string; valor: number };
+
+/** Meses FECHADOS com adicional > 0 ainda não lançado, de contas pagantes. */
+export async function adicionaisALancar(hoje = new Date()): Promise<AdicionalALancar[]> {
+  const atual = competenciaAtualBrt(hoje);
+  const cfg = await configFaixas();
+  if (!cfg.cobrancaAtiva) return [];
+  const aps = await prisma.apuracaoColaboradoresMes.findMany({
+    where: { competencia: { lt: atual }, faixaValor: { gt: 0 }, cobrancaRef: null, conta: { contaTeste: false, plano: "PREMIUM", statusAssinatura: { in: ["ATIVA", "INADIMPLENTE"] }, usuarios: { none: { superAdmin: true } } } },
+    select: { id: true, contaId: true, competencia: true, pico: true, conta: { select: { empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1, orderBy: { criadoEm: "asc" } } } } },
+    orderBy: { competencia: "asc" },
+  });
+  return aps.map((a) => {
+    const f = faixaDe(a.pico, cfg.faixas);
+    return { apuracaoId: a.id, contaId: a.contaId, nome: a.conta.empresas[0]?.nomeFantasia || a.conta.empresas[0]?.razaoSocial || a.contaId, competencia: a.competencia, pico: a.pico, faixa: rotuloFaixa(f), valor: f.valor };
+  });
+}
+
+/** Cria a cobrança do adicional no Asaas (vence junto com a próxima mensalidade). */
+export async function lancarAdicional(apuracaoId: string): Promise<{ ok: true; mensagem: string; cobrancaId: string } | { erro: string }> {
+  const ap = await prisma.apuracaoColaboradoresMes.findUnique({
+    where: { id: apuracaoId },
+    select: { id: true, contaId: true, competencia: true, pico: true, cobrancaRef: true, conta: { select: { plano: true, gatewaySubscriptionId: true, proximoVencimento: true, statusAssinatura: true } } },
+  });
+  if (!ap) return { erro: "Apuração não encontrada." };
+  if (ap.cobrancaRef) return { erro: "O adicional deste mês já foi lançado." };
+  if (ap.competencia >= competenciaAtualBrt()) return { erro: "O mês ainda não fechou: a faixa é a do pico do mês inteiro." };
+  const cfg = await configFaixas();
+  const f = faixaDe(ap.pico, cfg.faixas);
+  if (f.acimaDaUltima) return { erro: `Conta acima de ${f.ate} colaboradores: valor sob consulta, combine com o cliente e lance manualmente.` };
+  if (f.valor <= 0) return { erro: "Faixa sem adicional." };
+  const competenciaAdicional = `${ap.competencia}-TERCEIRIZACAO`;
+  const ja = await prisma.cobranca.findFirst({ where: { contaId: ap.contaId, competencia: competenciaAdicional, status: { not: "CANCELADA" } }, select: { id: true } });
+  if (ja) {
+    await prisma.apuracaoColaboradoresMes.update({ where: { id: ap.id }, data: { cobrancaRef: ja.id, cobradoEm: new Date() } });
+    return { erro: "Já existia cobrança deste adicional; apenas vinculei à apuração." };
+  }
+
+  const { getGateway } = await import("@/lib/gateway");
+  const { garantirCustomer } = await import("@/app/actions/assinatura");
+  const gateway = await getGateway();
+  // Mesmo vencimento da próxima mensalidade (data que o cliente já espera).
+  let vencimento: Date | null = null;
+  const g = gateway as unknown as { consultarAssinatura?: (id: string) => Promise<{ proximoVencimento: Date | null } | null> };
+  if (ap.conta.gatewaySubscriptionId && g.consultarAssinatura) vencimento = (await g.consultarAssinatura(ap.conta.gatewaySubscriptionId).catch(() => null))?.proximoVencimento ?? null;
+  vencimento ??= ap.conta.proximoVencimento;
+  const minimo = new Date(Date.now() + 3 * 86_400_000);
+  if (!vencimento || vencimento < minimo) vencimento = minimo;
+
+  const [ano, mes] = ap.competencia.split("-");
+  const descricao = `${cfg.nomePacote} — adicional da faixa de ${rotuloFaixa(f)} colaboradores (pico de ${ap.pico} em ${mes}/${ano})`;
+  const { customerId } = await garantirCustomer(ap.contaId);
+  const cobranca = await prisma.cobranca.create({
+    data: { contaId: ap.contaId, competencia: competenciaAdicional, plano: ap.conta.plano, forma: "PIX", valor: f.valor, vencimento, status: "PENDENTE", observacoes: descricao },
+  });
+  try {
+    const r = await gateway.criarCobranca({ customerId, cobrancaIdInterno: cobranca.id, valor: f.valor, vencimento, forma: "PIX", descricao });
+    await prisma.cobranca.update({ where: { id: cobranca.id }, data: { gatewayChargeId: r.chargeId, gatewayInvoiceUrl: r.invoiceUrl ?? null, pixQrCode: r.pixQrCode ?? null, pixCopiaCola: r.pixCopiaCola ?? null, status: r.status } });
+  } catch (e) {
+    await prisma.cobranca.update({ where: { id: cobranca.id }, data: { status: "CANCELADA", observacoes: `${descricao} — falhou no Asaas: ${e instanceof Error ? e.message : String(e)}` } });
+    return { erro: `O Asaas recusou a cobrança: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  await prisma.apuracaoColaboradoresMes.update({ where: { id: ap.id }, data: { cobrancaRef: cobranca.id, cobradoEm: new Date() } });
+  return { ok: true, cobrancaId: cobranca.id, mensagem: `Adicional de ${f.valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} lançado no Asaas, vence em ${vencimento.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}.` };
+}

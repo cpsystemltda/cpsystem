@@ -4,7 +4,8 @@ import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { competenciaAtualBrt } from "@/lib/dreConstantes";
 import { faixaDe, rotuloFaixa } from "@/lib/faixasTerceirizacao";
-import { configFaixas } from "@/lib/faixasTerceirizacaoServer";
+import { adicionaisALancar, configFaixas } from "@/lib/faixasTerceirizacaoServer";
+import { BotaoLancarAdicional } from "./BotaoLancarAdicional";
 import { FormFaixas } from "./FormFaixas";
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -24,7 +25,7 @@ export default async function AdminTerceirizacaoPage() {
     );
   }
   const competencia = competenciaAtualBrt();
-  const [cfg, apuracoes] = await Promise.all([
+  const [cfg, apuracoes, pendentes] = await Promise.all([
     configFaixas(),
     prisma.apuracaoColaboradoresMes.findMany({
       where: { competencia: { gte: `${Number(competencia.slice(0, 4)) - 1}${competencia.slice(4)}` } },
@@ -38,6 +39,7 @@ export default async function AdminTerceirizacaoPage() {
         conta: { select: { plano: true, statusAssinatura: true, contaTeste: true, empresas: { select: { nomeFantasia: true, razaoSocial: true }, take: 1, orderBy: { criadoEm: "asc" } } } },
       },
     }),
+    adicionaisALancar(),
   ]);
 
   return (
@@ -63,6 +65,28 @@ export default async function AdminTerceirizacaoPage() {
 
       <section className="mt-6">
         <FormFaixas faixas={cfg.faixas} nomePacote={cfg.nomePacote} cobrancaAtiva={cfg.cobrancaAtiva} />
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-[12px] font-bold uppercase tracking-[0.18em] text-violet-800">Adicionais a lançar ({pendentes.length})</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Meses fechados com adicional. O lançamento cria uma cobrança no Asaas que vence junto com a próxima mensalidade do cliente. O monitor diário avisa no grupo de suporte
+          enquanto houver item aqui.
+        </p>
+        {pendentes.length === 0 ? (
+          <p className="mt-3 text-sm text-slate-500">Nenhum adicional pendente.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+            {pendentes.map((p) => (
+              <li key={p.apuracaoId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+                <span>
+                  <strong>{p.nome}</strong> · {p.competencia.split("-").reverse().join("/")} · pico {p.pico} (faixa {p.faixa}) · <strong>{brl(p.valor)}</strong>
+                </span>
+                <BotaoLancarAdicional apuracaoId={p.apuracaoId} rotulo={`${p.nome}, adicional de ${brl(p.valor)} (${p.competencia.split("-").reverse().join("/")})`} />
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="mt-8">

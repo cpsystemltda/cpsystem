@@ -6,7 +6,7 @@ import { exigirUsuario } from "@/lib/auth";
 import { bloquearEspionagem } from "@/lib/espionagem";
 import { registrarAuditoria } from "@/lib/auditoria";
 import { CHAVE_FAIXAS, CHAVE_NOME_PACOTE, type Faixa } from "@/lib/faixasTerceirizacao";
-import { CHAVE_COBRANCA_ATIVA } from "@/lib/faixasTerceirizacaoServer";
+import { CHAVE_COBRANCA_ATIVA, lancarAdicional } from "@/lib/faixasTerceirizacaoServer";
 
 export type ResultadoFaixas = { ok?: boolean; erro?: string; mensagem?: string } | null;
 
@@ -58,4 +58,16 @@ export async function salvarFaixasAction(_p: ResultadoFaixas, formData: FormData
   });
   revalidatePath("/admin-plataforma/terceirizacao");
   return { ok: true, mensagem: cobrancaAtiva ? "Salvo. Clientes passam a ver a faixa e a receber os avisos." : "Salvo. Clientes continuam sem ver preço de faixa (só o admin vê a apuração)." };
+}
+
+/** RN05: lança no Asaas o adicional de um mês fechado (um clique do gestor). */
+export async function lancarAdicionalAction(apuracaoId: string): Promise<ResultadoFaixas> {
+  const usuario = await exigirUsuario();
+  await bloquearEspionagem();
+  if (!usuario.superAdmin) return { erro: "Só o gestor da plataforma lança cobranças." };
+  const r = await lancarAdicional(apuracaoId);
+  if ("erro" in r) return { erro: r.erro };
+  await registrarAuditoria({ contaId: usuario.contaId, usuarioId: usuario.id, acao: "CRIAR", recurso: "Cobranca", recursoId: r.cobrancaId, resumo: `Adicional da faixa de colaboradores lançado: ${r.mensagem}` });
+  revalidatePath("/admin-plataforma/terceirizacao");
+  return { ok: true, mensagem: r.mensagem };
 }
