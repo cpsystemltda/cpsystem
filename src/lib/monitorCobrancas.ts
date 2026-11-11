@@ -37,16 +37,18 @@ export async function monitorarCobrancas(hoje = new Date()): Promise<{ ok: boole
     const dela = asaas.dados.filter((p) => p.contaId === c.id);
     const abertas = dela.filter((p) => STATUS_EM_ABERTO.includes(p.status));
 
-    // Cobrança em dobro: mesma assinatura, mesmo vencimento, duas cobranças vivas.
+    // Cobrança em dobro: mesmo cliente, mesmo vencimento, MESMO valor, duas
+    // cobranças vivas (da assinatura ou avulsa). O adicional da faixa vence no
+    // mesmo dia mas tem outro valor, então não entra aqui.
     const porVenc = new Map<string, typeof dela>();
-    for (const p of dela.filter((x) => x.subscription && (STATUS_EM_ABERTO.includes(x.status) || STATUS_RECEBIDO.includes(x.status)))) {
-      const k = `${p.subscription}|${p.vencimento}`;
+    for (const p of dela.filter((x) => STATUS_EM_ABERTO.includes(x.status) || STATUS_RECEBIDO.includes(x.status))) {
+      const k = `${p.vencimento}|${p.valor.toFixed(2)}`;
       porVenc.set(k, [...(porVenc.get(k) ?? []), p]);
     }
     for (const [k, ps] of porVenc) {
       if (ps.length < 2) continue;
-      const venc = k.split("|")[1];
-      problemas.push({ conta: nome, tipo: "DUPLICADA", texto: `${ps.length} cobranças da assinatura com vencimento ${dBr(venc)}: ${ps.map((p) => `${brl(p.valor)} ${STATUS_RECEBIDO.includes(p.status) ? `paga em ${dBr(p.pagamento ?? p.vencimento)}` : "em aberto"} (${p.id})`).join(" · ")}` });
+      const venc = k.split("|")[0];
+      problemas.push({ conta: nome, tipo: "DUPLICADA", texto: `${ps.length} cobranças de ${brl(ps[0].valor)} com vencimento ${dBr(venc)}: ${ps.map((p) => `${STATUS_RECEBIDO.includes(p.status) ? `paga em ${dBr(p.pagamento ?? p.vencimento)}` : "em aberto"}${p.subscription ? " (assinatura)" : " (avulsa)"} ${p.id}`).join(" · ")}` });
     }
 
     // Vencida e não paga.
