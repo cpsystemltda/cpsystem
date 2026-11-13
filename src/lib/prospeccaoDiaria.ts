@@ -18,12 +18,21 @@ import { inicioDoDiaBrt } from "@/lib/saudacao";
  *
  * As três travas de sempre continuam valendo, e são o motivo de o número ainda
  * existir depois de 12/08:
- *   1. teto de 10 por dia;
+ *   1. teto de 15 por dia (era 10; Regina subiu em 13/11/2026), somando repescagens;
  *   2. intervalo humano de 3 a 5 minutos, sorteado;
  *   3. texto diferente em cada envio, montado com o contrato real do lead.
  */
 
-const TETO_DIARIO = 10;
+// Regina, 13/11/2026: "vamos aumentar para 15, para não bloquear o WhatsApp
+// mas também não ficar só em 10". O intervalo de 3 a 5 min e o texto único
+// continuam: 15 envios espaçados levam ~1h, nada de rajada.
+const TETO_DIARIO = 15;
+/** Metade do dia vai para a repescagem; sobra de um lado passa para o outro. */
+const RESERVA_REPESCAGEM = 7;
+/** Intervalo mínimo entre uma abordagem e a repescagem do mesmo lead. */
+const DIAS_ENTRE_REPESCAGENS = 7;
+/** Depois da 1ª mensagem, no máximo 3 repescagens por lead. */
+const MAX_REPESCAGENS = 3;
 const MIN_INTERVALO_MIN = 3;
 const MAX_INTERVALO_MIN = 5;
 
@@ -121,8 +130,36 @@ function montarMensagem(l: {
   );
 }
 
+/**
+ * Repescagem (Regina 13/11/2026: "venda é insistência — aparece de novo para
+ * esses caras"). Abordagem diferente da primeira, curta, com uma pergunta
+ * direta e saída para indicar o responsável. Três ângulos, um por rodada.
+ */
+function montarRepescagem(l: { empresa: string; orgao: string | null; valorTotal: number; venceEm: Date; qtdContratos: number }, rodada: number): string {
+  const nome = nomeCurtoEmpresa(l.empresa);
+  const orgao = l.orgao ? apresentavel(l.orgao, true) : "o órgão";
+  const valor = l.qtdContratos > 1 ? `${brl(l.valorTotal)} em ${l.qtdContratos} contratos` : brl(l.valorTotal);
+  const angulos = [
+    `Olá! Retomando o contato do CP System com a ${nome}.\n\n` +
+      `Uma pergunta rápida: hoje, quem aí confere se cada nota do contrato com ${orgao} (${valor}) foi paga no prazo? Um atraso de 30 dias numa nota costuma passar despercebido até faltar no caixa.\n\n` +
+      `O CP System mostra isso sozinho, nota por nota, e avisa aqui no WhatsApp. São 14 dias grátis em *cpsystem.app.br*, sem cartão.\n\n` +
+      `Se não for com você, pode me indicar quem cuida dos contratos públicos?\n\nContato CP System`,
+    `Olá, ${nome}! Aqui é do CP System de novo.\n\n` +
+      `Sei que a rotina é corrida, então vou direto: empresas que vendem para ${orgao} usam o CP System para não perder prazo de entrega, saber o saldo de cada ata e pedir o Atestado de Capacidade Técnica na hora certa.\n\n` +
+      `Posso te mostrar em 15 minutos, com os contratos de vocês já carregados? É só me dizer um horário que funcione.\n\nContato CP System`,
+    `Olá! Última mensagem do CP System para a ${nome}, prometo.\n\n` +
+      `Se em algum momento fizer sentido ter num só lugar os contratos com ${orgao} e os demais órgãos — prazos, saldo, notas em atraso e atestados —, o teste de 14 dias continua aberto em *cpsystem.app.br*.\n\n` +
+      `Se preferir que eu não envie mais nada, é só responder "não". Obrigado pela atenção.\n\nContato CP System`,
+  ];
+  return angulos[Math.min(rodada, angulos.length) - 1];
+}
+
+/** Resposta que tira o lead da repescagem: número de outra pessoa, contabilidade, não vende ao governo. */
+const RESPOSTA_DESCARTA = /(n[aã]o tenho contato|n[aã]o conhe[cç]o|n[uú]mero errado|engano|n[aã]o (é|e) (daqui|aqui|dessa|desta|a empresa)|n[aã]o (trabalh|vend|atend)\w* (com|para|pro) (o )?(governo|[oó]rg[aã]o|licita)|n[aã]o participamos|contabil|contador|escrit[oó]rio de contab|pare de|n[aã]o mande|n[aã]o envie|bloque)/i;
+
 export type ResumoProspeccao = {
   enfileiradas: number;
+  repescagens?: number;
   primeiraAs: string | null;
   ultimaAs: string | null;
   jaFeitasHoje: number;
@@ -130,16 +167,19 @@ export type ResumoProspeccao = {
   motivo?: string;
 };
 
-export async function prospectarDoDia(): Promise<ResumoProspeccao> {
+export async function prospectarDoDia(opts: { simular?: boolean } = {}): Promise<ResumoProspeccao & { previa?: { empresa: string; rodada: number; texto: string }[]; repescaveis?: number; descartados?: number }> {
   // Dia de Brasília: com `setHours` o "hoje" virava às 21h daqui, porque o
   // processo roda em UTC na Vercel.
   const inicioDoDia = inicioDoDiaBrt();
 
   // Quantas já saíram hoje — inclusive as que eu tiver disparado à mão. O teto
   // é do DIA, não da execução.
-  const jaFeitasHoje = await prisma.leadProspeccao.count({
-    where: { dataPrimeiroContato: { gte: inicioDoDia } },
-  });
+  // Conta primeiros contatos E repescagens: o teto é de mensagens no dia.
+  const [primeirosHoje, enfileiradasHoje] = await Promise.all([
+    prisma.leadProspeccao.count({ where: { dataPrimeiroContato: { gte: inicioDoDia } } }),
+    prisma.mensagemSaidaWhatsApp.count({ where: { tipo: "PROSPECCAO", criadoEm: { gte: inicioDoDia } } }),
+  ]);
+  const jaFeitasHoje = Math.max(primeirosHoje, enfileiradasHoje);
   const vagas = TETO_DIARIO - jaFeitasHoje;
   if (vagas <= 0) {
     return { enfileiradas: 0, primeiraAs: null, ultimaAs: null, jaFeitasHoje, semCelular: 0, motivo: "teto diário já atingido" };
@@ -169,7 +209,40 @@ export async function prospectarDoDia(): Promise<ResumoProspeccao> {
   });
 
   const comCelular = candidatos.filter((l) => ehCelular(l.telefone));
-  const fila = comCelular.slice(0, vagas);
+
+  // Repescagem: já abordados, sem conversa com a closer, que não pediram para
+  // parar nem disseram que o número é de outra pessoa/da contabilidade.
+  const limiteRepesca = new Date(Date.now() - DIAS_ENTRE_REPESCAGENS * 86_400_000);
+  const jaAbordados = await prisma.leadProspeccao.findMany({
+    where: { alvoIdeal: true, situacao: "TENTOU_NAO_FALOU", telefone: { not: null }, dataUltimoContato: { lt: limiteRepesca } },
+    orderBy: [{ dataUltimoContato: "asc" }],
+    take: 1000,
+    select: { id: true, empresa: true, telefone: true, orgao: true, valorTotal: true, venceEm: true, qtdContratos: true, anotacoes: true },
+  });
+  const ult8 = (t: string | null) => (t || "").replace(/\D/g, "").slice(-8);
+  const respostas = await prisma.mensagemInboundWhatsApp.findMany({ select: { telefone: true, texto: true } });
+  const descartados = new Set(respostas.filter((r) => r.texto && RESPOSTA_DESCARTA.test(r.texto)).map((r) => ult8(r.telefone)));
+  const falhas = await prisma.mensagemSaidaWhatsApp.findMany({ where: { tipo: "PROSPECCAO", status: "FALHOU" }, select: { destino: true } });
+  const semWhats = new Set(falhas.map((f) => ult8(f.destino)));
+  const rodadas = (a: string | null) => (a?.match(/Repescagem \d/g) ?? []).length;
+  const repescaveis = jaAbordados.filter((l) => ehCelular(l.telefone) && !descartados.has(ult8(l.telefone)) && !semWhats.has(ult8(l.telefone)) && rodadas(l.anotacoes) < MAX_REPESCAGENS);
+
+  const vagasNovos = Math.min(comCelular.length, Math.max(vagas - Math.min(RESERVA_REPESCAGEM, repescaveis.length), 0));
+  const novos = comCelular.slice(0, vagasNovos).map((l) => ({ ...l, rodada: 0 }));
+  const repesca = repescaveis.slice(0, vagas - novos.length).map((l) => ({ ...l, rodada: rodadas(l.anotacoes) + 1 }));
+  // Intercala para o dia não ter um bloco só de repescagem.
+  const fila: ((typeof novos)[number])[] = [];
+  for (let i = 0; i < Math.max(novos.length, repesca.length); i++) {
+    if (novos[i]) fila.push(novos[i]);
+    if (repesca[i]) fila.push(repesca[i]);
+  }
+  if (opts.simular) {
+    return {
+      enfileiradas: 0, primeiraAs: null, ultimaAs: null, jaFeitasHoje, semCelular: candidatos.length - comCelular.length,
+      repescaveis: repescaveis.length, descartados: jaAbordados.length - repescaveis.length,
+      previa: fila.map((l) => ({ empresa: l.empresa, rodada: l.rodada, texto: l.rodada > 0 ? montarRepescagem(l, l.rodada) : montarMensagem(l) })),
+    };
+  }
   if (fila.length === 0) {
     return { enfileiradas: 0, primeiraAs: null, ultimaAs: null, jaFeitasHoje, semCelular: candidatos.length - comCelular.length, motivo: "sem lead elegível" };
   }
@@ -190,7 +263,7 @@ export async function prospectarDoDia(): Promise<ResumoProspeccao> {
     await prisma.mensagemSaidaWhatsApp.create({
       data: {
         destino: "55" + (l.telefone ?? "").replace(/\D/g, ""),
-        texto: montarMensagem(l),
+        texto: l.rodada > 0 ? montarRepescagem(l, l.rodada) : montarMensagem(l),
         tipo: "PROSPECCAO",
         agendadoPara,
       },
@@ -198,12 +271,13 @@ export async function prospectarDoDia(): Promise<ResumoProspeccao> {
 
     // Marca o lead na hora de enfileirar, não na entrega: se o cron rodar duas
     // vezes, o mesmo lead não entra duas vezes na fila.
-    const nota = `[${new Date().toLocaleDateString("pt-BR")}] Abordagem de prospecção enfileirada pelo CP System (envio automático).`;
+    const hojeBr = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+    const nota = l.rodada > 0 ? `[${hojeBr}] Repescagem ${l.rodada} enfileirada pelo CP System (envio automático).` : `[${hojeBr}] Abordagem de prospecção enfileirada pelo CP System (envio automático).`;
     await prisma.leadProspeccao.update({
       where: { id: l.id },
       data: {
         situacao: "TENTOU_NAO_FALOU",
-        dataPrimeiroContato: new Date(),
+        ...(l.rodada > 0 ? {} : { dataPrimeiroContato: new Date() }),
         dataUltimoContato: new Date(),
         anotacoes: l.anotacoes ? `${l.anotacoes}\n${nota}` : nota,
         atualizadoPorNome: "CP System (prospecção automática)",
@@ -225,6 +299,7 @@ export async function prospectarDoDia(): Promise<ResumoProspeccao> {
     });
   return {
     enfileiradas: fila.length,
+    repescagens: repesca.length,
     primeiraAs: hora(horarios[0]),
     ultimaAs: hora(horarios[horarios.length - 1]),
     jaFeitasHoje,
