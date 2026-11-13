@@ -152,6 +152,24 @@ export async function rodarCicloDeVida(): Promise<ResumoCiclo> {
     // cron das 11h desfazia todo dia a reativação da véspera. Prazo concedido
     // à mão é decisão de gente; rotina automática não passa por cima.
     const trialVigente = !!c.trialAteEm && c.trialAteEm > agora;
+
+    // ── Teste acabou e nunca pagou (mesmo tendo lançado documentos) ─────────
+    // Regina, 22/09 e de novo 11/11: *"esse MS Lucas não ficou como cliente,
+    // tem que sair da lista e ir para os arquivados"*. A regra de baixo só
+    // pega quem nunca lançou nada; quem usou o teste e não assinou virava
+    // "inadimplente" e ficava na carteira para sempre. Arquiva em silêncio
+    // (sem mensagem ao cliente) 30 dias depois do fim do teste; a equipe vê
+    // no relatório do grupo. Reativar = tirar o arquivamento no admin.
+    if (c.tipo === "EMPRESA" && !c.arquivadaEm && !trialVigente && c.trialAteEm && diasEntre(c.trialAteEm, agora) >= TRIAL_ARQUIVA_DIAS) {
+      const pagou = await prisma.cobranca.count({ where: { contaId: c.id, status: "PAGA" } });
+      if (pagou === 0 && c.statusAssinatura !== "ATIVA") {
+        await prisma.conta.update({ where: { id: c.id }, data: { arquivadaEm: agora, statusAssinatura: "CANCELADA" } });
+        r.arquivadas++;
+        r.detalhes.push(`arquivada: ${nomeConta} (teste acabou há ${diasEntre(c.trialAteEm, agora)}d e nunca pagou)`);
+        continue;
+      }
+    }
+
     const trialMorto = c.tipo === "EMPRESA" && !paga && documentos === 0 && !trialVigente;
     if (!trialMorto) continue;
 

@@ -329,7 +329,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           modulosPermitidos={usuario.modulosPermitidos}
           indicador={indicador}
         />
-        <main className="flex-1 overflow-y-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto pt-14 lg:pt-0">
           {exigirFormaDePagamento && <AvisoUltimoDiaTrial />}
           {paginaPessoalNoAcompanhamento ? (
             <PaginaPessoalNaEspionagem contaNome={espionagem!.contaNome} />

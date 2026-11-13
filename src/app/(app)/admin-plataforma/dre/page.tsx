@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Crown } from "lucide-react";
+import { ArrowLeft, ArrowRight, Crown, TrendingDown, TrendingUp, Wallet, Landmark, AlertTriangle } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { SeletorClasse } from "./SeletorClasse";
 import { montarDre, rotuloMes, ROTULO_CATEGORIA, CATEGORIAS_DESPESA, type LinhaDre, type CategoriaDespesa } from "@/lib/dre";
@@ -14,18 +14,19 @@ function pct(parte: number, todo: number): string {
   if (!todo) return "—";
   return `${((parte / todo) * 100).toFixed(0)}%`;
 }
+const dBr = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+const nomeCategoria = (c: string) => (ROTULO_CATEGORIA[(c as CategoriaDespesa) in ROTULO_CATEGORIA ? (c as CategoriaDespesa) : "OUTROS"] ?? c).split(" (")[0];
 
 /**
- * DRE mensal da plataforma (Regina 07/11/2026). Regime de competência; o que
- * o banco sabe (faturas pagas, estornos, comissões) vem sozinho, o resto
- * (infra, IA, ferramentas, marketing, contador, impostos) é lançado aqui.
- * Explicação completa em `src/lib/dre.ts`.
+ * DRE mensal da plataforma (Regina 07/11/2026; refeito em 13/11 — "tem que
+ * estar no nível que a CP System merece"). Receita, taxas e saídas vêm do
+ * Asaas; despesas pagas fora dele são lançadas aqui. Cálculo em `src/lib/dre.ts`.
  */
 export default async function AdminDrePage() {
   const usuario = await exigirUsuario();
   if (!usuario.superAdmin) {
     return (
-      <div className="mx-auto max-w-2xl px-8 py-20 text-center">
+      <div className="mx-auto max-w-2xl px-6 py-20 text-center">
         <h1 className="text-2xl font-bold text-slate-900">Acesso restrito</h1>
         <p className="mt-3 text-sm text-slate-600">Esta área é exclusiva para gestores da plataforma.</p>
       </div>
@@ -33,167 +34,158 @@ export default async function AdminDrePage() {
   }
 
   const dre = await montarDre();
-  // Mais recente à esquerda: é o mês que interessa; os anteriores servem de comparação.
-  const meses = [...dre.meses].reverse();
+  const meses = [...dre.meses].reverse(); // mais recente à esquerda
   const categoriasUsadas = CATEGORIAS_DESPESA.filter((c) => (dre.totais.despesas[c] ?? 0) > 0);
+  const totalAportes = dre.aportes.reduce((s, a) => s + a.total, 0);
+  const aConferir = dre.saidas.filter((s) => s.revisar).length;
+  const colunas = meses.length + 2;
 
   return (
-    <div className="mx-auto max-w-[1400px] px-8 py-8">
-      <header className="glass mb-6 flex items-end justify-between gap-6 rounded-[24px] px-7 py-5">
-        <div className="relative z-[1]">
-          <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase" style={{ letterSpacing: "0.22em", color: "var(--primary-deep)" }}>
+    <div className="mx-auto w-full min-w-0 max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      {/* Cabeçalho */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-amber-700">
             <Crown className="h-3.5 w-3.5" /> Adm CP System · Financeiro
           </p>
-          <h1 className="mt-2 text-[32px] font-extrabold leading-none" style={{ color: "var(--text)", letterSpacing: "-0.04em" }}>
-            DRE{" "}
-            <em style={{ fontStyle: "normal", background: "linear-gradient(135deg, var(--primary-deep), var(--primary))", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              mensal
-            </em>
-          </h1>
-          <p className="mt-2 max-w-[720px] text-[14px]" style={{ color: "var(--text-soft)" }}>
-            Regime de competência: cada valor pertence ao mês de vencimento da cobrança. A receita, as taxas, os estornos e o que está em
-            aberto vêm direto do Asaas; comissões vêm dos repasses registrados; as despesas da plataforma são lançadas abaixo, por mês.
+          <h1 className="mt-1.5 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-[34px]">Demonstração do resultado</h1>
+          <p className="mt-1.5 max-w-2xl text-sm text-slate-500">
+            Receita, taxas e saídas lidas direto do Asaas, mês a mês. Cada cobrança entra no mês a que se refere; o dinheiro que entrou aparece no memorando.
           </p>
-          {dre.fonte === "ASAAS" ? (
-            <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-              ● Dados do Asaas lidos em {dre.lidoEm?.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
-              {dre.semCliente.length > 0 && ` · ${dre.semCliente.length} cobrança(s) sem cliente correspondente no CP System`}
-            </p>
-          ) : (
-            <p className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">
-              Asaas não respondeu ({dre.fonteErro}). Os números abaixo são do registro interno e podem estar desatualizados.
-            </p>
-          )}
         </div>
-        <div className="flex flex-col items-end gap-2 text-sm font-semibold">
-          <Link href="/admin-plataforma/financeiro" className="transition hover:opacity-70" style={{ color: "var(--text-soft)" }}>
-            Dashboard de BI (MRR) →
+        <nav className="flex shrink-0 flex-wrap gap-2 text-sm">
+          <Link href="/admin-plataforma" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 transition hover:bg-slate-50">
+            <ArrowLeft className="h-4 w-4" /> Visão geral
           </Link>
-          <Link href="/admin-plataforma" className="transition hover:opacity-70" style={{ color: "var(--text-soft)" }}>
-            ← Voltar à visão geral
+          <Link href="/admin-plataforma/financeiro" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-600 transition hover:bg-slate-50">
+            MRR <ArrowRight className="h-4 w-4" />
           </Link>
-        </div>
+        </nav>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-4">
-        <Kpi titulo="Receita líquida acumulada" valor={brl(dre.totais.receitaLiquida)} sub={`${dre.totais.faturasPagas} fatura(s) paga(s) · ${dre.totais.clientesPagantes} cliente(s)`} />
-        <Kpi titulo="Comissões (período)" valor={brl(dre.totais.comissoes)} sub={`${brl(dre.totais.comissoesPagas)} já repassadas`} />
-        <Kpi titulo="Despesas lançadas" valor={brl(dre.totais.totalDespesas)} sub={`${dre.despesas.length} lançamento(s)`} />
+      {dre.fonte === "ASAAS" ? (
+        <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Asaas lido em {dre.lidoEm?.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}
+        </p>
+      ) : (
+        <p className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> O Asaas não respondeu ({dre.fonteErro}). Os números abaixo vêm do registro interno e podem estar desatualizados.
+        </p>
+      )}
+
+      {/* Indicadores */}
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi icone={<TrendingUp className="h-4 w-4" />} titulo="Receita líquida" valor={brl(dre.totais.receitaLiquida)} sub={`${dre.totais.faturasPagas} fatura${dre.totais.faturasPagas === 1 ? "" : "s"} paga${dre.totais.faturasPagas === 1 ? "" : "s"} · ${dre.totais.clientesPagantes} cliente${dre.totais.clientesPagantes === 1 ? "" : "s"}`} />
+        <Kpi icone={<TrendingDown className="h-4 w-4" />} titulo="Despesas e comissões" valor={brl(dre.totais.totalDespesas + dre.totais.comissoes)} sub={`${dre.saidas.length} saída${dre.saidas.length === 1 ? "" : "s"} do Asaas${dre.despesas.length ? ` · ${dre.despesas.length} lançamento${dre.despesas.length === 1 ? "" : "s"} manual` : ""}`} />
         <Kpi
-          titulo="Resultado acumulado"
+          icone={<Wallet className="h-4 w-4" />}
+          titulo="Resultado do período"
           valor={brl(dre.totais.resultado)}
           sub={`margem ${pct(dre.totais.resultado, dre.totais.receitaLiquida)} sobre a receita líquida`}
-          destaque={dre.totais.resultado >= 0 ? "positivo" : "negativo"}
+          tom={dre.totais.resultado >= 0 ? "positivo" : "negativo"}
         />
+        <Kpi icone={<Landmark className="h-4 w-4" />} titulo="Aportes dos sócios" valor={brl(totalAportes)} sub="capital colocado na conta · não é receita" />
       </div>
 
+      {/* DRE */}
       <section className="mt-8">
-        <h2 className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}>
-          Demonstração do resultado por mês
-        </h2>
-        <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-          Mês mais recente à esquerda. Faturas de teste e contas internas (Regina/Igor) ficam de fora. Comissão conta no mês da
-          fatura do cliente, mesmo que o PIX do repasse saia depois.
-        </p>
-        <div className="glass mt-3 overflow-x-auto rounded-[20px]">
-          <table className="table-glass min-w-[720px]">
+        <TituloSecao titulo="Resultado mês a mês" texto="Mês mais recente à esquerda. Contas de teste e internas ficam de fora; a comissão conta no mês da fatura do cliente." />
+        <div className="mt-3 max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="w-full min-w-[780px] border-separate border-spacing-0 text-sm">
             <thead>
-              <tr>
-                <th className="sticky left-0 z-[1]" style={{ background: "var(--glass-2)" }}>Linha</th>
+              <tr className="text-[11px] uppercase tracking-wider text-slate-500">
+                <th className="sticky left-0 z-20 min-w-[210px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-left font-semibold">Linha</th>
                 {meses.map((m) => (
-                  <th key={m.competencia} className="num whitespace-nowrap">
+                  <th key={m.competencia} className={`whitespace-nowrap border-b border-slate-200 px-3 py-3 text-right font-semibold ${m.competencia === dre.competenciaAtual ? "bg-amber-50/70 text-amber-800" : "bg-slate-50"}`}>
                     {rotuloMes(m.competencia)}
-                    {m.competencia === dre.competenciaAtual && (
-                      <span className="ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ background: "rgba(212,175,55,0.2)", color: "var(--primary-deep)" }}>
-                        atual
-                      </span>
-                    )}
+                    {m.competencia === dre.competenciaAtual && <span className="block text-[9px] font-bold tracking-widest text-amber-600">em curso</span>}
                   </th>
                 ))}
-                <th className="num whitespace-nowrap">Total</th>
+                <th className="whitespace-nowrap border-b border-slate-200 bg-slate-100 px-4 py-3 text-right font-semibold text-slate-700">Total</th>
               </tr>
             </thead>
             <tbody>
-              <Secao titulo="Receitas" colunas={meses.length + 2} />
-              <Linha rotulo="Receita bruta de assinaturas" meses={meses} total={dre.totais} pega={(l) => l.receitaBruta} />
-              <Linha rotulo="Faturas pagas" meses={meses} total={dre.totais} pega={(l) => l.faturasPagas} formato="n" mudo />
-              <Linha rotulo="Clientes pagantes" meses={meses} total={dre.totais} pega={(l) => l.clientesPagantes} formato="n" mudo />
-              <Linha rotulo="(−) Estornos" meses={meses} total={dre.totais} pega={(l) => l.estornos} negativo />
-              <Linha rotulo="(−) Taxas do Asaas" meses={meses} total={dre.totais} pega={(l) => l.taxasGateway} negativo />
-              <Linha rotulo="= Receita líquida" meses={meses} total={dre.totais} pega={(l) => l.receitaLiquida} forte />
+              <Secao titulo="Receitas" colunas={colunas} />
+              <Linha rotulo="Receita bruta de assinaturas" meses={meses} total={dre.totais} pega={(l) => l.receitaBruta} atual={dre.competenciaAtual} />
+              <Linha rotulo="Faturas pagas" meses={meses} total={dre.totais} pega={(l) => l.faturasPagas} formato="n" mudo atual={dre.competenciaAtual} />
+              <Linha rotulo="Clientes pagantes" meses={meses} total={dre.totais} pega={(l) => l.clientesPagantes} formato="n" mudo atual={dre.competenciaAtual} />
+              <Linha rotulo="(−) Estornos" meses={meses} total={dre.totais} pega={(l) => l.estornos} negativo atual={dre.competenciaAtual} />
+              <Linha rotulo="(−) Taxas do Asaas" meses={meses} total={dre.totais} pega={(l) => l.taxasGateway} negativo atual={dre.competenciaAtual} />
+              <Linha rotulo="Receita líquida" meses={meses} total={dre.totais} pega={(l) => l.receitaLiquida} subtotal atual={dre.competenciaAtual} />
 
-              <Secao titulo="Custos variáveis" colunas={meses.length + 2} />
-              <Linha rotulo="(−) Comissões de analistas e indicadores" meses={meses} total={dre.totais} pega={(l) => l.comissoes} negativo />
-              <Linha rotulo="= Margem de contribuição" meses={meses} total={dre.totais} pega={(l) => l.margemContribuicao} forte />
+              <Secao titulo="Custos variáveis" colunas={colunas} />
+              <Linha rotulo="(−) Comissões de analistas" meses={meses} total={dre.totais} pega={(l) => l.comissoes} negativo atual={dre.competenciaAtual} />
+              <Linha rotulo="Margem de contribuição" meses={meses} total={dre.totais} pega={(l) => l.margemContribuicao} subtotal atual={dre.competenciaAtual} />
 
-              <Secao titulo="Despesas da plataforma" colunas={meses.length + 2} />
+              <Secao titulo="Despesas" colunas={colunas} />
               {categoriasUsadas.length === 0 ? (
                 <tr>
-                  <td colSpan={meses.length + 2} className="text-xs" style={{ color: "var(--text-mute)", padding: "10px 16px" }}>
-                    Nenhuma despesa lançada ainda. Use o formulário abaixo: Vercel, Neon, Anthropic, Z-API, Google Ads, contador, impostos.
+                  <td colSpan={colunas} className="border-b border-slate-100 px-5 py-3 text-xs text-slate-400">
+                    Nenhuma despesa no período.
                   </td>
                 </tr>
               ) : (
-                categoriasUsadas.map((c) => (
-                  <Linha key={c} rotulo={`(−) ${ROTULO_CATEGORIA[c]}`} meses={meses} total={dre.totais} pega={(l) => l.despesas[c] ?? 0} negativo />
-                ))
+                categoriasUsadas.map((c) => <Linha key={c} rotulo={`(−) ${nomeCategoria(c)}`} meses={meses} total={dre.totais} pega={(l) => l.despesas[c] ?? 0} negativo atual={dre.competenciaAtual} />)
               )}
-              <Linha rotulo="= Total de despesas" meses={meses} total={dre.totais} pega={(l) => l.totalDespesas} negativo forte />
+              <Linha rotulo="Total de despesas" meses={meses} total={dre.totais} pega={(l) => l.totalDespesas} negativo subtotal atual={dre.competenciaAtual} />
 
-              <Secao titulo="Resultado" colunas={meses.length + 2} />
-              <Linha rotulo="= Resultado do mês" meses={meses} total={dre.totais} pega={(l) => l.resultado} forte sinal />
+              <Linha rotulo="Resultado do mês" meses={meses} total={dre.totais} pega={(l) => l.resultado} resultado atual={dre.competenciaAtual} />
               <tr>
-                <td className="sticky left-0 z-[1] text-xs" style={{ background: "var(--glass-2)", color: "var(--text-soft)" }}>Margem sobre a receita líquida</td>
+                <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-5 py-2.5 text-xs text-slate-500">Margem sobre a receita líquida</td>
                 {meses.map((m) => (
-                  <td key={m.competencia} className="num text-xs" style={{ color: "var(--text-soft)" }}>{pct(m.resultado, m.receitaLiquida)}</td>
+                  <td key={m.competencia} className={`border-b border-slate-100 px-4 py-2.5 text-right text-xs tabular-nums text-slate-500 ${m.competencia === dre.competenciaAtual ? "bg-amber-50/40" : ""}`}>
+                    {pct(m.resultado, m.receitaLiquida)}
+                  </td>
                 ))}
-                <td className="num text-xs" style={{ color: "var(--text-soft)" }}>{pct(dre.totais.resultado, dre.totais.receitaLiquida)}</td>
+                <td className="border-b border-slate-100 bg-slate-50 px-5 py-2.5 text-right text-xs font-semibold tabular-nums text-slate-600">{pct(dre.totais.resultado, dre.totais.receitaLiquida)}</td>
               </tr>
 
-              <Secao titulo="Memorando (não entra no resultado)" colunas={meses.length + 2} />
-              <Linha rotulo="Faturas da competência ainda em aberto" meses={meses} total={dre.totais} pega={(l) => l.aReceber} mudo />
-              <Linha rotulo="Dinheiro que entrou no mês (líquido, data do pagamento)" meses={meses} total={dre.totais} pega={(l) => l.recebidoNoMes} mudo />
-              <Linha rotulo="Comissões já repassadas por PIX" meses={meses} total={dre.totais} pega={(l) => l.comissoesPagas} mudo />
-              <Linha rotulo="Aportes dos sócios na conta do Asaas (não é receita)" meses={meses} total={dre.totais} pega={(l) => l.aportesNoMes} mudo />
-              <Linha rotulo="Retiradas e reembolsos aos sócios (não é despesa)" meses={meses} total={dre.totais} pega={(l) => l.retiradasNoMes} mudo />
+              <Secao titulo="Memorando · não entra no resultado" colunas={colunas} />
+              <Linha rotulo="Faturas do mês ainda em aberto" meses={meses} total={dre.totais} pega={(l) => l.aReceber} mudo atual={dre.competenciaAtual} />
+              <Linha rotulo="Dinheiro que entrou (líquido)" meses={meses} total={dre.totais} pega={(l) => l.recebidoNoMes} mudo atual={dre.competenciaAtual} />
+              <Linha rotulo="Comissões já repassadas" meses={meses} total={dre.totais} pega={(l) => l.comissoesPagas} mudo atual={dre.competenciaAtual} />
+              <Linha rotulo="Aportes dos sócios" meses={meses} total={dre.totais} pega={(l) => l.aportesNoMes} mudo atual={dre.competenciaAtual} />
+              <Linha rotulo="Retiradas e reembolsos a sócios" meses={meses} total={dre.totais} pega={(l) => l.retiradasNoMes} mudo atual={dre.competenciaAtual} ultima />
             </tbody>
           </table>
         </div>
       </section>
 
-      <section className="mt-8">
-        <h2 className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}>
-          Saídas da conta Asaas ({dre.saidas.length})
-        </h2>
-        <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-          Tudo que saiu da conta (PIX, transferências, contas pagas), já somado nas despesas do mês. Taxas do Asaas e comissões de analistas aparecem nas linhas próprias. A
-          categoria vem de uma regra pelo destinatário; troque aqui quando estiver errada — o DRE recalcula na hora.
-        </p>
+      {/* Saídas do Asaas */}
+      <section className="mt-10">
+        <TituloSecao
+          titulo={`Saídas da conta Asaas · ${dre.saidas.length}`}
+          texto="Tudo o que saiu da conta, já somado nas despesas. A categoria vem do destinatário; troque quando estiver errada e o resultado recalcula na hora."
+          extra={aConferir > 0 ? <span className="whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">{aConferir} para conferir</span> : null}
+        />
         {dre.saidasErro ? (
-          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">Não foi possível ler o extrato do Asaas ({dre.saidasErro}). As despesas abaixo mostram só os lançamentos manuais.</p>
+          <p className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> Não foi possível ler o extrato do Asaas ({dre.saidasErro}). As despesas acima mostram só os lançamentos manuais.
+          </p>
         ) : (
-          <div className="glass mt-3 overflow-hidden rounded-[20px]">
-            <table className="table-glass">
-              <thead>
+          <div className="mt-3 max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th>Data</th>
-                  <th>Para quem</th>
-                  <th>Descrição</th>
-                  <th className="num">Valor</th>
-                  <th>Categoria</th>
+                  <th className="px-5 py-3 text-left font-semibold">Data</th>
+                  <th className="px-4 py-3 text-left font-semibold">Para quem</th>
+                  <th className="px-4 py-3 text-right font-semibold">Valor</th>
+                  <th className="px-5 py-3 text-left font-semibold">Categoria</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {dre.saidas.map((x) => (
-                  <tr key={x.id}>
-                    <td className="whitespace-nowrap">{x.data.split("-").reverse().join("/")}</td>
-                    <td>
-                      {x.destinatario}
-                      {x.revisar && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-amber-800">conferir</span>}
+                  <tr key={x.id} className="transition hover:bg-slate-50/70">
+                    <td className="whitespace-nowrap px-5 py-2.5 text-slate-500 tabular-nums">{dBr(x.data)}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-slate-800">{tituloNome(x.destinatario)}</span>
+                        {x.revisar && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">conferir</span>}
+                      </div>
+                      {x.descricao && <div className="text-xs text-slate-400">{x.descricao}</div>}
                     </td>
-                    <td className="text-xs" style={{ color: "var(--text-soft)" }}>{x.descricao || "—"}</td>
-                    <td className="num">{brl(x.valor)}</td>
-                    <td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums text-slate-800">{brl(x.valor)}</td>
+                    <td className="px-5 py-2.5">
                       <SeletorClasse id={x.id} classe={x.classe} />
                     </td>
                   </tr>
@@ -204,82 +196,75 @@ export default async function AdminDrePage() {
         )}
       </section>
 
+      {/* Aportes */}
       {dre.aportes.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}>
-            Aportes dos sócios · desde o início (Asaas)
-          </h2>
-          <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-            PIX enviados direto para a chave da conta, sem cobrança emitida. Ficam fora da receita do DRE: é capital colocado pelos sócios, não venda.
-          </p>
-          <div className="mt-3 grid gap-4 md:grid-cols-3">
+        <section className="mt-10">
+          <TituloSecao titulo="Aportes dos sócios · desde o início" texto="PIX enviados direto para a chave da conta, sem cobrança emitida. É capital dos sócios, não venda: fica fora da receita." />
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {dre.aportes.map((a) => (
-              <div key={a.pagador} className="glass rounded-[20px] px-5 py-4">
-                <p className="text-sm font-bold" style={{ color: "var(--text)" }}>{a.pagador}</p>
-                <p className="mt-1 text-2xl font-extrabold" style={{ color: "var(--primary-deep)" }}>{brl(a.total)}</p>
-                <p className="text-xs" style={{ color: "var(--text-soft)" }}>{a.quantidade} aporte{a.quantidade === 1 ? "" : "s"}</p>
-                <ul className="mt-2 space-y-0.5 text-xs" style={{ color: "var(--text-soft)" }}>
+              <div key={a.pagador} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-800">{tituloNome(a.pagador)}</p>
+                  <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                    {a.quantidade} aporte{a.quantidade === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <p className="mt-2 text-2xl font-extrabold tracking-tight text-slate-900 tabular-nums">{brl(a.total)}</p>
+                <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
                   {a.lancamentos.map((x, i) => (
-                    <li key={i} className="flex justify-between gap-3">
-                      <span>{x.data.split("-").reverse().join("/")}</span>
-                      <span className="num">{brl(x.valor)}</span>
+                    <li key={i} className="flex justify-between gap-3 tabular-nums">
+                      <span>{dBr(x.data)}</span>
+                      <span className="font-medium text-slate-700">{brl(x.valor)}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             ))}
-            <div className="glass rounded-[20px] px-5 py-4">
-              <p className="text-sm font-bold" style={{ color: "var(--text)" }}>Total aportado</p>
-              <p className="mt-1 text-2xl font-extrabold" style={{ color: "var(--text)" }}>{brl(dre.aportes.reduce((s, a) => s + a.total, 0))}</p>
+            <div className="flex flex-col justify-between rounded-2xl bg-slate-900 p-5 text-white shadow-sm">
+              <p className="text-sm font-semibold text-slate-300">Total aportado</p>
+              <p className="mt-2 text-3xl font-extrabold tracking-tight tabular-nums">{brl(totalAportes)}</p>
+              <p className="mt-3 text-xs text-slate-400">Soma de todos os PIX dos sócios para a conta Asaas.</p>
             </div>
           </div>
         </section>
       )}
 
-      <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,420px)_1fr]">
-        <div>
-          <h2 className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}>
-            Lançar despesa
-          </h2>
-          <p className="mt-1 text-xs" style={{ color: "var(--text-soft)" }}>
-            Informe o mês a que a despesa se refere. Para assinatura mensal, use “repetir” e ela entra nos meses seguintes de uma vez.
-          </p>
-          <div className="glass mt-3 rounded-[20px] px-5 py-5">
+      {/* Despesas fora do Asaas */}
+      <section className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
+        <div className="min-w-0">
+          <TituloSecao titulo="Lançar despesa paga fora do Asaas" texto="Cartão de crédito ou outro banco: Vercel, Anthropic, Neon, Z-API, contador. Para assinatura mensal, use “repetir”." />
+          <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <FormDespesa competenciaAtual={dre.competenciaAtual} />
           </div>
         </div>
-        <div>
-          <h2 className="text-[12px] font-bold uppercase" style={{ letterSpacing: "0.18em", color: "var(--primary-deep)" }}>
-            Lançamentos ({dre.despesas.length})
-          </h2>
-          <div className="glass mt-3 overflow-hidden rounded-[20px]">
-            <table className="table-glass">
-              <thead>
+        <div className="min-w-0">
+          <TituloSecao titulo={`Lançamentos manuais · ${dre.despesas.length}`} />
+          <div className="mt-3 max-w-full overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead className="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th>Mês</th>
-                  <th>Categoria</th>
-                  <th>Descrição</th>
-                  <th className="num">Valor</th>
-                  <th></th>
+                  <th className="px-5 py-3 text-left font-semibold">Mês</th>
+                  <th className="px-4 py-3 text-left font-semibold">Categoria</th>
+                  <th className="px-4 py-3 text-left font-semibold">Descrição</th>
+                  <th className="px-4 py-3 text-right font-semibold">Valor</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-100">
                 {dre.despesas.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="center" style={{ padding: "32px 24px", color: "var(--text-mute)" }}>
-                      Nenhum lançamento.
+                    <td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-400">
+                      Nenhuma despesa lançada à mão até agora.
                     </td>
                   </tr>
                 ) : (
                   dre.despesas.map((d) => (
                     <tr key={d.id}>
-                      <td className="whitespace-nowrap">{rotuloMes(d.competencia)}</td>
-                      <td className="text-xs" style={{ color: "var(--text-soft)" }}>
-                        {ROTULO_CATEGORIA[(d.categoria as CategoriaDespesa) in ROTULO_CATEGORIA ? (d.categoria as CategoriaDespesa) : "OUTROS"].split(" (")[0]}
-                      </td>
-                      <td>{d.descricao}</td>
-                      <td className="num">{brl(d.valor)}</td>
-                      <td className="num">
+                      <td className="whitespace-nowrap px-5 py-2.5 text-slate-600">{rotuloMes(d.competencia)}</td>
+                      <td className="px-4 py-2.5 text-xs text-slate-500">{nomeCategoria(d.categoria)}</td>
+                      <td className="px-4 py-2.5 text-slate-800">{d.descricao}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right font-semibold tabular-nums text-slate-800">{brl(d.valor)}</td>
+                      <td className="px-4 py-2.5 text-right">
                         <BotaoExcluirDespesa id={d.id} descricao={`${d.descricao} (${rotuloMes(d.competencia)})`} />
                       </td>
                     </tr>
@@ -294,13 +279,39 @@ export default async function AdminDrePage() {
   );
 }
 
-function Kpi({ titulo, valor, sub, destaque }: { titulo: string; valor: string; sub?: string; destaque?: "positivo" | "negativo" }) {
-  const cor = destaque === "positivo" ? "var(--mint-deep)" : destaque === "negativo" ? "var(--coral-deep)" : "var(--text)";
+/** "GOOGLE CLOUD BRASIL LTDA." → "Google Cloud Brasil Ltda." (nomes do banco vêm em caixa alta). */
+function tituloNome(s: string): string {
+  if (s !== s.toUpperCase()) return s;
+  const minusculas = new Set(["de", "da", "do", "das", "dos", "e"]);
+  return s
+    .toLowerCase()
+    .split(" ")
+    .map((p, i) => (i > 0 && minusculas.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)))
+    .join(" ");
+}
+
+function TituloSecao({ titulo, texto, extra }: { titulo: string; texto?: string; extra?: React.ReactNode }) {
   return (
-    <div className="glass-tile relative overflow-hidden rounded-[18px] px-5 py-5">
-      <h3 className="text-[13px] font-bold" style={{ color: "var(--text-soft)" }}>{titulo}</h3>
-      <p className="mt-2 text-[28px] font-extrabold tabular leading-none" style={{ color: cor, letterSpacing: "-0.04em" }}>{valor}</p>
-      {sub && <p className="mt-2 text-[12px] font-semibold" style={{ color: "var(--text-soft)" }}>{sub}</p>}
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <h2 className="text-base font-bold text-slate-900">{titulo}</h2>
+        {texto && <p className="mt-0.5 max-w-3xl text-xs text-slate-500">{texto}</p>}
+      </div>
+      {extra}
+    </div>
+  );
+}
+
+function Kpi({ icone, titulo, valor, sub, tom }: { icone: React.ReactNode; titulo: string; valor: string; sub?: string; tom?: "positivo" | "negativo" }) {
+  const cor = tom === "positivo" ? "text-emerald-700" : tom === "negativo" ? "text-rose-600" : "text-slate-900";
+  return (
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-amber-50 text-amber-700">{icone}</span>
+        {titulo}
+      </div>
+      <p className={`mt-3 truncate text-[26px] font-extrabold leading-none tracking-tight tabular-nums ${cor}`}>{valor}</p>
+      {sub && <p className="mt-2 text-xs text-slate-500">{sub}</p>}
     </div>
   );
 }
@@ -308,8 +319,8 @@ function Kpi({ titulo, valor, sub, destaque }: { titulo: string; valor: string; 
 function Secao({ titulo, colunas }: { titulo: string; colunas: number }) {
   return (
     <tr>
-      <td colSpan={colunas} className="text-[10px] font-bold uppercase" style={{ letterSpacing: "0.16em", color: "var(--primary-deep)", background: "rgba(212,175,55,0.07)", padding: "8px 16px" }}>
-        {titulo}
+      <td colSpan={colunas} className="border-b border-slate-100 bg-slate-50/60 px-5 pb-2 pt-4 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">
+        <span className="sticky left-5">{titulo}</span>
       </td>
     </tr>
   );
@@ -320,45 +331,61 @@ function Linha({
   meses,
   total,
   pega,
+  atual,
   formato = "brl",
   negativo,
-  forte,
+  subtotal,
+  resultado,
   mudo,
-  sinal,
+  ultima,
 }: {
   rotulo: string;
   meses: LinhaDre[];
   total: Omit<LinhaDre, "competencia">;
   pega: (l: LinhaDre | Omit<LinhaDre, "competencia">) => number;
+  atual: string;
   formato?: "brl" | "n";
-  /** Linha de dedução: mostra em vermelho suave quando há valor. */
+  /** Dedução: valor com sinal de menos. */
   negativo?: boolean;
-  /** Subtotal: negrito. */
-  forte?: boolean;
+  /** Subtotal: negrito com fundo leve. */
+  subtotal?: boolean;
+  /** Resultado: verde/vermelho, destaque. */
+  resultado?: boolean;
   /** Informativa: cinza. */
   mudo?: boolean;
-  /** Resultado: verde se positivo, vermelho se negativo. */
-  sinal?: boolean;
+  ultima?: boolean;
 }) {
-  const fmt = (n: number) => (formato === "n" ? String(n) : brl(n));
-  const cor = (n: number) => {
-    if (sinal) return n > 0 ? "var(--mint-deep)" : n < 0 ? "var(--coral-deep)" : "var(--text-mute)";
-    if (mudo) return "var(--text-mute)";
-    if (negativo) return n > 0 ? "var(--coral-deep)" : "var(--text-mute)";
-    return n === 0 ? "var(--text-mute)" : "var(--text)";
+  const fmt = (n: number) => (formato === "n" ? String(n) : brl(Math.abs(n)));
+  const texto = (n: number) => {
+    if (n === 0) return "—";
+    if (resultado) return n < 0 ? `−${fmt(n)}` : fmt(n);
+    if (negativo) return `−${fmt(n)}`;
+    return formato === "n" ? String(n) : brl(n);
   };
-  const celula = (n: number, chave: string) => (
-    <td key={chave} className="num whitespace-nowrap" style={{ color: cor(n), fontWeight: forte ? 700 : 500 }}>
-      {negativo && n > 0 ? `− ${fmt(n)}` : fmt(n)}
-    </td>
-  );
+  const cor = (n: number) => {
+    if (n === 0) return "text-slate-300";
+    if (resultado) return n > 0 ? "text-emerald-700" : "text-rose-600";
+    if (mudo) return "text-slate-500";
+    if (negativo) return "text-rose-600/90";
+    return "text-slate-800";
+  };
+  const fundo = resultado ? "bg-slate-900/[0.03]" : subtotal ? "bg-slate-50/80" : "";
+  const borda = ultima ? "" : "border-b border-slate-100";
+  const peso = resultado ? "font-extrabold" : subtotal ? "font-bold" : "font-medium";
   return (
-    <tr>
-      <td className={`sticky left-0 z-[1] ${forte ? "strong" : ""}`} style={{ background: "var(--glass-2)", color: mudo ? "var(--text-soft)" : "var(--text)" }}>
+    <tr className={resultado ? "text-[15px]" : ""}>
+      <td className={`sticky left-0 z-10 whitespace-nowrap px-4 py-2.5 ${borda} ${resultado || subtotal ? "font-bold text-slate-900" : mudo ? "text-slate-500" : "text-slate-700"} ${resultado ? "bg-slate-100" : subtotal ? "bg-slate-50" : "bg-white"}`}>
         {rotulo}
       </td>
-      {meses.map((m) => celula(pega(m), m.competencia))}
-      {celula(pega(total), "total")}
+      {meses.map((m) => {
+        const n = pega(m);
+        return (
+          <td key={m.competencia} className={`whitespace-nowrap px-3 py-2.5 text-right tabular-nums ${borda} ${peso} ${cor(n)} ${fundo} ${m.competencia === atual ? "bg-amber-50/40" : ""}`}>
+            {texto(n)}
+          </td>
+        );
+      })}
+      <td className={`whitespace-nowrap bg-slate-50 px-4 py-2.5 text-right tabular-nums ${borda} ${resultado || subtotal ? "font-extrabold" : "font-semibold"} ${cor(pega(total))}`}>{texto(pega(total))}</td>
     </tr>
   );
 }

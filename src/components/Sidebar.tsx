@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Menu as IconeMenu, X as IconeFechar } from "lucide-react";
 import {
   LayoutDashboard,
   FileText,
@@ -211,6 +213,8 @@ export function Sidebar({
   indicador?: boolean;
 }) {
   const pathname = usePathname();
+  // Celular/tablet: o menu vira gaveta (Regina 13/11/2026: "sem responsivo").
+  const [aberto, setAberto] = useState(false);
 
   // Empresa "em foco": cookie selecionou OU só existe 1 empresa cadastrada
   // (nesse caso, não faz sentido tela "consolidada" — toda operação é dela).
@@ -243,7 +247,22 @@ export function Sidebar({
           : "Sem empresa cadastrada";
 
   return (
-    <aside className="glass sidebar-cp relative m-[18px] flex h-[calc(100vh-36px)] w-[290px] flex-col overflow-hidden">
+    <>
+    <button
+      type="button"
+      onClick={() => setAberto(true)}
+      aria-label="Abrir menu"
+      className="glass fixed! left-3 top-3 z-40 grid h-11 w-11 place-items-center rounded-xl lg:hidden"
+    >
+      <IconeMenu className="h-5 w-5" style={{ color: "var(--primary-deep)" }} />
+    </button>
+    {aberto && <div className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[2px] lg:hidden" onClick={() => setAberto(false)} aria-hidden />}
+    <aside
+      className={`glass sidebar-cp fixed! inset-y-0 left-0 z-50 m-0 flex h-full w-[290px] max-w-[85vw] flex-col overflow-hidden transition-transform duration-200 lg:relative! lg:z-auto lg:m-[18px] lg:h-[calc(100vh-36px)] lg:max-w-none lg:translate-x-0 ${aberto ? "translate-x-0" : "-translate-x-full"}`}
+    >
+      <button type="button" onClick={() => setAberto(false)} aria-label="Fechar menu" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 lg:hidden">
+        <IconeFechar className="h-5 w-5" />
+      </button>
       {/* Header sticky — logo + seletores */}
       <div className="shrink-0 border-b border-[color:var(--hairline)]">
         <div className="relative px-6 py-3">
@@ -280,7 +299,7 @@ export function Sidebar({
       </div>
 
       {/* Navegação central — scroll inteligente, scrollbar invisível default */}
-      <nav className="sidebar-nav flex-1 overflow-y-auto px-3 py-3">
+      <nav className="sidebar-nav flex-1 overflow-y-auto px-3 py-3" onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setAberto(false); }}>
         {grupos.map((grupo, gi) => (
           <div key={grupo.titulo} className={gi > 0 ? "mt-4" : ""}>
             <h3
@@ -409,5 +428,6 @@ export function Sidebar({
         }
       `}</style>
     </aside>
+    </>
   );
 }

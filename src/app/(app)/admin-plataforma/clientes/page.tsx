@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Crown, Search, ArrowUpRight, AlertTriangle, CheckCircle2, Clock, XCircle, Eye, ShieldCheck } from "lucide-react";
 import { exigirUsuario } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { BotaoArquivo } from "./BotaoArquivo";
 import { faixasDasContas } from "@/lib/faixasTerceirizacaoServer";
 import { asaasDisponivel, pagamentosAsaas, resumoPorConta, type ResumoCobrancaConta } from "@/lib/asaasFinanceiro";
 import { contaEhPagante, mensalidadeDaConta } from "@/lib/metricasReceita";
@@ -49,6 +50,11 @@ export default async function AdminClientesPage({
 
   const verArquivadas = sp?.arquivadas === "1";
 
+  const [totalCarteira, totalArquivadas] = await Promise.all([
+    prisma.conta.count({ where: { arquivadaEm: null } }),
+    prisma.conta.count({ where: { arquivadaEm: { not: null } } }),
+  ]);
+
   const contasTodas = await prisma.conta.findMany({
     where: {
       // Mostra todas as contas — inclusive as de super admin (Regina/Igor),
@@ -60,7 +66,7 @@ export default async function AdminClientesPage({
       // verdade — quem parou de existir como cliente some da vista, mas
       // continua no banco por 30 dias, caso volte. `?arquivadas=1` traz de
       // volta quando for preciso conferir.
-      ...(verArquivadas ? {} : { arquivadaEm: null }),
+      ...(verArquivadas ? { arquivadaEm: { not: null } } : { arquivadaEm: null }),
       ...(statusFiltro && { statusAssinatura: statusFiltro as "TRIAL" | "ATIVA" | "INADIMPLENTE" | "CANCELADA" }),
       ...(tipo === "EMPRESA" && { tipo: "EMPRESA" }),
       ...(tipo === "ANALISTA" && { tipo: "ANALISTA" }),
@@ -129,7 +135,7 @@ export default async function AdminClientesPage({
             <Crown className="h-3.5 w-3.5" /> Adm CP System · Clientes
           </p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-            Todos os assinantes
+            {verArquivadas ? "Clientes arquivados" : "Carteira de clientes"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {contas.length} conta(s){statusFiltro ? ` no status "${STATUS_LABEL[statusFiltro].rotulo}"` : ""}{q ? ` correspondendo a "${q}"` : ""}.
@@ -143,8 +149,19 @@ export default async function AdminClientesPage({
         </Link>
       </div>
 
+      {/* Carteira × Arquivados (Regina 11/11/2026) */}
+      <div className="mt-6 inline-flex rounded-xl border border-slate-200 bg-white p-1 text-sm">
+        <Link href="/admin-plataforma/clientes" className={`rounded-lg px-4 py-1.5 font-semibold transition ${!verArquivadas ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
+          Carteira ({totalCarteira})
+        </Link>
+        <Link href="/admin-plataforma/clientes?arquivadas=1" className={`rounded-lg px-4 py-1.5 font-semibold transition ${verArquivadas ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}>
+          Arquivados ({totalArquivadas})
+        </Link>
+      </div>
+
       {/* Filtros */}
-      <form method="get" className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+      <form method="get" className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+        {verArquivadas && <input type="hidden" name="arquivadas" value="1" />}
         <div className="flex-1 min-w-[280px] relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
@@ -185,24 +202,17 @@ export default async function AdminClientesPage({
       ) : (
         <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">Asaas não respondeu ({asaas.erro}). Próximo pagamento mostrado pelo registro interno.</p>
       )}
-      <div className="mt-6 overflow-x-auto rounded-xl border border-slate-200 bg-white">
-        <table className="w-full min-w-[1100px] text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+      <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full min-w-[1060px] text-sm">
+          <thead className="bg-slate-50/80 text-[11px] uppercase tracking-wider text-slate-500">
             <tr>
-              <th className="px-4 py-3 text-left font-medium">Cliente</th>
-              <th className="px-4 py-3 text-left font-medium">Tipo</th>
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Plano</th>
-              <th className="px-4 py-3 text-left font-medium">Colaboradores · faixa</th>
-              <th className="px-4 py-3 text-right font-medium">MRR</th>
-              <th className="px-4 py-3 text-left font-medium">Origem</th>
-              <th className="px-4 py-3 text-left font-medium">Última cobrança paga</th>
-              <th className="px-4 py-3 text-left font-medium">Próximo pagamento</th>
-              <th className="px-4 py-3 text-left font-medium">Adimplência</th>
-              <th className="px-4 py-3 text-left font-medium">Criada em</th>
-              <th className="sticky right-0 z-10 bg-slate-50 px-4 py-3 text-right font-medium shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)]">
-                Ações
-              </th>
+              <th className="px-5 py-3 text-left font-semibold">Cliente</th>
+              <th className="px-4 py-3 text-left font-semibold">Situação</th>
+              <th className="px-4 py-3 text-left font-semibold">Plano · MRR</th>
+              <th className="px-4 py-3 text-left font-semibold">Cobrança</th>
+              <th className="px-4 py-3 text-left font-semibold">Terceirização</th>
+              <th className="px-4 py-3 text-left font-semibold">Adimplência</th>
+              <th className="sticky right-0 z-10 bg-slate-50 px-4 py-3 text-right font-semibold shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.12)]">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -239,155 +249,145 @@ export default async function AdminClientesPage({
               const pagas = c.cobrancas.filter((cb) => cb.status === "PAGA").length;
               const adimplenciaPct = totalCob > 0 ? (pagas / totalCob) * 100 : null;
               const ehMinhaConta = c.usuarios.some((u) => u.id === usuario.id);
+              // Regina 11/11: vencimento da fatura EM CIMA de cada cliente, sem
+              // precisar rolar a tabela para o lado até a coluna.
+              const rcTopo = resumoCob.get(c.id);
+              const proxTopo = rcTopo?.proxima ?? (proxDaAssinatura.get(c.id) ? { ...proxDaAssinatura.get(c.id)!, status: "PENDING", forma: null } : null) ?? (!asaas.ok && c.proximoVencimento ? { vencimento: c.proximoVencimento.toISOString().slice(0, 10), valor: null, status: "PENDING", forma: null } : null);
+              const semCobTopo = ehContaAdmin || ehContaTeste || ehCarteiraImportada || c.tipo !== "EMPRESA";
+              const nomeCurto = c.tipo === "ANALISTA" ? nome : c.empresas[0] ? c.empresas[0].nomeFantasia || c.empresas[0].razaoSocial : nome;
+              const razao = c.tipo === "EMPRESA" && c.empresas[0] && c.empresas[0].nomeFantasia && c.empresas[0].nomeFantasia !== c.empresas[0].razaoSocial ? c.empresas[0].razaoSocial : null;
+              const fx = faixasConta.get(c.id);
               return (
-                <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-900">{nome}</span>
+                <tr key={c.id} className="border-t border-slate-100 align-top transition hover:bg-slate-50/70">
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-semibold text-slate-900">{nomeCurto}</span>
                       {ehContaAdmin && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
-                          <ShieldCheck className="h-2.5 w-2.5" />
-                          Adm CP
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                          <ShieldCheck className="h-2.5 w-2.5" /> Adm CP
                         </span>
                       )}
-                      {ehContaTeste && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                          Conta de teste
-                        </span>
-                      )}
-                      {ehCarteiraImportada && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                          Carteira de analista
-                        </span>
-                      )}
+                      {ehContaTeste && <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">Conta de teste</span>}
+                      {ehCarteiraImportada && <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">Carteira de analista</span>}
                     </div>
-                    <div className="text-xs text-slate-500">
-                      {c.tipo === "EMPRESA" && c.empresas[0]?.cnpj
-                        ? `CNPJ ${c.empresas[0].cnpj}`
-                        : c.usuarios[0]?.email}
+                    {razao && <div className="mt-0.5 max-w-[360px] truncate text-xs text-slate-500" title={razao}>{razao}</div>}
+                    <div className="mt-0.5 text-xs text-slate-400">
+                      {c.tipo === "EMPRESA" ? (c.empresas[0]?.cnpj ? `CNPJ ${c.empresas[0].cnpj}` : "Empresa") : `Analista · ${c.usuarios[0]?.email ?? ""}`}
+                      {" · "}
+                      {c.embaixador?.nomeCompleto ? `indicação de ${c.embaixador.nomeCompleto}` : "cadastro direto"}
+                      {" · desde "}
+                      {c.criadoEm.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
                     </div>
+                    {!semCobTopo && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {rcTopo && rcTopo.emAtraso.length > 0 && (
+                          <span className="inline-flex items-center whitespace-nowrap rounded-full bg-red-50 px-2.5 py-0.5 text-[11px] font-semibold text-red-700 ring-1 ring-red-200">
+                            Em atraso desde {dBr(rcTopo.emAtraso[0].vencimento)} · {brl(rcTopo.emAtraso.reduce((t, a) => t + a.valor, 0))}
+                          </span>
+                        )}
+                        {proxTopo ? (
+                          <span className="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
+                            Próxima fatura vence {dBr(proxTopo.vencimento)}
+                            {proxTopo.valor != null ? ` · ${brl(proxTopo.valor)}` : ""}
+                          </span>
+                        ) : c.statusAssinatura === "TRIAL" && c.trialAteEm ? (
+                          <span className="inline-flex items-center whitespace-nowrap rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800 ring-1 ring-sky-200">
+                            Em teste até {c.trialAteEm.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">Sem fatura agendada</span>
+                        )}
+                      </div>
+                    )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">{c.tipo}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-4">
                     {ehContaTeste ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Teste · não é cliente</span>
+                      <span className="inline-flex items-center whitespace-nowrap rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">Não é cliente</span>
                     ) : (
-                      <span className={`inline-flex items-center gap-1 rounded-full ${conf.bg} ${conf.cor} px-2 py-0.5 text-[11px] font-semibold`}>
+                      <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full ${conf.bg} ${conf.cor} px-2.5 py-0.5 text-[11px] font-semibold`}>
                         <Icon className="h-3 w-3" />
                         {conf.rotulo}
                       </span>
                     )}
+                    {c.arquivadaEm && <div className="mt-1 text-[11px] text-slate-400">arquivado em {c.arquivadaEm.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}</div>}
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-700">{ehContaTeste ? <span className="text-slate-400">— (demonstração)</span> : c.plano}</td>
-                  <td className="px-4 py-3 text-xs text-slate-700">
-                    {(() => {
-                      const fx = faixasConta.get(c.id);
-                      if (!fx?.usaModulo) return <span className="text-slate-400">—</span>;
-                      return (
-                        <>
-                          <span className="font-semibold text-slate-900">{fx.pico} ativo(s)</span>
-                          <span className="block text-slate-500">
-                            faixa {fx.faixa}
-                            {fx.valor > 0 ? ` · ${brl(fx.valor)}` : " · incluída"}
-                          </span>
-                        </>
-                      );
-                    })()}
+                  <td className="px-4 py-4 text-xs">
+                    <div className="font-semibold text-slate-800">{ehContaTeste ? "Demonstração" : c.tipo === "ANALISTA" ? "Analista" : c.plano.charAt(0) + c.plano.slice(1).toLowerCase()}</div>
+                    <div className="mt-0.5 tabular-nums text-slate-500">{mrr > 0 ? `${brl(mrr)}/mês` : "sem receita"}</div>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-900">
-                    {mrr > 0 ? brl(mrr) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-600">
-                    {c.embaixador?.nomeCompleto ? `Indicação: ${c.embaixador.nomeCompleto}` : "Direto"}
-                  </td>
-                  {(() => {
-                    const rc = resumoCob.get(c.id);
-                    const prox = rc?.proxima ?? (proxDaAssinatura.get(c.id) ? { ...proxDaAssinatura.get(c.id)!, status: "PENDING", forma: null } : null) ?? (!asaas.ok && c.proximoVencimento ? { vencimento: c.proximoVencimento.toISOString().slice(0, 10), valor: null, status: "PENDING", forma: null } : null);
-                    const semCobranca = ehContaAdmin || ehContaTeste || ehCarteiraImportada || c.tipo !== "EMPRESA";
-                    return (
-                      <>
-                        <td className="px-4 py-3 text-xs text-slate-700">
-                          {semCobranca ? (
-                            <span className="text-slate-400">—</span>
-                          ) : rc?.ultimaPaga ? (
-                            <>
-                              <span className="font-semibold text-slate-900">{dBr(rc.ultimaPaga.data)}</span>
-                              <span className="block text-slate-500">
-                                {brl(rc.ultimaPaga.valor)}
-                                {rc.ultimaPaga.forma && FORMA[rc.ultimaPaga.forma] ? ` · ${FORMA[rc.ultimaPaga.forma]}` : ""}
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-slate-400">nenhuma ainda</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-slate-700">
-                          {semCobranca ? (
-                            <span className="text-slate-400">—</span>
-                          ) : (
-                            <>
-                              {rc && rc.emAtraso.length > 0 && (
-                                <span className="mb-0.5 block font-semibold text-red-700">
-                                  em atraso: {rc.emAtraso.map((a) => `${dBr(a.vencimento)} (${brl(a.valor)})`).join(", ")}
-                                </span>
-                              )}
-                              {prox ? (
-                                <>
-                                  <span className="font-semibold text-slate-900">{dBr(prox.vencimento)}</span>
-                                  <span className="block text-slate-500">
-                                    {prox.valor != null ? brl(prox.valor) : "conforme assinatura"}
-                                    {prox.forma && FORMA[prox.forma] ? ` · ${FORMA[prox.forma]}` : ""}
-                                  </span>
-                                </>
-                              ) : c.statusAssinatura === "TRIAL" && c.trialAteEm ? (
-                                <span className="text-slate-500">teste até {c.trialAteEm.toLocaleDateString("pt-BR")}</span>
-                              ) : (
-                                <span className="text-slate-400">sem cobrança agendada</span>
-                              )}
-                            </>
-                          )}
-                        </td>
-                      </>
-                    );
-                  })()}
-                  <td className="px-4 py-3 text-xs text-slate-700">
-                    {adimplenciaPct === null ? (
-                      <span className="text-slate-400">—</span>
+                  <td className="px-4 py-4 text-xs">
+                    {semCobTopo ? (
+                      <span className="text-slate-300">—</span>
                     ) : (
-                      <span
-                        className={
-                          adimplenciaPct >= 90
-                            ? "text-emerald-700 font-semibold"
-                            : adimplenciaPct >= 70
-                              ? "text-amber-700 font-semibold"
-                              : "text-red-700 font-semibold"
-                        }
-                      >
-                        {adimplenciaPct.toFixed(0)}%
-                      </span>
+                      <dl className="space-y-1.5 whitespace-nowrap">
+                        <div>
+                          <dt className="text-[10px] uppercase tracking-wide text-slate-400">Última paga</dt>
+                          <dd className="text-slate-700">
+                            {rcTopo?.ultimaPaga ? (
+                              <>
+                                <strong className="text-slate-900">{dBr(rcTopo.ultimaPaga.data)}</strong> · {brl(rcTopo.ultimaPaga.valor)}
+                                {rcTopo.ultimaPaga.forma && FORMA[rcTopo.ultimaPaga.forma] ? ` · ${FORMA[rcTopo.ultimaPaga.forma]}` : ""}
+                              </>
+                            ) : (
+                              <span className="text-slate-400">nenhuma ainda</span>
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-[10px] uppercase tracking-wide text-slate-400">Próxima</dt>
+                          <dd className="text-slate-700">
+                            {proxTopo ? (
+                              <>
+                                <strong className="text-slate-900">{dBr(proxTopo.vencimento)}</strong> · {proxTopo.valor != null ? brl(proxTopo.valor) : "conforme assinatura"}
+                                {proxTopo.forma && FORMA[proxTopo.forma] ? ` · ${FORMA[proxTopo.forma]}` : ""}
+                              </>
+                            ) : (
+                              <span className="text-slate-400">{c.statusAssinatura === "TRIAL" ? "em teste" : "sem cobrança agendada"}</span>
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
                     )}
-                    <span className="ml-1 text-slate-400">
-                      ({pagas}/{totalCob})
-                    </span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">
-                    {c.criadoEm.toLocaleDateString("pt-BR")}
+                  <td className="px-4 py-4 text-xs">
+                    {fx?.usaModulo ? (
+                      <>
+                        <div className="font-semibold text-slate-800">{fx.pico} colaborador{fx.pico === 1 ? "" : "es"}</div>
+                        <div className="mt-0.5 whitespace-nowrap text-slate-500">
+                          faixa {fx.faixa} · {fx.valor > 0 ? brl(fx.valor) : "incluída"}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </td>
-                  <td className="sticky right-0 z-10 bg-white px-4 py-3 text-right shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.15)]">
+                  <td className="px-4 py-4 text-xs whitespace-nowrap">
+                    {adimplenciaPct === null ? (
+                      <span className="text-slate-300">—</span>
+                    ) : (
+                      <>
+                        <span className={adimplenciaPct >= 90 ? "font-semibold text-emerald-700" : adimplenciaPct >= 70 ? "font-semibold text-amber-700" : "font-semibold text-red-700"}>{adimplenciaPct.toFixed(0)}%</span>
+                        <span className="ml-1 text-slate-400">({pagas}/{totalCob} faturas)</span>
+                      </>
+                    )}
+                  </td>
+                  <td className="sticky right-0 z-10 bg-white px-4 py-4 text-right shadow-[-8px_0_8px_-8px_rgba(15,23,42,0.12)]">
                     {ehMinhaConta ? (
                       <span className="text-[11px] text-slate-400">você</span>
                     ) : (
-                      <form action={entrarEspionagemAction} className="inline-flex">
-                        <input type="hidden" name="contaId" value={c.id} />
-                        <button
-                          type="submit"
-                          className="inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 transition"
-                          title="Entrar no espaço deste cliente em somente leitura"
-                        >
-                          <Eye className="h-3 w-3" />
-                          Ver como cliente
-                        </button>
-                      </form>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <form action={entrarEspionagemAction}>
+                          <input type="hidden" name="contaId" value={c.id} />
+                          <button
+                            type="submit"
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
+                            title="Entrar no espaço deste cliente em somente leitura"
+                          >
+                            <Eye className="h-3 w-3" /> Ver como cliente
+                          </button>
+                        </form>
+                        {!ehContaAdmin && <BotaoArquivo contaId={c.id} nome={nomeCurto} arquivada={!!c.arquivadaEm} />}
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -395,7 +395,7 @@ export default async function AdminClientesPage({
             })}
             {contas.length === 0 && (
               <tr>
-                <td colSpan={12} className="px-4 py-12 text-center text-sm text-slate-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-sm text-slate-400">
                   Nenhum cliente encontrado com esses filtros.
                 </td>
               </tr>
